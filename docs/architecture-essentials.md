@@ -650,6 +650,16 @@ waitlists
 notifications
 ```
 
+The `clinics` table must include:
+
+```text
+latitude
+longitude
+address
+```
+
+for the clinic map feature.
+
 ---
 
 # 32. API Rules
@@ -833,6 +843,17 @@ For chat:
 [ ] Patient ↔ Doctor remains blocked
 ```
 
+For map features:
+
+```text
+[ ] Clinic latitude and longitude stored in database
+[ ] GET /clinics/:id/location returns coordinates
+[ ] Map widget renders clinic pin correctly
+[ ] Map is read-only for patients
+[ ] Only admin can update clinic location
+[ ] Address label displayed on map
+```
+
 ---
 
 # 37. Avoid Overengineering
@@ -1007,6 +1028,8 @@ Log technical events without exposing sensitive information.
 32. Follow the architecture before introducing new patterns.
 
 33. When implementing features that modify requirements, update the relevant documentation (.md files) to keep implementation and documentation consistent.
+
+34. The clinics table must store latitude and longitude for the map feature. The map is read-only for patients. Only admins update clinic location coordinates.
 ```
 
 ---

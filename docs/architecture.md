@@ -194,6 +194,7 @@ mobile/
 │   ├── payments/
 │   ├── secretary-chat/
 │   ├── ai-chat/
+│   ├── clinic-map/
 │   ├── waitlist/
 │   ├── notifications/
 │   └── profile/
@@ -1090,7 +1091,8 @@ Responsibilities:
 - Doctors.
 - Secretaries.
 - Operating hours.
-- Clinic location.
+- Clinic location (address, latitude, longitude).
+- Map coordinates storage and retrieval.
 - Approval status.
 
 ---
@@ -1240,6 +1242,13 @@ PATCH /payments/:id/reject
 POST  /payments/:id/charges
 ```
 
+### Clinic Map
+
+```text
+GET  /clinics/:id/location
+PATCH /clinics/:id/location
+```
+
 ---
 
 # 47. Reservation Transaction
@@ -1379,6 +1388,66 @@ ai_messages
 
 waitlists
 notifications
+```
+
+---
+
+# 52. Clinic Map Feature Architecture
+
+The clinic map feature allows patients to view the physical location of a clinic directly within the doctor or clinic profile screen.
+
+## Map Data Flow
+
+```text
+Patient
+   ↓
+Doctor Profile or Clinic Profile Screen
+   ↓
+GET /clinics/:id/location
+   ↓
+Backend Returns { address, latitude, longitude }
+   ↓
+Mobile Map Widget Renders Clinic Pin
+   ↓
+Patient Views Clinic Location
+```
+
+## Clinic Location Data Model
+
+The `clinics` table shall include location fields:
+
+```text
+clinics
+-------
+id
+name
+address
+latitude         -- decimal, e.g. 14.5995
+longitude        -- decimal, e.g. 120.9842
+contact_info
+description
+approval_status
+created_at
+updated_at
+```
+
+## Map Provider
+
+The mobile application shall use a map provider (such as Google Maps or OpenStreetMap via flutter_map) to render the clinic location. The map package is selected during mobile implementation.
+
+The map must:
+
+- Display a pin at the clinic's coordinates.
+- Show the clinic name and address as a label.
+- Be read-only for patients (no editing).
+
+## Permissions
+
+```text
+Patient     → Read clinic location (YES)
+Doctor      → Read clinic location (YES)
+Secretary   → Read clinic location (YES)
+Admin       → Read and update clinic location (YES)
 ```
 
 ---

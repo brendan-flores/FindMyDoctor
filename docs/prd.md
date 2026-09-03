@@ -265,7 +265,8 @@ Each clinic may contain:
 
 - Clinic name.
 - Address.
-- Location.
+- Location (latitude and longitude coordinates).
+- Map display (embedded map view of the clinic location).
 - Contact information.
 - Description.
 - Doctors.
@@ -856,6 +857,14 @@ Administrators shall be able to approve/reject clinics.
 
 Administrators shall be able to manage secretary accounts and clinic associations.
 
+## FR-043 — Clinic Map
+
+The system shall display an embedded map view of the clinic's location on the clinic and doctor profile pages so that patients can easily locate the clinic.
+
+The clinic record shall store latitude and longitude coordinates.
+
+The map view is read-only for patients. Only administrators may update clinic location coordinates.
+
 ---
 
 # 26. Core User Stories
@@ -903,6 +912,10 @@ Administrators shall be able to manage secretary accounts and clinic association
 ### Doctor — Capacity
 
 **As a doctor,** I want to configure how many patients I can accommodate on a specific day so that the daily queue matches my workload.
+
+### Patient — Clinic Map
+
+**As a patient,** I want to view the clinic's location on a map so that I can easily find out where the clinic is before my appointment.
 
 ---
 
@@ -1039,6 +1052,20 @@ Response Processing
 Patient
 ```
 
+## Clinic Map
+
+```text
+Patient
+  ↓
+View Doctor Profile or Clinic Profile
+  ↓
+View Clinic Location Section
+  ↓
+Embedded Map Displays Clinic Pin
+  ↓
+Patient Views Address and Directions
+```
+
 ---
 
 # 28. MVP Scope
@@ -1048,6 +1075,7 @@ Patient
 - Registration/login.
 - Doctor search.
 - Doctor profiles.
+- Clinic location map view.
 - Availability.
 - Reservation without mandatory payment.
 - Queue number.
