@@ -1,0 +1,25 @@
+# Windsurf Global AI Rules for FindMyDoctor
+
+**1. Context Hierarchy & Single Source of Truth**
+- ALWAYS read `/docs/ARCHITECTURE-ESSENTIALS.md`, `/docs/ARCHITECTURE.md`, and `/docs/PRD.md` before suggesting any code changes.
+- DO NOT invent technologies, libraries, roles, or database schemas not explicitly defined in these documents.
+
+**2. Anti-Hallucination & Scope Protocol**
+- If a user requests a feature that contradicts the PRD or Architecture (such as direct patient-to-doctor chat), flag the contradiction immediately and refuse to write the code.
+- Do not assume database schemas or API endpoints; always check the documentation or existing backend models.
+- If required context is missing, ASK clarifying questions instead of guessing.
+
+**3. Architectural Boundaries**
+- **Mobile (`/mobile`):** Flutter code must reside here. It must NEVER connect directly to PostgreSQL. All data operations must go through the REST API.
+- **Backend (`/backend`):** Modular monolith backend using a resource-oriented REST API (`/api/v1`). 
+- **Database (`/database`):** PostgreSQL is the absolute source of truth for persistent data. Use migrations for all schema modifications.
+
+**4. Communication & Security Rules**
+- Patient ↔ Secretary chat is allowed. Patient ↔ AI chatbot is allowed. 
+- Patient ↔ Doctor direct chat is strictly prohibited. Never create doctor chat endpoints, tables, or screens.
+- AI provider API keys and database credentials must remain strictly on the backend. Never expose them to the Flutter mobile application.
+
+**5. Code Generation Standards**
+- Write complete, production-ready code blocks. Avoid placeholders like `// TODO: implement later` where possible.
+- Keep business logic server-side in the backend modules, not in the mobile UI components.
+- Stick strictly to the defined tech stack and avoid introducing unapproved dependencies or microservices.
