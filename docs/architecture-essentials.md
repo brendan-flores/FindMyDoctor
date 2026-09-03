@@ -754,9 +754,24 @@ Preserve the walk-in patient's permanent account identity.
 
 Enforce temporary-password change before normal first-time access.
 
+### Rule 16
+
+**Requirements Documentation Must Stay Updated**
+
+When a requested feature change modifies, replaces, removes, or adds a requirement defined in the project documentation, the AI coding agent must update the relevant .md document(s) as part of the same change.
+
+The implementation and documentation must remain consistent. Do not apply a feature change in the codebase while leaving outdated requirements, workflows, rules, or architecture details in PRD.md, ARCHITECTURE.md, or ARCHITECTURE-ESSENTIALS.md.
+
+Before completing the change, verify that:
+
+- The affected feature is updated in the implementation.
+- The relevant requirement or workflow in the .md documentation is updated.
+- Any related architecture rule, permission, business rule, or user flow remains consistent.
+- No conflicting or outdated documentation remains.
+
 ---
 
-# 35. Feature Implementation Checklist
+# 36. Feature Implementation Checklist
 
 Before completing a feature:
 
@@ -820,7 +835,7 @@ For chat:
 
 ---
 
-# 36. Avoid Overengineering
+# 37. Avoid Overengineering
 
 Do not introduce without a documented need:
 
@@ -846,7 +861,7 @@ PostgreSQL
 
 ---
 
-# 37. Naming Rules
+# 38. Naming Rules
 
 Database:
 
@@ -878,7 +893,7 @@ Avoid inconsistent endpoint naming.
 
 ---
 
-# 38. Error Rules
+# 39. Error Rules
 
 Use clear error codes:
 
@@ -905,7 +920,7 @@ Sensitive Medical Data
 
 ---
 
-# 39. Logging Rules
+# 40. Logging Rules
 
 Never log:
 
@@ -924,7 +939,7 @@ Log technical events without exposing sensitive information.
 
 ---
 
-# 40. Final Golden Rules
+# 41. Final Golden Rules
 
 ```text
 1. Mobile never connects directly to PostgreSQL.
@@ -990,11 +1005,13 @@ Log technical events without exposing sensitive information.
 31. Follow the PRD before adding features.
 
 32. Follow the architecture before introducing new patterns.
+
+33. When implementing features that modify requirements, update the relevant documentation (.md files) to keep implementation and documentation consistent.
 ```
 
 ---
 
-# 41. Architecture Mental Model
+# 42. Architecture Mental Model
 
 ```text
                          PATIENT
