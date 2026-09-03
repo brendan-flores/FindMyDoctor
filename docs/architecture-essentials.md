@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-This document contains the essential development rules for FindMyDoctor.
+This document contains the non-negotiable architectural and development rules for FindMyDoctor.
 
 It must be used together with:
 
@@ -11,48 +11,18 @@ PRD.md
 ARCHITECTURE.md
 ```
 
-These rules apply to developers and AI coding agents.
+AI coding agents and developers must follow these rules when creating or modifying the project.
 
 ---
 
-# 2. Project Definition
+# 2. Core Architecture
 
-FindMyDoctor is a:
-
-> **Mobile doctor appointment-booking, appointment-management, patient-secretary communication, and AI-assisted healthcare information application.**
-
-Core workflow:
-
-```text
-Find Doctor
-    ↓
-Check Availability
-    ↓
-Book Appointment
-    ↓
-Manage Appointment
-    ↓
-Communicate with Secretary
-    ↓
-Use AI Assistant
-    ↓
-Visit
-    ↓
-Prescription
-```
-
----
-
-# 3. Core Architecture
-
-Use:
+Always use:
 
 ```text
 Mobile App
     ↓
-REST API
-    ↓
-Modular Monolith Backend
+Backend API
     ↓
 PostgreSQL
 ```
@@ -67,17 +37,11 @@ External AI Provider
 
 ### Absolute Rule
 
-The mobile application must **never connect directly to PostgreSQL**.
-
-Correct:
-
-```text
-Mobile → Backend → PostgreSQL
-```
+The mobile app must never connect directly to PostgreSQL.
 
 ---
 
-# 4. Roles
+# 3. User Roles
 
 Supported roles:
 
@@ -89,360 +53,553 @@ CLINIC_STAFF
 ADMIN
 ```
 
-Do not create additional roles unless the requirements are explicitly updated.
+Do not invent roles without changing the project requirements.
 
 ---
 
-# 5. Critical Communication Rule
+# 4. Communication Rules
 
-This is one of the most important project requirements.
+These are hard requirements:
 
 ```text
-Patient ↔ Secretary   YES
-Patient ↔ AI          YES
-Patient ↔ Doctor      NO
+Patient ↔ Secretary = YES
+Patient ↔ AI        = YES
+Patient ↔ Doctor    = NO
 ```
 
-The system must **never provide direct patient-to-doctor chat**.
+The patient must never receive a direct doctor-chat feature.
 
 Do not create:
 
 ```text
-doctor chat screens
-doctor chat endpoints
-doctor conversation tables
-doctor messaging services
+Doctor Chat Screen
+Doctor Chat API
+Doctor Conversation Table
+Patient Doctor Messaging Service
 ```
 
-unless the PRD is explicitly changed.
+---
+
+# 5. Secretary Chat Rules
+
+Patient-secretary chat may be used for:
+
+- Appointment questions.
+- Schedule questions.
+- Clinic questions.
+- Queue-related questions.
+- Reservation assistance.
+
+The backend must verify:
+
+```text
+Authenticated User
+        ↓
+Valid Conversation
+        ↓
+Authorized Participant
+        ↓
+Send / Read Message
+```
+
+Patients cannot access another patient's conversation.
+
+Secretaries cannot access unrelated clinic conversations without authorization.
 
 ---
 
-# 6. Patient–Secretary Chat Rules
-
-Patients may:
-
-- Start conversations with authorized secretaries.
-- Send messages.
-- Receive replies.
-- View conversation history.
-- Ask appointment-related questions.
-- Ask scheduling questions.
-- Ask clinic-related questions.
-
-Secretaries may:
-
-- View authorized patient conversations.
-- Reply to patients.
-- View relevant appointment information.
-- Assist with scheduling and clinic-related questions.
-
-The backend must verify conversation membership on every protected operation.
-
----
-
-# 7. AI Chatbot Rules
+# 6. AI Chatbot Rules
 
 The AI chatbot is for:
 
-> **General medical information and health-related education.**
+> **General medical information and health education.**
 
-Patients may ask about:
+The AI is not a doctor.
 
-- General health concerns
-- Symptoms
-- Health topics
-- General healthcare information
-- When they may need professional medical attention
-
-The AI is **not a doctor**.
-
----
-
-# 8. AI Restrictions
-
-The AI must not:
+It must not:
 
 ```text
-Diagnose a patient
-Prescribe medication
-Change prescriptions
-Replace professional medical advice
-Claim certainty about a medical condition
+Diagnose
+Prescribe
+Change medication
+Replace professional advice
 Make clinical decisions
-Pretend to be a doctor
+Claim to be a physician
 ```
 
-The AI should clearly state its limitations when appropriate.
+Potentially urgent situations should encourage professional or emergency care.
 
 ---
 
-# 9. AI Safety Rule
+# 7. AI Security
 
-AI responses should generally follow:
-
-```text
-User Question
-     ↓
-Validate
-     ↓
-Safety Processing
-     ↓
-AI
-     ↓
-Safety / Response Processing
-     ↓
-User
-```
-
-For potentially serious or emergency situations, the AI should encourage appropriate professional or emergency care.
-
----
-
-# 10. AI Provider Security
-
-The mobile app must never receive the AI provider API key.
+The AI API key must remain on the backend.
 
 Correct:
 
 ```text
-Mobile
-  ↓
-Backend
-  ↓
-AI Provider
+Mobile → Backend → AI Provider
 ```
 
 Incorrect:
 
 ```text
-Mobile
-  ↓
-AI Provider
+Mobile → AI Provider
 ```
 
-unless a future architecture explicitly defines a secure alternative.
+Do not expose:
+
+```text
+AI_API_KEY
+DATABASE_URL
+AUTH_SECRET
+```
+
+to the mobile application.
 
 ---
 
-# 11. AI Data Minimization
+# 8. AI Data Minimization
 
-Do not automatically send all patient information to the AI provider.
+Do not automatically send complete patient records to the AI provider.
 
-Avoid sending:
+Avoid unnecessary transmission of:
 
 ```text
 Full Medical History
-Full Patient Record
-Prescription Records
+Full Prescription History
 Unrelated Appointments
 Other Patient Data
-Authentication Secrets
-Database Credentials
+Credentials
+Secrets
+Database Data
 ```
 
-Only send information required for the current AI interaction.
+Send only necessary information.
 
 ---
 
-# 12. Backend Architecture Rule
+# 9. Consultation Duration
 
-Use:
+The default estimated consultation duration is:
 
 ```text
-API
- ↓
-Service
- ↓
-Domain Logic
- ↓
-Repository
- ↓
-PostgreSQL
+30 minutes
 ```
 
-Do not place major business logic inside mobile UI components or API controllers.
+Do not replace this default unless the requirements are explicitly changed.
 
 ---
 
-# 13. Module Rules
+# 10. Daily Capacity Rules
 
-Use separate modules for:
+Capacity must consider:
 
 ```text
-auth
-users
-patients
-doctors
-clinics
-secretaries
-schedules
-appointments
-visits
-prescriptions
-conversations
-messages
-ai-chat
-waitlists
-notifications
-admin
+Doctor Availability
+Clinic Operating Hours
+Break Periods
+Consultation Duration
+Configured Daily Maximum
 ```
 
-Keep responsibilities separated.
-
----
-
-# 14. Authentication Rules
-
-All protected operations require authentication.
-
-The backend must determine:
+Calculation:
 
 ```text
-Who is the user?
-What role do they have?
-What resource are they accessing?
-Are they allowed to perform this action?
-```
-
-Never trust role information supplied by the mobile client.
-
----
-
-# 15. Authorization Rules
-
-### Patient
-
-Can:
-
-- Manage own appointments.
-- Access own prescriptions.
-- Chat with authorized secretaries.
-- Use AI chatbot.
-
-Cannot:
-
-- Access another patient's data.
-- Chat with doctors.
-- Access another patient's conversation.
-
-### Doctor
-
-Can:
-
-- Manage own schedule.
-- View authorized appointments.
-- View authorized patient information.
-- Create prescriptions.
-
-Cannot:
-
-- Use patient-secretary chat as a patient.
-- Obtain direct patient-chat functionality.
-
-### Secretary
-
-Can:
-
-- Access authorized clinic conversations.
-- Reply to patients.
-- View relevant appointment information.
-
-Cannot:
-
-- Access unrelated clinic conversations.
-- Perform doctor-only operations.
-
-### Admin
-
-Can:
-
-- Manage users.
-- Approve doctors.
-- Approve clinics.
-- Manage secretaries.
-- Review basic appointment information.
-
----
-
-# 16. Conversation Rules
-
-A normal conversation contains:
-
-```text
-Patient
-+
-Secretary
-+
-Clinic
-```
-
-It must not contain:
-
-```text
-Doctor
-```
-
-as a participant in patient-secretary chat.
-
-The database structure should reinforce this rule.
-
----
-
-# 17. Message Rules
-
-Every message must:
-
-- Belong to a valid conversation.
-- Have a valid sender.
-- Be authorized by the backend.
-- Be timestamped.
-- Remain associated with its conversation.
-
-Never allow a user to send a message simply by providing another user's ID.
-
----
-
-# 18. Appointment Rules
-
-Appointment availability must always be verified server-side.
-
-Never trust:
-
-```text
-Frontend availability
-```
-
-Use:
-
-```text
-Working Hours
--
-Unavailable Periods
--
-Existing Appointments
+Available Consultation Time
+÷ Consultation Duration
 =
-Available Slots
+Calculated Capacity
+```
+
+Final capacity:
+
+```text
+MIN(Calculated Capacity, Configured Capacity)
+```
+
+when a lower configured capacity exists.
+
+---
+
+# 11. Capacity Applies to Both Sources
+
+These are equal:
+
+```text
+Online Registration
+Walk-in Registration
+```
+
+Both consume one unit of the daily capacity.
+
+Do not create separate capacity pools.
+
+Correct:
+
+```text
+Online + Walk-in = One Daily Capacity
 ```
 
 ---
 
-# 19. Double-Booking Rule
+# 12. Full Capacity Rule
+
+When:
+
+```text
+Registered Patients >= Final Capacity
+```
+
+the date becomes:
+
+```text
+FULL
+```
+
+The system must reject:
+
+- New regular online reservations.
+- New walk-in registrations.
+
+Do not depend only on the mobile UI to display the Full state.
+
+---
+
+# 13. Unified Queue Rule
+
+Online and walk-in patients must use one unified daily queue.
+
+```text
+ONLINE
+   \
+    → UNIFIED QUEUE
+   /
+WALK-IN
+```
+
+Do not create separate online and walk-in queues.
+
+---
+
+# 14. Queue Priority Rule
+
+Queue priority is determined by successful registration time.
+
+Registration source does not affect priority.
+
+Example:
+
+```text
+09:01 Online  → #1
+09:04 Walk-in → #2
+09:08 Online  → #3
+```
+
+Never automatically prioritize:
+
+```text
+Online > Walk-in
+```
+
+or:
+
+```text
+Walk-in > Online
+```
+
+---
+
+# 15. Queue Number Rule
+
+Queue numbers must be sequential and concurrency-safe.
+
+Never generate queue numbers using:
+
+```text
+Frontend counters
+Client-side timestamps
+Local mobile state
+```
+
+The backend/database is responsible for queue assignment.
+
+---
+
+# 16. Queue Status Rules
+
+Use controlled states:
+
+```text
+WAITING
+CALLED
+NOT_PRESENT
+SKIPPED
+IN_CHECKUP
+COMPLETED
+CANCELLED
+NO_SHOW
+```
+
+Important:
+
+> Skipping a patient must not automatically delete the queue record.
+
+---
+
+# 17. Secretary Queue Controls
+
+The secretary must be able to perform:
+
+```text
+Next Patient
+Start Checkup
+Skip / Not Present
+Complete Checkup
+```
+
+Queue status transitions must be handled by the backend.
+
+Do not implement critical queue logic only in the mobile UI.
+
+---
+
+# 18. Reservation and Payment Rule
+
+Payment and reservation are separate.
+
+A regular consultation reservation must succeed without advance payment.
+
+Do not reject a reservation because:
+
+```text
+Patient has no funds
+Patient chooses to pay later
+Patient has not uploaded a receipt
+```
+
+---
+
+# 19. GCash Rules
+
+The MVP does not use a GCash payment API.
+
+Use:
+
+```text
+Static Clinic GCash QR
+```
+
+Patient flow:
+
+```text
+View QR
+ ↓
+Pay using GCash
+ ↓
+Upload Receipt
+ ↓
+Pending Verification
+ ↓
+Secretary Review
+ ↓
+Paid / Rejected
+```
+
+Receipt upload does not automatically mean the payment is valid.
+
+---
+
+# 20. Payment Status Rules
+
+Use:
+
+```text
+UNPAID
+PENDING_VERIFICATION
+PAID
+REJECTED
+```
+
+Only authorized secretaries should verify GCash receipts during the MVP.
+
+---
+
+# 21. Additional Charge Rules
+
+The secretary may add applicable charges.
+
+Calculation:
+
+```text
+Consultation Fee
++
+Additional Charges
+=
+Total Amount Due
+```
+
+Charges may include:
+
+- Medicine.
+- Additional clinic services.
+- Other applicable clinic fees.
+
+---
+
+# 22. Walk-in Registration Rules
+
+The secretary controls walk-in registration.
+
+Workflow:
+
+```text
+Find Patient
+ ↓
+Existing?
+ ├── Yes → Use Account
+ └── No → Create Account
+ ↓
+Select Doctor
+ ↓
+Check Capacity
+ ↓
+Register
+ ↓
+Assign Queue
+```
+
+Walk-in registration must use the same capacity and queue logic as online reservation.
+
+---
+
+# 23. Walk-in Account Rules
+
+If the patient has no account:
+
+1. Collect email.
+2. Email becomes username/login identifier.
+3. Generate random temporary password.
+4. Mark account as `must_change_password`.
+5. Provide credentials through the designated clinic process.
+6. Require password change during first login.
+7. Block normal application access until the password is changed.
+
+---
+
+# 24. Temporary Password Security
+
+Temporary passwords must:
+
+- Be random.
+- Contain letters and numbers.
+- Be securely hashed.
+- Not remain stored in plaintext.
+- Require a first-login password change.
+
+Do not expose temporary passwords through logs.
+
+---
+
+# 25. Medical History Rules
+
+Every completed consultation must remain associated with the correct patient account.
+
+Correct:
+
+```text
+Patient Account
+ ↓
+Appointment
+ ↓
+Visit
+ ↓
+Medical History
+ ↓
+Prescription
+```
+
+Do not create disconnected temporary medical records for walk-in patients.
+
+---
+
+# 26. Patient Data Rules
+
+Treat the following as sensitive:
+
+```text
+Medical History
+Allergies
+Medications
+Visit Notes
+Prescriptions
+Payment Records
+GCash Receipts
+Secretary Messages
+AI Medical Conversations
+```
+
+Do not expose these through public endpoints.
+
+---
+
+# 27. Appointment Integrity
+
+The backend must verify:
+
+```text
+Valid Doctor
++
+Valid Schedule
++
+Available Capacity
++
+Available Consultation
++
+No Conflict
+```
+
+before creating a reservation.
+
+---
+
+# 28. Double-Booking Rule
 
 Double booking is unacceptable.
 
 Use:
 
+- Server-side validation.
 - Transactions.
-- Database constraints.
-- Server-side checks.
-- Appropriate locking/isolation.
+- PostgreSQL constraints.
+- Appropriate concurrency controls.
 
-Frontend checks are not sufficient.
+Never trust frontend availability alone.
 
 ---
 
-# 20. Database Rules
+# 29. Concurrency Rule
+
+Protect these operations against simultaneous requests:
+
+```text
+Appointment Creation
+Queue Number Assignment
+Capacity Consumption
+Walk-in Registration
+```
+
+The system must prevent:
+
+```text
+Capacity Overflow
+Duplicate Queue Number
+Double Booking
+```
+
+---
+
+# 30. Database Rules
 
 PostgreSQL is the source of truth for persistent data.
 
@@ -454,48 +611,48 @@ Use:
 - Transactions.
 - Migrations.
 
-Do not bypass database integrity rules from application code.
+Do not bypass database integrity requirements.
 
 ---
 
-# 21. Required Communication Tables
+# 31. Required Database Concepts
 
 The architecture should support:
 
 ```text
+users
+patients
+doctors
+clinics
+secretaries
+
+doctor_schedules
+doctor_unavailability
+daily_capacities
+
+appointments
+queue_entries
+
+visits
+prescriptions
+prescription_items
+
+payments
+payment_charges
+
 conversations
 messages
-```
 
-for patient-secretary communication.
-
-AI conversations should use separate structures:
-
-```text
 ai_conversations
 ai_messages
-```
 
-Do not combine AI chat and patient-secretary chat into the same conversation model unless the architecture is intentionally redesigned.
+waitlists
+notifications
+```
 
 ---
 
-# 22. Doctor Chat Restriction
-
-The following are prohibited by default:
-
-```text
-POST /doctor-chat
-POST /doctors/:id/chat
-GET  /doctor-conversations
-doctor_id in patient-secretary conversation records
-```
-
-Do not accidentally create doctor messaging while implementing generic chat functionality.
-
----
-
-# 23. API Rules
+# 32. API Rules
 
 Use:
 
@@ -503,232 +660,181 @@ Use:
 /api/v1
 ```
 
-Use resource-oriented endpoints.
+Do not expose database access directly to the mobile app.
 
-Examples:
-
-```text
-GET  /doctors
-POST /appointments
-GET  /appointments/:id
-GET  /conversations
-POST /conversations/:id/messages
-POST /ai/chat
-```
-
-Avoid unnecessary custom action endpoints when a resource-oriented approach is appropriate.
+All important operations must pass through backend authorization and validation.
 
 ---
 
-# 24. API Security Rule
+# 33. Doctor Chat Restriction
 
-Authorization must happen on the backend.
-
-For example:
+Never add generic messaging logic that accidentally allows:
 
 ```text
-GET /conversations/123
+Patient → Doctor
 ```
 
-must verify that the authenticated user belongs to or is authorized for conversation `123`.
-
-Never assume that knowing an ID grants access.
-
----
-
-# 25. AI API Rules
-
-AI requests should follow:
+Before implementing any messaging feature, verify:
 
 ```text
-Authenticate
- ↓
-Validate
- ↓
-Authorize
- ↓
-Process Safety
- ↓
-Call AI Provider
- ↓
-Process Response
- ↓
-Return Result
-```
-
-AI credentials must remain server-side.
-
----
-
-# 26. Sensitive Data Rules
-
-Treat these as sensitive:
-
-```text
-Patient information
-Allergies
-Medical history
-Medications
-Visit notes
-Prescriptions
-Patient-secretary messages
-AI medical conversations
-```
-
-Do not expose sensitive data through:
-
-- Public endpoints.
-- Search results.
-- Logs.
-- URLs.
-- Unprotected files.
-
----
-
-# 27. Prescription Rules
-
-Only authorized doctors can create prescriptions.
-
-Patients can only access their own prescriptions.
-
-Prescription PDFs must not be publicly accessible.
-
----
-
-# 28. Validation Rules
-
-Validate on:
-
-```text
-Mobile
- ↓
-API
- ↓
-Business Logic
- ↓
-Database
-```
-
-Client-side validation improves UX.
-
-Backend validation protects the system.
-
-Database constraints protect data integrity.
-
----
-
-# 29. Error Rules
-
-Use predictable error codes:
-
-```text
-VALIDATION_ERROR
-UNAUTHORIZED
-FORBIDDEN
-NOT_FOUND
-CONFLICT
-APPOINTMENT_SLOT_UNAVAILABLE
-CONVERSATION_ACCESS_DENIED
-AI_SERVICE_UNAVAILABLE
-AI_RESPONSE_ERROR
-SERVER_ERROR
-```
-
-Never expose:
-
-```text
-SQL statements
-API keys
-Stack traces
-Internal secrets
-Sensitive medical information
+Patient → Secretary = Allowed
+Patient → AI = Allowed
+Patient → Doctor = Blocked
 ```
 
 ---
 
-# 30. Logging Rules
+# 34. AI Coding Agent Rules
 
-Do not log:
+When an AI coding agent changes the project:
 
-```text
-Passwords
-API Keys
-Authentication Tokens
-Full Medical Histories
-Full Prescription Contents
-Sensitive Chat Contents
-```
+### Rule 1
 
-Log technical failures without exposing sensitive information.
+Read the existing architecture before changing it.
 
----
+### Rule 2
 
-# 31. Time Rules
-
-Use:
+Follow:
 
 ```text
-Asia/Manila
+PRD.md
+ARCHITECTURE.md
+ARCHITECTURE-ESSENTIALS.md
 ```
 
-consistently for the target environment.
+### Rule 3
 
-Be consistent with:
+Do not invent requirements.
 
-- Appointments
-- Working hours
-- Messages
-- Notifications
-- AI timestamps
+### Rule 4
+
+Do not add patient-doctor chat.
+
+### Rule 5
+
+Do not make payment mandatory for normal reservations.
+
+### Rule 6
+
+Use the same capacity service for online and walk-in registration.
+
+### Rule 7
+
+Use the same queue service for online and walk-in registration.
+
+### Rule 8
+
+Never make online patients automatically higher priority than walk-ins.
+
+### Rule 9
+
+Never mark a GCash receipt as Paid without secretary verification.
+
+### Rule 10
+
+Never expose AI credentials to the mobile app.
+
+### Rule 11
+
+Never treat AI output as a diagnosis.
+
+### Rule 12
+
+Do not send unnecessary patient information to external AI services.
+
+### Rule 13
+
+Protect patient, payment, medical, and conversation data.
+
+### Rule 14
+
+Preserve the walk-in patient's permanent account identity.
+
+### Rule 15
+
+Enforce temporary-password change before normal first-time access.
 
 ---
 
-# 32. Database Migration Rules
+# 35. Feature Implementation Checklist
 
-All schema changes must use migrations.
-
-Required additions for the communication features may include:
+Before completing a feature:
 
 ```text
-secretaries
-conversations
-messages
-ai_conversations
-ai_messages
+[ ] Requirement exists in PRD
+[ ] Correct user role identified
+[ ] Correct module identified
+[ ] Mobile UI implemented
+[ ] Backend API implemented
+[ ] Authorization implemented
+[ ] Validation implemented
+[ ] Business rules implemented
+[ ] Database migration created if needed
+[ ] Security reviewed
+[ ] Error handling implemented
+[ ] Tests added
+[ ] Existing features checked
 ```
 
-Never manually modify shared database schemas without a migration.
+For queue features:
+
+```text
+[ ] Capacity checked
+[ ] Queue number generated server-side
+[ ] Online/walk-in share queue
+[ ] Registration source stored
+[ ] Queue status validated
+[ ] Concurrency protected
+```
+
+For payment features:
+
+```text
+[ ] Payment is not required for reservation
+[ ] Static GCash QR used
+[ ] Receipt uploaded securely
+[ ] Status starts Pending Verification
+[ ] Secretary verification required
+[ ] Additional charges supported
+```
+
+For AI features:
+
+```text
+[ ] API key remains server-side
+[ ] Input validated
+[ ] Safety instructions applied
+[ ] No definitive diagnosis
+[ ] No prescription
+[ ] Sensitive data minimized
+[ ] AI errors handled
+```
+
+For chat:
+
+```text
+[ ] Patient ↔ Secretary works
+[ ] Unauthorized conversation access blocked
+[ ] Patient ↔ Doctor remains blocked
+```
 
 ---
 
-# 33. Dependency Rules
+# 36. Avoid Overengineering
 
-Before adding a dependency:
-
-1. Check whether the project already has a solution.
-2. Confirm the dependency is necessary.
-3. Avoid duplicate libraries.
-4. Keep the architecture simple.
-
----
-
-# 34. Avoid Overengineering
-
-Do not introduce:
+Do not introduce without a documented need:
 
 ```text
 Microservices
 Kubernetes
 Kafka
-Complex Event Bus
 CQRS
 Event Sourcing
 Multiple Databases
+Complex Event Bus
 ```
 
-without a documented requirement.
-
-Default:
+Default architecture:
 
 ```text
 Mobile
@@ -740,119 +846,85 @@ PostgreSQL
 
 ---
 
-# 35. AI Coding Agent Rules
+# 37. Naming Rules
 
-When an AI coding agent works on the project:
-
-### Rule A — Read First
-
-Inspect the existing implementation before making changes.
-
-### Rule B — Follow the Documents
-
-Follow:
+Database:
 
 ```text
-PRD.md
-ARCHITECTURE.md
-ARCHITECTURE-ESSENTIALS.md
+snake_case
 ```
 
-### Rule C — Do Not Invent Requirements
+Examples:
 
-Do not add features that are not required.
+```text
+doctor_id
+appointment_date
+queue_number
+payment_status
+created_at
+```
 
-### Rule D — Preserve Communication Restrictions
+API resources:
 
-Never accidentally introduce patient-doctor messaging.
+```text
+/doctors
+/appointments
+/queue
+/payments
+/conversations
+```
 
-### Rule E — Protect AI Credentials
-
-Never expose AI API keys to the mobile application.
-
-### Rule F — Protect Healthcare Data
-
-Treat patient information, prescriptions, messages, and AI medical conversations as sensitive.
-
-### Rule G — Keep Business Logic Server-Side
-
-Do not implement critical authorization or appointment rules only on the mobile side.
-
-### Rule H — Preserve Existing Patterns
-
-Reuse existing project patterns before introducing new architecture.
-
-### Rule I — Minimize Changes
-
-Modify only what is necessary.
-
-### Rule J — Test Before Finishing
-
-Test affected features and related business rules.
+Avoid inconsistent endpoint naming.
 
 ---
 
-# 36. Feature Implementation Checklist
+# 38. Error Rules
 
-Before completing a feature:
+Use clear error codes:
 
 ```text
-[ ] Requirement exists in PRD
-[ ] Correct role identified
-[ ] Correct module identified
-[ ] Mobile UI implemented
-[ ] API implemented
-[ ] Authorization implemented
-[ ] Validation implemented
-[ ] Business rules implemented
-[ ] Database migration created if needed
-[ ] Security reviewed
-[ ] Error handling implemented
-[ ] Tests added
-[ ] Existing features checked
+CAPACITY_FULL
+APPOINTMENT_SLOT_UNAVAILABLE
+QUEUE_ASSIGNMENT_FAILED
+CONVERSATION_ACCESS_DENIED
+PAYMENT_VERIFICATION_REQUIRED
+AI_SERVICE_UNAVAILABLE
+FORBIDDEN
+UNAUTHORIZED
 ```
 
-For communication features also verify:
+Never expose:
 
 ```text
-[ ] Patient ↔ Secretary works
-[ ] Secretary ↔ Patient works
-[ ] Patient ↔ Doctor remains blocked
-```
-
-For AI features also verify:
-
-```text
-[ ] AI credentials remain server-side
-[ ] AI safety instructions are applied
-[ ] AI does not claim to diagnose
-[ ] AI errors are handled
-[ ] Sensitive information is minimized
+SQL
+Stack Traces
+Secrets
+API Keys
+Sensitive Medical Data
 ```
 
 ---
 
-# 37. Source of Truth
+# 39. Logging Rules
 
-When requirements conflict:
+Never log:
 
 ```text
-Explicit Current Requirement
-          ↓
-PRD.md
-          ↓
-ARCHITECTURE.md
-          ↓
-ARCHITECTURE-ESSENTIALS.md
-          ↓
-Existing Implementation
+Passwords
+Temporary Passwords
+API Keys
+Authentication Tokens
+Full Medical Records
+Prescription Contents
+Full GCash Receipts
+Sensitive Chat Contents
 ```
 
-A significant architectural change should be reflected in the documentation.
+Log technical events without exposing sensitive information.
 
 ---
 
-# 38. Final Golden Rules
+# 40. Final Golden Rules
 
 ```text
 1. Mobile never connects directly to PostgreSQL.
@@ -861,71 +933,93 @@ A significant architectural change should be reflected in the documentation.
 
 3. PostgreSQL is the source of truth for persistent data.
 
-4. Never trust the mobile client.
+4. Default consultation duration is 30 minutes.
 
-5. Authorization must always be enforced on the backend.
+5. Capacity considers availability, clinic hours, breaks, and consultation duration.
 
-6. Never allow appointment double booking.
+6. Doctor and authorized secretary may configure a lower daily capacity.
 
-7. Patients can chat with secretaries.
+7. Online and walk-in patients share one daily capacity.
 
-8. Secretaries can reply to patients.
+8. Online and walk-in patients share one unified queue.
 
-9. Patients cannot directly chat with doctors.
+9. Queue priority is based on successful registration time.
 
-10. Never create a doctor-chat endpoint unless the requirements explicitly change.
+10. Registration source does not affect queue priority.
 
-11. Patients can use the AI chatbot for general medical information.
+11. Regular reservations do not require advance payment.
 
-12. The AI chatbot must never present itself as a doctor.
+12. GCash uses a static clinic QR code.
 
-13. The AI chatbot must not provide definitive diagnosis or prescribe treatment.
+13. Uploaded receipts start as Pending Verification.
 
-14. AI credentials must remain on the backend.
+14. Secretary verification is required before Paid.
 
-15. Minimize sensitive data sent to external AI services.
+15. Secretary can add additional charges.
 
-16. Protect patient, prescription, message, and AI conversation data.
+16. Walk-in patients can receive generated accounts.
 
-17. Use transactions for critical operations.
+17. Generated temporary passwords require first-login change.
 
-18. Use migrations for database changes.
+18. Patient medical history must remain linked to the permanent patient account.
 
-19. Keep modules separated.
+19. Secretary manages the daily operational queue.
 
-20. Avoid premature overengineering.
+20. Skipped patients must not automatically disappear from the queue.
 
-21. Follow the PRD before adding functionality.
+21. Patients can chat with secretaries.
 
-22. Reuse existing project patterns.
+22. Patients cannot directly chat with doctors.
 
-23. Test critical scheduling, authorization, communication, and AI logic.
+23. Patients can use the AI chatbot for general medical information.
 
-24. Keep the project an educational prototype, not a production EHR.
+24. AI must not diagnose or prescribe.
+
+25. AI credentials must remain server-side.
+
+26. Sensitive patient data must be protected.
+
+27. Capacity, queue, and booking operations must be concurrency-safe.
+
+28. Use database transactions for critical operations.
+
+29. Use migrations for schema changes.
+
+30. Avoid premature overengineering.
+
+31. Follow the PRD before adding features.
+
+32. Follow the architecture before introducing new patterns.
 ```
 
 ---
 
-# 39. Architecture Mental Model
+# 41. Architecture Mental Model
 
 ```text
                          PATIENT
                             │
-             ┌──────────────┼───────────────┐
-             │              │               │
-             ▼              ▼               ▼
-       APPOINTMENTS     SECRETARY       AI CHATBOT
-             │            CHAT               │
-             │              │               │
-             ▼              ▼               ▼
-         DOCTOR         SECRETARY      EXTERNAL AI
+             ┌──────────────┼──────────────┐
+             │              │              │
+             ▼              ▼              ▼
+        APPOINTMENT     SECRETARY       AI CHAT
+             │              │              │
+             ▼              ▼              ▼
+       UNIFIED QUEUE     SECRETARY     AI PROVIDER
              │
              ▼
-       PRESCRIPTIONS
+          DOCTOR
+             │
+             ▼
+       CONSULTATION
+             │
+       ┌─────┴─────┐
+       ▼           ▼
+ MEDICAL HISTORY  PRESCRIPTION
 
-                 Patient ──X── Doctor Chat
+              PATIENT ──X── DOCTOR CHAT
 ```
 
-The core rule is:
+The core priority is:
 
-> **FindMyDoctor allows patients to communicate with clinic secretaries and the AI chatbot, but direct patient-to-doctor chat is intentionally not supported.**
+**Correctness → Data Integrity → Security → Authorization → Maintainability → Simplicity**

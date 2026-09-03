@@ -2,76 +2,80 @@
 
 ## 1. Architecture Overview
 
-FindMyDoctor is a **mobile doctor appointment-booking, appointment-management, communication, and AI-assisted healthcare information platform**.
+FindMyDoctor is a mobile-first doctor appointment, daily queue-management, patient communication, payment-recording, prescription, and AI-assisted healthcare information system.
 
-The system consists of:
-
-```text
-┌──────────────────────────────────────────┐
-│           FindMyDoctor Mobile App        │
-│                                          │
-│ Patient UI                               │
-│ Doctor UI                                │
-│ Secretary UI                             │
-│ Clinic Staff UI                          │
-│ Admin UI                                 │
-│ AI Chat UI                               │
-└───────────────────┬──────────────────────┘
-                    │
-                    │ HTTPS / JSON API
-                    ▼
-┌──────────────────────────────────────────┐
-│             Backend API Server            │
-│                                          │
-│ Authentication & Authorization            │
-│ Doctor Discovery                          │
-│ Scheduling                                │
-│ Appointment Management                    │
-│ Patient Records                           │
-│ Prescriptions                             │
-│ Secretary Messaging                       │
-│ AI Chatbot Integration                    │
-│ Notifications                             │
-│ Administration                            │
-└───────────────────┬──────────────────────┘
-                    │
-                    │ SQL
-                    ▼
-┌──────────────────────────────────────────┐
-│               PostgreSQL                  │
-│                                          │
-│ Users                                     │
-│ Patients                                  │
-│ Doctors                                   │
-│ Clinics                                   │
-│ Secretaries                               │
-│ Schedules                                 │
-│ Appointments                              │
-│ Visits                                    │
-│ Prescriptions                             │
-│ Conversations                             │
-│ Messages                                  │
-│ AI Conversations                          │
-│ AI Messages                               │
-│ Waitlists                                 │
-│ Notifications                             │
-└──────────────────────────────────────────┘
-
-                    │
-        ┌───────────┴────────────┐
-        ▼                        ▼
- External AI Service       File / Push Services
-        │                        │
-        ▼                        ▼
-   AI Responses             PDFs / Notifications
-```
-
-### Communication Architecture
+The architecture consists of:
 
 ```text
-Patient ↔ Secretary       YES
-Patient ↔ AI              YES
-Patient ↔ Doctor          NO
+┌────────────────────────────────────────────┐
+│              Mobile Application            │
+│                                            │
+│ Patient UI                                 │
+│ Doctor UI                                  │
+│ Secretary UI                               │
+│ Clinic Staff UI                            │
+│ Admin UI                                   │
+│ AI Chat UI                                 │
+└─────────────────────┬──────────────────────┘
+                      │
+                      │ HTTPS / JSON
+                      ▼
+┌────────────────────────────────────────────┐
+│              Backend API                   │
+│                                            │
+│ Authentication                             │
+│ Authorization                              │
+│ Users                                      │
+│ Doctors                                    │
+│ Clinics                                    │
+│ Secretaries                                │
+│ Scheduling                                 │
+│ Capacity                                   │
+│ Appointments                               │
+│ Queue                                      │
+│ Patients                                   │
+│ Visits                                     │
+│ Prescriptions                              │
+│ Payments                                   │
+│ Conversations                              │
+│ Messages                                   │
+│ AI Chat                                    │
+│ Notifications                              │
+│ Administration                             │
+└─────────────────────┬──────────────────────┘
+                      │
+                      │ SQL
+                      ▼
+┌────────────────────────────────────────────┐
+│                 PostgreSQL                 │
+│                                            │
+│ Users                                      │
+│ Patients                                   │
+│ Doctors                                    │
+│ Clinics                                    │
+│ Secretaries                                │
+│ Schedules                                  │
+│ Capacity                                   │
+│ Appointments                               │
+│ Queue Entries                              │
+│ Visits                                     │
+│ Prescriptions                              │
+│ Payments                                   │
+│ Payment Charges                            │
+│ Conversations                              │
+│ Messages                                   │
+│ AI Conversations                           │
+│ AI Messages                                │
+│ Notifications                              │
+└────────────────────────────────────────────┘
+
+                      │
+          ┌───────────┴────────────┐
+          ▼                        ▼
+   External AI Provider       Secure File Storage
+                                  │
+                                  ▼
+                         GCash Receipts / PDFs
 ```
 
 The mobile application must never connect directly to PostgreSQL.
@@ -83,55 +87,34 @@ The mobile application must never connect directly to PostgreSQL.
 The architecture should:
 
 1. Support a mobile-first application.
-2. Separate presentation, business logic, and data access.
-3. Provide secure API communication.
-4. Protect patient and communication data.
-5. Prevent appointment conflicts.
-6. Enforce role-based access.
-7. Support patient-secretary communication.
-8. Support controlled AI chatbot integration.
-9. Keep scheduling logic centralized.
-10. Remain simple enough for an educational project.
+2. Use PostgreSQL as the primary database.
+3. Use a modular monolithic backend.
+4. Centralize appointment and queue business rules.
+5. Prevent double booking and capacity overflow.
+6. Combine online and walk-in patients into one queue.
+7. Support patient-secretary messaging.
+8. Support AI chatbot integration.
+9. Keep AI access server-side.
+10. Protect patient, payment, medical, and communication data.
+11. Keep the system simple enough for an educational project.
 
 ---
 
 # 3. Architectural Style
 
-Use a **modular monolith backend**.
+Use a **modular monolith**.
 
 ```text
-Mobile Application
-        │
-        ▼
-     REST API
-        │
-        ▼
-┌──────────────────────────────┐
-│       Backend Modules        │
-│                              │
-│ Auth                         │
-│ Users                        │
-│ Patients                     │
-│ Doctors                      │
-│ Clinics                      │
-│ Secretaries                  │
-│ Schedules                    │
-│ Appointments                 │
-│ Visits                       │
-│ Prescriptions                │
-│ Conversations                │
-│ Messages                     │
-│ AI Chatbot                   │
-│ Waitlists                    │
-│ Notifications                │
-│ Admin                        │
-└───────────────┬──────────────┘
-                │
-                ▼
-           PostgreSQL
+Mobile
+  ↓
+REST API
+  ↓
+Modular Backend
+  ↓
+PostgreSQL
 ```
 
-Do not introduce microservices unless a future requirement explicitly justifies them.
+The backend modules should remain logically separate without introducing microservices.
 
 ---
 
@@ -149,15 +132,52 @@ Data Access
 PostgreSQL
 ```
 
-The AI integration is treated as an external service dependency of the backend.
+### API Layer
 
-The mobile app never directly calls the AI provider unless a future architecture explicitly requires secure client-side integration.
+Handles:
+
+- HTTP routes.
+- Authentication.
+- Request validation.
+- Authorization.
+- Response formatting.
+
+### Application Layer
+
+Handles:
+
+- Booking.
+- Capacity.
+- Queue.
+- Walk-in registration.
+- Payment workflows.
+- Messaging.
+- AI workflows.
+
+### Domain Layer
+
+Handles rules such as:
+
+- Capacity.
+- Queue numbering.
+- Appointment conflicts.
+- Payment states.
+- Communication permissions.
+
+### Data Access Layer
+
+Handles:
+
+- PostgreSQL queries.
+- Transactions.
+- Persistence.
+- Repositories.
 
 ---
 
 # 5. Mobile Application Architecture
 
-Recommended structure:
+Recommended:
 
 ```text
 mobile/
@@ -167,8 +187,11 @@ mobile/
 │   ├── doctors/
 │   ├── appointments/
 │   ├── schedules/
+│   ├── queue/
+│   ├── capacity/
 │   ├── patients/
 │   ├── prescriptions/
+│   ├── payments/
 │   ├── secretary-chat/
 │   ├── ai-chat/
 │   ├── waitlist/
@@ -186,21 +209,21 @@ mobile/
 
 ---
 
-# 6. Mobile Navigation
-
-## Patient
+# 6. Patient Navigation
 
 ```text
 Home
  ├── Search Doctors
- ├── Doctor Details
- ├── Availability
- └── Booking
+ ├── Doctor Profile
+ └── Availability
 
-Appointments
+Reservations
  ├── Upcoming
  ├── Past
  └── Details
+
+Queue
+ └── Current Queue Information
 
 Chat
  └── Secretary Conversations
@@ -209,6 +232,8 @@ AI Assistant
 
 Waitlist
 
+Payments
+
 Prescriptions
 
 Notifications
@@ -216,46 +241,81 @@ Notifications
 Profile
 ```
 
-## Doctor
+There is no direct doctor-chat screen.
+
+---
+
+# 7. Doctor Navigation
 
 ```text
 Dashboard
+
 Appointments
+ ├── Today
+ ├── Upcoming
+ └── History
+
 Schedule
+ ├── Working Hours
+ ├── Availability
+ └── Daily Capacity
+
 Patients
+
 Prescriptions
-Profile
-```
 
-There is intentionally **no patient chat section for doctors**.
-
-## Secretary
-
-```text
-Dashboard
-Conversations
-Appointments
-Clinic Information
-Profile
-```
-
-## Administrator
-
-```text
-Dashboard
-Users
-Doctors
-Secretaries
-Clinics
-Appointments
 Profile
 ```
 
 ---
 
-# 7. Backend Module Architecture
+# 8. Secretary Navigation
 
-Core modules:
+```text
+Dashboard
+
+Daily Queue
+
+Appointments
+
+Conversations
+
+Walk-in Registration
+
+Payments
+
+Clinic
+
+Profile
+```
+
+The secretary is the primary operational user for daily queue and payment verification.
+
+---
+
+# 9. Admin Navigation
+
+```text
+Dashboard
+
+Users
+
+Doctors
+
+Secretaries
+
+Clinics
+
+Appointments
+
+Profile
+```
+
+---
+
+# 10. Backend Modules
+
+Recommended backend modules:
 
 ```text
 auth
@@ -265,9 +325,12 @@ doctors
 clinics
 secretaries
 schedules
+capacity
 appointments
+queue
 visits
 prescriptions
+payments
 conversations
 messages
 ai-chat
@@ -276,35 +339,381 @@ notifications
 admin
 ```
 
-Each module should have a clearly defined responsibility.
+---
+
+# 11. Scheduling Module
+
+The schedule module manages:
+
+- Working days.
+- Working hours.
+- Clinic operating hours.
+- Break periods.
+- Appointment duration.
+- Unavailable periods.
+- Doctor availability.
+
+The default consultation duration is:
+
+**30 minutes**
 
 ---
 
-# 8. Secretary Module
+# 12. Capacity Module
 
-The secretary module manages the clinic-side patient communication role.
+The capacity module determines the maximum number of patients that can be registered for a particular date.
+
+### Capacity Inputs
+
+```text
+Doctor Availability
+Clinic Operating Hours
+Break Periods
+Consultation Duration
+Configured Daily Maximum
+```
+
+### Capacity Calculation
+
+```text
+Available Consultation Time
+        ÷
+Consultation Duration
+        =
+Calculated Capacity
+```
+
+Example:
+
+```text
+8 hours ÷ 30 minutes = 16 patients
+```
+
+### Final Capacity
+
+If the doctor/secretary has configured a lower maximum:
+
+```text
+Final Capacity = MIN(Calculated Capacity, Configured Capacity)
+```
+
+If there is no configured lower limit, the calculated capacity can be used.
+
+---
+
+# 13. Capacity Data Model
+
+Recommended table:
+
+```text
+daily_capacities
+----------------
+id
+doctor_id
+clinic_id
+date
+consultation_duration
+calculated_capacity
+configured_capacity
+final_capacity
+created_at
+updated_at
+```
+
+The final capacity is the value enforced by the booking and walk-in registration services.
+
+---
+
+# 14. Capacity and Queue
+
+Capacity applies to the entire daily patient queue.
+
+Both registration types consume the same capacity:
+
+```text
+Online Registration
+        │
+        ├────────────┐
+        │            │
+        ▼            ▼
+                 Daily Capacity
+        ▲            ▲
+        │            │
+Walk-in Registration
+```
+
+One successfully registered patient consumes one capacity unit.
+
+---
+
+# 15. Appointment Module
 
 Responsibilities:
 
-- Secretary profile
-- Clinic association
-- Conversation access
-- Patient inquiries
-- Appointment-related assistance
-- Clinic-related questions
+- Create reservations.
+- View appointments.
+- Cancel appointments.
+- Reschedule appointments.
+- Update appointment states.
+- Prevent booking conflicts.
 
-Secretaries should only access conversations assigned to or authorized for their clinic.
+Payment is intentionally separate from basic reservation creation.
 
 ---
 
-# 9. Conversation Module
+# 16. Reservation Model
 
-The conversation module manages patient-secretary chat sessions.
+A regular reservation does not require payment.
 
-A conversation should contain:
+A successful reservation results in:
 
 ```text
-conversation_id
+Appointment
+    +
+Queue Entry
+    +
+Capacity Consumption
+```
+
+Optional:
+
+```text
+Payment
+```
+
+Payment does not determine whether the reservation is successfully created.
+
+---
+
+# 17. Unified Queue Module
+
+The queue module is a core domain service.
+
+Responsibilities:
+
+- Create queue entries.
+- Assign queue numbers.
+- Retrieve daily queue.
+- Determine next patient.
+- Call patients.
+- Skip patients.
+- Update queue status.
+- Preserve queue history.
+
+Both online and walk-in registrations use the same queue service.
+
+---
+
+# 18. Queue Data Model
+
+Recommended table:
+
+```text
+queue_entries
+-------------
+id
+patient_id
+doctor_id
+clinic_id
+appointment_id
+queue_date
+queue_number
+registration_source
+status
+created_at
+called_at
+started_at
+completed_at
+updated_at
+```
+
+### Registration Source
+
+```text
+ONLINE
+WALK_IN
+```
+
+### Status
+
+```text
+WAITING
+CALLED
+NOT_PRESENT
+SKIPPED
+IN_CHECKUP
+COMPLETED
+CANCELLED
+NO_SHOW
+```
+
+---
+
+# 19. Queue Number Generation
+
+Queue numbers must be sequential within the applicable daily queue.
+
+Ordering is based on successful queue registration time.
+
+Example:
+
+```text
+10:01 Online  → Queue 1
+10:04 Walk-in → Queue 2
+10:05 Online  → Queue 3
+```
+
+The registration source must not affect queue priority.
+
+The queue-number assignment must be concurrency-safe.
+
+---
+
+# 20. Queue State Flow
+
+```text
+WAITING
+   ↓
+CALLED
+   ├──► IN_CHECKUP
+   │       ↓
+   │    COMPLETED
+   │
+   └──► NOT_PRESENT / SKIPPED
+```
+
+A skipped patient remains in the database and can be managed later.
+
+---
+
+# 21. Secretary Queue Service
+
+The secretary queue service provides:
+
+```text
+Next Patient
+Start Checkup
+Skip / Not Present
+Complete Checkup
+```
+
+The mobile interface should call backend actions rather than implementing queue state transitions locally.
+
+---
+
+# 22. Walk-in Registration Module
+
+Walk-in registration is a secretary-controlled workflow.
+
+```text
+Secretary
+   ↓
+Search Patient
+   ↓
+Existing Account?
+ ├── Yes
+ │    ↓
+ │ Use Existing Account
+ │
+ └── No
+      ↓
+   Create Patient
+      ↓
+   Generate Temporary Password
+      ↓
+   Require First-Login Password Change
+   ↓
+Select Doctor / Date
+   ↓
+Check Capacity
+   ↓
+Create Appointment/Registration
+   ↓
+Create Queue Entry
+   ↓
+Update Capacity
+```
+
+Walk-in registration must use the same capacity and queue services as online reservation.
+
+---
+
+# 23. Walk-in Account Architecture
+
+New walk-in accounts require:
+
+```text
+email
+username = email
+temporary_password
+must_change_password = true
+```
+
+The temporary password must be securely hashed.
+
+The plaintext temporary password should not be retained after the authorized credential-delivery process.
+
+The backend must block normal application access until:
+
+```text
+must_change_password = false
+```
+
+---
+
+# 24. Medical History Association
+
+Walk-in and online patients must use the same patient identity model.
+
+Correct flow:
+
+```text
+Patient
+   ↓
+Appointment
+   ↓
+Queue Entry
+   ↓
+Visit
+   ↓
+Medical History
+   ↓
+Prescription
+```
+
+A walk-in patient must not receive a disconnected temporary medical record.
+
+---
+
+# 25. Secretary–Patient Communication Module
+
+The communication module supports:
+
+```text
+Patient ↔ Secretary
+```
+
+It does not support:
+
+```text
+Patient ↔ Doctor
+```
+
+Recommended tables:
+
+```text
+conversations
+messages
+```
+
+---
+
+# 26. Conversation Data Model
+
+```text
+conversations
+-------------
+id
 patient_id
 secretary_id
 clinic_id
@@ -313,7 +722,9 @@ created_at
 updated_at
 ```
 
-Potential status:
+There should be no `doctor_id` in this patient-secretary conversation model.
+
+Recommended statuses:
 
 ```text
 OPEN
@@ -321,21 +732,13 @@ CLOSED
 ARCHIVED
 ```
 
-The conversation belongs to the **patient-secretary communication domain**.
-
-No patient-doctor conversation type should be implemented.
-
 ---
 
-# 10. Message Module
-
-Messages belong to a conversation.
-
-Conceptual structure:
+# 27. Message Data Model
 
 ```text
 messages
----------
+--------
 id
 conversation_id
 sender_user_id
@@ -344,200 +747,233 @@ sent_at
 read_at
 ```
 
-Each message must reference a valid conversation participant.
-
-The backend must verify that the sender is authorized to participate in the conversation.
+The backend must verify that the sender is an authorized participant.
 
 ---
 
-# 11. Patient–Secretary Chat Architecture
+# 28. Chat Architecture
 
 ```text
-Patient Mobile App
-       │
-       │ POST /conversations/:id/messages
-       ▼
-Backend API
-       │
-       ├── Authenticate
-       ├── Verify Patient Role
-       ├── Verify Conversation Membership
-       ├── Validate Message
-       └── Save Message
-       │
-       ▼
-PostgreSQL
-       │
-       ▼
-Secretary Mobile App
-```
-
-The same permission model applies in the opposite direction.
-
-### Important
-
-The API should never accept:
-
-```text
-patient_id + doctor_id
-```
-
-to create a direct patient-doctor conversation.
-
----
-
-# 12. Real-Time Messaging
-
-The application may implement messaging using:
-
-- WebSockets
-- Server-Sent Events
-- Polling
-
-The implementation can be selected based on the mobile/backend technology.
-
-For the MVP, a simple reliable approach is preferred.
-
-Regardless of transport, PostgreSQL remains the persistent source of truth for messages.
-
----
-
-# 13. AI Chatbot Module
-
-The AI chatbot is a backend-integrated service.
-
-Architecture:
-
-```text
-Patient
-   │
-   ▼
-Mobile AI Chat UI
-   │
-   │ HTTPS
-   ▼
-Backend AI Module
-   │
-   ├── Authentication
-   ├── Input Validation
-   ├── Safety Processing
-   ├── Conversation Context
-   │
-   ▼
-External AI Provider
-   │
-   ▼
-Safety / Response Processing
-   │
-   ▼
+Patient Mobile
+      ↓
+POST /conversations/:id/messages
+      ↓
 Backend
-   │
-   ▼
-Mobile App
+      ↓
+Authenticate
+      ↓
+Verify Conversation Access
+      ↓
+Validate Message
+      ↓
+Save Message
+      ↓
+Notify Secretary
 ```
 
-The AI provider must not receive unrestricted application access to PostgreSQL.
+The same authorization model applies when the secretary replies.
 
 ---
 
-# 14. AI Chat Responsibilities
+# 29. Doctor Chat Restriction
 
-The backend AI module is responsible for:
+The architecture must not provide direct patient-doctor messaging.
 
-- Sending user questions to the AI provider.
-- Managing conversation context.
-- Applying system instructions.
-- Applying safety rules.
-- Processing AI responses.
-- Returning responses to the mobile application.
-- Optionally recording conversation history.
-
-The AI module must not directly modify:
-
-- Appointments
-- Prescriptions
-- Patient records
-- Doctor schedules
-
-unless a future feature explicitly introduces such functionality with appropriate authorization and validation.
-
----
-
-# 15. AI Safety Architecture
-
-The AI pipeline should conceptually be:
+Do not create:
 
 ```text
-Patient Input
-     ↓
-Input Validation
-     ↓
-Safety / Policy Checks
-     ↓
-AI Request
-     ↓
-AI Response
-     ↓
-Response Safety Processing
-     ↓
+doctor-chat endpoints
+doctor conversation tables
+patient-doctor chat screens
+```
+
+Generic conversation code must explicitly enforce this restriction.
+
+---
+
+# 30. Payment Module
+
+Payment is separate from reservation.
+
+Supported initial methods:
+
+```text
+CASH
+GCASH
+```
+
+The system does not require advance payment for regular reservations.
+
+---
+
+# 31. GCash Architecture
+
+The project does not integrate directly with the GCash API.
+
+Use a static/default clinic GCash QR.
+
+```text
 Patient
+   ↓
+View GCash QR
+   ↓
+Pay using GCash externally
+   ↓
+Upload Receipt
+   ↓
+Receipt Storage
+   ↓
+Payment = PENDING_VERIFICATION
+   ↓
+Secretary Reviews
+   ↓
+PAID / REJECTED
 ```
 
-The AI must be instructed that it is an informational assistant.
-
-The system should prevent or discourage AI behavior that:
-
-- Claims to be a physician.
-- Provides definitive diagnosis.
-- Prescribes medications.
-- Changes a doctor's prescription.
-- Makes clinical decisions.
-- Gives misleading certainty.
+Receipt upload does not automatically mean payment is valid.
 
 ---
 
-# 16. AI Emergency Handling
-
-When the AI detects a potentially urgent scenario, it should prioritize appropriate emergency guidance.
-
-Conceptually:
-
-```text
-Medical Question
-      │
-      ▼
-AI Safety Evaluation
-      │
-      ├── General Information
-      │        ↓
-      │     AI Response
-      │
-      └── Potential Emergency
-               ↓
-       Recommend Immediate
-       Professional / Emergency Care
-```
-
-The AI should not attempt to manage an emergency entirely through conversation.
-
----
-
-# 17. AI Conversation Data
-
-If AI conversations are persisted, use separate records from patient-secretary conversations.
+# 32. Payment Data Model
 
 Recommended:
 
 ```text
+payments
+--------
+id
+patient_id
+appointment_id
+payment_method
+consultation_amount
+total_additional_charges
+total_amount
+status
+receipt_url
+verified_by
+verified_at
+created_at
+updated_at
+```
+
+Statuses:
+
+```text
+UNPAID
+PENDING_VERIFICATION
+PAID
+REJECTED
+```
+
+---
+
+# 33. Additional Charges Data Model
+
+Recommended:
+
+```text
+payment_charges
+---------------
+id
+payment_id
+description
+amount
+created_by
+created_at
+```
+
+Calculation:
+
+```text
+Consultation Fee
+      +
+Additional Charges
+      =
+Total Amount Due
+```
+
+---
+
+# 34. Payment Verification
+
+Only authorized secretaries should verify uploaded GCash receipts during the MVP workflow.
+
+Flow:
+
+```text
+Upload Receipt
+      ↓
+PENDING_VERIFICATION
+      ↓
+Secretary Review
+      ├── Valid → PAID
+      └── Invalid → REJECTED
+```
+
+---
+
+# 35. Receipt Storage
+
+Receipts should use secure file storage.
+
+```text
+Mobile
+  ↓
+Receipt Upload API
+  ↓
+Secure File Storage
+  ↓
+Receipt Reference
+  ↓
+PostgreSQL
+```
+
+The receipt must not be publicly accessible.
+
+---
+
+# 36. AI Chatbot Module
+
+AI is integrated through the backend.
+
+```text
+Patient
+   ↓
+Mobile AI Chat
+   ↓
+Backend
+   ↓
+Authentication
+   ↓
+Input Validation
+   ↓
+Safety Processing
+   ↓
+External AI Provider
+   ↓
+Response Processing
+   ↓
+Patient
+```
+
+The mobile application should not expose the AI provider's credentials.
+
+---
+
+# 37. AI Conversation Data
+
+Recommended tables:
+
+```text
 ai_conversations
------------------
+----------------
 id
 patient_id
 created_at
 updated_at
 
 ai_messages
-------------
+-----------
 id
 conversation_id
 role
@@ -545,7 +981,7 @@ content
 created_at
 ```
 
-Possible `role` values:
+Roles may include:
 
 ```text
 USER
@@ -553,309 +989,276 @@ ASSISTANT
 SYSTEM
 ```
 
-AI conversation records must have appropriate access controls.
+---
+
+# 38. AI Safety Architecture
+
+The AI is an informational assistant.
+
+It must not:
+
+- Diagnose.
+- Prescribe.
+- Change prescriptions.
+- Replace professional medical advice.
+- Make clinical decisions.
+- Claim to be a physician.
+
+Potentially urgent cases should result in appropriate advice to seek professional or emergency assistance.
 
 ---
 
-# 18. AI Privacy
+# 39. AI Data Minimization
 
-The AI integration should minimize unnecessary sharing of sensitive patient information.
+Do not automatically send the entire patient record to the AI provider.
 
-Before sending information to an external AI provider:
+Do not send unless necessary:
 
-- Send only information necessary for the request.
-- Avoid exposing unrelated patient records.
-- Do not send authentication secrets.
-- Do not expose database credentials.
-- Do not provide unrestricted medical records to the AI by default.
+- Full medical history.
+- Complete prescription history.
+- Unrelated appointments.
+- Other patients' records.
+- Authentication credentials.
+- Database credentials.
 
-The AI integration must follow the project's educational/prototype scope.
+Only necessary information should be used for the current conversation.
 
 ---
 
-# 19. Authentication Module
+# 40. Doctor Module
 
 Responsibilities:
 
-- Registration
-- Login
-- Logout
-- Token/session handling
-- Authentication state
-- Password management
+- Profile.
+- Specialty.
+- Credentials.
+- Biography.
+- Consultation fee.
+- Approval status.
+- Availability.
+- Capacity.
 
 ---
 
-# 20. Role-Based Access Control
+# 41. Clinic Module
 
-Supported roles:
+Responsibilities:
+
+- Clinic information.
+- Doctors.
+- Secretaries.
+- Operating hours.
+- Clinic location.
+- Approval status.
+
+---
+
+# 42. Patient Module
+
+Responsibilities:
+
+- Account.
+- Medical history.
+- Allergies.
+- Medications.
+- Emergency contact.
+- Appointment history.
+- Consultation history.
+
+---
+
+# 43. Visit Module
+
+Recommended:
 
 ```text
-PATIENT
-DOCTOR
-SECRETARY
-CLINIC_STAFF
-ADMIN
-```
-
-### Patient
-
-Can:
-
-- Search doctors
-- Book appointments
-- Manage own appointments
-- Chat with authorized secretaries
-- Use AI chatbot
-- View own prescriptions
-
-### Doctor
-
-Can:
-
-- Manage own schedules
-- View own appointments
-- Access authorized patient information
-- Create prescriptions
-
-Cannot:
-
-- Access patient-secretary conversations unless explicitly required by another documented feature
-- Participate in patient chat
-
-### Secretary
-
-Can:
-
-- Manage authorized patient conversations
-- Reply to patients
-- View relevant appointment information
-- Assist with clinic scheduling
-
-### Clinic Staff
-
-Can:
-
-- Manage authorized clinic operations
-
-### Admin
-
-Can:
-
-- Manage users
-- Approve doctors
-- Approve clinics
-- Manage secretaries
-- Review appointments
-
----
-
-# 21. Communication Authorization Matrix
-
-| Sender | Recipient | Allowed |
-|---|---|---|
-| Patient | Secretary | Yes |
-| Secretary | Patient | Yes |
-| Patient | AI | Yes |
-| AI | Patient | Yes |
-| Patient | Doctor | **No** |
-| Doctor | Patient | **No direct chat** |
-
-Backend authorization must enforce this matrix.
-
-The mobile UI alone must not be responsible for preventing doctor chat.
-
----
-
-# 22. Doctor Module
-
-Responsibilities:
-
-- Doctor profile
-- Specialty
-- Credentials
-- Biography
-- Consultation fee
-- Approval status
-- Doctor search
-
-Approved doctors become available for booking according to system rules.
-
----
-
-# 23. Clinic Module
-
-Responsibilities:
-
-- Clinic profile
-- Address
-- Location
-- Contact information
-- Doctors
-- Secretaries
-- Approval status
-
----
-
-# 24. Schedule Module
-
-Responsibilities:
-
-- Working hours
-- Appointment duration
-- Unavailable dates
-- Unavailable times
-- Availability calculation
-
-Availability:
-
-```text
-Working Hours
-      -
-Unavailable Periods
-      -
-Existing Appointments
-      =
-Available Slots
-```
-
----
-
-# 25. Appointment Module
-
-Responsibilities:
-
-- Create appointment
-- View appointment
-- Cancel appointment
-- Reschedule appointment
-- Update appointment status
-- Prevent double booking
-- Maintain appointment history
-
----
-
-# 26. Double-Booking Prevention
-
-The system must prevent simultaneous booking of the same slot.
-
-Use:
-
-- PostgreSQL constraints where applicable.
-- Database transactions.
-- Server-side checks.
-- Appropriate locking/isolation.
-
-Frontend availability checks are not sufficient.
-
----
-
-# 27. Patient Module
-
-Responsibilities:
-
-- Patient profile
-- Allergies
-- Medical history
-- Medications
-- Emergency contact
-- Appointment history
-
-Sensitive data must be protected.
-
----
-
-# 28. Visit Module
-
-Responsibilities:
-
-- Visit records
-- Visit notes
-- Appointment association
-- Patient association
-- Doctor association
-- Prescription association
-
----
-
-# 29. Prescription Module
-
-Responsibilities:
-
-- Prescription creation
-- Prescription storage
-- Prescription item management
-- PDF generation
-- Patient prescription access
-
-Prescription PDF files should be protected.
-
----
-
-# 30. Waitlist Module
-
-Responsibilities:
-
-- Create waitlist entries
-- Manage waitlists
-- Match availability
-- Track waitlist status
-
----
-
-# 31. Notification Module
-
-Responsibilities:
-
-- Appointment notifications
-- New secretary message notifications
-- Prescription notifications
-- Waitlist notifications
-- Other system events
-
----
-
-# 32. Administrator Module
-
-Responsibilities:
-
-- User management
-- Doctor approvals
-- Clinic approvals
-- Secretary management
-- Appointment monitoring
-
----
-
-# 33. PostgreSQL Database Architecture
-
-Core tables:
-
-```text
-users
-patients
-doctors
-clinics
-secretaries
-clinic_staff
-doctor_clinics
-doctor_schedules
-doctor_unavailability
-appointments
 visits
+------
+id
+appointment_id
+patient_id
+doctor_id
+visit_date
+reason_for_visit
+notes
+created_at
+updated_at
+```
+
+Completed consultations should be associated with the patient account.
+
+---
+
+# 44. Prescription Module
+
+Recommended:
+
+```text
 prescriptions
+-------------
+id
+visit_id
+patient_id
+doctor_id
+prescription_date
+pdf_url
+notes
+created_at
+updated_at
+```
+
+```text
 prescription_items
-waitlists
-notifications
-conversations
-messages
-ai_conversations
-ai_messages
+------------------
+id
+prescription_id
+medication_name
+dosage
+frequency
+duration
+instructions
 ```
 
 ---
 
-# 34. Core Relationships
+# 45. Notification Module
+
+Notifications may be generated when:
+
+- Reservation is created.
+- Queue information changes.
+- Secretary sends a message.
+- Payment is verified.
+- Prescription is created.
+- Appointment changes.
+- Waitlist status changes.
+
+---
+
+# 46. API Architecture
+
+Base:
+
+```text
+/api/v1
+```
+
+### Capacity
+
+```text
+GET  /doctors/:id/capacity
+PUT  /doctors/:id/capacity
+POST /doctors/:id/capacity/:date
+```
+
+### Queue
+
+```text
+GET   /queue/:date
+GET   /queue/:date/patient/:patientId
+POST  /queue/:date/next
+PATCH /queue/:id/status
+```
+
+### Walk-in
+
+```text
+POST /walk-ins
+GET  /walk-ins/search
+POST /walk-ins/create-account
+```
+
+### Secretary Chat
+
+```text
+GET  /conversations
+POST /conversations
+GET  /conversations/:id
+GET  /conversations/:id/messages
+POST /conversations/:id/messages
+PATCH /conversations/:id/read
+```
+
+### AI
+
+```text
+POST /ai/chat
+GET  /ai/conversations
+GET  /ai/conversations/:id
+GET  /ai/conversations/:id/messages
+```
+
+### Payments
+
+```text
+GET   /payments/:appointmentId
+POST  /payments/:appointmentId/receipt
+PATCH /payments/:id/verify
+PATCH /payments/:id/reject
+POST  /payments/:id/charges
+```
+
+---
+
+# 47. Reservation Transaction
+
+Online reservation should be atomic.
+
+```text
+BEGIN TRANSACTION
+
+Validate Doctor
+Validate Schedule
+Check Capacity
+Check Slot Conflict
+Create Appointment
+Create Queue Entry
+Assign Queue Number
+Update Daily Registration Count
+Create Notification
+
+COMMIT
+```
+
+If any required step fails, roll back the transaction.
+
+---
+
+# 48. Walk-in Transaction
+
+```text
+BEGIN TRANSACTION
+
+Find/Create Patient
+Validate Doctor
+Validate Schedule
+Check Capacity
+Create Appointment/Registration
+Create Queue Entry
+Assign Queue Number
+Update Daily Registration Count
+
+COMMIT
+```
+
+---
+
+# 49. Concurrency Protection
+
+Capacity and queue registration are concurrency-sensitive.
+
+The backend must prevent:
+
+- Capacity overflow.
+- Duplicate queue numbers.
+- Double booking.
+- Race conditions between online booking and walk-in registration.
+
+Use PostgreSQL transactions, constraints, and appropriate locking/isolation.
+
+---
+
+# 50. Database Relationships
 
 ```text
 USER
@@ -865,31 +1268,34 @@ USER
  ├── CLINIC STAFF
  └── ADMIN
 
-PATIENT
- ├── APPOINTMENTS
- ├── WAITLISTS
- ├── PRESCRIPTIONS
- ├── CONVERSATIONS
- └── AI_CONVERSATIONS
-
-SECRETARY
- └── CONVERSATIONS
-
-DOCTOR
- ├── SCHEDULES
- ├── APPOINTMENTS
- ├── VISITS
- └── PRESCRIPTIONS
-
 CLINIC
  ├── DOCTORS
  └── SECRETARIES
+
+PATIENT
+ ├── APPOINTMENTS
+ ├── QUEUE ENTRIES
+ ├── VISITS
+ ├── PRESCRIPTIONS
+ ├── PAYMENTS
+ ├── CONVERSATIONS
+ └── AI CONVERSATIONS
+
+DOCTOR
+ ├── SCHEDULES
+ ├── CAPACITY
+ ├── APPOINTMENTS
+ ├── VISITS
+ └── PRESCRIPTIONS
 
 CONVERSATION
  └── MESSAGES
 
 AI_CONVERSATION
  └── AI_MESSAGES
+
+PAYMENT
+ └── PAYMENT_CHARGES
 
 APPOINTMENT
  └── VISIT
@@ -898,271 +1304,117 @@ APPOINTMENT
 
 ---
 
-# 35. Users Table
+# 51. Recommended Database Tables
 
 ```text
 users
----------
-id
-email
-password_hash
-role
-status
-created_at
-updated_at
-```
-
----
-
-# 36. Secretaries Table
-
-```text
+patients
+doctors
+clinics
 secretaries
-------------
-id
-user_id
-clinic_id
-full_name
-contact_number
-status
-created_at
-updated_at
-```
+clinic_staff
+doctor_clinics
 
-A secretary should be associated with a clinic.
+doctor_schedules
+doctor_unavailability
+daily_capacities
 
----
+appointments
+queue_entries
 
-# 37. Conversations Table
+visits
+prescriptions
+prescription_items
 
-```text
+payments
+payment_charges
+
 conversations
---------------
-id
-patient_id
-secretary_id
-clinic_id
-status
-created_at
-updated_at
-```
-
-A conversation represents a patient-secretary communication channel.
-
-There should be **no doctor_id** in this table.
-
-That structure reinforces the requirement that patients cannot directly chat with doctors.
-
----
-
-# 38. Messages Table
-
-```text
 messages
----------
-id
-conversation_id
-sender_user_id
-message
-sent_at
-read_at
-```
 
-The backend must verify that `sender_user_id` belongs to a valid participant.
-
----
-
-# 39. AI Conversations Table
-
-```text
 ai_conversations
------------------
-id
-patient_id
-created_at
-updated_at
-```
-
----
-
-# 40. AI Messages Table
-
-```text
 ai_messages
-------------
-id
-conversation_id
-role
-content
-created_at
-```
 
-Potential roles:
-
-```text
-USER
-ASSISTANT
-SYSTEM
-```
-
-AI messages should be associated with the authenticated patient.
-
----
-
-# 41. API Architecture
-
-Base API:
-
-```text
-/api/v1
-```
-
-All protected communication endpoints require authentication.
-
----
-
-# 42. Secretary Chat Endpoints
-
-Example:
-
-```text
-GET    /conversations
-POST   /conversations
-GET    /conversations/:id
-GET    /conversations/:id/messages
-POST   /conversations/:id/messages
-PATCH  /conversations/:id/read
-```
-
-The backend must verify whether the authenticated user is an authorized patient or secretary for the conversation.
-
----
-
-# 43. Important API Restriction
-
-Do not create an endpoint such as:
-
-```text
-POST /doctor-chat
-POST /doctors/:id/chat
-POST /conversations/doctor
-```
-
-for direct patient-doctor communication.
-
-The API should not expose a mechanism that bypasses the communication policy.
-
----
-
-# 44. AI Chat Endpoints
-
-Example:
-
-```text
-POST   /ai/chat
-GET    /ai/conversations
-GET    /ai/conversations/:id
-GET    /ai/conversations/:id/messages
-```
-
-The backend should identify the authenticated patient rather than trusting a client-provided patient ID.
-
----
-
-# 45. AI Service Flow
-
-```text
-POST /ai/chat
-       ↓
-Authenticate Patient
-       ↓
-Validate Input
-       ↓
-Load Allowed Conversation Context
-       ↓
-Apply AI System Instructions
-       ↓
-Send Request to AI Provider
-       ↓
-Validate / Process Response
-       ↓
-Store AI Conversation Data
-       ↓
-Return Response
+waitlists
+notifications
 ```
 
 ---
 
-# 46. Doctor Endpoints
+# 52. Security Architecture
 
 ```text
-GET    /doctors
-GET    /doctors/:id
-GET    /doctors/:id/availability
-GET    /doctors/:id/schedules
-POST   /doctors/:id/schedules
-PUT    /doctors/:id/schedules/:scheduleId
-DELETE /doctors/:id/schedules/:scheduleId
+Mobile
+  ↓
+HTTPS
+  ↓
+Authentication
+  ↓
+Role Authorization
+  ↓
+Resource Ownership
+  ↓
+Business Validation
+  ↓
+Database
 ```
+
+The backend must enforce every permission.
 
 ---
 
-# 47. Appointment Endpoints
+# 53. Communication Authorization
 
-```text
-POST   /appointments
-GET    /appointments
-GET    /appointments/:id
-POST   /appointments/:id/cancel
-POST   /appointments/:id/reschedule
-PATCH  /appointments/:id
-```
+| User | Target | Permission |
+|---|---|---|
+| Patient | Secretary | Allowed |
+| Secretary | Patient | Allowed |
+| Patient | AI | Allowed |
+| Patient | Doctor | Denied |
+| Doctor | Patient | Direct chat denied |
 
----
-
-# 48. Prescription Endpoints
-
-```text
-POST   /prescriptions
-GET    /prescriptions/:id
-GET    /prescriptions/:id/pdf
-GET    /patients/me/prescriptions
-```
+The backend must enforce this matrix.
 
 ---
 
-# 49. Notification Endpoints
+# 54. Patient Data Security
 
-```text
-GET    /notifications
-PATCH  /notifications/:id/read
-PATCH  /notifications/read-all
-```
+Sensitive data includes:
 
----
+- Medical history.
+- Allergies.
+- Medications.
+- Visit notes.
+- Prescriptions.
+- Payment records.
+- GCash receipts.
+- Secretary conversations.
+- AI medical conversations.
 
-# 50. Administrative Endpoints
-
-```text
-GET    /admin/users
-
-GET    /admin/doctors
-PATCH  /admin/doctors/:id/approve
-PATCH  /admin/doctors/:id/reject
-
-GET    /admin/secretaries
-PATCH  /admin/secretaries/:id/status
-
-GET    /admin/clinics
-PATCH  /admin/clinics/:id/approve
-PATCH  /admin/clinics/:id/reject
-
-GET    /admin/appointments
-```
+Only authorized users should access these records.
 
 ---
 
-# 51. API Response Format
+# 55. Timezone
+
+The initial deployment target is:
+
+```text
+Asia/Manila
+```
+
+Date/time handling must be consistent across:
+
+- Appointments.
+- Queue entries.
+- Schedules.
+- Messages.
+- Notifications.
+- Payments.
+
+---
+
+# 56. API Response Format
 
 Success:
 
@@ -1180,238 +1432,17 @@ Error:
 {
   "success": false,
   "error": {
-    "code": "FORBIDDEN",
-    "message": "You are not authorized to access this conversation."
+    "code": "CAPACITY_FULL",
+    "message": "The selected date has reached its maximum patient capacity."
   }
 }
 ```
 
 ---
 
-# 52. Authentication and Authorization
+# 57. Error Codes
 
-The backend must enforce:
-
-```text
-Authentication
-      ↓
-Identify User
-      ↓
-Determine Role
-      ↓
-Verify Resource Ownership
-      ↓
-Verify Action Permission
-      ↓
-Execute Operation
-```
-
-Do not depend on UI visibility for security.
-
----
-
-# 53. Communication Security
-
-Patient-secretary messages must be protected.
-
-Rules:
-
-- Only conversation participants may read messages.
-- Only authorized participants may send messages.
-- Patients cannot access another patient's conversation.
-- Secretaries cannot access conversations belonging to unrelated clinics unless explicitly authorized.
-- Doctors cannot access patient-secretary conversations through normal doctor permissions.
-
----
-
-# 54. AI Security
-
-AI provider credentials must remain on the backend.
-
-Never expose:
-
-```text
-AI_API_KEY
-DATABASE_URL
-AUTH_SECRET
-```
-
-to the mobile application.
-
-The mobile app communicates with:
-
-```text
-Mobile → Backend → AI Provider
-```
-
-not:
-
-```text
-Mobile → AI Provider
-```
-
-unless a secure architecture explicitly requires it.
-
----
-
-# 55. AI Data Minimization
-
-The AI module should only provide the information required to answer a user's request.
-
-Do not automatically send:
-
-- Full patient records
-- Full medical history
-- Prescription records
-- Unrelated appointments
-- Other users' information
-
-to the AI provider.
-
----
-
-# 56. AI Output Handling
-
-AI responses should be treated as **untrusted generated content**.
-
-The backend should:
-
-- Validate the response.
-- Apply safety instructions.
-- Handle provider failures.
-- Avoid exposing internal prompts.
-- Avoid exposing API credentials.
-- Return a controlled response to the mobile application.
-
----
-
-# 57. Scheduling and Time
-
-The target timezone is:
-
-```text
-Asia/Manila
-```
-
-The system should use consistent date/time handling across:
-
-- Appointments
-- Schedules
-- Unavailability
-- Messages
-- Notifications
-- AI conversation timestamps
-
----
-
-# 58. Database Transactions
-
-Use transactions for critical multi-step operations.
-
-### Booking
-
-```text
-BEGIN
-  Check Slot
-  Verify Conflict
-  Create Appointment
-  Create Notification
-COMMIT
-```
-
-### Rescheduling
-
-```text
-BEGIN
-  Verify Ownership
-  Verify New Slot
-  Update Appointment
-  Create Notification
-COMMIT
-```
-
-### Important Chat Operations
-
-A message creation operation should ensure the conversation and participant authorization are valid before inserting the message.
-
----
-
-# 59. Database Indexing
-
-Potential indexes:
-
-```text
-users.email
-
-doctors.specialty
-doctors.approval_status
-
-appointments.doctor_id
-appointments.patient_id
-appointments.appointment_date
-appointments.status
-
-conversations.patient_id
-conversations.secretary_id
-conversations.clinic_id
-
-messages.conversation_id
-messages.sent_at
-
-ai_conversations.patient_id
-ai_messages.conversation_id
-
-notifications.user_id
-notifications.is_read
-```
-
-Indexes should be based on actual query patterns.
-
----
-
-# 60. File Storage
-
-Prescription PDFs should use secure file storage.
-
-```text
-Prescription
-      ↓
-PDF Generator
-      ↓
-Secure Storage
-      ↓
-Storage Reference
-      ↓
-PostgreSQL
-```
-
-Prescription files must not be publicly accessible.
-
----
-
-# 61. Search Architecture
-
-Doctor search remains server-side:
-
-```text
-Mobile Search
-      ↓
-Doctor Search API
-      ↓
-Search Service
-      ↓
-PostgreSQL
-      ↓
-Filtered Doctors
-      ↓
-Mobile App
-```
-
----
-
-# 62. Error Handling
-
-Use predictable errors:
+Possible errors:
 
 ```text
 VALIDATION_ERROR
@@ -1419,84 +1450,27 @@ UNAUTHORIZED
 FORBIDDEN
 NOT_FOUND
 CONFLICT
+
+CAPACITY_FULL
 APPOINTMENT_SLOT_UNAVAILABLE
+QUEUE_ASSIGNMENT_FAILED
+
 CONVERSATION_ACCESS_DENIED
+
+PAYMENT_VERIFICATION_REQUIRED
+PAYMENT_ALREADY_VERIFIED
+INVALID_PAYMENT_RECEIPT
+
 AI_SERVICE_UNAVAILABLE
 AI_RESPONSE_ERROR
+
 INVALID_APPOINTMENT_STATUS
 SERVER_ERROR
 ```
 
-Do not expose internal implementation details.
-
 ---
 
-# 63. Logging
-
-Useful events include:
-
-- Authentication failures
-- Appointment conflicts
-- Chat failures
-- AI provider failures
-- PDF generation failures
-- Administrative actions
-
-Do not log sensitive information unnecessarily.
-
-Avoid logging:
-
-- Passwords
-- API keys
-- Authentication secrets
-- Full patient medical histories
-- Full prescription contents
-- Sensitive conversation contents
-
----
-
-# 64. Deployment Architecture
-
-```text
-                 Internet
-                    │
-                    ▼
-              Mobile App
-                    │
-                  HTTPS
-                    │
-                    ▼
-              Backend API
-             /      |      \
-            /       |       \
-           ▼        ▼        ▼
-     PostgreSQL   Storage   AI Provider
-                             │
-                             ▼
-                         AI Service
-```
-
-Push notification services can be added separately.
-
----
-
-# 65. Environment Configuration
-
-Examples:
-
-```text
-DATABASE_URL
-AUTH_SECRET
-AI_API_KEY
-STORAGE credentials
-PUSH credentials
-```
-
-Never commit secrets to Git.
-
----
-
-# 66. Repository Structure
+# 58. Repository Structure
 
 ```text
 findmydoctor/
@@ -1508,8 +1482,11 @@ findmydoctor/
 │   │   ├── doctors/
 │   │   ├── appointments/
 │   │   ├── schedules/
+│   │   ├── queue/
+│   │   ├── capacity/
 │   │   ├── patients/
 │   │   ├── prescriptions/
+│   │   ├── payments/
 │   │   ├── secretary-chat/
 │   │   ├── ai-chat/
 │   │   ├── waitlist/
@@ -1529,9 +1506,12 @@ findmydoctor/
 │   │   │   ├── clinics/
 │   │   │   ├── secretaries/
 │   │   │   ├── schedules/
+│   │   │   ├── capacity/
 │   │   │   ├── appointments/
+│   │   │   ├── queue/
 │   │   │   ├── visits/
 │   │   │   ├── prescriptions/
+│   │   │   ├── payments/
 │   │   │   ├── conversations/
 │   │   │   ├── messages/
 │   │   │   ├── ai-chat/
@@ -1558,134 +1538,149 @@ findmydoctor/
 
 ---
 
-# 67. Testing Architecture
+# 59. Testing Architecture
 
-Test:
+Critical tests should cover:
 
-### Authentication
+### Booking
 
-- Login
-- Registration
-- Role restrictions
+- Valid reservation.
+- Reservation without payment.
+- Double booking.
+- Capacity full.
+- Concurrent booking.
 
-### Appointments
+### Queue
 
-- Availability
-- Booking
-- Double booking
-- Cancellation
-- Rescheduling
+- Sequential queue numbers.
+- Online/walk-in combination.
+- Queue status transitions.
+- Skip/not-present behavior.
+- Capacity updates.
+
+### Walk-in
+
+- Existing account.
+- New account.
+- Temporary password.
+- First-login password change.
+
+### Payments
+
+- Receipt upload.
+- Pending verification.
+- Secretary verification.
+- Rejection.
+- Additional charges.
+- Total amount.
 
 ### Chat
 
-- Patient can message secretary
-- Secretary can reply
-- Unauthorized patient cannot access another conversation
-- Doctor cannot use patient-secretary chat
+- Patient-secretary communication.
+- Conversation ownership.
+- Unauthorized conversation access.
+- Patient-doctor chat blocked.
 
 ### AI
 
-- Patient can send a message
-- AI response is returned
-- AI provider failure is handled
-- Conversation ownership is enforced
-- AI limitations are respected
-
-### Prescriptions
-
-- Doctor creates prescription
-- Patient accesses own prescription
-- Unauthorized users are rejected
+- AI request.
+- Authentication.
+- AI provider errors.
+- Safety behavior.
+- Conversation ownership.
 
 ---
 
-# 68. Important Architectural Boundaries
+# 60. Deployment Architecture
 
 ```text
-PATIENT
- │
- ├──────────────► SECRETARY CHAT
- │
- ├──────────────► AI CHATBOT
- │
- ├──────────────► APPOINTMENTS
- │
- └──────────────► PRESCRIPTIONS
-
-PATIENT ──X──► DOCTOR CHAT
-```
-
-This is an intentional product and architecture constraint.
-
----
-
-# 69. Scalability
-
-The initial system does not require microservices.
-
-Start with:
-
-```text
-Mobile
-  ↓
-Modular Backend
-  ↓
-PostgreSQL
-```
-
-The AI provider remains an external service.
-
-Future scaling can introduce:
-
-- Background workers
-- Queues
-- Caching
-- Multiple API instances
-- Dedicated messaging services
-
-only when justified.
-
----
-
-# 70. Final Architecture Principle
-
-The core architecture is:
-
-```text
-                  MOBILE APP
+                   Internet
                        │
-                       │ HTTPS
                        ▼
-                MODULAR BACKEND
+                  Mobile App
                        │
-       ┌───────────────┼────────────────┐
-       │               │                │
-       ▼               ▼                ▼
- APPOINTMENTS    SECRETARY CHAT     AI CHATBOT
-       │               │                │
-       └───────────────┼────────────────┘
+                     HTTPS
+                       │
                        ▼
-                   POSTGRESQL
-
-AI CHATBOT
-     │
-     ▼
-External AI Provider
+                  Backend API
+             ┌─────────┼─────────┐
+             ▼         ▼         ▼
+        PostgreSQL   Storage   AI Provider
+             │
+             └────── Application Data
 ```
+
+---
+
+# 61. Environment Configuration
+
+Potential environment values:
+
+```text
+DATABASE_URL
+AUTH_SECRET
+AI_API_KEY
+STORAGE credentials
+PUSH credentials
+```
+
+Secrets must never be committed to source control.
+
+---
+
+# 62. Architectural Rules Summary
+
+The architecture must always maintain these relationships:
+
+```text
+Mobile → Backend → PostgreSQL
+
+Mobile → Backend → AI Provider
+
+Patient ↔ Secretary
+
+Patient ↔ AI
+
+Patient ──X── Doctor
+```
+
+Online and walk-in:
+
+```text
+Online
+  ↓
+Unified Queue
+  ↑
+Walk-in
+```
+
+Reservation and payment:
+
+```text
+Reservation
+   ↓
+Successful without payment
+   ↓
+Optional GCash Payment
+```
+
+---
+
+# 63. Final Architecture Principle
 
 The backend is the source of truth for:
 
-- Authentication
-- Authorization
-- Appointments
-- Scheduling
-- Communication permissions
-- Patient access
-- Prescription access
-- AI integration
+- Authentication.
+- Authorization.
+- Availability.
+- Capacity.
+- Queue numbers.
+- Appointments.
+- Payments.
+- Communication permissions.
+- Medical-record access.
+- AI integration.
 
-PostgreSQL is the source of truth for persistent application data.
+PostgreSQL is the source of truth for persistent data.
 
-The most important communication rule is:
-
-> **Patients can communicate with secretaries and the AI chatbot, but they cannot directly chat with doctors.**
+The system should remain a **modular, secure, mobile-first educational prototype** without unnecessary distributed infrastructure.
