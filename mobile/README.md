@@ -1,6 +1,20 @@
 # mobile
 
-A new Flutter project.
+The FindMyDoctor Flutter frontend. Run Flutter commands from this directory.
+
+## Source layout
+
+```text
+lib/
++-- app/       # App composition, routing, and theme
++-- core/      # Shared infrastructure and reusable primitives
++-- features/  # Feature-owned screens, state, models, and data access
++-- main.dart  # Process entrypoint
+```
+
+Feature code should stay inside its feature directory. API calls belong in the
+frontend data layer and must target the backend REST API; the app must not
+connect directly to PostgreSQL or an external AI provider.
 
 ## Getting Started
 
