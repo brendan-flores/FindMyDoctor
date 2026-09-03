@@ -12,7 +12,7 @@
 **3. Architectural Boundaries**
 - **Mobile (`/mobile`):** Flutter code for patient mobile app must reside here. It must NEVER connect directly to PostgreSQL. All data operations must go through the REST API.
 - **Web (`/web`):** Next.js code for doctor/secretary/admin dashboards must reside here. It must NEVER connect directly to PostgreSQL. All data operations must go through the REST API.
-- **Backend (`/mobile/backend`):** Modular monolith backend using a resource-oriented REST API (`/api/v1`). Serves both mobile and web applications.
+- **Backend (`/backend`):** Modular monolith backend using a resource-oriented REST API (`/api/v1`). Serves both mobile and web applications.
 - **Database (`/database`):** PostgreSQL is the absolute source of truth for persistent data. Use migrations for all schema modifications.
 
 **4. Communication & Security Rules**
@@ -34,13 +34,13 @@
 - Dashboard layouts should follow the role-specific navigation defined in the architecture document (Doctor: appointments, schedule, patients, prescriptions; Secretary: queue, walk-ins, payments, conversations; Admin: users, doctors, secretaries, clinics).
 
 **7. Monorepo Structure**
-- This is a monorepo with three main applications: `mobile/` (Flutter), `web/` (Next.js), and `mobile/backend/` (REST API).
-- Backend is nested under `mobile/backend/` but serves both mobile and web applications.
+- This is a monorepo with three main applications: `mobile/` (Flutter), `web/` (Next.js), and `backend/` (REST API).
+- Backend is at root level and serves both mobile and web applications.
 - When working on backend features, consider impact on both frontend applications.
-- Development commands should be run from respective directories: Flutter commands from `mobile/`, Next.js commands from `web/`, backend commands from `mobile/backend/`.
+- Development commands should be run from respective directories: Flutter commands from `mobile/`, Next.js commands from `web/`, backend commands from `backend/`.
 
 **8. File Path References**
-- Backend path: `/mobile/backend/` (NOT `/backend/`)
+- Backend path: `/backend/` (NOT `/mobile/backend/`)
 - Web path: `/web/` for Next.js application
 - Mobile path: `/mobile/` for Flutter application
 - Documentation path: `/docs/` for architecture and PRD documents

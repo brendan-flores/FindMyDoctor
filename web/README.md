@@ -52,7 +52,7 @@ npm start
 
 ## Backend Integration
 
-The web application communicates with the REST API located in `mobile/backend/`. Both frontend applications (mobile and web) use the same backend API.
+The web application communicates with the REST API located in `backend/`. Both frontend applications (mobile and web) use the same backend API.
 
 ## Architecture Notes
 

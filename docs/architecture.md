@@ -1537,33 +1537,34 @@ findmydoctor/
 │   ├── services/
 │   ├── api/
 │   └── types/
-│   ├── backend/
-│   │   ├── src/
-│   │   │   ├── modules/
-│   │   │   │   ├── auth/
-│   │   │   │   ├── users/
-│   │   │   │   ├── patients/
-│   │   │   │   ├── doctors/
-│   │   │   │   ├── clinics/
-│   │   │   │   ├── secretaries/
-│   │   │   │   ├── schedules/
-│   │   │   │   ├── capacity/
-│   │   │   │   ├── appointments/
-│   │   │   │   ├── queue/
-│   │   │   │   ├── visits/
-│   │   │   │   ├── prescriptions/
-│   │   │   │   ├── payments/
-│   │   │   │   ├── conversations/
-│   │   │   │   ├── messages/
-│   │   │   │   ├── ai-chat/
-│   │   │   │   ├── waitlists/
-│   │   │   │   ├── notifications/
-│   │   │   │   └── admin/
-│   │   │   ├── middleware/
-│   │   │   ├── config/
-│   │   │   ├── database/
-│   │   │   └── utils/
-│   │   └── tests/
+
+├── backend/
+│   ├── src/
+│   │   ├── modules/
+│   │   │   ├── auth/
+│   │   │   ├── users/
+│   │   │   ├── patients/
+│   │   │   ├── doctors/
+│   │   │   ├── clinics/
+│   │   │   ├── secretaries/
+│   │   │   ├── schedules/
+│   │   │   ├── capacity/
+│   │   │   ├── appointments/
+│   │   │   ├── queue/
+│   │   │   ├── visits/
+│   │   │   ├── prescriptions/
+│   │   │   ├── payments/
+│   │   │   ├── conversations/
+│   │   │   ├── messages/
+│   │   │   ├── ai-chat/
+│   │   │   ├── waitlists/
+│   │   │   ├── notifications/
+│   │   │   └── admin/
+│   │   ├── middleware/
+│   │   ├── config/
+│   │   ├── database/
+│   │   └── utils/
+│   └── tests/
 
 ├── web/
 │   ├── src/
@@ -1590,7 +1591,115 @@ findmydoctor/
 
 ---
 
-# 59. Testing Architecture
+# 59. Technology Stack
+
+## Frontend Applications
+
+### Mobile Application (`/mobile`)
+- **Framework**: Flutter
+- **Language**: Dart
+- **Target Platforms**: iOS, Android, Web (optional)
+- **State Management**: To be determined
+- **API Communication**: REST API via HTTP/HTTPS
+
+### Web Application (`/web`)
+- **Framework**: Next.js 14 with App Router
+- **Language**: TypeScript
+- **UI Library**: React
+- **Styling**: Tailwind CSS
+- **Component Library**: shadcn/ui (optional, for complex UI components)
+- **API Communication**: REST API via HTTP/HTTPS
+- **Purpose**: Doctor, Secretary, and Admin dashboards only
+
+**Styling Recommendation: Tailwind CSS + shadcn/ui Components**
+
+This combination provides:
+- Tailwind's utility-first styling for rapid development
+- shadcn/ui's pre-built, accessible components for complex UI elements
+- Perfect integration with Next.js 14 App Router
+- No component library bloat - copy-paste only what you need
+- Easy to maintain and customize
+- Excellent for healthcare dashboard interfaces
+
+Since Tailwind CSS is already configured, shadcn/ui components can be added as needed for complex UI elements like forms, tables, and modals.
+
+## Backend Application (`/backend`)
+
+### Core Framework
+- **Runtime**: Node.js
+- **Framework**: Express.js
+- **Language**: TypeScript or JavaScript (to be determined)
+- **Architecture**: Modular Monolith
+
+### API Layer
+- **Style**: REST API
+- **Base Path**: `/api/v1`
+- **Content Type**: JSON
+- **Authentication**: JWT tokens (to be implemented)
+
+### Database Layer
+- **Database**: PostgreSQL
+- **ORM**: To be determined (Prisma, TypeORM, or raw SQL)
+- **Migrations**: Database migration system
+- **Connection Pooling**: To be configured
+
+### External Services
+- **AI Provider**: External AI service (credentials server-side only)
+- **File Storage**: Secure file storage for receipts and documents
+
+## Development Tools
+
+### Version Control
+- **Git**: Version control system
+- **Repository Structure**: Monorepo with three applications
+
+### Code Quality
+- **Linting**: ESLint (web), Flutter linter (mobile)
+- **Type Checking**: TypeScript (web), Dart analyzer (mobile)
+- **Formatting**: Prettier (optional)
+
+### Package Management
+- **Web**: npm
+- **Mobile**: pub (Flutter)
+- **Backend**: npm
+
+## Security Considerations
+
+- **HTTPS**: All API communications must use HTTPS
+- **CORS**: Proper CORS configuration for web application
+- **Authentication**: JWT-based authentication for all applications
+- **Authorization**: Role-based access control (RBAC)
+- **Data Encryption**: Encrypted database connections
+- **Secret Management**: Environment variables for sensitive data
+
+## Deployment Considerations
+
+- **Backend**: Node.js server hosting
+- **Web**: Next.js deployment (Vercel, Netlify, or self-hosted)
+- **Mobile**: App stores (Apple App Store, Google Play Store)
+- **Database**: Managed PostgreSQL service or self-hosted
+
+## Current Tech Stack Summary
+
+**Frontend:**
+- Mobile: Flutter, Dart
+- Web: Next.js 14, React, TypeScript
+
+**Styling:**
+- Web: Tailwind CSS (configured) + shadcn/ui (optional)
+
+**Backend:**
+- Node.js, Express.js (in backend/)
+
+**Database:**
+- PostgreSQL
+
+**Architecture:**
+- Monorepo with shared REST API serving both mobile and web applications
+
+---
+
+# 60. Testing Architecture
 
 Critical tests should cover:
 
@@ -1643,13 +1752,16 @@ Critical tests should cover:
 
 ---
 
-# 60. Deployment Architecture
+# 61. Deployment Architecture
 
 ```text
                    Internet
                        │
-                       ▼
-                  Mobile App
+           ┌───────────┴───────────┐
+           ▼                       ▼
+      Mobile App              Web App
+           │                       │
+           └───────────┬───────────┘
                        │
                      HTTPS
                        │
@@ -1664,23 +1776,28 @@ Critical tests should cover:
 
 ---
 
-# 61. Environment Configuration
+# 62. Environment Configuration
 
 Potential environment values:
 
 ```text
+# Backend
 DATABASE_URL
 AUTH_SECRET
 AI_API_KEY
 STORAGE credentials
 PUSH credentials
+
+# Web Application
+NEXT_PUBLIC_API_URL
+NEXT_PUBLIC_APP_URL
 ```
 
 Secrets must never be committed to source control.
 
 ---
 
-# 62. Architectural Rules Summary
+# 63. Architectural Rules Summary
 
 The architecture must always maintain these relationships:
 
@@ -1718,7 +1835,7 @@ Optional GCash Payment
 
 ---
 
-# 63. Final Architecture Principle
+# 64. Final Architecture Principle
 
 The backend is the source of truth for:
 
