@@ -1,61 +1,143 @@
-export default function Home() {
+'use client';
+
+import { useState } from 'react';
+
+export default function Login() {
+  const [role, setRole] = useState<'secretary' | 'doctor'>('secretary');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-center font-mono text-sm">
-        <h1 className="text-4xl font-bold mb-8 text-center">
-          FindMyDoctor Dashboard
-        </h1>
-        <p className="text-center mb-12 text-gray-600">
-          Select your role to access the appropriate dashboard
-        </p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <a
-            href="/doctor"
-            className="group rounded-lg border border-transparent px-5 py-4 transition-colors border-gray-300 hover:border-gray-500 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          >
-            <h2 className="mb-3 text-2xl font-semibold">
-              Doctor Dashboard
-              <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-                →
-              </span>
-            </h2>
-            <p className="m-0 max-w-[30ch] text-sm opacity-50">
-              Manage appointments, schedules, patients, and prescriptions
-            </p>
-          </a>
-
-          <a
-            href="/secretary"
-            className="group rounded-lg border border-transparent px-5 py-4 transition-colors border-gray-300 hover:border-gray-500 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          >
-            <h2 className="mb-3 text-2xl font-semibold">
-              Secretary Dashboard
-              <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-                →
-              </span>
-            </h2>
-            <p className="m-0 max-w-[30ch] text-sm opacity-50">
-              Manage daily queue, walk-ins, payments, and messaging
-            </p>
-          </a>
-
-          <a
-            href="/admin"
-            className="group rounded-lg border border-transparent px-5 py-4 transition-colors border-gray-300 hover:border-gray-500 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          >
-            <h2 className="mb-3 text-2xl font-semibold">
-              Admin Dashboard
-              <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-                →
-              </span>
-            </h2>
-            <p className="m-0 max-w-[30ch] text-sm opacity-50">
-              Manage users, doctors, secretaries, clinics, and system settings
-            </p>
-          </a>
+    <div className="h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+        <div className="text-center mb-8">
+          <div className="mb-6">
+            <img 
+              src="/images/fido_logo.png" 
+              alt="FiDo Logo" 
+              className="mx-auto h-16 w-auto"
+            />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome back
+          </h1>
+          <p className="text-gray-600">
+            Please enter your details to sign in.
+          </p>
         </div>
+
+        <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+          {/* Role Toggle */}
+          <div className="grid grid-cols-2 gap-1 rounded-full border border-gray-200 bg-gray-100 p-1.5">
+            {(['secretary', 'doctor'] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRole(r)}
+                className={`rounded-full py-3 text-base font-bold capitalize transition-colors ${
+                  role === r
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+
+          {/* Email Input */}
+          <div className="space-y-2">
+            <label htmlFor="email" className="text-sm font-semibold text-gray-900">
+              Email Address
+            </label>
+            <div className="relative">
+              <svg className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@example.com"
+                className="h-14 w-full rounded-xl border border-gray-200 bg-gray-50/40 pl-12 pr-4 text-base focus:outline-none focus:ring-2 focus:ring-blue-700 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Password Input */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label htmlFor="password" className="text-sm font-semibold text-gray-900">
+                Password
+              </label>
+              <a href="#" className="text-sm font-bold text-blue-700 hover:underline">
+                Forgot Password?
+              </a>
+            </div>
+            <div className="relative">
+              <svg className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="h-14 w-full rounded-xl border border-gray-200 bg-gray-50/40 pl-12 pr-12 text-base focus:outline-none focus:ring-2 focus:ring-blue-700 focus:border-transparent"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Remember Me */}
+          <label className="flex items-center gap-2 text-sm text-gray-500">
+            <input type="checkbox" defaultChecked className="h-4 w-4 rounded border-gray-300 text-blue-700 focus:ring-blue-700" />
+            Remember me
+          </label>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            className="h-14 w-full rounded-xl bg-blue-700 text-base font-bold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2"
+          >
+            Sign In
+          </button>
+
+          {/* Sign Up Link */}
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Don&apos;t have an account?{' '}
+              <a href="#" className="font-bold text-blue-700 hover:underline">
+                Sign up
+              </a>
+            </p>
+            <div className="mt-3">
+              <a href="#" className="text-xs font-semibold text-gray-400 hover:text-blue-700">
+                Administrator login
+              </a>
+            </div>
+          </div>
+        </form>
       </div>
-    </main>
+    </div>
   );
 }
