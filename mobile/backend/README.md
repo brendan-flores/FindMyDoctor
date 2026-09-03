@@ -7,12 +7,15 @@ The backend owns authentication, authorization, doctor discovery, scheduling, ap
 ## Boundary
 
 ```text
-mobile/ -> REST API -> backend/ -> PostgreSQL
-                         |
-                         -> External AI provider
+mobile/ -> REST API -> mobile/backend/ -> PostgreSQL
+                              |
+                              -> External AI provider
+web/    -> REST API -> mobile/backend/ -> PostgreSQL
+                              |
+                              -> External AI provider
 ```
 
-The mobile app must not connect directly to PostgreSQL or the AI provider. AI provider credentials remain server-side.
+The mobile and web apps must not connect directly to PostgreSQL or the AI provider. AI provider credentials remain server-side.
 
 ## Planned structure
 

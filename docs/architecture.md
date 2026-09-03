@@ -209,6 +209,48 @@ mobile/
 
 ---
 
+# 5.1. Web Application Architecture
+
+Recommended:
+
+```text
+web/
+├── src/
+│   ├── app/
+│   │   ├── page.tsx           # Landing page with role selection
+│   │   ├── doctor/            # Doctor dashboard
+│   │   │   ├── page.tsx
+│   │   │   ├── appointments/
+│   │   │   ├── schedule/
+│   │   │   ├── patients/
+│   │   │   └── prescriptions/
+│   │   ├── secretary/         # Secretary dashboard
+│   │   │   ├── page.tsx
+│   │   │   ├── queue/
+│   │   │   ├── walk-ins/
+│   │   │   ├── payments/
+│   │   │   └── conversations/
+│   │   └── admin/             # Admin dashboard
+│   │       ├── page.tsx
+│   │       ├── users/
+│   │       ├── doctors/
+│   │       ├── secretaries/
+│   │       └── clinics/
+│   ├── components/
+│   │   ├── layout/
+│   │   ├── ui/
+│   │   └── dashboard/
+│   └── lib/
+│       ├── api/
+│       ├── auth/
+│       └── utils/
+└── public/
+```
+
+The web application uses Next.js 14 with App Router, TypeScript, and Tailwind CSS.
+
+---
+
 # 6. Patient Navigation
 
 ```text
@@ -1495,34 +1537,44 @@ findmydoctor/
 │   ├── services/
 │   ├── api/
 │   └── types/
-│
-├── backend/
+│   ├── backend/
+│   │   ├── src/
+│   │   │   ├── modules/
+│   │   │   │   ├── auth/
+│   │   │   │   ├── users/
+│   │   │   │   ├── patients/
+│   │   │   │   ├── doctors/
+│   │   │   │   ├── clinics/
+│   │   │   │   ├── secretaries/
+│   │   │   │   ├── schedules/
+│   │   │   │   ├── capacity/
+│   │   │   │   ├── appointments/
+│   │   │   │   ├── queue/
+│   │   │   │   ├── visits/
+│   │   │   │   ├── prescriptions/
+│   │   │   │   ├── payments/
+│   │   │   │   ├── conversations/
+│   │   │   │   ├── messages/
+│   │   │   │   ├── ai-chat/
+│   │   │   │   ├── waitlists/
+│   │   │   │   ├── notifications/
+│   │   │   │   └── admin/
+│   │   │   ├── middleware/
+│   │   │   ├── config/
+│   │   │   ├── database/
+│   │   │   └── utils/
+│   │   └── tests/
+
+├── web/
 │   ├── src/
-│   │   ├── modules/
-│   │   │   ├── auth/
-│   │   │   ├── users/
-│   │   │   ├── patients/
-│   │   │   ├── doctors/
-│   │   │   ├── clinics/
-│   │   │   ├── secretaries/
-│   │   │   ├── schedules/
-│   │   │   ├── capacity/
-│   │   │   ├── appointments/
-│   │   │   ├── queue/
-│   │   │   ├── visits/
-│   │   │   ├── prescriptions/
-│   │   │   ├── payments/
-│   │   │   ├── conversations/
-│   │   │   ├── messages/
-│   │   │   ├── ai-chat/
-│   │   │   ├── waitlists/
-│   │   │   ├── notifications/
+│   │   ├── app/
+│   │   │   ├── page.tsx
+│   │   │   ├── doctor/
+│   │   │   ├── secretary/
 │   │   │   └── admin/
-│   │   ├── middleware/
-│   │   ├── config/
-│   │   ├── database/
-│   │   └── utils/
-│   └── tests/
+│   │   ├── components/
+│   │   └── lib/
+│   └── public/
 │
 ├── database/
 │   ├── migrations/
