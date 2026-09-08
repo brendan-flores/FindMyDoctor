@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 
-export default function Login() {
-  const [role, setRole] = useState<'secretary' | 'doctor'>('secretary');
+export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -20,32 +19,14 @@ export default function Login() {
             />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back
+            Administrator Login
           </h1>
           <p className="text-gray-600">
-            Please enter your details to sign in.
+            Please enter your admin credentials to sign in.
           </p>
         </div>
 
         <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-          {/* Role Toggle */}
-          <div className="grid grid-cols-2 gap-1 rounded-full border border-gray-200 bg-gray-100 p-1.5">
-            {(['secretary', 'doctor'] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRole(r)}
-                className={`rounded-full py-3 text-base font-bold capitalize transition-colors ${
-                  role === r
-                    ? 'bg-white text-blue-700 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-
           {/* Email Input */}
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-semibold text-gray-900">
@@ -60,7 +41,7 @@ export default function Login() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
+                placeholder="admin@fido.ph"
                 className="h-14 w-full rounded-xl border border-gray-200 bg-gray-50/40 pl-12 pr-4 text-base focus:outline-none focus:ring-2 focus:ring-blue-700 focus:border-transparent"
               />
             </div>
@@ -121,16 +102,6 @@ export default function Login() {
           >
             Sign In
           </button>
-
-          {/* Sign Up Link */}
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Don&apos;t have an account?{' '}
-              <a href="#" className="font-bold text-blue-700 hover:underline">
-                Sign up
-              </a>
-            </p>
-          </div>
         </form>
       </div>
     </div>
