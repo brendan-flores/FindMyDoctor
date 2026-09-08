@@ -1,0 +1,341 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{width:100%;margin:0;padding:0;}body{overscroll-behavior-y:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"outline":"#6e7881","primary-fixed":"#c9e6ff","primary-container":"#0ea5e9","secondary-container":"#dae2fd","on-primary-container":"#003751","on-primary-fixed":"#001e2f","secondary-fixed":"#dae2fd","on-surface":"#0b1c30","secondary":"#565e74","inverse-surface":"#213145","on-secondary-fixed-variant":"#3f465c","outline-variant":"#bec8d2","on-secondary":"#ffffff","on-error":"#ffffff","on-tertiary":"#ffffff","on-surface-variant":"#3e4850","error-container":"#ffdad6","background":"#f8f9ff","on-tertiary-fixed-variant":"#005048","on-secondary-container":"#5c647a","surface":"#f8f9ff","primary-fixed-dim":"#89ceff","error":"#ba1a1a","on-error-container":"#93000a","tertiary-fixed-dim":"#4fdbc8","secondary-fixed-dim":"#bec6e0","surface-container-highest":"#d3e4fe","surface-container-high":"#dce9ff","on-tertiary-container":"#003a33","inverse-primary":"#89ceff","tertiary-container":"#00ae9d","on-tertiary-fixed":"#00201c","surface-bright":"#f8f9ff","on-primary-fixed-variant":"#004c6e","on-background":"#0b1c30","primary":"#006591","inverse-on-surface":"#eaf1ff","on-primary":"#ffffff","surface-variant":"#d3e4fe","surface-container-low":"#eff4ff","surface-container":"#e5eeff","tertiary":"#006b5f","surface-dim":"#cbdbf5","surface-tint":"#006591","surface-container-lowest":"#ffffff","tertiary-fixed":"#71f8e4","on-secondary-fixed":"#131b2e"},borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","2xl":"1rem","full":"9999px"},spacing:{"touch-target":"3rem","gutter-xs":"0.25rem","gutter-3xl":"2rem","gutter-lg":"1rem","gutter-xl":"1.25rem","safe-margin":"1rem","gutter-2xl":"1.5rem","gutter-sm":"0.5rem","gutter-md":"0.75rem"},fontFamily:{"label-md":["Plus Jakarta Sans"],"body-md":["Plus Jakarta Sans"],"body-lg":["Plus Jakarta Sans"],"body-md-medium":["Plus Jakarta Sans"],"headline-md":["Plus Jakarta Sans"],"body-lg-medium":["Plus Jakarta Sans"],"queue-num":["Plus Jakarta Sans"],"headline-lg":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"],"label-sm":["Plus Jakarta Sans"]},fontSize:{"label-md":["13px",{"lineHeight":"16px","fontWeight":"600"}],"body-md":["14px",{"lineHeight":"20px","fontWeight":"400"}],"body-lg":["16px",{"lineHeight":"24px","fontWeight":"400"}],"body-md-medium":["14px",{"lineHeight":"20px","fontWeight":"500"}],"headline-md":["22px",{"lineHeight":"28px","fontWeight":"700"}],"body-lg-medium":["16px",{"lineHeight":"24px","fontWeight":"500"}],"queue-num":["32px",{"lineHeight":"36px","fontWeight":"800"}],"headline-lg":["28px",{"lineHeight":"36px","fontWeight":"700"}],"headline-sm":["18px",{"lineHeight":"24px","fontWeight":"600"}],"label-sm":["11px",{"lineHeight":"14px","letterSpacing":"0.04em","fontWeight":"700"}]}}}};</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.04); opacity: 0.4; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .badge-glow {
+      animation: pulse-ring 2.2s infinite ease-in-out;
+    }
+  </style>
+<title>When User Clicks a Doctor</title></head><body class="bg-surface font-body-md text-on-surface min-h-screen flex flex-col antialiased selection:bg-primary-fixed selection:text-on-primary-fixed relative overflow-x-hidden"><header class="fixed top-0 w-full z-40 pt-safe pointer-events-none"><div class="flex items-center justify-between px-safe-margin pt-1.5 text-secondary text-[11px] font-semibold tracking-tight"><span class="tabular-nums">9:41</span><div class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[14px]">signal_cellular_alt</span><span class="material-symbols-outlined text-[14px]">wifi</span><span class="material-symbols-outlined text-[14px]">battery_full</span></div></div><div class="h-14 px-safe-margin flex items-center justify-between gap-gutter-sm"><div class="flex items-center gap-2 min-w-0 pointer-events-none"><button aria-label="Go back" class="w-10 h-10 -ml-1.5 flex items-center justify-center text-on-surface bg-surface-container-lowest hover:bg-surface-container border border-slate-200 shadow-sm rounded-full transition-all active:scale-95 touch-manipulation" onclick="history.back()"><span class="material-symbols-outlined text-[20px]">arrow_back_ios_new</span></button><h1 class="text-[15px] font-bold text-on-surface truncate pointer-events-auto ml-1">Doctor Schedule &amp; Date</h1></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-32 px-safe-margin bg-surface"><div class="flex flex-col w-full pt-3">
+<!-- Compact Doctor Summary Card -->
+<section class="w-full bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-slate-100 mb-4"><div class="flex items-center gap-3.5"><div class="relative shrink-0"><img class="w-14 h-14 rounded-xl object-cover shadow-sm ring-1 ring-slate-100" data-alt="Warm and professional portrait of Dr. Maria Angela Santos, a Filipino female cardiologist in her early forties, wearing a white medical coat and navy scrubs with a stethoscope, warm studio lighting with soft teal and blue clinical bokeh background, high resolution photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYx7IG_PK6HMzGpdgmYMMzuEk-ehureo0j2ywWz8Sck9qGXanzl8HTDMu8qltd3WbI1Faj2D9gTOewpwpIwQGS_TrHImnTNP3lyaKp9aDWYa_II87F9yg5u9Ul498biG6uxPF0vF8xWNn-Sjoa4_g9mdSjfv_42GC-LhD0W9BKmxSKqXPX4IQaWUX_9aEc82syKGf7LoqCfNY9enJqAqpswbYfJab9ZeYPQ-MiXExhUzFAdLsk35cHbw"><div class="absolute -bottom-1 -right-1 bg-tertiary text-on-tertiary w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-white"><span class="material-symbols-outlined text-[10px]" style="font-variation-settings: 'FILL' 1;">verified</span></div></div><div class="flex-1 min-w-0"><div class="flex items-baseline justify-between gap-1"><h2 class="font-headline-sm text-[16px] text-on-surface leading-tight font-bold truncate">Dr. Maria Angela Santos, MD</h2></div><p class="font-body-md text-secondary text-[13px] mt-0.5 truncate">Adult Cardiology • St. Luke's BGC</p><div class="flex items-center justify-between gap-2 mt-2 pt-1 border-t border-slate-100"><span class="text-secondary text-[12px] font-medium flex items-center gap-1 min-w-0 truncate"><span class="material-symbols-outlined text-[14px] text-primary shrink-0">meeting_room</span><span class="truncate">Room 412, Medical Arts</span></span><span class="inline-flex items-center px-2 py-0.5 rounded-full bg-sky-50 text-primary font-bold text-[11px] border border-sky-100 shrink-0">₱1,000 / consult</span></div></div></div></section>
+<!-- Streamlined Date Selection -->
+<section class="w-full bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-slate-100 mb-4"><div class="flex items-center justify-between pb-3 border-b border-slate-100"><div class="flex items-start gap-3"><div class="w-9 h-9 rounded-xl bg-sky-50 text-primary flex items-center justify-center shrink-0 mt-0.5 border border-sky-100"><span class="material-symbols-outlined text-[20px]">calendar_month</span></div><div class="min-w-0"><h3 class="font-headline-sm text-headline-sm text-on-surface font-bold leading-tight">Clinic Schedule &amp; Calendar</h3><p class="text-label-md text-secondary font-medium mt-1 flex items-center gap-1.5 truncate"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0"></span><span class="truncate">Tue &amp; Thu • 9:00 AM – 3:00 PM</span></p></div></div></div><div class="mt-3 flex items-center justify-between px-1"><button aria-label="Previous month" class="w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:text-on-surface hover:bg-surface-container border border-slate-200/60 transition-all active:scale-95" type="button"><span class="material-symbols-outlined text-[18px]">chevron_left</span></button><div class="flex items-center gap-2"><h4 class="text-[15px] font-bold text-on-surface tracking-tight">October 2025</h4><span class="px-2 py-0.5 rounded-full bg-sky-50 border border-sky-100 text-primary text-[10px] font-bold uppercase tracking-wider">Regular Clinic</span></div><button aria-label="Next month" class="w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:text-on-surface hover:bg-surface-container border border-slate-200/60 transition-all active:scale-95" type="button"><span class="material-symbols-outlined text-[18px]">chevron_right</span></button></div><div class="mt-3 grid grid-cols-7 gap-1 text-center font-bold text-[11px] text-slate-400 pb-1 border-b border-slate-100"><span class="">Su</span><span class="">Mo</span><span class="text-primary font-extrabold">Tu</span><span class="">We</span><span class="text-primary font-extrabold">Th</span><span class="">Fr</span><span class="">Sa</span></div><div class="mt-2 grid grid-cols-7 gap-1 text-center text-[12px]"><div class="p-1 min-h-[44px] flex flex-col items-center justify-center text-slate-300"></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center text-slate-300"></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center text-slate-300"></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">1</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg bg-slate-50 text-slate-400 opacity-60"><span class="text-[12px] line-through">2</span><span class="text-[9px] text-slate-400">Past</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">3</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">4</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">5</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">6</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg bg-slate-50 text-slate-400 opacity-60"><span class="text-[12px] line-through">7</span><span class="text-[9px] text-slate-400">Past</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">8</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg bg-slate-50 text-slate-400 opacity-60"><span class="text-[12px] line-through">9</span><span class="text-[9px] text-slate-400">Past</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">10</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">11</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">12</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">13</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg bg-slate-50 text-slate-400 opacity-60"><span class="text-[12px] line-through">14</span><span class="text-[9px] text-slate-400">Past</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">15</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg bg-slate-50 text-slate-400 opacity-60"><span class="text-[12px] line-through">16</span><span class="text-[9px] text-slate-400">Past</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">17</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">18</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">19</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">20</span></div><button class="p-1 min-h-[48px] flex flex-col items-center justify-center rounded-xl bg-primary text-on-primary shadow-sm ring-2 ring-primary ring-offset-1 transition-all" type="button"><span class="text-[13px] font-extrabold leading-none">21</span><span class="inline-block px-1 py-0.2 rounded-full bg-white/20 text-[9px] font-bold mt-1 text-sky-100">Q #4</span></button><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">22</span></div><div class="p-1 min-h-[48px] flex flex-col items-center justify-center rounded-xl bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed" title="Fully Booked"><span class="text-[13px] font-bold leading-none text-slate-500">23</span><span class="inline-block px-1 py-0.2 rounded-full bg-slate-200 text-[9px] font-bold mt-1 text-slate-500">Full</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">24</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">25</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">26</span></div><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">27</span></div><button class="p-1 min-h-[48px] flex flex-col items-center justify-center rounded-xl bg-sky-50/70 border border-primary/30 hover:border-primary text-primary transition-all" type="button"><span class="text-[13px] font-bold leading-none text-on-surface">28</span><span class="inline-block px-1 py-0.2 rounded-full bg-emerald-500/15 text-tertiary text-[9px] font-bold mt-1">7 left</span></button><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">29</span></div><button class="p-1 min-h-[48px] flex flex-col items-center justify-center rounded-xl bg-sky-50/70 border border-primary/30 hover:border-primary text-primary transition-all" type="button"><span class="text-[13px] font-bold leading-none text-on-surface">30</span><span class="inline-block px-1 py-0.2 rounded-full bg-emerald-500/15 text-tertiary text-[9px] font-bold mt-1">10 left</span></button><div class="p-1 min-h-[44px] flex flex-col items-center justify-center rounded-lg text-slate-400"><span class="text-[12px]">31</span></div></div><div class="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-y-1.5 px-1 text-[11px] text-secondary"><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-primary inline-block"></span><span class="font-medium text-on-surface">Selected</span></div><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span><span class="font-medium text-on-surface">Open Slots</span></div><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span><span class="">Fully Booked</span></div><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-slate-200 inline-block"></span><span class="">Non-Clinic</span></div></div></section>
+<!-- Intuitive, Clean Time Slots Section -->
+<section class="w-full bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-slate-100 mb-4"><div class="flex items-center justify-between pb-3 border-b border-slate-100"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-primary text-[20px]">confirmation_number</span><h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Selected Day &amp; Queue Summary</h3></div></div><div class="mt-3.5 p-4 rounded-xl bg-gradient-to-r from-sky-50 to-blue-50/60 border border-sky-100"><div class="flex items-center justify-between gap-3"><div class="flex items-center gap-3 min-w-0"><div class="w-12 h-12 rounded-xl bg-primary text-on-primary flex flex-col items-center justify-center shrink-0 shadow-sm"><span class="text-[9px] font-bold text-sky-100 leading-tight uppercase tracking-wider">Queue</span><span class="text-[22px] font-extrabold leading-none" id="q1Num">#4</span></div><div class="min-w-0"><h4 class="font-bold text-on-surface text-[15px] leading-tight truncate" id="slotStatusHeadline">Tuesday, Oct 21, 2025</h4><p class="text-secondary text-[12px] mt-1 flex items-center gap-1"><span class="material-symbols-outlined text-[14px] text-primary">schedule</span><span class="">9:00 AM – 3:00 PM</span></p></div></div><div class="text-right shrink-0"><span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-tertiary font-bold text-[11px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>4 Slots Left</span></div></div></div><div class="space-y-2 text-[12px] text-on-surface-variant border-t border-slate-100 pt-3 mt-3.5"><div class="flex items-center justify-between"><span class="flex items-center gap-1.5 text-secondary"><span class="material-symbols-outlined text-[16px] text-secondary shrink-0">payments</span><span class="">Consultation Fee</span></span><span class="font-bold text-on-surface">₱1,000 (Pay at clinic cashier)</span></div><div class="flex items-center justify-between"><span class="flex items-center gap-1.5 text-tertiary"><span class="material-symbols-outlined text-[16px] text-tertiary shrink-0">verified_user</span><span class="">Cancellation Policy</span></span><span class="text-emerald-700 font-semibold text-[11px]">Cancel anytime</span></div></div></section>
+</div>
+<!-- Sticky Bottom CTA Section -->
+<div class="fixed bottom-0 left-0 right-0 w-full z-30 bg-surface-container-lowest/95 backdrop-blur-md p-4 rounded-t-2xl border-t border-slate-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-safe-margin pb-safe">
+<div class="flex items-center justify-between mb-2 px-1">
+<div>
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider block">Total</span>
+<span class="font-headline-md text-headline-md text-on-surface font-bold">₱1,000</span>
+</div>
+<div class="text-right">
+<span class="font-body-md-medium text-body-md text-slate-600 block">Pay at clinic</span>
+<span class="font-label-sm text-label-sm text-tertiary font-semibold block" id="bottomSummaryDate">Tue, Oct 21, 2025 (Clinic Day)</span>
+</div>
+</div>
+<button class="w-full h-12 bg-primary hover:bg-surface-tint active:bg-sky-800 text-on-primary font-headline-sm text-headline-sm rounded-xl flex items-center justify-center gap-2 shadow-md transition-all touch-manipulation active:scale-[0.98]" id="btnContinueReview" type="button"><span class="">Confirm Clinic Date &amp; Reserve Queue</span><span class="material-symbols-outlined text-[20px]">arrow_forward</span></button>
+</div>
+<!-- Disabled Date Toast Notification -->
+<div class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-inverse-surface text-inverse-on-surface px-4 py-2.5 rounded-full shadow-lg text-[13px] font-medium flex items-center gap-2 opacity-0 pointer-events-none transition-all duration-300 transform translate-y-3" id="toastNotification">
+<span class="material-symbols-outlined text-[18px] text-amber-400">error</span>
+<span class="">Thursday, Oct 23 is fully booked. Please select an available date.</span>
+</div>
+<!-- Bottom Sheet Modal Backdrop & Sheet -->
+<div class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-[2px] opacity-0 pointer-events-none transition-opacity duration-300 flex flex-col justify-end" id="modalBackdrop">
+<!-- Modal Sheet -->
+<div class="w-full max-w-lg mx-auto bg-surface-container-lowest rounded-t-3xl shadow-2xl border-t border-slate-100 flex flex-col max-h-[88vh] transform translate-y-full transition-transform duration-300 ease-out overflow-hidden" id="modalSheet">
+<!-- Drag Handle and Close Row -->
+<div class="relative pt-3 pb-2 px-5 flex items-center justify-between border-b border-slate-100">
+<div class="w-10 h-1.5 bg-slate-300 rounded-full mx-auto absolute left-1/2 -translate-x-1/2 top-2.5"></div>
+<div class="flex items-center gap-1.5 pt-2">
+<span class="material-symbols-outlined text-primary text-[20px]">verified</span>
+<span class="text-label-sm uppercase tracking-wider text-primary font-bold">Reservation Preview</span>
+</div>
+<button class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-secondary hover:text-on-surface flex items-center justify-center transition-colors pt-2" onclick="closeDateModal()" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<!-- Scrollable Modal Content -->
+<div class="p-5 overflow-y-auto space-y-4">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Confirm Clinic Date &amp; Queue Reservation</h3>
+<p class="font-body-md text-secondary text-[13px] mt-0.5">Please review your reserved clinic schedule details before generating your digital queue slip.</p>
+</div>
+<!-- Doctor Snippet in Modal -->
+<div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+<img alt="Dr. Santos" class="w-11 h-11 rounded-lg object-cover ring-1 ring-slate-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYx7IG_PK6HMzGpdgmYMMzuEk-ehureo0j2ywWz8Sck9qGXanzl8HTDMu8qltd3WbI1Faj2D9gTOewpwpIwQGS_TrHImnTNP3lyaKp9aDWYa_II87F9yg5u9Ul498biG6uxPF0vF8xWNn-Sjoa4_g9mdSjfv_42GC-LhD0W9BKmxSKqXPX4IQaWUX_9aEc82syKGf7LoqCfNY9enJqAqpswbYfJab9ZeYPQ-MiXExhUzFAdLsk35cHbw">
+<div class="min-w-0 flex-1">
+<h4 class="font-label-md font-bold text-on-surface text-[14px] truncate">Dr. Maria Angela Santos, MD</h4>
+<p class="text-[12px] text-secondary truncate">Adult Cardiology • St. Luke's BGC</p>
+</div>
+<div class="text-right shrink-0">
+<span class="text-[11px] font-bold text-slate-500 block">Room</span>
+<span class="text-[13px] font-extrabold text-on-surface">412</span>
+</div>
+</div>
+<!-- Selected Date Banner -->
+<div class="p-4 rounded-2xl bg-sky-50 border border-primary/20 relative overflow-hidden">
+<div class="flex items-center justify-between">
+<div>
+<span class="text-[11px] font-bold uppercase tracking-wider text-primary">Selected Clinic Date</span>
+<h4 class="text-[18px] font-headline-sm font-extrabold text-on-surface mt-0.5" id="modalSelectedDate">Tuesday, Oct 21, 2025</h4>
+<p class="text-[13px] text-secondary flex items-center gap-1.5 mt-1">
+<span class="material-symbols-outlined text-[15px] text-primary">schedule</span>
+<span class="" id="modalSelectedHours">Clinic Hours: 9:00 AM – 3:00 PM</span>
+</p>
+</div>
+<div class="w-11 h-11 rounded-xl bg-primary text-on-primary flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[24px]">event_available</span>
+</div>
+</div>
+</div>
+<!-- Prominent Digital Queue Badge -->
+<div class="p-4 rounded-2xl bg-gradient-to-br from-primary via-sky-600 to-sky-700 text-on-primary shadow-md relative overflow-hidden">
+<div class="absolute -right-4 -bottom-4 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+<div class="flex items-center justify-between relative z-10">
+<div>
+<span class="text-sky-100 text-[11px] font-bold uppercase tracking-wider block">Assigned Digital Queue</span>
+<div class="flex items-baseline gap-2 mt-1">
+<span class="font-queue-num text-[34px] font-extrabold leading-none tracking-tight" id="modalQueueNumber">Queue #4</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-100 border border-emerald-300/30 text-[11px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>Allocated to You
+              </span>
+</div>
+<p class="text-sky-100 text-[12px] mt-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">hourglass_top</span>
+<span class="">Estimated Consultation Window: <strong class="text-white" id="modalEstWindow">10:15 AM – 11:00 AM</strong></span>
+</p>
+</div>
+</div>
+</div>
+<!-- Arrival Instructions & Details -->
+<div class="space-y-3 bg-surface-container-low p-3.5 rounded-xl border border-slate-200/60">
+<div class="flex items-start gap-2.5">
+<span class="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">pin_drop</span>
+<div>
+<h5 class="text-[13px] font-bold text-on-surface">Arrival &amp; Check-in</h5>
+<p class="text-[12px] text-secondary mt-0.5 leading-relaxed">Proceed directly to Room 412, Medical Arts Bldg, St. Luke's BGC. Present this digital queue slip to Secretary Grace upon arrival.</p>
+</div>
+</div>
+<div class="flex items-start gap-2.5 pt-2 border-t border-slate-200/50">
+<span class="material-symbols-outlined text-tertiary text-[18px] shrink-0 mt-0.5">price_check</span>
+<div>
+<h5 class="text-[13px] font-bold text-on-surface">Payment Details</h5>
+<p class="text-[12px] text-secondary mt-0.5 leading-relaxed"><strong>₱1,000 Consultation Fee</strong> — No advance payment required. Pay directly at the clinic reception on the day of consultation (Cash or GCash).</p>
+</div>
+</div>
+</div>
+<!-- Success Confirmation Banner (Hidden by Default) -->
+<div class="hidden p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 transition-all duration-300 animate-fadeIn" id="modalSuccessBanner">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[22px]">check</span>
+</div>
+<div>
+<h5 class="font-bold text-[14px] text-emerald-900">Queue Reserved Successfully!</h5>
+<p class="text-[12px] text-emerald-700 mt-0.5">Digital Queue Slip #<span class="" id="confirmedQueueNum">4</span> generated. SMS confirmation sent to your registered mobile number.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Modal Footer Actions -->
+<div class="p-4 border-t border-slate-100 bg-surface-container-lowest flex items-center gap-2.5 pb-safe">
+<button class="flex-1 h-12 rounded-xl border border-slate-300 text-secondary hover:text-on-surface hover:bg-slate-50 font-bold text-[14px] transition-colors" onclick="closeDateModal()" type="button">
+        Change Date
+      </button>
+<button class="flex-[1.8] h-12 rounded-xl bg-primary hover:bg-surface-tint active:bg-sky-800 text-on-primary font-headline-sm text-[15px] flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-[0.98]" id="btnModalConfirm" onclick="confirmQueueSlip()" type="button"><span class="" id="btnModalConfirmText">Confirm &amp; Generate Slip</span><span class="material-symbols-outlined text-[18px]">arrow_forward</span></button>
+</div>
+</div>
+</div>
+</main>
+<script>
+  // State
+  let currentSelection = {
+    id: 'oct21',
+    fullDate: 'Tuesday, Oct 21, 2025',
+    time: '9:00 AM – 3:00 PM',
+    queue: '4',
+    slots: '4',
+    est: '10:15 AM – 11:00 AM'
+  };
+
+  const modalBackdrop = document.getElementById('modalBackdrop');
+  const modalSheet = document.getElementById('modalSheet');
+  const toastNotification = document.getElementById('toastNotification');
+  let toastTimeout;
+
+  function showToast(message) {
+    if (toastNotification) {
+      if (message) toastNotification.querySelector('span:last-child').textContent = message;
+      toastNotification.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-3');
+      toastNotification.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toastNotification.classList.add('opacity-0', 'pointer-events-none', 'translate-y-3');
+        toastNotification.classList.remove('opacity-100', 'translate-y-0');
+      }, 3000);
+    }
+  }
+
+  function openDateModal() {
+    updateModalContent();
+    // Reset success banner if previously confirmed
+    const successBanner = document.getElementById('modalSuccessBanner');
+    const confirmBtn = document.getElementById('btnModalConfirm');
+    const confirmText = document.getElementById('btnModalConfirmText');
+    if (successBanner) successBanner.classList.add('hidden');
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.className = "flex-[1.8] h-12 rounded-xl bg-primary hover:bg-sky-700 active:bg-sky-800 text-on-primary font-bold text-[14px] flex items-center justify-center gap-1.5 shadow-md transition-all";
+    }
+    if (confirmText) confirmText.textContent = "Confirm & Generate Slip";
+
+    modalBackdrop.classList.remove('opacity-0', 'pointer-events-none');
+    modalBackdrop.classList.add('opacity-100');
+    modalSheet.classList.remove('translate-y-full');
+    modalSheet.classList.add('translate-y-0');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeDateModal() {
+    modalSheet.classList.remove('translate-y-0');
+    modalSheet.classList.add('translate-y-full');
+    modalBackdrop.classList.remove('opacity-100');
+    modalBackdrop.classList.add('opacity-0', 'pointer-events-none');
+    document.body.style.overflow = '';
+  }
+
+  function updateModalContent() {
+    document.getElementById('modalSelectedDate').textContent = currentSelection.fullDate;
+    document.getElementById('modalSelectedHours').textContent = `Clinic Hours: ${currentSelection.time}`;
+    document.getElementById('modalQueueNumber').textContent = `Queue #${currentSelection.queue}`;
+    document.getElementById('modalEstWindow').textContent = currentSelection.est;
+    document.getElementById('confirmedQueueNum').textContent = currentSelection.queue;
+  }
+
+  function selectDateCard(cardElement, shouldOpenModal = false) {
+    const dateId = cardElement.getAttribute('data-date-id');
+    const fullDate = cardElement.getAttribute('data-full-date');
+    const time = cardElement.getAttribute('data-time');
+    const queue = cardElement.getAttribute('data-queue');
+    const slots = cardElement.getAttribute('data-slots');
+    const est = cardElement.getAttribute('data-est');
+
+    currentSelection = { id: dateId, fullDate, time, queue, slots, est };
+
+    // Update styling for all cards
+    document.querySelectorAll('.clinic-card').forEach(card => {
+      const isSelected = card === cardElement;
+      const calBadge = card.querySelector('.cal-badge');
+      const selectedPill = card.querySelector('.selected-pill');
+
+      if (isSelected) {
+        card.className = "clinic-card cursor-pointer p-3.5 rounded-xl border-2 border-primary bg-sky-50/70 relative transition-all shadow-sm";
+        if (calBadge) {
+          calBadge.className = "cal-badge w-12 h-12 rounded-xl bg-primary text-on-primary flex flex-col items-center justify-center shrink-0 shadow-sm transition-colors";
+          const daySpan = calBadge.querySelector('span:first-child');
+          if (daySpan) daySpan.className = "text-[10px] font-bold uppercase tracking-wider text-sky-100 leading-tight";
+          const numSpan = calBadge.querySelector('span:last-child');
+          if (numSpan) numSpan.className = "text-[20px] font-extrabold leading-none";
+        }
+        if (selectedPill) selectedPill.classList.remove('hidden');
+      } else {
+        card.className = "clinic-card cursor-pointer p-3.5 rounded-xl border border-slate-200/80 hover:border-primary/40 bg-surface-container-lowest hover:bg-slate-50/50 transition-all";
+        if (calBadge) {
+          calBadge.className = "cal-badge w-12 h-12 rounded-xl bg-slate-100 text-on-surface flex flex-col items-center justify-center shrink-0 border border-slate-200 transition-colors";
+          const daySpan = calBadge.querySelector('span:first-child');
+          if (daySpan) daySpan.className = "text-[10px] font-bold uppercase tracking-wider text-secondary leading-tight";
+          const numSpan = calBadge.querySelector('span:last-child');
+          if (numSpan) numSpan.className = "text-[20px] font-bold leading-none text-on-surface";
+        }
+        if (selectedPill) selectedPill.classList.add('hidden');
+      }
+    });
+
+    // Update Live Status Section
+    const headline = document.getElementById('slotStatusHeadline');
+    const subtext = document.getElementById('slotStatusSubtext');
+    const bottomDate = document.getElementById('bottomSummaryDate');
+    const instructions = document.getElementById('instructionsText');
+    const q1 = document.getElementById('q1Num');
+    const q2 = document.getElementById('q2Num');
+    const q3 = document.getElementById('q3Num');
+    const q4 = document.getElementById('q4Num');
+
+    if (headline) headline.textContent = `⚡ ${slots} Clinic Slots Remaining for Today's Booking`;
+    if (subtext) subtext.textContent = `Your reservation immediately reserves the next vacant queue number on ${fullDate.split(',')[0]}, ${fullDate.split(',')[1].trim()}.`;
+    if (bottomDate) bottomDate.textContent = `${fullDate.slice(0, 11)}, 2025 (Clinic Day)`;
+    
+    const startQ = parseInt(queue, 10);
+    if (q1) q1.textContent = `#${startQ}`;
+    if (q2) q2.textContent = `#${startQ + 1}`;
+    if (q3) q3.textContent = `#${startQ + 2}`;
+    if (q4) q4.textContent = `#${startQ + 3}`;
+
+    if (instructions) {
+      instructions.innerHTML = `Your reservation secures <strong>Queue #${queue}</strong> for ${fullDate.split(',')[0]}, ${fullDate.split(',')[1].trim()}. No advance payment needed. Arrive between <strong>9:00 AM – 11:00 AM</strong> for early consultation at Room 412, Medical Arts.`;
+    }
+
+    if (shouldOpenModal) {
+      openDateModal();
+    }
+  }
+
+  function confirmQueueSlip() {
+    const successBanner = document.getElementById('modalSuccessBanner');
+    const confirmBtn = document.getElementById('btnModalConfirm');
+    const confirmText = document.getElementById('btnModalConfirmText');
+
+    if (successBanner) {
+      successBanner.classList.remove('hidden');
+    }
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.className = "flex-[1.8] h-12 rounded-xl bg-emerald-600 text-white font-bold text-[14px] flex items-center justify-center gap-1.5 shadow-md transition-all";
+    }
+    if (confirmText) {
+      confirmText.textContent = "Queue Slip Reserved!";
+    }
+
+    // After 2.5 seconds auto dismiss or let user inspect
+    setTimeout(() => {
+      showToast(`Reserved Queue #${currentSelection.queue} for ${currentSelection.fullDate}!`);
+    }, 400);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Open date cards
+    document.querySelectorAll('.clinic-card').forEach(card => {
+      card.addEventListener('click', () => {
+        selectDateCard(card, true);
+      });
+    });
+
+    // Disabled card click
+    document.querySelectorAll('.clinic-card-full').forEach(card => {
+      card.addEventListener('click', () => {
+        showToast('Thursday, Oct 23 is fully booked. Please choose another date.');
+      });
+    });
+
+    // Sticky CTA button
+    const ctaBtn = document.getElementById('btnContinueReview');
+    if (ctaBtn) {
+      ctaBtn.addEventListener('click', () => {
+        ctaBtn.classList.add('scale-[0.98]');
+        setTimeout(() => {
+          ctaBtn.classList.remove('scale-[0.98]');
+          openDateModal();
+        }, 120);
+      });
+    }
+
+    // Modal backdrop click to close
+    modalBackdrop.addEventListener('click', (e) => {
+      if (e.target === modalBackdrop) {
+        closeDateModal();
+      }
+    });
+  });
+</script>
+</body></html>

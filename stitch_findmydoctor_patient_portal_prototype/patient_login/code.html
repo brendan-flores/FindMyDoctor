@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FindMyDoctor Philippines - Patient Login</title>
+<!-- Tailwind CSS v3 with forms and container queries plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              navy: '#002B49',
+              dark: '#0f172a',
+              primary: '#005b94',
+              primaryHover: '#004c7d',
+              teal: '#059669',
+              tealBadge: '#00A86B',
+              bgLight: '#f8f9ff',
+              softGray: '#f1f5f9',
+              accentBlue: '#0284c7'
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+          },
+          boxShadow: {
+            'card-sm': '0 2px 10px rgba(0, 43, 73, 0.04)',
+            'nav-btn': '0 2px 8px rgba(0, 0, 0, 0.04)'
+          }
+        }
+      }
+    };
+  </script>
+<!-- Custom Fonts & Refinements -->
+<style data-purpose="typography">
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+<style data-purpose="layout">
+    /* Enforce realistic mobile dimensions with seamless backdrop */
+    .mobile-frame {
+      max-width: 414px;
+      min-height: 100vh;
+      margin: 0 auto;
+      background-color: #f8f9ff;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 flex justify-center min-h-screen text-slate-800 antialiased selection:bg-sky-100 selection:text-sky-900">
+<!-- BEGIN: MobileDeviceContainer -->
+<main class="mobile-frame w-full relative flex flex-col justify-between shadow-2xl overflow-hidden border-x border-slate-200/60" data-purpose="mobile-screen-wrapper">
+<!-- Top section: Status Bar, Navigation, Branding, and Form -->
+<div class="w-full flex flex-col">
+<!-- BEGIN: iOSStatusBar -->
+<div class="w-full px-7 pt-3.5 pb-2 flex justify-between items-center select-none" data-purpose="status-bar">
+<span class="text-[15px] font-semibold text-slate-900 tracking-tight">9:41</span>
+<div class="flex items-center space-x-2 text-slate-900">
+<!-- Cellular Network Indicator -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 16 12">
+<rect height="3" rx="0.75" width="2.5" x="0" y="9"></rect>
+<rect height="6" rx="0.75" width="2.5" x="4" y="6"></rect>
+<rect height="9" rx="0.75" width="2.5" x="8" y="3"></rect>
+<rect height="12" rx="0.75" width="2.5" x="12" y="0"></rect>
+</svg>
+<!-- Wi-Fi Icon -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 16 12">
+<path d="M8 9.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm-3.5-3a5.002 5.002 0 017 0 .75.75 0 101.06-1.06A6.5 6.5 0 003.44 5.44.75.75 0 104.5 6.5zm-3-3a9.004 9.004 0 0113 0 .75.75 0 101.06-1.06 10.5 10.5 0 00-15.12 0 .75.75 0 001.06 1.06z"></path>
+</svg>
+<!-- Battery Icon -->
+<div class="w-6 h-3 rounded-[4px] border-[1.5px] border-slate-900 p-[1.5px] flex items-center relative">
+<div class="h-full w-full bg-slate-900 rounded-[1.5px]"></div>
+<div class="absolute -right-[3.5px] top-1/2 -translate-y-1/2 w-[2px] h-[4.5px] bg-slate-900 rounded-r-sm"></div>
+</div>
+</div>
+</div>
+<!-- END: iOSStatusBar -->
+<!-- BEGIN: TopNavigation -->
+<nav class="w-full px-6 pt-3 pb-4 flex items-center" data-purpose="top-navigation">
+<button aria-label="Go Back" class="w-11 h-11 rounded-full bg-white border border-slate-200/80 shadow-nav-btn flex items-center justify-center text-slate-800 hover:bg-slate-50 active:scale-95 transition-all" type="button">
+<svg class="w-5 h-5 -ml-0.5 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15.75 19.5L8.25 12l7.5-7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</nav>
+<!-- END: TopNavigation -->
+<!-- Content Container with standard padding matching screen flows -->
+<div class="px-6 flex flex-col">
+<!-- BEGIN: BrandHeader -->
+<div class="mt-2 mb-8 flex items-center gap-3 select-none" data-purpose="brand-identity">
+<!-- Light Blue Medical Location Badge -->
+<div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#009ee2] to-[#007cc2] flex items-center justify-center shadow-md shadow-sky-500/15">
+<svg class="w-6 h-6 text-white drop-shadow-sm" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 10.5a3.5 3.5 0 01-3.5-3.5A3.5 3.5 0 0112 5.5a3.5 3.5 0 013.5 3.5 3.5 3.5 0 01-3.5 3.5z" opacity="0.35"></path>
+<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm2.25 7.75h-1.5v1.5a.75.75 0 01-1.5 0v-1.5h-1.5a.75.75 0 010-1.5h1.5v-1.5a.75.75 0 011.5 0v1.5h1.5a.75.75 0 010 1.5z"></path>
+</svg>
+</div>
+<div class="flex flex-col">
+<span class="text-[20px] font-extrabold tracking-tight text-[#002b49] leading-tight">FindMyDoctor</span>
+<span class="text-[10px] font-bold tracking-[0.16em] text-[#00a86b] uppercase -mt-0.5">PHILIPPINES</span>
+</div>
+</div>
+<!-- END: BrandHeader -->
+<!-- BEGIN: WelcomeHeader -->
+<header class="mb-7" data-purpose="screen-title">
+<h1 class="text-[26px] sm:text-[28px] font-extrabold text-[#002b49] tracking-tight leading-snug">Welcome Back</h1>
+<p class="text-[14px] font-medium text-slate-500 mt-1">Log in to continue to your account.</p>
+</header>
+<!-- END: WelcomeHeader -->
+<!-- BEGIN: LoginForm -->
+<form class="space-y-4" data-purpose="login-form" onsubmit="event.preventDefault();">
+<!-- Email Input Group -->
+<div class="space-y-1.5">
+<label class="block text-[13.5px] font-bold text-slate-700" for="email">Email</label>
+<div class="relative flex items-center">
+<div class="absolute left-4 pointer-events-none text-slate-400 flex items-center justify-center">
+<svg class="w-5 h-5 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<input class="w-full bg-white text-slate-800 text-[14.5px] font-normal pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/90 shadow-card-sm placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all" id="email" name="email" placeholder="Enter your email" required="" type="email"/>
+</div>
+</div>
+<!-- Password Input Group -->
+<div class="space-y-1.5">
+<label class="block text-[13.5px] font-bold text-slate-700" for="password">Password</label>
+<div class="relative flex items-center">
+<div class="absolute left-4 pointer-events-none text-slate-400 flex items-center justify-center">
+<svg class="w-5 h-5 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<input class="w-full bg-white text-slate-800 text-[14.5px] font-normal pl-11 pr-12 py-3.5 rounded-2xl border border-slate-200/90 shadow-card-sm placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all" id="password" name="password" placeholder="Enter your password" required="" type="password"/>
+<!-- Password Visibility Toggle Button -->
+<button aria-label="Toggle password visibility" class="absolute right-3.5 p-1.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors" data-purpose="password-visibility-toggle" id="togglePassword" type="button">
+<!-- Eye Open Icon -->
+<svg class="w-5 h-5 stroke-[1.8]" fill="none" id="eyeOpenIcon" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<!-- Eye Slash Icon (hidden by default) -->
+<svg class="w-5 h-5 stroke-[1.8] hidden" fill="none" id="eyeSlashIcon" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</div>
+<!-- Secondary Action: Forgot Password Link -->
+<div class="flex justify-end pt-0.5" data-purpose="forgot-password-link">
+<a class="text-[13px] font-semibold text-[#005b94] hover:text-[#00426b] hover:underline active:opacity-80 transition-all" href="#">
+              Forgot Password?
+            </a>
+</div>
+<!-- Primary Call to Action Button -->
+<div class="pt-3" data-purpose="submit-container">
+<button class="w-full h-[54px] bg-[#00529b] hover:bg-[#00427c] active:scale-[0.99] text-white rounded-2xl font-bold text-[15.5px] tracking-wide flex items-center justify-center space-x-2 shadow-lg shadow-sky-900/10 transition-all" type="submit">
+<span>Log In</span>
+<svg class="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</form>
+<!-- END: LoginForm -->
+</div>
+</div>
+<!-- Bottom Section: Sign Up Redirection & iOS Home Indicator -->
+<div class="w-full px-6 pt-6 pb-3 flex flex-col items-center select-none" data-purpose="footer-section">
+<!-- BEGIN: SignUpNavigation -->
+<p class="text-[14px] text-slate-500 font-medium text-center">
+        Don't have an account? 
+        <a class="font-bold text-[#00529b] hover:text-[#00386b] hover:underline ml-1 inline-block" href="#">
+          Sign Up
+        </a>
+</p>
+<!-- END: SignUpNavigation -->
+<!-- BEGIN: iOSHomeIndicator -->
+<div class="w-full flex justify-center pt-5 pb-1">
+<div class="w-32 h-1 bg-slate-300/80 rounded-full"></div>
+</div>
+<!-- END: iOSHomeIndicator -->
+</div>
+</main>
+<!-- END: MobileDeviceContainer -->
+<!-- BEGIN: InteractiveScripts -->
+<script data-purpose="event-handlers">
+    // Interactive password visibility toggle handler
+    const passwordInput = document.getElementById('password');
+    const toggleButton = document.getElementById('togglePassword');
+    const eyeOpen = document.getElementById('eyeOpenIcon');
+    const eyeSlash = document.getElementById('eyeSlashIcon');
+
+    if (toggleButton && passwordInput) {
+      toggleButton.addEventListener('click', () => {
+        const isPassword = passwordInput.getAttribute('type') === 'password';
+        passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+        eyeOpen.classList.toggle('hidden', isPassword);
+        eyeSlash.classList.toggle('hidden', !isPassword);
+      });
+    }
+  </script>
+<!-- END: InteractiveScripts -->
+</body></html>
