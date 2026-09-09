@@ -49,7 +49,6 @@ Supported roles:
 PATIENT
 DOCTOR
 SECRETARY
-CLINIC_STAFF
 ADMIN
 ```
 
