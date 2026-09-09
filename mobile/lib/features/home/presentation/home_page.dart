@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../appointments/presentation/appointments_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -60,51 +61,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildAppointmentsContent() {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: spacing.AppSpacing.gutterMd),
-            Text(
-              'My Appointments',
-              style: AppTextStyles.headlineLg,
-            ),
-            const SizedBox(height: spacing.AppSpacing.gutterLg),
-            SizedBox(
-              height: MediaQuery.of(context).size.height - 200,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.calendar_month,
-                      size: 64,
-                      color: AppColors.secondary,
-                    ),
-                    const SizedBox(height: spacing.AppSpacing.gutterMd),
-                    Text(
-                      'No appointments yet',
-                      style: AppTextStyles.bodyMd.copyWith(
-                        color: AppColors.secondary,
-                      ),
-                    ),
-                    const SizedBox(height: spacing.AppSpacing.gutterSm),
-                    Text(
-                      'Book your first appointment to get started',
-                      style: AppTextStyles.labelSm.copyWith(
-                        color: AppColors.outline,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return const AppointmentsPage();
   }
 
   Widget _buildChatContent() {
