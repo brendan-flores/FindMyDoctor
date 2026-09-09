@@ -13,7 +13,6 @@ The architecture consists of:
 │ Patient UI                                 │
 │ Doctor UI                                  │
 │ Secretary UI                               │
-│ Clinic Staff UI                            │
 │ Admin UI                                   │
 │ AI Chat UI                                 │
 └─────────────────────┬──────────────────────┘
@@ -1316,7 +1315,6 @@ USER
  ├── PATIENT
  ├── DOCTOR
  ├── SECRETARY
- ├── CLINIC STAFF
  └── ADMIN
 
 CLINIC
@@ -1363,7 +1361,6 @@ patients
 doctors
 clinics
 secretaries
-clinic_staff
 doctor_clinics
 
 doctor_schedules

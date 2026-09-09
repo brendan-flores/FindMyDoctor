@@ -202,16 +202,6 @@ Secretaries can:
 - Add additional charges.
 - View necessary patient information according to permissions.
 
-## 5.4 Clinic Staff
-
-Clinic staff may perform authorized operational functions such as:
-
-- Appointment management.
-- Clinic management.
-- Schedule management.
-
-Specific permissions depend on the assigned role.
-
 ## 5.5 Administrator
 
 Administrators can manage:
@@ -232,7 +222,6 @@ Administrators can manage:
 | Patient | Search, reserve, manage appointments, use queue, chat with secretary, use AI, access own records |
 | Doctor | Manage schedule/capacity, appointments, patient information, visits, prescriptions |
 | Secretary | Walk-ins, queue, patient chat, payment verification, daily operations |
-| Clinic Staff | Authorized clinic operations |
 | Admin | Users, doctors, secretaries, clinics, approvals, platform oversight |
 
 ### Communication Permissions
