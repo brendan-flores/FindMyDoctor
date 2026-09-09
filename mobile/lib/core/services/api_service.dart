@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_constants.dart';
 
 class ApiService {
-  final String _baseUrl = ApiConstants.baseUrl;
+  final String baseUrl = ApiConstants.baseUrl;
   String? _accessToken;
 
   // Singleton pattern
@@ -20,9 +20,15 @@ class ApiService {
 
   // Save token to storage
   Future<void> _saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('access_token', token);
-    _accessToken = token;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('access_token', token);
+      _accessToken = token;
+      print('🟢 Token saved successfully');
+    } catch (e) {
+      print('🔴 Error saving token: $e');
+      rethrow;
+    }
   }
 
   // Clear token from storage
@@ -51,7 +57,7 @@ class ApiService {
     bool requireAuth = true,
     Map<String, String>? queryParams,
   }) async {
-    Uri uri = Uri.parse('$_baseUrl$endpoint');
+    Uri uri = Uri.parse('$baseUrl$endpoint');
     if (queryParams != null) {
       uri = uri.replace(queryParameters: queryParams);
     }
@@ -70,12 +76,19 @@ class ApiService {
     Map<String, dynamic>? body,
     bool requireAuth = false,
   }) async {
+    final url = '$baseUrl$endpoint';
+    print('🟡 POST Request to: $url');
+    print('🟡 Request body: ${body != null ? jsonEncode(body) : "null"}');
+    
     final response = await http.post(
-      Uri.parse('$_baseUrl$endpoint'),
+      Uri.parse(url),
       headers: _getHeaders(requireAuth: requireAuth),
       body: body != null ? jsonEncode(body) : null,
     );
 
+    print('🟡 Response status: ${response.statusCode}');
+    print('🟡 Response body: ${response.body}');
+    
     return _handleResponse(response);
   }
 
@@ -86,7 +99,7 @@ class ApiService {
     bool requireAuth = true,
   }) async {
     final response = await http.put(
-      Uri.parse('$_baseUrl$endpoint'),
+      Uri.parse('$baseUrl$endpoint'),
       headers: _getHeaders(requireAuth: requireAuth),
       body: body != null ? jsonEncode(body) : null,
     );
@@ -101,7 +114,7 @@ class ApiService {
     bool requireAuth = true,
   }) async {
     final response = await http.patch(
-      Uri.parse('$_baseUrl$endpoint'),
+      Uri.parse('$baseUrl$endpoint'),
       headers: _getHeaders(requireAuth: requireAuth),
       body: body != null ? jsonEncode(body) : null,
     );
@@ -115,7 +128,7 @@ class ApiService {
     bool requireAuth = true,
   }) async {
     final response = await http.delete(
-      Uri.parse('$_baseUrl$endpoint'),
+      Uri.parse('$baseUrl$endpoint'),
       headers: _getHeaders(requireAuth: requireAuth),
     );
 
@@ -124,14 +137,25 @@ class ApiService {
 
   // Handle API response
   Map<String, dynamic> _handleResponse(http.Response response) {
-    final body = jsonDecode(response.body);
+    try {
+      final body = jsonDecode(response.body);
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return body;
-    } else {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return body;
+      } else {
+        throw ApiException(
+          message: body['error']?['message'] ?? 'An error occurred',
+          code: body['error']?['code'] ?? 'UNKNOWN_ERROR',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) {
+        rethrow;
+      }
       throw ApiException(
-        message: body['error']?['message'] ?? 'An error occurred',
-        code: body['error']?['code'] ?? 'UNKNOWN_ERROR',
+        message: 'Failed to parse server response',
+        code: 'PARSE_ERROR',
         statusCode: response.statusCode,
       );
     }

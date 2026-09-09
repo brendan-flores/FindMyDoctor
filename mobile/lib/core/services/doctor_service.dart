@@ -1,5 +1,4 @@
 import 'api_service.dart';
-import '../models/user.dart';
 import '../models/doctor.dart';
 
 class DoctorService {

@@ -10,20 +10,25 @@ router.post('/register', async (req: Request, res: Response) => {
   try {
     const { email, password, role, firstName, lastName } = req.body;
 
+    console.log('🟢 Register request received:', { email, role, firstName, lastName });
+
     // Basic validation
     if (!email || !password || !role) {
+      console.log('🔴 Validation failed: missing required fields');
       return res.status(400).json(
         error(ErrorCodes.VALIDATION_ERROR, 'Email, password, and role are required')
       );
     }
 
     if (!['PATIENT', 'DOCTOR', 'SECRETARY', 'ADMIN'].includes(role)) {
+      console.log('🔴 Validation failed: invalid role');
       return res.status(400).json(
         error(ErrorCodes.VALIDATION_ERROR, 'Invalid role')
       );
     }
 
     if (role === 'PATIENT' && (!firstName || !lastName)) {
+      console.log('🔴 Validation failed: missing name for patient');
       return res.status(400).json(
         error(ErrorCodes.VALIDATION_ERROR, 'First name and last name are required for patients')
       );
@@ -31,10 +36,14 @@ router.post('/register', async (req: Request, res: Response) => {
 
     const result = await register({ email, password, role, firstName, lastName });
 
-    res.status(201).json(
-      success(result, 'Registration successful')
-    );
+    console.log('🟢 Registration successful, result:', result);
+
+    const response = success(result, 'Registration successful');
+    console.log('🟢 Sending response:', JSON.stringify(response));
+    
+    res.status(201).json(response);
   } catch (err: any) {
+    console.log('🔴 Registration error:', err);
     const errorCode = err.code || ErrorCodes.SERVER_ERROR;
     const errorMessage = err.message || 'Registration failed';
     

@@ -57,6 +57,13 @@ class AppTextStyles {
         color: AppColors.onSurface,
       );
 
+  static TextStyle get bodySm => GoogleFonts.plusJakartaSans(
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        height: 1.33,
+        color: AppColors.onSurface,
+      );
+
   // Label Styles
   static TextStyle get labelMd => GoogleFonts.plusJakartaSans(
         fontSize: 13,

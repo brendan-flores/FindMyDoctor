@@ -2,11 +2,13 @@ import 'api_service.dart';
 import '../models/user.dart';
 
 class AuthService {
-  final ApiService _apiService = ApiService();
+  final ApiService apiService = ApiService();
+  
+  String get baseUrl => apiService.baseUrl;
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
-      final response = await _apiService.login(email, password);
+      final response = await apiService.login(email, password);
       return response;
     } catch (e) {
       rethrow;
@@ -21,26 +23,29 @@ class AuthService {
     String? lastName,
   }) async {
     try {
-      final response = await _apiService.register(
+      print('🔵 AuthService.register called');
+      final response = await apiService.register(
         email: email,
         password: password,
         role: role,
         firstName: firstName,
         lastName: lastName,
       );
+      print('🟢 AuthService.register response: $response');
       return response;
     } catch (e) {
+      print('🔴 AuthService.register error: $e');
       rethrow;
     }
   }
 
   Future<void> logout() async {
-    await _apiService.logout();
+    await apiService.logout();
   }
 
   Future<User?> getCurrentUser() async {
     try {
-      final response = await _apiService.getCurrentUser();
+      final response = await apiService.getCurrentUser();
       if (response['success'] == true) {
         return User.fromJson(response['data']);
       }
@@ -51,7 +56,7 @@ class AuthService {
   }
 
   Future<bool> isAuthenticated() async {
-    await _apiService.init();
+    await apiService.init();
     final user = await getCurrentUser();
     return user != null;
   }

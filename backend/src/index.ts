@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { config } from './config';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { authenticate } from './middleware/auth';
+import { pool } from './database/connection';
 
 // Import routers
 import authRouter from './api/auth';
@@ -47,7 +48,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Request logging
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
+  console.log(`🟢 ${req.method} ${req.path}`);
+  console.log(`🟢 Headers: ${JSON.stringify(req.headers)}`);
+  console.log(`🟢 Body: ${JSON.stringify(req.body)}`);
   next();
 });
 
@@ -79,10 +82,34 @@ app.use(errorHandler);
 
 // Start server
 const PORT = config.app.port;
-app.listen(PORT, () => {
-  console.log(`FindMyDoctor API server running on port ${PORT}`);
-  console.log(`Environment: ${config.app.env}`);
-  console.log(`API version: ${apiVersion}`);
+
+// Test database connection before starting server
+async function testDatabaseConnection() {
+  try {
+    const client = await pool.connect();
+    await client.query('SELECT NOW()');
+    client.release();
+    console.log('Connected to PostgreSQL database');
+    return true;
+  } catch (error) {
+    console.error('Failed to connect to PostgreSQL database:', error);
+    console.error('Please check your database configuration in .env file');
+    return false;
+  }
+}
+
+// Start server only after database connection test
+testDatabaseConnection().then((connected) => {
+  if (connected) {
+    app.listen(PORT, () => {
+      console.log(`FindMyDoctor API server running on port ${PORT}`);
+      console.log(`Environment: ${config.app.env}`);
+      console.log(`API version: ${apiVersion}`);
+    });
+  } else {
+    console.error('Server not started due to database connection failure');
+    process.exit(1);
+  }
 });
 
 export default app;

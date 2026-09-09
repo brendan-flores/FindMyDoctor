@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Patient Sign Up - FindMyDoctor Philippines</title>
+<!-- Google Fonts: Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN with forms and container queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#005a9c',
+              800: '#075985',
+              900: '#0c4a6e',
+            },
+            navy: {
+              900: '#0f172a',
+              950: '#090d16',
+            },
+            surface: {
+              bg: '#f8fafc',
+              card: '#ffffff',
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          boxShadow: {
+            'btn-primary': '0 8px 20px -4px rgba(0, 90, 156, 0.35)',
+            'input-soft': '0 2px 6px 0 rgba(0, 0, 0, 0.02)',
+            'back-btn': '0 2px 8px rgba(15, 23, 42, 0.06)',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-overrides">
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Hide scrollbars for slick native app look */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    * {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-surface-bg text-slate-700 antialiased min-h-screen flex justify-center selection:bg-brand-100 selection:text-brand-700">
+<!-- BEGIN: MobileContainer -->
+<!-- Constrained to realistic iPhone viewport width for high-fidelity mobile presentation -->
+<div class="w-full max-w-[430px] min-h-screen bg-white flex flex-col justify-between shadow-2xl relative overflow-x-hidden" data-purpose="mobile-viewport">
+<!-- Top Decorative Subtle Glow -->
+<div class="absolute -top-24 -left-20 w-64 h-64 bg-sky-100 rounded-full blur-3xl pointer-events-none opacity-60"></div>
+<div class="absolute top-20 -right-24 w-60 h-60 bg-blue-50 rounded-full blur-2xl pointer-events-none opacity-50"></div>
+<!-- Main Content Area -->
+<div class="flex-1 px-6 pt-3 pb-8 relative z-10 flex flex-col">
+<!-- BEGIN: iOSStatusBar -->
+<header class="w-full flex items-center justify-between pt-1 pb-4 select-none" data-purpose="status-bar">
+<span class="text-sm font-semibold tracking-tight text-navy-900">9:41</span>
+<div class="flex items-center space-x-2 text-navy-900">
+<!-- Cellular Signal Bars -->
+<svg aria-hidden="true" class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path class="opacity-0" d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19.4c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.28 19.64 10.59 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 15c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"></path>
+<path d="M2 17h2v4H2v-4zm5-4h2v8H7v-8zm5-4h2v12h-2V9zm5-4h2v16h-2V5z"></path>
+</svg>
+<!-- Wi-Fi Icon -->
+<svg aria-hidden="true" class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.38c3.6 0 6.87 1.34 9.38 3.55L12 19.34 2.62 10.93C5.13 8.72 8.4 7.38 12 7.38z"></path>
+</svg>
+<!-- Battery Icon with Pill fill -->
+<div class="flex items-center space-x-0.5">
+<div class="w-5 h-2.5 rounded-sm border border-navy-900 p-0.5 flex items-center">
+<div class="w-full h-full bg-navy-900 rounded-2xs"></div>
+</div>
+<div class="w-0.5 h-1 bg-navy-900 rounded-r-xs"></div>
+</div>
+</div>
+</header>
+<!-- END: iOSStatusBar -->
+<!-- BEGIN: NavigationAndBrand -->
+<section class="mt-1 mb-6 flex flex-col items-start" data-purpose="navigation-and-brand">
+<!-- Circular Back Button -->
+<a aria-label="Go back to login" class="w-11 h-11 rounded-full bg-white border border-slate-200/80 shadow-back-btn flex items-center justify-center text-navy-900 hover:bg-slate-50 transition-all active:scale-95 duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500/20" href="#login">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24">
+<polyline points="15 18 9 12 15 6"></polyline>
+</svg>
+</a>
+<!-- FindMyDoctor Philippines Logo Header -->
+<div class="mt-6 flex items-center gap-3" data-purpose="app-branding">
+<div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 via-sky-500 to-blue-600 flex items-center justify-center shadow-md shadow-sky-500/25 flex-shrink-0">
+<!-- Location Pin with Cross Icon -->
+<svg class="w-6 h-6 text-white fill-current" viewbox="0 0 24 24">
+<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" opacity="0.4"></path>
+<path d="M12 2C8.14 2 5 5.14 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.86-3.14-7-7-7zm2.5 8h-1.5v1.5a1 1 0 0 1-2 0V10H9.5a1 1 0 0 1 0-2H11V6.5a1 1 0 0 1 2 0V8h1.5a1 1 0 0 1 0 2z"></path>
+</svg>
+</div>
+<div class="leading-tight">
+<span class="block text-xl font-extrabold text-navy-900 tracking-tight">FindMyDoctor</span>
+<span class="block text-[11px] font-bold text-emerald-600 tracking-widest uppercase">Philippines</span>
+</div>
+</div>
+</section>
+<!-- END: NavigationAndBrand -->
+<!-- BEGIN: TitleHeader -->
+<section class="mb-6" data-purpose="screen-title-section">
+<h1 class="text-2xl sm:text-[28px] font-extrabold text-navy-900 tracking-tight">Create an Account</h1>
+<p class="mt-1.5 text-sm text-slate-500 leading-snug">
+          Join FindMyDoctor to book clinic appointments and track live queue passes.
+        </p>
+</section>
+<!-- END: TitleHeader -->
+<!-- BEGIN: SignUpForm -->
+<form class="space-y-4" data-purpose="registration-form" id="signUpForm" onsubmit="event.preventDefault();">
+<!-- Full Name Field -->
+<div>
+<label class="block text-sm font-semibold text-navy-900 mb-1.5" for="fullName">Full Name</label>
+<div class="relative flex items-center">
+<span class="absolute left-4 text-slate-400 pointer-events-none flex items-center justify-center">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</span>
+<input class="w-full bg-slate-50/70 border border-slate-200 text-slate-900 placeholder:text-slate-400 text-[15px] rounded-xl pl-11 pr-10 py-3.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600 transition duration-150" id="fullName" name="fullName" placeholder="e.g. Juan Michael Reyes" required="" type="text" value="Juan Michael Reyes"/>
+<!-- Valid Checkmark Indicator -->
+<span class="absolute right-3.5 text-emerald-500 flex items-center">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</span>
+</div>
+</div>
+<!-- Email Address Field -->
+<div>
+<label class="block text-sm font-semibold text-navy-900 mb-1.5" for="email">Email Address</label>
+<div class="relative flex items-center">
+<span class="absolute left-4 text-slate-400 pointer-events-none flex items-center">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</span>
+<input class="w-full bg-slate-50/70 border border-slate-200 text-slate-900 placeholder:text-slate-400 text-[15px] rounded-xl pl-11 pr-10 py-3.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600 transition duration-150" id="email" name="email" placeholder="Enter your email" required="" type="email" value="juan.reyes@gmail.com"/>
+<!-- Valid Checkmark Indicator -->
+<span class="absolute right-3.5 text-emerald-500 flex items-center">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</span>
+</div>
+</div>
+<!-- Mobile Number Field (Philippine format) -->
+<div>
+<div class="flex justify-between items-center mb-1.5">
+<label class="block text-sm font-semibold text-navy-900" for="phone">Mobile Number</label>
+<span class="text-xs font-medium text-slate-400">For SMS queue alerts</span>
+</div>
+<div class="relative flex items-center">
+<!-- Philippine Flag & Country Code Pill -->
+<div class="absolute left-3.5 flex items-center space-x-1.5 pr-2.5 border-r border-slate-200 pointer-events-none">
+<span class="text-base leading-none">🇵🇭</span>
+<span class="text-xs font-semibold text-slate-700">+63</span>
+</div>
+<input class="w-full bg-slate-50/70 border border-slate-200 text-slate-900 placeholder:text-slate-400 text-[15px] rounded-xl pl-24 pr-4 py-3.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600 transition duration-150" id="phone" name="phone" placeholder="917 123 4567" type="tel" value="917 842 5591"/>
+</div>
+</div>
+<!-- Password Field -->
+<div>
+<label class="block text-sm font-semibold text-navy-900 mb-1.5" for="password">Password</label>
+<div class="relative flex items-center">
+<span class="absolute left-4 text-slate-400 pointer-events-none flex items-center">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24">
+<rect height="10" rx="2" stroke-linecap="round" stroke-linejoin="round" width="14" x="5" y="11"></rect>
+<path d="M8 11V7a4 4 0 118 0v4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</span>
+<input class="w-full bg-slate-50/70 border border-slate-200 text-slate-900 placeholder:text-slate-400 text-[15px] rounded-xl pl-11 pr-11 py-3.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600 transition duration-150" id="password" name="password" placeholder="Create password (min. 8 characters)" required="" type="password" value="Mabuhay2024!"/>
+<!-- Password Visibility Toggle Button -->
+<button aria-label="Toggle password visibility" class="absolute right-3.5 text-slate-400 hover:text-slate-600 focus:outline-none p-1" data-purpose="password-visibility-toggle" id="togglePassword" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Password Requirement Pills / Realtime status -->
+<div class="mt-2 flex flex-wrap gap-1.5" data-purpose="password-rules-indicator">
+<span class="inline-flex items-center text-[11px] font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200/60">
+<svg class="w-3 h-3 mr-1 text-emerald-600" fill="currentColor" viewbox="0 0 20 20">
+<path clip-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fill-rule="evenodd"></path>
+</svg>
+              8+ chars
+            </span>
+<span class="inline-flex items-center text-[11px] font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200/60">
+<svg class="w-3 h-3 mr-1 text-emerald-600" fill="currentColor" viewbox="0 0 20 20">
+<path clip-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fill-rule="evenodd"></path>
+</svg>
+              1 number
+            </span>
+<span class="inline-flex items-center text-[11px] font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200/60">
+<svg class="w-3 h-3 mr-1 text-emerald-600" fill="currentColor" viewbox="0 0 20 20">
+<path clip-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fill-rule="evenodd"></path>
+</svg>
+              1 uppercase
+            </span>
+</div>
+</div>
+<!-- Confirm Password Field -->
+<div>
+<label class="block text-sm font-semibold text-navy-900 mb-1.5" for="confirmPassword">Confirm Password</label>
+<div class="relative flex items-center">
+<span class="absolute left-4 text-slate-400 pointer-events-none flex items-center">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24">
+<rect height="10" rx="2" stroke-linecap="round" stroke-linejoin="round" width="14" x="5" y="11"></rect>
+<path d="M8 11V7a4 4 0 118 0v4" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M10 16l1.5 1.5 3-3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</span>
+<input class="w-full bg-slate-50/70 border border-slate-200 text-slate-900 placeholder:text-slate-400 text-[15px] rounded-xl pl-11 pr-11 py-3.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600 transition duration-150" id="confirmPassword" name="confirmPassword" placeholder="Confirm your password" required="" type="password" value="Mabuhay2024!"/>
+<button aria-label="Toggle confirm password visibility" class="absolute right-3.5 text-slate-400 hover:text-slate-600 focus:outline-none p-1" id="toggleConfirmPassword" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</div>
+<!-- Terms and Consent Checkbox -->
+<div class="pt-1.5 pb-1">
+<label class="flex items-start cursor-pointer group select-none">
+<div class="relative flex items-center mt-0.5">
+<input checked="" class="w-4 h-4 text-brand-700 bg-white border-slate-300 rounded focus:ring-brand-500/30 focus:ring-2 focus:ring-offset-0 transition cursor-pointer" id="terms" name="terms" type="checkbox"/>
+</div>
+<span class="ml-2.5 text-xs text-slate-600 leading-relaxed font-medium">
+              I agree to FindMyDoctor's 
+              <a class="text-brand-700 font-semibold hover:underline" href="#terms">Terms of Service</a> and 
+              <a class="text-brand-700 font-semibold hover:underline" href="#privacy">Privacy Policy</a>, including Philippine Data Privacy Act compliance.
+            </span>
+</label>
+</div>
+<!-- Primary Call to Action Button -->
+<div class="pt-3">
+<button class="w-full h-13 py-3.5 px-6 rounded-xl bg-brand-700 hover:bg-brand-800 active:scale-[0.99] text-white font-bold text-[16px] tracking-wide flex items-center justify-center space-x-2 shadow-btn-primary transition duration-150 focus:outline-none focus:ring-4 focus:ring-brand-700/25" id="createAccountBtn" type="submit">
+<span>Create Account</span>
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24">
+<path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</form>
+<!-- END: SignUpForm -->
+</div>
+<!-- BEGIN: BottomNavigationFooter -->
+<footer class="w-full pb-3 pt-2 bg-white flex flex-col items-center select-none" data-purpose="bottom-navigation-area">
+<!-- Alternate Login Redirect Link -->
+<p class="text-sm font-medium text-slate-500 mb-4">
+        Already have an account? 
+        <a class="text-brand-700 font-bold hover:text-brand-800 transition duration-150" href="#login">Log In</a>
+</p>
+<!-- iOS Home Bar Indicator -->
+<div class="w-32 h-1 bg-slate-300 rounded-full mb-1"></div>
+</footer>
+<!-- END: BottomNavigationFooter -->
+</div>
+<!-- END: MobileContainer -->
+<!-- BEGIN: InteractiveHandlers -->
+<script data-purpose="password-visibility">
+    // Toggle main password input type
+    const togglePasswordBtn = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+
+    if (togglePasswordBtn && passwordInput) {
+      togglePasswordBtn.addEventListener('click', () => {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+      });
+    }
+
+    // Toggle confirm password input type
+    const toggleConfirmBtn = document.getElementById('toggleConfirmPassword');
+    const confirmInput = document.getElementById('confirmPassword');
+
+    if (toggleConfirmBtn && confirmInput) {
+      toggleConfirmBtn.addEventListener('click', () => {
+        const type = confirmInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        confirmInput.setAttribute('type', type);
+      });
+    }
+  </script>
+<!-- END: InteractiveHandlers -->
+</body></html>
