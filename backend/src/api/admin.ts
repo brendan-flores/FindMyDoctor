@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { query } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
@@ -123,6 +124,44 @@ router.patch('/secretaries/:id/approve', authenticate, authorize('ADMIN'), async
     res.json(success(null, 'Secretary approved successfully'));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to approve secretary'));
+  }
+});
+
+// Create additional Admin account (authorized Admin only)
+router.post('/admins', authenticate, authorize('ADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Email and password are required'));
+    }
+
+    // Check if email already exists
+    const existingUser = await query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json(error(ErrorCodes.EMAIL_ALREADY_EXISTS, 'Email already registered'));
+    }
+
+    // Hash password securely
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create Admin user
+    const userResult = await query(
+      `INSERT INTO users (email, password_hash, role, is_active, must_change_password)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, email, role, is_active, must_change_password, created_at`,
+      [email, passwordHash, 'ADMIN', true, true]
+    );
+
+    const admin = userResult.rows[0];
+
+    res.status(201).json(success(admin, 'Admin account created successfully'));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create admin account'));
   }
 });
 

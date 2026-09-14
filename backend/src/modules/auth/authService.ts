@@ -20,6 +20,11 @@ export interface LoginData {
 export async function register(data: RegisterData) {
   const { email, password, role, firstName, lastName } = data;
 
+  // Prevent public Admin registration
+  if (role === 'ADMIN') {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Admin registration is not allowed through public endpoint' };
+  }
+
   // Check if email already exists
   const existingUser = await query(
     'SELECT id FROM users WHERE email = $1',
