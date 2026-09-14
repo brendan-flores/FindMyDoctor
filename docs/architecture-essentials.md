@@ -85,7 +85,6 @@ Patient-secretary chat may be used for:
 
 - Appointment questions.
 - Schedule questions.
-- Clinic questions.
 - Queue-related questions.
 - Reservation assistance.
 
@@ -103,7 +102,7 @@ Send / Read Message
 
 Patients cannot access another patient's conversation.
 
-Secretaries cannot access unrelated clinic conversations without authorization.
+Secretaries cannot access unrelated conversations without authorization.
 
 ---
 
@@ -122,7 +121,7 @@ Diagnose
 Prescribe
 Change medication
 Replace professional advice
-Make clinical decisions
+Make medical decisions
 Claim to be a physician
 ```
 
@@ -196,7 +195,7 @@ Capacity must consider:
 
 ```text
 Doctor Availability
-Clinic Operating Hours
+Operating Hours
 Break Periods
 Consultation Duration
 Configured Daily Maximum
@@ -386,7 +385,7 @@ The MVP does not use a GCash payment API.
 Use:
 
 ```text
-Static Clinic GCash QR
+Static GCash QR
 ```
 
 Patient flow:
@@ -441,8 +440,8 @@ Total Amount Due
 Charges may include:
 
 - Medicine.
-- Additional clinic services.
-- Other applicable clinic fees.
+- Additional services.
+- Other applicable fees.
 
 ---
 
@@ -480,7 +479,7 @@ If the patient has no account:
 2. Email becomes username/login identifier.
 3. Generate random temporary password.
 4. Mark account as `must_change_password`.
-5. Provide credentials through the designated clinic process.
+5. Provide credentials through the designated process.
 6. Require password change during first login.
 7. Block normal application access until the password is changed.
 
@@ -622,7 +621,6 @@ The architecture should support:
 users
 patients
 doctors
-clinics
 secretaries
 
 doctor_schedules
@@ -648,16 +646,6 @@ ai_messages
 waitlists
 notifications
 ```
-
-The `clinics` table must include:
-
-```text
-latitude
-longitude
-address
-```
-
-for the clinic map feature.
 
 ---
 
@@ -842,17 +830,6 @@ For chat:
 [ ] Patient ↔ Doctor remains blocked
 ```
 
-For map features:
-
-```text
-[ ] Clinic latitude and longitude stored in database
-[ ] GET /clinics/:id/location returns coordinates
-[ ] Map widget renders clinic pin correctly
-[ ] Map is read-only for patients
-[ ] Only admin can update clinic location
-[ ] Address label displayed on map
-```
-
 ---
 
 # 37. Avoid Overengineering
@@ -970,7 +947,7 @@ Log technical events without exposing sensitive information.
 
 4. Default consultation duration is 30 minutes.
 
-5. Capacity considers availability, clinic hours, breaks, and consultation duration.
+5. Capacity considers availability, operating hours, breaks, and consultation duration.
 
 6. Doctor and authorized secretary may configure a lower daily capacity.
 
@@ -984,7 +961,7 @@ Log technical events without exposing sensitive information.
 
 11. Regular reservations do not require advance payment.
 
-12. GCash uses a static clinic QR code.
+12. GCash uses a static QR code.
 
 13. Uploaded receipts start as Pending Verification.
 
@@ -1027,8 +1004,6 @@ Log technical events without exposing sensitive information.
 32. Follow the architecture before introducing new patterns.
 
 33. When implementing features that modify requirements, update the relevant documentation (.md files) to keep implementation and documentation consistent.
-
-34. The clinics table must store latitude and longitude for the map feature. The map is read-only for patients. Only admins update clinic location coordinates.
 ```
 
 ---

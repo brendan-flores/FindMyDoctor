@@ -8,19 +8,19 @@
 
 ### Product Type
 
-Mobile doctor appointment-booking, patient queue-management, clinic communication, payment-recording, and AI-assisted healthcare information platform.
+Mobile doctor appointment-booking, patient queue-management, healthcare communication, payment-recording, and AI-assisted healthcare information platform.
 
 ### Product Purpose
 
-FindMyDoctor is an educational healthcare appointment-management prototype designed to connect patients, doctors, secretaries, and clinics through a centralized mobile application.
+FindMyDoctor is an educational healthcare appointment-management prototype designed to connect patients, doctors, and secretaries through a centralized mobile application.
 
-Patients can search for doctors, view doctor profiles and availability, reserve consultation schedules, receive queue numbers, manage appointments, communicate with clinic secretaries, use an AI chatbot for general medical concerns, and access their consultation and prescription history.
+Patients can search for doctors, view doctor profiles and availability, reserve consultation schedules, receive queue numbers, manage appointments, communicate with secretaries, use an AI chatbot for general medical concerns, and access their consultation and prescription history.
 
 Doctors can manage their availability, daily patient capacity, appointments, patient information, visit history, and digital prescriptions.
 
-Secretaries are responsible for clinic-side operations such as walk-in registration, daily queue management, patient communication, payment verification, daily capacity management, and appointment-related assistance.
+Secretaries are responsible for operational tasks such as walk-in registration, daily queue management, patient communication, payment verification, daily capacity management, and appointment-related assistance.
 
-Administrators manage users, doctors, clinics, secretaries, approvals, and basic platform information.
+Administrators manage users, doctors, secretaries, and approvals.
 
 ### Core Workflow
 
@@ -30,7 +30,7 @@ Administrators manage users, doctors, clinics, secretaries, approvals, and basic
 
 The platform provides two patient communication channels:
 
-- **Patient ↔ Secretary** — allowed for appointment, schedule, clinic, and related concerns.
+- **Patient ↔ Secretary** — allowed for appointment, schedule, and related concerns.
 - **Patient ↔ AI Chatbot** — allowed for general medical information and concerns.
 
 Patients **cannot directly chat with doctors** through the application.
@@ -51,16 +51,16 @@ It is not intended to replace:
 
 # 2. Problem Statement
 
-Patients often need to call clinics to:
+Patients often need to call to:
 
 - Ask whether a doctor is available.
-- Ask about clinic schedules.
+- Ask about schedules.
 - Determine available appointment times.
 - Ask about consultation fees.
 - Reserve an appointment.
 - Ask questions about an existing reservation.
 
-Clinics may also rely on manual processes for:
+They may also rely on manual processes for:
 
 - Appointment scheduling.
 - Walk-in registration.
@@ -92,7 +92,7 @@ FindMyDoctor addresses these problems through a centralized mobile application t
 FindMyDoctor should:
 
 1. Allow patients to discover doctors.
-2. Display doctor and clinic information.
+2. Display doctor information.
 3. Display doctor availability.
 4. Calculate or configure daily patient capacity.
 5. Allow patients to reserve consultation schedules without mandatory advance payment.
@@ -105,7 +105,7 @@ FindMyDoctor should:
 12. Allow doctors to manage schedules and capacity.
 13. Allow doctors to manage appointments and consultation records.
 14. Allow doctors to create digital prescriptions.
-15. Allow optional GCash advance payment through a static clinic QR code.
+15. Allow optional GCash advance payment through a static QR code.
 16. Allow secretaries to verify GCash receipts.
 17. Maintain patient payment information and additional charges.
 18. Maintain consultation and medical history.
@@ -122,7 +122,7 @@ The following are outside the initial scope:
 - AI diagnosis.
 - AI prescribing medication.
 - AI replacing a doctor.
-- AI making clinical decisions.
+- AI making medical decisions.
 - Real-time video consultations.
 - Emergency medical services.
 - Full hospital management.
@@ -209,7 +209,7 @@ Administrators can manage:
 - Users.
 - Doctors.
 - Secretaries.
-- Clinics.
+- Approval.
 - Approvals.
 - Basic appointment information.
 
@@ -222,7 +222,7 @@ Administrators can manage:
 | Patient | Search, reserve, manage appointments, use queue, chat with secretary, use AI, access own records |
 | Doctor | Manage schedule/capacity, appointments, patient information, visits, prescriptions |
 | Secretary | Walk-ins, queue, patient chat, payment verification, daily operations |
-| Admin | Users, doctors, secretaries, clinics, approvals, platform oversight |
+| Admin | Users, doctors, secretaries, approvals, platform oversight |
 
 ### Communication Permissions
 
@@ -237,7 +237,7 @@ Administrators can manage:
 
 ---
 
-# 7. Doctor and Clinic Information
+# 7. Doctor Information
 
 Each doctor profile should include:
 
@@ -246,20 +246,7 @@ Each doctor profile should include:
 - Credentials.
 - Biography.
 - Consultation/checkup fee.
-- Clinic.
-- Clinic location.
 - Availability.
-
-Each clinic may contain:
-
-- Clinic name.
-- Address.
-- Location (latitude and longitude coordinates).
-- Map display (embedded map view of the clinic location).
-- Contact information.
-- Description.
-- Doctors.
-- Secretaries.
 
 ---
 
@@ -268,7 +255,7 @@ Each clinic may contain:
 The system shall manage patient bookings based on:
 
 - Doctor availability.
-- Clinic operating hours.
+- Operating hours.
 - Break periods.
 - Consultation duration.
 - Configured daily patient capacity.
@@ -396,7 +383,7 @@ The system must prevent additional regular online bookings and walk-in registrat
 
 # 12. Walk-in Registration
 
-Patients who do not use the application or prefer to visit the clinic directly may register as walk-ins.
+Patients who do not use the application or prefer to visit directly may register as walk-ins.
 
 The secretary can:
 
@@ -421,7 +408,7 @@ When a walk-in patient does not have an account:
 1. The secretary collects the patient's email address.
 2. The email becomes the patient's username/login identifier.
 3. The system generates a random temporary password containing characters and numbers.
-4. The credentials are provided to the patient through the clinic's designated process.
+4. The credentials are provided to the patient through the designated process.
 5. The account is marked as requiring a password change.
 6. At first login, the patient must change the generated password.
 7. The patient cannot access normal application features until the password is changed.
@@ -491,7 +478,7 @@ Possible queue statuses:
 - Cancelled
 - No-show
 
-The clinic may refine these statuses according to operational procedures.
+The platform may refine these statuses according to operational procedures.
 
 ---
 
@@ -501,10 +488,10 @@ Patients can communicate with secretaries regarding:
 
 - Appointment time.
 - Schedule questions.
-- Clinic information.
+- Information.
 - Reservation concerns.
 - Queue-related questions.
-- Other appropriate clinic concerns.
+- Other appropriate concerns.
 
 Secretaries can:
 
@@ -565,11 +552,11 @@ A successful reservation must not depend on payment.
 
 # 19. GCash Payment
 
-Because the system does not have a GCash payment API, the clinic shall use a static/default GCash QR code.
+Because the system does not have a GCash payment API, the system shall use a static/default GCash QR code.
 
 Patients may:
 
-1. View the clinic's GCash QR code.
+1. View the GCash QR code.
 2. Scan the QR code using GCash.
 3. Download/save the QR code if supported.
 4. Make the payment externally.
@@ -614,7 +601,7 @@ The secretary may add additional applicable charges such as:
 
 - Prescribed medicine.
 - Additional services.
-- Other clinic charges.
+- Other charges.
 
 The system shall calculate:
 
@@ -760,7 +747,7 @@ The patient shall be required to change the temporary password before using norm
 
 ## FR-021 — GCash QR
 
-The system shall display the static clinic GCash QR code.
+The system shall display the static GCash QR code.
 
 ## FR-022 — Receipt Upload
 
@@ -830,7 +817,7 @@ Doctors shall be able to create digital prescriptions.
 
 The system shall generate prescription PDFs.
 
-## FR-039 — Notifications
+## FR-039 — Notification System
 
 The system shall provide relevant application notifications.
 
@@ -838,21 +825,11 @@ The system shall provide relevant application notifications.
 
 Administrators shall be able to approve/reject doctors.
 
-## FR-041 — Clinic Approval
+## FR-041 — Secretary Management
 
-Administrators shall be able to approve/reject clinics.
+Administrators shall be able to manage secretary accounts.
 
-## FR-042 — Secretary Management
-
-Administrators shall be able to manage secretary accounts and clinic associations.
-
-## FR-043 — Clinic Map
-
-The system shall display an embedded map view of the clinic's location on the clinic and doctor profile pages so that patients can easily locate the clinic.
-
-The clinic record shall store latitude and longitude coordinates.
-
-The map view is read-only for patients. Only administrators may update clinic location coordinates.
+Administrators shall be able to manage secretary accounts.
 
 ---
 
@@ -868,7 +845,7 @@ The map view is read-only for patients. Only administrators may update clinic lo
 
 ### Patient — Secretary Chat
 
-**As a patient,** I want to chat with the clinic secretary so that I can ask questions about my appointment, schedule, or clinic.
+**As a patient,** I want to chat with the secretary so that I can ask questions about my appointment, schedule, or healthcare concerns.
 
 ### Patient — AI
 
@@ -888,7 +865,7 @@ The map view is read-only for patients. Only administrators may update clinic lo
 
 ### Secretary — Queue
 
-**As a secretary,** I want to call, skip, and update patients so that I can manage the daily clinic queue.
+**As a secretary,** I want to call, skip, and update patients so that I can manage the daily queue.
 
 ### Secretary — Payment
 
@@ -896,15 +873,15 @@ The map view is read-only for patients. Only administrators may update clinic lo
 
 ### Secretary — Capacity
 
-**As a secretary,** I want to configure the daily patient limit so that the clinic does not exceed its capacity.
+**As a secretary,** I want to configure the daily patient limit so that the system does not exceed its capacity.
 
 ### Doctor — Capacity
 
 **As a doctor,** I want to configure how many patients I can accommodate on a specific day so that the daily queue matches my workload.
 
-### Patient — Clinic Map
+### Patient — Profile Map
 
-**As a patient,** I want to view the clinic's location on a map so that I can easily find out where the clinic is before my appointment.
+**As a patient,** I want to view the profile information so that I can easily find out relevant details before my appointment.
 
 ---
 
@@ -1041,18 +1018,16 @@ Response Processing
 Patient
 ```
 
-## Clinic Map
+## Profile Management
 
 ```text
 Patient
   ↓
-View Doctor Profile or Clinic Profile
+View Doctor Profile
   ↓
-View Clinic Location Section
+View Profile Information
   ↓
-Embedded Map Displays Clinic Pin
-  ↓
-Patient Views Address and Directions
+Patient Views Professional Details
 ```
 
 ---
@@ -1064,7 +1039,7 @@ Patient Views Address and Directions
 - Registration/login.
 - Doctor search.
 - Doctor profiles.
-- Clinic location map view.
+- Profile management.
 - Availability.
 - Reservation without mandatory payment.
 - Queue number.
@@ -1108,7 +1083,7 @@ Patient Views Address and Directions
 - User management.
 - Doctor management.
 - Secretary management.
-- Clinic management.
+- Profile management.
 - Approvals.
 - Basic appointment monitoring.
 
@@ -1165,7 +1140,7 @@ Patient, payment, medical, prescription, and conversation data must be protected
 
 ### Communication Boundaries
 
-Patients communicate with secretaries for clinic concerns and with AI for general medical information. Direct patient-doctor chat is excluded.
+Patients communicate with secretaries for healthcare concerns and with AI for general medical information. Direct patient-doctor chat is excluded.
 
 ### AI Responsibility
 
@@ -1177,13 +1152,13 @@ Appointments, queues, payments, medical history, and prescriptions must remain c
 
 ### Educational Focus
 
-The platform demonstrates realistic appointment and clinic-management workflows without attempting to become a production EHR.
+The platform demonstrates realistic appointment and healthcare management workflows without attempting to become a production EHR.
 
 ---
 
 # 31. Final Product Definition
 
-FindMyDoctor is a mobile appointment and clinic-management platform centered around:
+FindMyDoctor is a mobile appointment and healthcare management platform centered around:
 
 **Find Doctor → Check Availability → Reserve → Queue → Consult → Record → Prescription**
 
@@ -1191,7 +1166,7 @@ Supporting workflows include:
 
 **Patient ↔ Secretary**
 
-for clinic communication,
+for healthcare communication,
 
 **Patient ↔ AI**
 

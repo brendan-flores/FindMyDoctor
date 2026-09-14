@@ -26,7 +26,6 @@ The architecture consists of:
 │ Authorization                              │
 │ Users                                      │
 │ Doctors                                    │
-│ Clinics                                    │
 │ Secretaries                                │
 │ Scheduling                                 │
 │ Capacity                                   │
@@ -51,7 +50,6 @@ The architecture consists of:
 │ Users                                      │
 │ Patients                                   │
 │ Doctors                                    │
-│ Clinics                                    │
 │ Secretaries                                │
 │ Schedules                                  │
 │ Capacity                                   │
@@ -193,7 +191,6 @@ mobile/
 │   ├── payments/
 │   ├── secretary-chat/
 │   ├── ai-chat/
-│   ├── clinic-map/
 │   ├── waitlist/
 │   ├── notifications/
 │   └── profile/
@@ -234,8 +231,7 @@ web/
 │   │       ├── page.tsx
 │   │       ├── users/
 │   │       ├── doctors/
-│   │       ├── secretaries/
-│   │       └── clinics/
+│   │       └── secretaries/
 │   ├── components/
 │   │   ├── layout/
 │   │   ├── ui/
@@ -326,8 +322,6 @@ Walk-in Registration
 
 Payments
 
-Clinic
-
 Profile
 ```
 
@@ -346,10 +340,6 @@ Doctors
 
 Secretaries
 
-Clinics
-
-Appointments
-
 Profile
 ```
 
@@ -364,7 +354,6 @@ auth
 users
 patients
 doctors
-clinics
 secretaries
 schedules
 capacity
@@ -389,7 +378,7 @@ The schedule module manages:
 
 - Working days.
 - Working hours.
-- Clinic operating hours.
+- Operating hours.
 - Break periods.
 - Appointment duration.
 - Unavailable periods.
@@ -409,7 +398,7 @@ The capacity module determines the maximum number of patients that can be regist
 
 ```text
 Doctor Availability
-Clinic Operating Hours
+Operating Hours
 Break Periods
 Consultation Duration
 Configured Daily Maximum
@@ -452,7 +441,6 @@ daily_capacities
 ----------------
 id
 doctor_id
-clinic_id
 date
 consultation_duration
 calculated_capacity
@@ -556,7 +544,6 @@ queue_entries
 id
 patient_id
 doctor_id
-clinic_id
 appointment_id
 queue_date
 queue_number
@@ -758,7 +745,6 @@ conversations
 id
 patient_id
 secretary_id
-clinic_id
 status
 created_at
 updated_at
@@ -852,7 +838,7 @@ The system does not require advance payment for regular reservations.
 
 The project does not integrate directly with the GCash API.
 
-Use a static/default clinic GCash QR.
+Use a static/default GCash QR.
 
 ```text
 Patient
@@ -1043,7 +1029,7 @@ It must not:
 - Prescribe.
 - Change prescriptions.
 - Replace professional medical advice.
-- Make clinical decisions.
+- Make medical decisions.
 - Claim to be a physician.
 
 Potentially urgent cases should result in appropriate advice to seek professional or emergency assistance.
@@ -1082,21 +1068,7 @@ Responsibilities:
 
 ---
 
-# 41. Clinic Module
-
-Responsibilities:
-
-- Clinic information.
-- Doctors.
-- Secretaries.
-- Operating hours.
-- Clinic location (address, latitude, longitude).
-- Map coordinates storage and retrieval.
-- Approval status.
-
----
-
-# 42. Patient Module
+# 41. Patient Module
 
 Responsibilities:
 
@@ -1110,7 +1082,7 @@ Responsibilities:
 
 ---
 
-# 43. Visit Module
+# 42. Visit Module
 
 Recommended:
 
@@ -1132,7 +1104,7 @@ Completed consultations should be associated with the patient account.
 
 ---
 
-# 44. Prescription Module
+# 43. Prescription Module
 
 Recommended:
 
@@ -1164,7 +1136,7 @@ instructions
 
 ---
 
-# 45. Notification Module
+# 44. Notification Module
 
 Notifications may be generated when:
 
@@ -1178,7 +1150,7 @@ Notifications may be generated when:
 
 ---
 
-# 46. API Architecture
+# 45. API Architecture
 
 Base:
 
@@ -1241,16 +1213,9 @@ PATCH /payments/:id/reject
 POST  /payments/:id/charges
 ```
 
-### Clinic Map
-
-```text
-GET  /clinics/:id/location
-PATCH /clinics/:id/location
-```
-
 ---
 
-# 47. Reservation Transaction
+# 46. Reservation Transaction
 
 Online reservation should be atomic.
 
@@ -1274,7 +1239,7 @@ If any required step fails, roll back the transaction.
 
 ---
 
-# 48. Walk-in Transaction
+# 47. Walk-in Transaction
 
 ```text
 BEGIN TRANSACTION
@@ -1293,7 +1258,7 @@ COMMIT
 
 ---
 
-# 49. Concurrency Protection
+# 48. Concurrency Protection
 
 Capacity and queue registration are concurrency-sensitive.
 
@@ -1308,7 +1273,7 @@ Use PostgreSQL transactions, constraints, and appropriate locking/isolation.
 
 ---
 
-# 50. Database Relationships
+# 49. Database Relationships
 
 ```text
 USER
@@ -1316,10 +1281,6 @@ USER
  ├── DOCTOR
  ├── SECRETARY
  └── ADMIN
-
-CLINIC
- ├── DOCTORS
- └── SECRETARIES
 
 PATIENT
  ├── APPOINTMENTS
@@ -1353,15 +1314,13 @@ APPOINTMENT
 
 ---
 
-# 51. Recommended Database Tables
+# 50. Recommended Database Tables
 
 ```text
 users
 patients
 doctors
-clinics
 secretaries
-doctor_clinics
 
 doctor_schedules
 doctor_unavailability
@@ -1389,67 +1348,7 @@ notifications
 
 ---
 
-# 52. Clinic Map Feature Architecture
-
-The clinic map feature allows patients to view the physical location of a clinic directly within the doctor or clinic profile screen.
-
-## Map Data Flow
-
-```text
-Patient
-   ↓
-Doctor Profile or Clinic Profile Screen
-   ↓
-GET /clinics/:id/location
-   ↓
-Backend Returns { address, latitude, longitude }
-   ↓
-Mobile Map Widget Renders Clinic Pin
-   ↓
-Patient Views Clinic Location
-```
-
-## Clinic Location Data Model
-
-The `clinics` table shall include location fields:
-
-```text
-clinics
--------
-id
-name
-address
-latitude         -- decimal, e.g. 14.5995
-longitude        -- decimal, e.g. 120.9842
-contact_info
-description
-approval_status
-created_at
-updated_at
-```
-
-## Map Provider
-
-The mobile application shall use a map provider (such as Google Maps or OpenStreetMap via flutter_map) to render the clinic location. The map package is selected during mobile implementation.
-
-The map must:
-
-- Display a pin at the clinic's coordinates.
-- Show the clinic name and address as a label.
-- Be read-only for patients (no editing).
-
-## Permissions
-
-```text
-Patient     → Read clinic location (YES)
-Doctor      → Read clinic location (YES)
-Secretary   → Read clinic location (YES)
-Admin       → Read and update clinic location (YES)
-```
-
----
-
-# 52. Security Architecture
+# 50. Security Architecture
 
 ```text
 Mobile
@@ -1611,7 +1510,6 @@ findmydoctor/
 │   │   │   ├── users/
 │   │   │   ├── patients/
 │   │   │   ├── doctors/
-│   │   │   ├── clinics/
 │   │   │   ├── secretaries/
 │   │   │   ├── schedules/
 │   │   │   ├── capacity/
