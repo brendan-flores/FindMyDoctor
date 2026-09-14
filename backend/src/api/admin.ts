@@ -21,28 +21,28 @@ router.get('/users', authenticate, authorize('ADMIN'), async (req: AuthRequest, 
 // Create doctor
 router.post('/doctors', authenticate, authorize('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password, firstName, lastName, specialty, credentials, biography, consultationFee, clinicId } = req.body;
+    const { email, password, firstName, lastName, specialty, credentials, biography, consultationFee, practiceName, practiceAddress, practiceLatitude, practiceLongitude, practicePhone, practiceEmail, practiceDescription, operatingHoursStart, operatingHoursEnd } = req.body;
 
-    if (!email || !password || !firstName || !lastName || !specialty || !consultationFee) {
+    if (!email || !password || !firstName || !lastName || !specialty || !consultationFee || !practiceName || !practiceAddress || !practiceLatitude || !practiceLongitude) {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Required fields missing'));
     }
 
     // Create user
     const userResult = await query(
-      `INSERT INTO users (email, password_hash, role, must_change_password) 
-       VALUES ($1, crypt(gen_salt(), $2), 'DOCTOR', false) 
+      `INSERT INTO users (email, password_hash, role, must_change_password)
+       VALUES ($1, crypt(gen_salt(), $2), 'DOCTOR', false)
        RETURNING id`,
       [email, password]
     );
 
     const userId = userResult.rows[0].id;
 
-    // Create doctor profile
+    // Create doctor profile with practice information
     const doctorResult = await query(
-      `INSERT INTO doctors (user_id, clinic_id, first_name, last_name, specialty, credentials, biography, consultation_fee, is_approved)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+      `INSERT INTO doctors (user_id, first_name, last_name, specialty, credentials, biography, consultation_fee, practice_name, practice_address, practice_latitude, practice_longitude, practice_phone, practice_email, practice_description, operating_hours_start, operating_hours_end, is_approved)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, true)
        RETURNING *`,
-      [userId, clinicId, firstName, lastName, specialty, credentials, biography, consultationFee]
+      [userId, firstName, lastName, specialty, credentials, biography, consultationFee, practiceName, practiceAddress, practiceLatitude, practiceLongitude, practicePhone, practiceEmail, practiceDescription, operatingHoursStart, operatingHoursEnd]
     );
 
     res.status(201).json(success(doctorResult.rows[0], 'Doctor created successfully'));
@@ -67,87 +67,62 @@ router.patch('/doctors/:id/approve', authenticate, authorize('ADMIN'), async (re
   }
 });
 
-// Create clinic
-router.post('/clinics', authenticate, authorize('ADMIN'), async (req: AuthRequest, res: Response) => {
+// Create secretary
+router.post('/secretaries', authenticate, authorize('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    const { name, address, latitude, longitude, phone, email, description, operatingHoursStart, operatingHoursEnd } = req.body;
+    const { email, password, firstName, lastName, doctorId } = req.body;
 
-    if (!name || !address || !latitude || !longitude) {
+    if (!email || !password || !firstName || !lastName || !doctorId) {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Required fields missing'));
     }
 
-    const result = await query(
-      `INSERT INTO clinics (name, address, latitude, longitude, phone, email, description, operating_hours_start, operating_hours_end, is_approved)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
-       RETURNING *`,
-      [name, address, latitude, longitude, phone, email, description, operatingHoursStart, operatingHoursEnd]
+    // Verify doctor exists
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE id = $1',
+      [doctorId]
     );
 
-    res.status(201).json(success(result.rows[0], 'Clinic created successfully'));
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor not found'));
+    }
+
+    // Create user
+    const userResult = await query(
+      `INSERT INTO users (email, password_hash, role, must_change_password)
+       VALUES ($1, crypt(gen_salt(), $2), 'SECRETARY', false)
+       RETURNING id`,
+      [email, password]
+    );
+
+    const userId = userResult.rows[0].id;
+
+    // Create secretary profile associated with doctor
+    const secretaryResult = await query(
+      `INSERT INTO secretaries (user_id, doctor_id, first_name, last_name, is_approved)
+       VALUES ($1, $2, $3, $4, true)
+       RETURNING *`,
+      [userId, doctorId, firstName, lastName]
+    );
+
+    res.status(201).json(success(secretaryResult.rows[0], 'Secretary created successfully'));
   } catch (err: any) {
-    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create clinic'));
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create secretary'));
   }
 });
 
-// Approve clinic
-router.patch('/clinics/:id/approve', authenticate, authorize('ADMIN'), async (req: AuthRequest, res: Response) => {
+// Approve secretary
+router.patch('/secretaries/:id/approve', authenticate, authorize('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
     await query(
-      "UPDATE clinics SET is_approved = true WHERE id = $1",
+      "UPDATE secretaries SET is_approved = true WHERE id = $1",
       [id]
     );
 
-    res.json(success(null, 'Clinic approved successfully'));
+    res.json(success(null, 'Secretary approved successfully'));
   } catch (err: any) {
-    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to approve clinic'));
-  }
-});
-
-// Get all appointments (admin view)
-router.get('/appointments', authenticate, authorize('ADMIN'), async (req: AuthRequest, res: Response) => {
-  try {
-    const { status, startDate, endDate } = req.query;
-
-    let queryText = `
-      SELECT 
-        a.*,
-        p.first_name as patient_first_name, p.last_name as patient_last_name,
-        d.first_name as doctor_first_name, d.last_name as doctor_last_name,
-        c.name as clinic_name,
-        q.queue_number
-      FROM appointments a
-      JOIN patients p ON a.patient_id = p.id
-      JOIN doctors d ON a.doctor_id = d.id
-      JOIN clinics c ON a.clinic_id = c.id
-      LEFT JOIN queue_entries q ON a.id = q.appointment_id
-      WHERE 1=1
-    `;
-    const params: any[] = [];
-
-    if (status) {
-      params.push(status);
-      queryText += ` AND a.status = $${params.length}`;
-    }
-
-    if (startDate) {
-      params.push(startDate);
-      queryText += ` AND a.appointment_date >= $${params.length}`;
-    }
-
-    if (endDate) {
-      params.push(endDate);
-      queryText += ` AND a.appointment_date <= $${params.length}`;
-    }
-
-    queryText += ' ORDER BY a.appointment_date DESC';
-
-    const result = await query(queryText, params);
-
-    res.json(success(result.rows));
-  } catch (err: any) {
-    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch appointments'));
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to approve secretary'));
   }
 });
 
