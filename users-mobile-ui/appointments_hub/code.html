@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100%;margin:0;padding:0;min-height:100%;}body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 0.5rem);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "secondary-fixed-dim": "#bec6e0", "tertiary-fixed": "#71f8e4", "surface-container-highest": "#d3e4fe", "on-secondary": "#ffffff", "surface-tint": "#006591", "on-primary": "#ffffff", "primary-container": "#0ea5e9", "on-error": "#ffffff", "secondary-container": "#dae2fd", "surface-container-low": "#eff4ff", "outline-variant": "#bec8d2", "on-background": "#0b1c30", "surface-dim": "#cbdbf5", "error": "#ba1a1a", "on-primary-fixed-variant": "#004c6e", "on-surface": "#0b1c30", "secondary": "#565e74", "on-error-container": "#93000a", "on-tertiary-container": "#003a33", "surface-container": "#e5eeff", "on-tertiary-fixed": "#00201c", "surface-container-lowest": "#ffffff", "primary": "#006591", "on-surface-variant": "#3e4850", "on-primary-fixed": "#001e2f", "primary-fixed-dim": "#89ceff", "inverse-surface": "#213145", "inverse-primary": "#89ceff", "secondary-fixed": "#dae2fd", "outline": "#6e7881", "tertiary-fixed-dim": "#4fdbc8", "tertiary": "#006b5f", "on-tertiary": "#ffffff", "primary-fixed": "#c9e6ff", "surface-container-high": "#dce9ff", "on-tertiary-fixed-variant": "#005048", "inverse-on-surface": "#eaf1ff", "surface": "#f8f9ff", "surface-bright": "#f8f9ff", "on-secondary-fixed": "#131b2e", "error-container": "#ffdad6", "on-primary-container": "#003751", "surface-variant": "#d3e4fe", "on-secondary-fixed-variant": "#3f465c", "background": "#f8f9ff", "on-secondary-container": "#5c647a", "tertiary-container": "#00ae9d" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "gutter-xl": "1.25rem", "safe-margin": "1rem", "gutter-md": "0.75rem", "gutter-xs": "0.25rem", "gutter-lg": "1rem", "gutter-3xl": "2rem", "gutter-2xl": "1.5rem", "gutter-sm": "0.5rem", "touch-target": "3rem" }, "fontFamily": { "headline-sm": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"], "body-md-medium": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "queue-num": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "body-lg-medium": ["Plus Jakarta Sans"], "label-md": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"] }, "fontSize": { "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "body-md-medium": ["14px", { "lineHeight": "20px", "fontWeight": "500" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "queue-num": ["32px", { "lineHeight": "36px", "fontWeight": "800" }], "headline-lg": ["28px", { "lineHeight": "36px", "fontWeight": "700" }], "body-lg-medium": ["16px", { "lineHeight": "24px", "fontWeight": "500" }], "label-md": ["13px", { "lineHeight": "16px", "fontWeight": "600" }], "headline-md": ["22px", { "lineHeight": "28px", "fontWeight": "700" }], "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "700" }] } } } };</script></head><body class="bg-surface text-on-surface font-body-md text-body-md min-h-screen flex flex-col antialiased selection:bg-primary-fixed selection:text-on-primary-fixed"><header class="fixed top-0 w-full z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(11,28,48,0.04)] pt-safe"><div class="h-16 px-safe-margin flex items-center justify-between gap-gutter-md"><div class="flex items-center gap-gutter-sm min-w-0"><img alt="Brand logo. - Primary color: #0ea5e9 - Font: plusJakartaSans - Mode: light - Roundness: rounded-md" class="h-8 w-auto object-contain shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1WArXQQ4DfprrUKa2Z-r5x2Ei0NuFKAlXLDXa8ujvnA8H41xMyNhQq_0vWKDxwY2peVN2Gikb5Nbv_JF10FiuXdzh5DoBKW0l3XjEY0RQzr3AzxvvKxgVkZ8_UZd8jtrzq_PTkFnPOa1X9mtUP6slw9CNle25u-p8AJ4uLITI88Z6_h45ytGcXjk3-ZOni1qC9OScji5qPbU5L_s93lM57_PsFSLUdAeVCLW_B87c4ePP_cq27kdG2kpTU"/><div class="flex flex-col min-w-0"><span class="text-label-sm font-label-sm text-primary uppercase tracking-wider leading-none">FindMyDoctor</span><span class="text-headline-sm font-headline-sm text-on-surface truncate leading-tight">Appointments</span></div></div><div class="flex items-center gap-gutter-xs shrink-0"><button aria-label="Notifications" class="w-touch-target h-touch-target min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors relative" type="button"><span class="material-symbols-outlined text-[24px]">notifications</span><span class="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface"></span></button><button aria-label="Patient Profile" class="w-touch-target h-touch-target min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center" type="button"><img alt="Profile" class="w-8 h-8 rounded-full object-cover shadow-[0_2px_6px_rgba(11,28,48,0.12)]" src="https://lh3.googleusercontent.com/aida/AEtjO1V3sxs_83PnCVLLERDYwHNYLZliD_GxmGnyttvS86wH18fGyHl1nYl5OLH3zFg5qc2LnoCTAYOyGQbA4f-U2fwkewN3wez5lzCgfu2eqeQdFCg0Dbts9YTIqkl00TMHgS7lwq7TI-1m8AoFTqI5HfXssBk_k0jFCrWbeVAta2b-j3eDMVdYdr23LiNN01DmlVGBVu9WckUiV2oH29i0BS0qE1VgHtv4pRGOsXuq-WUHiQrZXdmSB8Y4Lm-s"/></button></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-28 bg-surface"><div class="flex flex-col w-full">
+<!-- Content Container -->
+<div class="px-safe-margin pt-gutter-lg pb-gutter-2xl flex flex-col gap-gutter-lg">
+<!-- Header Section -->
+<div class="flex flex-col gap-gutter-xs">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-gutter-xs">
+<h1 class="text-headline-md font-headline-md text-on-surface tracking-tight">My Appointments</h1>
+<span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-primary-container text-on-primary text-label-sm font-label-sm">
+            2 Active
+          </span>
+</div>
+<button aria-label="Appointment History or Help" class="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary hover:bg-surface-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">history_edu</span>
+</button>
+</div>
+<p class="text-body-md font-body-md text-secondary">Manage your clinic visits, queue passes &amp; medical records</p>
+</div>
+<!-- Search & Fast Filter Bar -->
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[20px] text-outline">search</span>
+<input class="w-full h-12 pl-11 pr-10 rounded-xl bg-surface-container-lowest shadow-sm text-body-md font-body-md text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary-container transition-all" id="appointmentSearchInput" placeholder="Search doctor, hospital, or specialty..." type="text"/>
+<button aria-label="Filter options" class="absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center text-secondary hover:text-primary transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+</button>
+</div>
+<!-- Segmented Filter Tabs -->
+<div class="flex items-center gap-gutter-xs p-1 bg-surface-container-low rounded-xl" role="tablist">
+<button class="flex-1 min-h-[40px] rounded-lg text-label-md font-label-md flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm" data-filter="upcoming" id="tab-upcoming" type="button">
+<span>Upcoming</span>
+<span class="w-5 h-5 rounded-full bg-primary/10 text-primary text-label-sm font-label-sm flex items-center justify-center">2</span>
+</button>
+<button class="flex-1 min-h-[40px] rounded-lg text-label-md font-label-md flex items-center justify-center gap-1.5 transition-all text-secondary hover:text-on-surface" data-filter="completed" id="tab-completed" type="button">
+<span>Completed</span>
+<span class="w-5 h-5 rounded-full bg-surface-container text-secondary text-label-sm font-label-sm flex items-center justify-center">4</span>
+</button>
+<button class="flex-1 min-h-[40px] rounded-lg text-label-md font-label-md flex items-center justify-center gap-1.5 transition-all text-secondary hover:text-on-surface" data-filter="cancelled" id="tab-cancelled" type="button">
+<span>Cancelled</span>
+<span class="w-5 h-5 rounded-full bg-surface-container text-secondary text-label-sm font-label-sm flex items-center justify-center">1</span>
+</button>
+</div>
+<!-- Active List View Container -->
+<div class="flex flex-col gap-gutter-lg" id="appointmentsList">
+<!-- UPCOMING SECTION -->
+<div class="flex flex-col gap-gutter-lg filter-group" id="upcomingGroup">
+<!-- CARD 1: Next Up / Confirmed with Active Live Queue Pass -->
+<article class="relative bg-surface-container-lowest rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+<!-- Top highlight accent bar for immediate appointment -->
+<div class="h-1.5 w-full bg-primary-container"></div>
+<div class="p-gutter-lg flex flex-col gap-gutter-md">
+<!-- Header: Badges & Menu -->
+<div class="flex items-center justify-between gap-gutter-sm">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-tertiary-container/15 text-on-tertiary-container text-label-md font-label-md">
+<span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
+                Confirmed • Queue #04
+              </span>
+<div class="flex items-center gap-1">
+<span class="text-label-sm font-label-sm text-secondary bg-surface-container-low px-2 py-0.5 rounded">In-Person</span>
+<button aria-label="Appointment options" class="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-on-surface" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Doctor Bio Row -->
+<div class="flex items-start gap-gutter-md">
+<div class="relative shrink-0">
+<img class="w-16 h-16 rounded-xl object-cover shadow-sm" data-alt="Close up professional portrait of Dr Maria Angela Santos, an approachable Filipina cardiologist in a white medical coat with stethoscope in a bright modern clinic with warm ambient lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKB7Z7pqd2xZ8JXXEgaGPNV1i1hK1DgkWH34xTpkz36itr7RoAC5xIjWYLxute1x4RiR4RQo2XdJpIKOIq5liDV2XA4VSLFIxqKOhcXI5GjoL-pc9074R4ypUR_NCxsSUbSEnjqz5lKdYiSOD9awTfPDz1PqnQmf_0jxRQSXSavXDibOFEZ0LOsYuuZ3QwyhrHmrtCAB4e3-jjW-I2Y6QChK7yonfdj_cDMHyvodXTn4DI-1LqoR2-Lw"/>
+<span class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-tertiary text-on-tertiary flex items-center justify-center shadow">
+<span class="material-symbols-outlined text-[13px]">verified</span>
+</span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between gap-1">
+<h2 class="text-headline-sm font-headline-sm text-on-surface truncate">Dr. Maria Angela Santos, MD</h2>
+</div>
+<p class="text-body-md-medium font-body-md-medium text-primary truncate">Adult Cardiology • Echocardiology</p>
+<div class="flex items-center gap-1 text-secondary text-body-md font-body-md mt-0.5 truncate">
+<span class="material-symbols-outlined text-[15px] shrink-0 text-outline">apartment</span>
+<span class="truncate">St. Luke's BGC • Rm 412, MAB</span>
+</div>
+</div>
+</div>
+<!-- Schedule & Live Queue Highlight Box -->
+<div class="rounded-xl bg-surface-container-low p-3.5 flex flex-col gap-2.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-surface-container-lowest flex items-center justify-center text-primary shadow-xs">
+<span class="material-symbols-outlined text-[18px]">event</span>
+</div>
+<div class="flex flex-col">
+<span class="text-body-md-medium font-body-md-medium text-on-surface">Tuesday, Oct 21, 2025</span>
+<span class="text-label-sm font-label-sm text-secondary">09:45 AM • Clinic opens 9:00 AM</span>
+</div>
+</div>
+<div class="text-right">
+<span class="text-label-sm font-label-sm uppercase tracking-wide text-secondary">Consultation</span>
+<p class="text-headline-sm font-headline-sm text-on-surface leading-none">₱1,000</p>
+</div>
+</div>
+<!-- Real-time Queue Mini Card -->
+<div class="flex items-center justify-between px-3 py-2 rounded-lg bg-surface-container-lowest shadow-xs">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-tertiary">radio_button_checked</span>
+<span class="text-body-md-medium font-body-md-medium text-on-surface">Now Serving: <strong class="text-tertiary font-bold font-headline-sm">#01</strong></span>
+</div>
+<span class="text-label-sm font-label-sm text-secondary">Est. wait: <strong class="text-on-surface font-semibold">~45 min</strong></span>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex items-center gap-gutter-sm pt-1">
+<button class="flex-1 h-12 rounded-xl bg-primary-container hover:bg-primary text-on-primary text-body-lg-medium font-body-lg-medium flex items-center justify-center gap-2 shadow-sm transition-colors" onclick="document.getElementById('queueSheet').classList.remove('hidden')" type="button">
+<span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+<span>View Queue Pass</span>
+</button>
+<button class="h-12 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-body-md-medium font-body-md-medium flex items-center justify-center gap-1.5 transition-colors" title="Chat with Clinic Secretary" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary">chat</span>
+<span class="hidden sm:inline">Secretary</span>
+</button>
+<button class="w-12 h-12 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface flex items-center justify-center transition-colors shrink-0" title="Clinic Location Map" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">directions</span>
+</button>
+</div>
+</div>
+</article>
+<!-- CARD 2: Scheduled Upcoming Checkup -->
+<article class="bg-surface-container-lowest rounded-2xl shadow-sm hover:shadow-md transition-shadow p-gutter-lg flex flex-col gap-gutter-md">
+<!-- Header & Badge -->
+<div class="flex items-center justify-between gap-gutter-sm">
+<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container text-label-md font-label-md">
+<span class="material-symbols-outlined text-[14px]">event_available</span>
+              Scheduled • Follow-up
+            </span>
+<span class="text-label-sm font-label-sm text-secondary bg-surface-container-low px-2 py-0.5 rounded">In-Person</span>
+</div>
+<!-- Doctor Bio Row -->
+<div class="flex items-start gap-gutter-md">
+<div class="relative shrink-0">
+<img class="w-16 h-16 rounded-xl object-cover shadow-sm" data-alt="Warm friendly Asian male pediatrician Dr Rafael Cruz in light blue scrub top with friendly smile in a colorful child-friendly clinic background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA35o2yUtVPkrecSfKCWn4YB2vCdNRLwCQpijo-OVsPJbGp81giCLH3jSkWjU_gOVkINSeS6Bz7GJtATqqShIPWSIzjv1zJBf7auR74nKFjrhoWqM47WwOV2893CTcUZCZ61LwQA89OTZx0Ba0CdYOihvduNVKc1ilKbsyQ9rw-84BCvF6Vppw6hKxeIm_aG6y9mid4I8TLuDMKAQc-9wJ5LL510CpqqqcXQUFB5pfr1RCaJHCLO-BMbA"/>
+<span class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center shadow">
+<span class="material-symbols-outlined text-[13px]">verified</span>
+</span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<h2 class="text-headline-sm font-headline-sm text-on-surface truncate">Dr. Rafael Cruz, MD</h2>
+<p class="text-body-md-medium font-body-md-medium text-primary truncate">Pediatrics • Developmental Specialist</p>
+<div class="flex items-center gap-1 text-secondary text-body-md font-body-md mt-0.5 truncate">
+<span class="material-symbols-outlined text-[15px] shrink-0 text-outline">apartment</span>
+<span class="truncate">The Medical City • Rm 208, Pod B</span>
+</div>
+</div>
+</div>
+<!-- Schedule Row -->
+<div class="rounded-xl bg-surface-container-low p-3.5 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-surface-container-lowest flex items-center justify-center text-primary shadow-xs">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+</div>
+<div class="flex flex-col">
+<span class="text-body-md-medium font-body-md-medium text-on-surface">Friday, Oct 24, 2025</span>
+<span class="text-label-sm font-label-sm text-secondary">02:00 PM • Slot 6</span>
+</div>
+</div>
+<div class="text-right">
+<span class="text-label-sm font-label-sm uppercase tracking-wide text-secondary">Consultation</span>
+<p class="text-headline-sm font-headline-sm text-on-surface leading-none">₱900</p>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex items-center gap-gutter-sm pt-1">
+<button class="flex-1 h-12 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-body-md-medium font-body-md-medium flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary">touch_app</span>
+<span>Check-in Online</span>
+</button>
+<button class="h-12 px-4 rounded-xl bg-surface-container-lowest hover:bg-surface-container-low text-secondary text-body-md-medium font-body-md-medium flex items-center justify-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">edit_calendar</span>
+<span>Reschedule</span>
+</button>
+</div>
+</article>
+</div>
+<!-- COMPLETED SECTION (Shown in view or tab) -->
+<div class="flex flex-col gap-gutter-lg filter-group" id="completedGroup">
+<article class="bg-surface-container-lowest rounded-2xl shadow-sm p-gutter-lg flex flex-col gap-gutter-md">
+<div class="flex items-center justify-between gap-gutter-sm">
+<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-surface-container text-secondary text-label-md font-label-md">
+<span class="material-symbols-outlined text-[14px] text-tertiary">check_circle</span>
+              Completed • Oct 05, 2025
+            </span>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-tertiary-container/10 text-tertiary text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[13px]">medication</span>
+              2 Meds Issued
+            </span>
+</div>
+<div class="flex items-start gap-gutter-md">
+<img class="w-16 h-16 rounded-xl object-cover shadow-sm shrink-0" data-alt="Professional modern headshot of Dr Kristine Lim, dermatologist in white doctor coat smiling warmly in a clinical aesthetic dermatology room" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBhmrV_bIKM0j0ptB_QrAAqD-IcLS95OU4TdnW_YEu4NLEFuPwG670AUA1iQsQEhd7MIn_i0JJkYeVcdeQtwyYFFb1vZrgqnZNW93kHHTiQ-KSUZGkBkM-Rvpl0GE7x2UThduhU9nifZJJLV6C5--D-zLGBqix72LHLZnu2Fi5R-lAXSpWadiYfdLW33oGBz43LA6gfKq7mhZY5rBw7i0ZVuAh0uB4ABSJOtMkKvB16jPgchLsvMqtZSQ"/>
+<div class="flex flex-col min-w-0 flex-1">
+<h2 class="text-headline-sm font-headline-sm text-on-surface truncate">Dra. Kristine Lim, DPDS</h2>
+<p class="text-body-md-medium font-body-md-medium text-secondary truncate">Dermatology • Skin Health</p>
+<div class="flex items-center gap-1 text-secondary text-body-md font-body-md mt-0.5 truncate">
+<span class="material-symbols-outlined text-[15px] shrink-0 text-outline">location_on</span>
+<span class="truncate">Asian Hospital • Suite 514</span>
+</div>
+</div>
+</div>
+<!-- Notes preview -->
+<div class="p-3 rounded-xl bg-surface-container-low text-body-md font-body-md text-on-surface-variant flex items-center justify-between">
+<span class="flex items-center gap-2 truncate">
+<span class="material-symbols-outlined text-[18px] text-primary">description</span>
+<span class="truncate">Diagnosis: Contact Dermatitis (Resolved)</span>
+</span>
+<span class="material-symbols-outlined text-[18px] text-outline">chevron_right</span>
+</div>
+<!-- Action buttons -->
+<div class="flex items-center gap-gutter-sm pt-1">
+<button class="flex-1 h-11 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-body-md-medium font-body-md-medium flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary">prescriptions</span>
+<span>View e-Prescription</span>
+</button>
+<button class="h-11 px-4 rounded-xl bg-primary-container/10 hover:bg-primary-container/20 text-primary text-body-md-medium font-body-md-medium flex items-center justify-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">replay</span>
+<span>Book Again</span>
+</button>
+</div>
+</article>
+</div>
+<!-- CANCELLED SECTION (Shown in view or tab) -->
+<div class="flex flex-col gap-gutter-lg filter-group" id="cancelledGroup">
+<article class="bg-surface-container-lowest rounded-2xl shadow-sm p-gutter-lg flex flex-col gap-gutter-md opacity-90">
+<div class="flex items-center justify-between gap-gutter-sm">
+<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-error-container text-on-error-container text-label-md font-label-md">
+<span class="material-symbols-outlined text-[14px]">cancel</span>
+              Cancelled by Patient
+            </span>
+<span class="text-label-sm font-label-sm text-secondary">Sep 18, 2025</span>
+</div>
+<div class="flex items-start gap-gutter-md">
+<img class="w-16 h-16 rounded-xl object-cover grayscale contrast-75 shadow-sm shrink-0" data-alt="Doctor headshot of middle-aged Filipino physician Dr Antonio Ramos in clinic office setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBoxMO0uo53ixQl-qTx7NUcwzT6FE-jpjuIIcKQr681GkJViUy86sGO7oF7t789vBuTmCOK5pMtSagYz-MU1F5nCg5sz1MiX9tRaqvDsdxh1gminMBYHTSr1nCRmUu0Hcl3KRW3nb_ntOq1MYBBYE9MicVMVHYq2qKXPPg4QKvW0yjv2kQKsDm3N-IWlpAni-Ofgq_ZDSJHX4HT1iy0wAaEWEU9zF5-4JhK_7wk38rTSjZwbkexYAxMgA"/>
+<div class="flex flex-col min-w-0 flex-1">
+<h2 class="text-headline-sm font-headline-sm text-on-surface truncate">Dr. Antonio Ramos</h2>
+<p class="text-body-md-medium font-body-md-medium text-secondary truncate">General Internal Medicine</p>
+<span class="text-label-sm font-label-sm text-error mt-0.5">Reason: Schedule conflict • Refund processed</span>
+</div>
+</div>
+<div class="flex items-center justify-end pt-1">
+<button class="h-11 px-5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-body-md-medium font-body-md-medium flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary">calendar_add_on</span>
+<span>Re-book Consultation</span>
+</button>
+</div>
+</article>
+</div>
+<!-- EMPTY STATE CARD (Hidden by default, shown via filter if empty) -->
+<div class="hidden flex-col items-center text-center p-8 bg-surface-container-lowest rounded-2xl shadow-sm gap-gutter-md my-4" id="emptyStateCard">
+<div class="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[32px]">calendar_today</span>
+</div>
+<div class="flex flex-col gap-1 max-w-xs">
+<h3 class="text-headline-sm font-headline-sm text-on-surface">No Appointments Found</h3>
+<p class="text-body-md font-body-md text-secondary">You don't have any appointments matching this tab or search filter.</p>
+</div>
+<button class="h-12 px-6 rounded-xl bg-primary-container text-on-primary text-body-md-medium font-body-md-medium flex items-center justify-center gap-2 shadow-sm" type="button">
+<span class="material-symbols-outlined text-[20px]">search</span>
+<span>Find a Doctor</span>
+</button>
+</div>
+</div>
+<!-- Quick Help & Clinic Hotline Banner -->
+<section class="rounded-2xl bg-gradient-to-r from-surface-container-low to-surface-container p-gutter-lg flex items-center justify-between gap-gutter-md shadow-xs">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-11 h-11 rounded-xl bg-surface-container-lowest text-primary flex items-center justify-center shrink-0 shadow-xs">
+<span class="material-symbols-outlined text-[22px]">support_agent</span>
+</div>
+<div class="flex flex-col min-w-0">
+<h3 class="text-body-lg-medium font-body-lg-medium text-on-surface truncate">Need urgent clinic help?</h3>
+<p class="text-label-sm font-label-sm text-secondary truncate">Connect directly with our 24/7 patient coordinator</p>
+</div>
+</div>
+<button aria-label="Call clinic desk" class="shrink-0 h-10 px-3.5 rounded-xl bg-surface-container-lowest text-primary text-label-md font-label-md flex items-center justify-center gap-1 shadow-xs hover:bg-surface-bright transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">call</span>
+<span>Hotline</span>
+</button>
+</section>
+</div>
+<!-- Interactive Bottom Sheet Modal: Queue Pass (Hidden by default, triggered by "View Queue Pass") -->
+<div class="hidden fixed inset-0 z-50 flex flex-col justify-end bg-on-surface/40 backdrop-blur-xs p-safe-margin transition-opacity" id="queueSheet">
+<div class="bg-surface-container-lowest rounded-t-3xl rounded-b-2xl shadow-xl w-full p-gutter-xl flex flex-col gap-gutter-lg max-h-[85vh] overflow-y-auto">
+<!-- Drag handle pill -->
+<div class="w-10 h-1 bg-outline-variant rounded-full mx-auto shrink-0"></div>
+<!-- Ticket Header -->
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm uppercase tracking-wider text-primary">Official Digital Queue Pass</span>
+<h3 class="text-headline-md font-headline-md text-on-surface">St. Luke's Medical BGC</h3>
+</div>
+<button class="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface" onclick="document.getElementById('queueSheet').classList.add('hidden')" type="button">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<!-- Ticket Body Card -->
+<div class="rounded-2xl bg-surface-container-low p-6 flex flex-col items-center text-center gap-gutter-md relative overflow-hidden">
+<div class="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-primary via-tertiary to-primary-container"></div>
+<span class="text-label-md font-label-md text-secondary">YOUR QUEUE NUMBER</span>
+<div class="text-queue-num font-queue-num text-primary tracking-tight">#04</div>
+<!-- Live status bar -->
+<div class="w-full bg-surface-container-lowest rounded-xl p-3 flex items-center justify-between text-left shadow-xs">
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm text-secondary">Current Serving</span>
+<span class="text-headline-sm font-headline-sm text-tertiary">Patient #01</span>
+</div>
+<div class="h-8 w-px bg-surface-container"></div>
+<div class="flex flex-col text-right">
+<span class="text-label-sm font-label-sm text-secondary">Est. Consultation</span>
+<span class="text-body-md-medium font-body-md-medium text-on-surface">~09:45 AM</span>
+</div>
+</div>
+<!-- QR Code Placeholder -->
+<div class="w-36 h-36 rounded-xl bg-surface-container-lowest p-2 shadow-xs flex items-center justify-center">
+<img class="w-full h-full object-contain" data-alt="Digital clinic appointment check-in QR code barcode vector graphics on white paper background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA-pLrOONwvYv0B_RFmeDSbomGCE7dOIAvOmFwPBO1SOABBDjOb-9IYKYnlcGfnr-l1KX-vd-9wFwV86V18pOJyn_xWMgp9N5MW9peP0p4F1OKsWK6iPgjIhRe9gNy6l2zwQpFWehxNgizneoao9wV7orgeGyzokVd138pQybeRu3Zr2taGsvzIajGEX1N8vEzxO6S0IWJyCiI8qw9ekUWeyV_h0FC-3WymtMe3qgjcZYHQ7A42zmMFuQ"/>
+</div>
+<span class="text-label-sm font-label-sm text-secondary">Scan this code at the triage kiosk upon clinic arrival</span>
+</div>
+<!-- Doctor & Clinic Snapshot -->
+<div class="flex items-center gap-3 p-3 rounded-xl bg-surface-container">
+<span class="material-symbols-outlined text-[22px] text-primary">stethoscope</span>
+<div class="flex flex-col text-left min-w-0 flex-1">
+<span class="text-body-md-medium font-body-md-medium text-on-surface truncate">Dr. Maria Angela Santos, MD</span>
+<span class="text-label-sm font-label-sm text-secondary truncate">Adult Cardiology • Room 412, Medical Arts</span>
+</div>
+</div>
+<!-- Modal Actions -->
+<div class="flex items-center gap-gutter-sm">
+<button class="flex-1 h-12 rounded-xl bg-primary-container text-on-primary font-body-lg-medium text-body-lg-medium flex items-center justify-center gap-2 shadow-sm" onclick="document.getElementById('queueSheet').classList.add('hidden')" type="button">
+<span class="material-symbols-outlined text-[18px]">check</span>
+<span>Done • Keep in Passbook</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<script>
+  (function() {
+    const tabs = document.querySelectorAll('[role="tablist"] button');
+    const upcomingGroup = document.getElementById('upcomingGroup');
+    const completedGroup = document.getElementById('completedGroup');
+    const cancelledGroup = document.getElementById('cancelledGroup');
+    const emptyState = document.getElementById('emptyStateCard');
+    const searchInput = document.getElementById('appointmentSearchInput');
+
+    function selectTab(filterKey) {
+      tabs.forEach(tab => {
+        const isActive = tab.getAttribute('data-filter') === filterKey;
+        if (isActive) {
+          tab.classList.add('bg-surface-container-lowest', 'text-primary', 'shadow-sm');
+          tab.classList.remove('text-secondary');
+        } else {
+          tab.classList.remove('bg-surface-container-lowest', 'text-primary', 'shadow-sm');
+          tab.classList.add('text-secondary');
+        }
+      });
+
+      // Filter groups visibility
+      if (filterKey === 'upcoming') {
+        upcomingGroup.classList.remove('hidden');
+        completedGroup.classList.add('hidden');
+        cancelledGroup.classList.add('hidden');
+        emptyState.classList.add('hidden');
+      } else if (filterKey === 'completed') {
+        upcomingGroup.classList.add('hidden');
+        completedGroup.classList.remove('hidden');
+        cancelledGroup.classList.add('hidden');
+        emptyState.classList.add('hidden');
+      } else if (filterKey === 'cancelled') {
+        upcomingGroup.classList.add('hidden');
+        completedGroup.classList.add('hidden');
+        cancelledGroup.classList.remove('hidden');
+        emptyState.classList.add('hidden');
+      }
+    }
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const filter = tab.getAttribute('data-filter');
+        selectTab(filter);
+      });
+    });
+
+    // Simple instant filter interaction
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase().trim();
+        const cards = document.querySelectorAll('#appointmentsList article');
+        let visibleCount = 0;
+
+        cards.forEach(card => {
+          const text = card.textContent.toLowerCase();
+          if (text.includes(q)) {
+            card.style.display = '';
+            visibleCount++;
+          } else {
+            card.style.display = 'none';
+          }
+        });
+
+        if (visibleCount === 0 && q.length > 0) {
+          emptyState.classList.remove('hidden');
+          emptyState.classList.add('flex');
+        } else {
+          emptyState.classList.add('hidden');
+          emptyState.classList.remove('flex');
+        }
+      });
+    }
+
+    // Default initialization
+    selectTab('upcoming');
+  })();
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-2px_16px_rgba(11,28,48,0.06)]" data-active-classes="text-primary-container font-semibold"><div class="h-16 px-gutter-md flex items-center justify-around"><a class="flex-1 min-w-[44px] min-h-[44px] h-touch-target flex flex-col items-center justify-center gap-0.5 text-secondary hover:text-on-surface transition-colors" data-path="home" href="#"><span class="material-symbols-outlined text-[22px]">home</span><span class="text-label-sm font-label-sm">Home</span></a><a aria-current="page" class="flex-1 min-w-[44px] min-h-[44px] h-touch-target flex flex-col items-center justify-center gap-0.5 transition-colors text-primary-container font-semibold" data-path="appointments" href="#"><span class="material-symbols-outlined text-[22px]">calendar_month</span><span class="text-label-sm font-label-sm">Appointments</span></a><a class="flex-1 min-w-[44px] min-h-[44px] h-touch-target flex flex-col items-center justify-center gap-0.5 text-secondary hover:text-on-surface transition-colors" data-path="chat" href="#"><span class="material-symbols-outlined text-[22px]">chat_bubble</span><span class="text-label-sm font-label-sm">Chat</span></a><a class="flex-1 min-w-[44px] min-h-[44px] h-touch-target flex flex-col items-center justify-center gap-0.5 text-secondary hover:text-on-surface transition-colors" data-path="profile" href="#"><span class="material-symbols-outlined text-[22px]">person</span><span class="text-label-sm font-label-sm">Profile</span></a></div></nav></body></html>
