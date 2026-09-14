@@ -58,6 +58,10 @@ web/.next/
 web/out/
 web/node_modules/
 
+# Admin UI
+admin-ui/
+user-mobile-ui/
+
 # Backend specific
 backend/node_modules/
 backend/dist/
