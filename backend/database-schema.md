@@ -7,15 +7,14 @@ Based on the documentation, the system supports these user roles:
 - **PATIENT**: Can search doctors, book appointments, manage queue, chat with secretaries, use AI chatbot, access medical records
 - **DOCTOR**: Manage schedule/capacity, appointments, patient information, visits, prescriptions
 - **SECRETARY**: Walk-ins, queue management, patient chat, payment verification, daily operations
-- **ADMIN**: Users, doctors, secretaries, clinics, approvals, platform oversight
+- **ADMIN**: Users, doctors, secretaries, approvals, platform oversight
 
 ### Core Entities Identified
 From the architecture and PRD, these are the main entities:
 - **Users**: Base user accounts with authentication
 - **Patients**: Patient-specific information and medical history
-- **Doctors**: Doctor profiles, specialties, credentials, consultation fees
-- **Clinics**: Clinic information, location, operating hours
-- **Secretaries**: Secretary profiles and clinic associations
+- **Doctors**: Doctor profiles, specialties, credentials, consultation fees, practice information (embedded)
+- **Secretaries**: Secretary profiles and doctor associations
 - **Doctor Schedules**: Working hours, availability, unavailability periods
 - **Daily Capacities**: Calculated and configured daily patient capacity
 - **Appointments**: Patient reservations with date, time, status
