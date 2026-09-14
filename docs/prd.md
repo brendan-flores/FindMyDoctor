@@ -1087,6 +1087,82 @@ Patient Views Professional Details
 - Approvals.
 - Basic appointment monitoring.
 
+### Web Application (Doctor, Secretary, Admin)
+
+The web application provides role-specific dashboards for doctors, secretaries, and administrators:
+
+**Doctor Web Dashboard:**
+- Appointments management
+- Schedule management
+- Patient information
+- Prescription creation
+
+**Secretary Web Dashboard:**
+- Daily queue management
+- Walk-in registration
+- Payment verification
+- Patient communication
+
+**Admin Web Dashboard:**
+- User management
+- Doctor management
+- Secretary management
+- Platform oversight
+
+---
+
+# 28.1 Web Authentication and Routing
+
+The web application uses role-based route namespaces with dedicated authentication flows:
+
+### Route Structure
+
+```text
+FiDo Web
+├── Admin
+│   └── `/admin/login` → `/admin/dashboard`
+└── Doctor/Secretary
+    └── `/auth/login`
+        ├── Doctor → `/doctor/dashboard`
+        └── Secretary → `/secretary/dashboard`
+```
+
+### Authentication Behavior
+
+**Root Route (`/`):**
+- Unauthenticated users redirect to `/auth/login`
+- Authenticated users redirect to their role-specific dashboard
+
+**Admin Authentication:**
+- Dedicated login at `/admin/login`
+- Admin-only UI with no Doctor/Secretary selector
+- Verifies backend-returned role is ADMIN
+- Successful login redirects to `/admin/dashboard`
+- Non-Admin login attempts are denied
+
+**Doctor/Secretary Authentication:**
+- Shared login at `/auth/login`
+- Doctor/Secretary selector for login intent (not authorization)
+- Verifies backend-returned role independently of selector
+- Doctor users redirect to `/doctor/dashboard`
+- Secretary users redirect to `/secretary/dashboard`
+- Admin users are redirected to `/admin/login`
+
+### Role-Based Protection
+
+- `/admin/*` routes - Allow only ADMIN users
+- `/doctor/*` routes - Allow only DOCTOR users
+- `/secretary/*` routes - Allow only SECRETARY users
+- All role verification uses backend-returned role, not frontend selector
+- Cross-role access is blocked and credentials are cleared on mismatch
+
+### Backend Integration
+
+- Uses existing JWT-based authentication through `/api/v1/auth/login`
+- Token stored in localStorage
+- Role verification on protected routes
+- API client includes Authorization header for authenticated requests
+
 ---
 
 # 29. Success Criteria

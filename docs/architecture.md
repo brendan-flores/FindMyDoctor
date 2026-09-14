@@ -214,24 +214,27 @@ Recommended:
 web/
 ├── src/
 │   ├── app/
-│   │   ├── page.tsx           # Landing page with role selection
-│   │   ├── doctor/            # Doctor dashboard
-│   │   │   ├── page.tsx
+│   │   ├── page.tsx           # Root redirect based on auth status
+│   │   ├── auth/              # Authentication routes
+│   │   │   └── login/         # Shared Doctor/Secretary login with role selector
+│   │   ├── admin/             # Admin dashboard namespace
+│   │   │   ├── login/         # Admin-only login
+│   │   │   ├── dashboard/     # Admin dashboard
+│   │   │   ├── users/
+│   │   │   ├── doctors/
+│   │   │   └── secretaries/
+│   │   ├── doctor/            # Doctor dashboard namespace
+│   │   │   ├── dashboard/     # Doctor dashboard
 │   │   │   ├── appointments/
 │   │   │   ├── schedule/
 │   │   │   ├── patients/
 │   │   │   └── prescriptions/
-│   │   ├── secretary/         # Secretary dashboard
-│   │   │   ├── page.tsx
-│   │   │   ├── queue/
-│   │   │   ├── walk-ins/
-│   │   │   ├── payments/
-│   │   │   └── conversations/
-│   │   └── admin/             # Admin dashboard
-│   │       ├── page.tsx
-│   │       ├── users/
-│   │       ├── doctors/
-│   │       └── secretaries/
+│   │   └── secretary/         # Secretary dashboard namespace
+│   │       ├── dashboard/     # Secretary dashboard
+│   │       ├── queue/
+│   │       ├── walk-ins/
+│   │       ├── payments/
+│   │       └── conversations/
 │   ├── components/
 │   │   ├── layout/
 │   │   ├── ui/
@@ -244,6 +247,56 @@ web/
 ```
 
 The web application uses Next.js 14 with App Router, TypeScript, and Tailwind CSS.
+
+## Web Authentication and Routing
+
+### Route Structure
+
+```text
+FiDo Web
+├── Admin
+│   └── `/admin/login` → `/admin/dashboard`
+└── Doctor/Secretary
+    └── `/auth/login`
+        ├── Doctor → `/doctor/dashboard`
+        └── Secretary → `/secretary/dashboard`
+```
+
+### Authentication Flow
+
+**Root (`/`):**
+- Unauthenticated users → `/auth/login`
+- Authenticated users → Redirect to role-specific dashboard
+
+**Admin Authentication:**
+- Dedicated login at `/admin/login`
+- Admin-only UI (no Doctor/Secretary selector)
+- Verifies backend-returned role is ADMIN
+- Success → `/admin/dashboard`
+- Non-Admin login → Access denied
+
+**Doctor/Secretary Authentication:**
+- Shared login at `/auth/login`
+- Doctor/Secretary selector for login intent (not authorization)
+- Verifies backend-returned role independently of selector
+- Doctor users → `/doctor/dashboard`
+- Secretary users → `/secretary/dashboard`
+- Admin users → Redirected to `/admin/login`
+
+### Role-Based Route Protection
+
+- Admin layout (`/admin/*`) - Allows only ADMIN users
+- Doctor layout (`/doctor/*`) - Allows only DOCTOR users
+- Secretary layout (`/secretary/*`) - Allows only SECRETARY users
+- All role verification uses backend-returned role, not frontend selector
+- Cross-role access is blocked and cleared credentials on mismatch
+
+### Backend Integration
+
+- Uses existing JWT-based authentication through `/api/v1/auth/login`
+- Token stored in localStorage
+- Role verification on protected routes
+- API client includes Authorization header for authenticated requests
 
 ---
 

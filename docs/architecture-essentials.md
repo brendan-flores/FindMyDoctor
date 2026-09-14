@@ -649,7 +649,61 @@ notifications
 
 ---
 
-# 32. API Rules
+# 32. Web Application Authentication
+
+The web application provides role-specific dashboards for doctors, secretaries, and administrators with dedicated authentication flows.
+
+### Route Structure
+
+```text
+FiDo Web
+├── Admin
+│   └── `/admin/login` → `/admin/dashboard`
+└── Doctor/Secretary
+    └── `/auth/login`
+        ├── Doctor → `/doctor/dashboard`
+        └── Secretary → `/secretary/dashboard`
+```
+
+### Authentication Rules
+
+**Root Route (`/`):**
+- Unauthenticated users redirect to `/auth/login`
+- Authenticated users redirect to their role-specific dashboard
+
+**Admin Authentication:**
+- Dedicated login at `/admin/login`
+- Admin-only UI with no Doctor/Secretary selector
+- Verifies backend-returned role is ADMIN
+- Successful login redirects to `/admin/dashboard`
+- Non-Admin login attempts are denied
+
+**Doctor/Secretary Authentication:**
+- Shared login at `/auth/login`
+- Doctor/Secretary selector for login intent (not authorization)
+- Verifies backend-returned role independently of selector
+- Doctor users redirect to `/doctor/dashboard`
+- Secretary users redirect to `/secretary/dashboard`
+- Admin users are redirected to `/admin/login`
+
+### Role-Based Protection
+
+- `/admin/*` routes - Allow only ADMIN users
+- `/doctor/*` routes - Allow only DOCTOR users
+- `/secretary/*` routes - Allow only SECRETARY users
+- All role verification uses backend-returned role, not frontend selector
+- Cross-role access is blocked and credentials are cleared on mismatch
+
+### Backend Integration
+
+- Uses existing JWT-based authentication through `/api/v1/auth/login`
+- Token stored in localStorage
+- Role verification on protected routes
+- API client includes Authorization header for authenticated requests
+
+---
+
+# 33. API Rules
 
 Use:
 
@@ -663,7 +717,7 @@ All important operations must pass through backend authorization and validation.
 
 ---
 
-# 33. Doctor Chat Restriction
+# 34. Doctor Chat Restriction
 
 Never add generic messaging logic that accidentally allows:
 
@@ -681,7 +735,7 @@ Patient → Doctor = Blocked
 
 ---
 
-# 34. AI Coding Agent Rules
+# 35. AI Coding Agent Rules
 
 When an AI coding agent changes the project:
 
@@ -768,7 +822,7 @@ Before completing the change, verify that:
 
 ---
 
-# 36. Feature Implementation Checklist
+# 37. Feature Implementation Checklist
 
 Before completing a feature:
 
@@ -832,7 +886,7 @@ For chat:
 
 ---
 
-# 37. Avoid Overengineering
+# 38. Avoid Overengineering
 
 Do not introduce without a documented need:
 
@@ -858,7 +912,7 @@ PostgreSQL
 
 ---
 
-# 38. Naming Rules
+# 39. Naming Rules
 
 Database:
 
@@ -890,7 +944,7 @@ Avoid inconsistent endpoint naming.
 
 ---
 
-# 39. Error Rules
+# 40. Error Rules
 
 Use clear error codes:
 
@@ -917,7 +971,7 @@ Sensitive Medical Data
 
 ---
 
-# 40. Logging Rules
+# 41. Logging Rules
 
 Never log:
 
@@ -936,7 +990,7 @@ Log technical events without exposing sensitive information.
 
 ---
 
-# 41. Final Golden Rules
+# 42. Final Golden Rules
 
 ```text
 1. Mobile never connects directly to PostgreSQL.
@@ -1008,7 +1062,7 @@ Log technical events without exposing sensitive information.
 
 ---
 
-# 42. Architecture Mental Model
+# 43. Architecture Mental Model
 
 ```text
                          PATIENT
