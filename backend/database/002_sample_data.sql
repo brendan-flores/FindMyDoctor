@@ -3,16 +3,6 @@
 -- Execute this after the initial schema to populate with test data
 
 -- ============================================
--- SAMPLE CLINICS
--- ============================================
-
-INSERT INTO clinics (name, address, latitude, longitude, phone, email, description, operating_hours_start, operating_hours_end, is_approved) VALUES
-('St. Luke''s Medical Center - BGC', 'Medical Arts Bldg, BGC, Taguig', 14.5498, 121.0489, '828-7000', 'info@stlukes.com.ph', 'Premier medical facility with comprehensive healthcare services', '08:00:00', '17:00:00', true),
-('The Medical City', 'Ortigas Avenue, Pasig City', 14.5764, 121.0583, '871-7000', 'info@themedicalcity.com', 'World-class healthcare with advanced technology', '07:00:00', '19:00:00', true),
-('Asian Hospital and Medical Center', 'Festival Supermall, Alabang, Muntinlupa', 14.4195, 121.0408, '771-9000', 'info@asianhospital.com', 'Specialized healthcare with international standards', '08:00:00', '17:00:00', true),
-('Makati Medical Center', 'Makati Avenue, Makati City', 14.5627, 121.0176, '888-8999', 'info@makatimed.com.ph', 'Leading healthcare institution in Makati', '08:00:00', '17:00:00', true);
-
--- ============================================
 -- SAMPLE USERS
 -- ============================================
 
@@ -32,30 +22,30 @@ INSERT INTO users (email, password_hash, role, is_active, must_change_password) 
 -- SAMPLE DOCTORS
 -- ============================================
 
-INSERT INTO doctors (user_id, clinic_id, first_name, last_name, specialty, credentials, biography, consultation_fee, is_approved) VALUES
-((SELECT id FROM users WHERE email = 'doctor.santos@stlukes.com'), 
- (SELECT id FROM clinics WHERE name = 'St. Luke''s Medical Center - BGC'),
- 'Maria Angela', 'Santos', 'Adult Cardiology', 'MD, FACC', 'Board-certified cardiologist with 15 years of experience in cardiovascular medicine', 1000.00, true),
+INSERT INTO doctors (user_id, first_name, last_name, specialty, credentials, biography, consultation_fee, practice_name, practice_address, practice_latitude, practice_longitude, practice_phone, practice_email, practice_description, operating_hours_start, operating_hours_end, is_approved) VALUES
+((SELECT id FROM users WHERE email = 'doctor.santos@stlukes.com'),
+ 'Maria Angela', 'Santos', 'Adult Cardiology', 'MD, FACC', 'Board-certified cardiologist with 15 years of experience in cardiovascular medicine', 1000.00,
+ 'St. Luke''s Medical Center - BGC', 'Medical Arts Bldg, BGC, Taguig', 14.5498, 121.0489, '828-7000', 'info@stlukes.com.ph', 'Premier medical facility with comprehensive healthcare services', '08:00:00', '17:00:00', true),
 
 ((SELECT id FROM users WHERE email = 'doctor.cruz@tmc.com'),
- (SELECT id FROM clinics WHERE name = 'The Medical City'),
- 'Rafael', 'Cruz', 'Pediatrics', 'MD, FAAP', 'Specialized in pediatric care and child development', 700.00, true),
+ 'Rafael', 'Cruz', 'Pediatrics', 'MD, FAAP', 'Specialized in pediatric care and child development', 700.00,
+ 'The Medical City', 'Ortigas Avenue, Pasig City', 14.5764, 121.0583, '871-7000', 'info@themedicalcity.com', 'World-class healthcare with advanced technology', '07:00:00', '19:00:00', true),
 
 ((SELECT id FROM users WHERE email = 'doctor.lim@asian.com'),
- (SELECT id FROM clinics WHERE name = 'Asian Hospital and Medical Center'),
- 'Kristine', 'Lim', 'Dermatology', 'DPDS', 'Expert in skin health and aesthetic dermatology', 800.00, true);
+ 'Kristine', 'Lim', 'Dermatology', 'DPDS', 'Expert in skin health and aesthetic dermatology', 800.00,
+ 'Asian Hospital and Medical Center', 'Festival Supermall, Alabang, Muntinlupa', 14.4195, 121.0408, '771-9000', 'info@asianhospital.com', 'Specialized healthcare with international standards', '08:00:00', '17:00:00', true);
 
 -- ============================================
 -- SAMPLE SECRETARIES
 -- ============================================
 
-INSERT INTO secretaries (user_id, clinic_id, first_name, last_name, is_approved) VALUES
+INSERT INTO secretaries (user_id, doctor_id, first_name, last_name, is_approved) VALUES
 ((SELECT id FROM users WHERE email = 'secretary.lim@stlukes.com'),
- (SELECT id FROM clinics WHERE name = 'St. Luke''s Medical Center - BGC'),
+ (SELECT id FROM doctors WHERE last_name = 'Santos'),
  'Grace', 'Lim', true),
 
 ((SELECT id FROM users WHERE email = 'secretary.reyes@tmc.com'),
- (SELECT id FROM clinics WHERE name = 'The Medical City'),
+ (SELECT id FROM doctors WHERE last_name = 'Cruz'),
  'Anna', 'Reyes', true);
 
 -- ============================================
@@ -102,85 +92,77 @@ INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, cons
 -- SAMPLE DAILY CAPACITIES
 -- ============================================
 
-INSERT INTO daily_capacities (doctor_id, clinic_id, date, consultation_duration_minutes, calculated_capacity, configured_capacity, final_capacity, registered_count) VALUES
+INSERT INTO daily_capacities (doctor_id, date, consultation_duration_minutes, calculated_capacity, configured_capacity, final_capacity, registered_count) VALUES
 -- Dr. Santos capacities for next week
-((SELECT id FROM doctors WHERE last_name = 'Santos'), (SELECT id FROM clinics WHERE name = 'St. Luke''s Medical Center - BGC'), '2025-10-21', 30, 16, 16, 16, 4),
-((SELECT id FROM doctors WHERE last_name = 'Santos'), (SELECT id FROM clinics WHERE name = 'St. Luke''s Medical Center - BGC'), '2025-10-22', 30, 16, 16, 16, 0),
-((SELECT id FROM doctors WHERE last_name = 'Santos'), (SELECT id FROM clinics WHERE name = 'St. Luke''s Medical Center - BGC'), '2025-10-23', 30, 16, 16, 16, 0),
-((SELECT id FROM doctors WHERE last_name = 'Santos'), (SELECT id FROM clinics WHERE name = 'St. Luke''s Medical Center - BGC'), '2025-10-24', 30, 16, 16, 16, 0),
-((SELECT id FROM doctors WHERE last_name = 'Santos'), (SELECT id FROM clinics WHERE name = 'St. Luke''s Medical Center - BGC'), '2025-10-25', 30, 12, 12, 12, 0),
+((SELECT id FROM doctors WHERE last_name = 'Santos'), '2025-10-21', 30, 16, 16, 16, 4),
+((SELECT id FROM doctors WHERE last_name = 'Santos'), '2025-10-22', 30, 16, 16, 16, 0),
+((SELECT id FROM doctors WHERE last_name = 'Santos'), '2025-10-23', 30, 16, 16, 16, 0),
+((SELECT id FROM doctors WHERE last_name = 'Santos'), '2025-10-24', 30, 16, 16, 16, 0),
+((SELECT id FROM doctors WHERE last_name = 'Santos'), '2025-10-25', 30, 12, 12, 12, 0),
 
 -- Dr. Cruz capacities for next week
-((SELECT id FROM doctors WHERE last_name = 'Cruz'), (SELECT id FROM clinics WHERE name = 'The Medical City'), '2025-10-21', 30, 18, 18, 18, 6),
-((SELECT id FROM doctors WHERE last_name = 'Cruz'), (SELECT id FROM clinics WHERE name = 'The Medical City'), '2025-10-22', 30, 18, 18, 18, 0),
-((SELECT id FROM doctors WHERE last_name = 'Cruz'), (SELECT id FROM clinics WHERE name = 'The Medical City'), '2025-10-23', 30, 18, 18, 18, 0),
-((SELECT id FROM doctors WHERE last_name = 'Cruz'), (SELECT id FROM clinics WHERE name = 'The Medical City'), '2025-10-24', 30, 18, 18, 18, 0),
-((SELECT id FROM doctors WHERE last_name = 'Cruz'), (SELECT id FROM clinics WHERE name = 'The Medical City'), '2025-10-25', 30, 18, 18, 18, 0),
+((SELECT id FROM doctors WHERE last_name = 'Cruz'), '2025-10-21', 30, 18, 18, 18, 6),
+((SELECT id FROM doctors WHERE last_name = 'Cruz'), '2025-10-22', 30, 18, 18, 18, 0),
+((SELECT id FROM doctors WHERE last_name = 'Cruz'), '2025-10-23', 30, 18, 18, 18, 0),
+((SELECT id FROM doctors WHERE last_name = 'Cruz'), '2025-10-24', 30, 18, 18, 18, 0),
+((SELECT id FROM doctors WHERE last_name = 'Cruz'), '2025-10-25', 30, 18, 18, 18, 0),
 
 -- Dr. Lim capacities for next week
-((SELECT id FROM doctors WHERE last_name = 'Lim'), (SELECT id FROM clinics WHERE name = 'Asian Hospital and Medical Center'), '2025-10-21', 30, 16, 16, 16, 2),
-((SELECT id FROM doctors WHERE last_name = 'Lim'), (SELECT id FROM clinics WHERE name = 'Asian Hospital and Medical Center'), '2025-10-22', 30, 16, 16, 16, 0),
-((SELECT id FROM doctors WHERE last_name = 'Lim'), (SELECT id FROM clinics WHERE name = 'Asian Hospital and Medical Center'), '2025-10-23', 30, 16, 16, 16, 0),
-((SELECT id FROM doctors WHERE last_name = 'Lim'), (SELECT id FROM clinics WHERE name = 'Asian Hospital and Medical Center'), '2025-10-24', 30, 16, 16, 16, 0),
-((SELECT id FROM doctors WHERE last_name = 'Lim'), (SELECT id FROM clinics WHERE name = 'Asian Hospital and Medical Center'), '2025-10-25', 30, 12, 12, 12, 0);
+((SELECT id FROM doctors WHERE last_name = 'Lim'), '2025-10-21', 30, 16, 16, 16, 2),
+((SELECT id FROM doctors WHERE last_name = 'Lim'), '2025-10-22', 30, 16, 16, 16, 0),
+((SELECT id FROM doctors WHERE last_name = 'Lim'), '2025-10-23', 30, 16, 16, 16, 0),
+((SELECT id FROM doctors WHERE last_name = 'Lim'), '2025-10-24', 30, 16, 16, 16, 0),
+((SELECT id FROM doctors WHERE last_name = 'Lim'), '2025-10-25', 30, 12, 12, 12, 0);
 
 -- ============================================
 -- SAMPLE APPOINTMENTS
 -- ============================================
 
-INSERT INTO appointments (patient_id, doctor_id, clinic_id, appointment_date, end_time, status, reason_for_visit, notes) VALUES
+INSERT INTO appointments (patient_id, doctor_id, appointment_date, end_time, status, reason_for_visit, notes) VALUES
 -- Juan Reyes appointments
-((SELECT id FROM patients WHERE last_name = 'Reyes'), 
+((SELECT id FROM patients WHERE last_name = 'Reyes'),
  (SELECT id FROM doctors WHERE last_name = 'Santos'),
- (SELECT id FROM clinics WHERE name = 'St. Luke''s Medical Center - BGC'),
  '2025-10-21 09:45:00+08', '2025-10-21 10:15:00+08', 'CONFIRMED', 'Follow-up for hypertension management', 'Regular checkup'),
 
 ((SELECT id FROM patients WHERE last_name = 'Reyes'),
  (SELECT id FROM doctors WHERE last_name = 'Cruz'),
- (SELECT id FROM clinics WHERE name = 'The Medical City'),
  '2025-10-24 14:00:00+08', '2025-10-24 14:30:00+08', 'SCHEDULED', 'Annual physical examination', 'Complete checkup'),
 
 -- Maria Santos appointments
 ((SELECT id FROM patients WHERE last_name = 'Santos'),
  (SELECT id FROM doctors WHERE last_name = 'Lim'),
- (SELECT id FROM clinics WHERE name = 'Asian Hospital and Medical Center'),
  '2025-10-05 10:30:00+08', '2025-10-05 11:00:00+08', 'COMPLETED', 'Skin consultation for rash', 'Contact dermatitis treatment'),
 
 -- Pedro Cruz appointments
 ((SELECT id FROM patients WHERE last_name = 'Cruz'),
  (SELECT id FROM doctors WHERE last_name = 'Santos'),
- (SELECT id FROM clinics WHERE name = 'St. Luke''s Medical Center - BGC'),
  '2025-09-18 11:00:00+08', '2025-09-18 11:30:00+08', 'CANCELLED', 'Cardiac consultation', 'Cancelled by patient - schedule conflict');
 
 -- ============================================
 -- SAMPLE QUEUE ENTRIES
 -- ============================================
 
-INSERT INTO queue_entries (patient_id, doctor_id, clinic_id, appointment_id, queue_date, queue_number, registration_source, status, called_at, started_at, completed_at) VALUES
+INSERT INTO queue_entries (patient_id, doctor_id, appointment_id, queue_date, queue_number, registration_source, status, called_at, started_at, completed_at) VALUES
 -- For Dr. Santos on Oct 21
 ((SELECT id FROM patients WHERE last_name = 'Reyes'),
  (SELECT id FROM doctors WHERE last_name = 'Santos'),
- (SELECT id FROM clinics WHERE name = 'St. Luke''s Medical Center - BGC'),
  (SELECT id FROM appointments WHERE patient_id = (SELECT id FROM patients WHERE last_name = 'Reyes') AND doctor_id = (SELECT id FROM doctors WHERE last_name = 'Santos') AND appointment_date = '2025-10-21 09:45:00+08'),
  '2025-10-21', 4, 'ONLINE', 'WAITING', NULL, NULL, NULL),
 
 -- For Dr. Cruz on Oct 21
 ((SELECT id FROM patients WHERE last_name = 'Santos'),
  (SELECT id FROM doctors WHERE last_name = 'Cruz'),
- (SELECT id FROM clinics WHERE name = 'The Medical City'),
  NULL,
  '2025-10-21', 1, 'WALK_IN', 'WAITING', NULL, NULL, NULL),
 
 ((SELECT id FROM patients WHERE last_name = 'Cruz'),
  (SELECT id FROM doctors WHERE last_name = 'Cruz'),
- (SELECT id FROM clinics WHERE name = 'The Medical City'),
  NULL,
  '2025-10-21', 2, 'WALK_IN', 'CALLED', '2025-10-21 08:30:00+08', NULL, NULL),
 
 -- For Dr. Lim on Oct 5 (completed)
 ((SELECT id FROM patients WHERE last_name = 'Santos'),
  (SELECT id FROM doctors WHERE last_name = 'Lim'),
- (SELECT id FROM clinics WHERE name = 'Asian Hospital and Medical Center'),
  (SELECT id FROM appointments WHERE patient_id = (SELECT id FROM patients WHERE last_name = 'Santos') AND doctor_id = (SELECT id FROM doctors WHERE last_name = 'Lim') AND appointment_date = '2025-10-05 10:30:00+08'),
  '2025-10-05', 1, 'ONLINE', 'COMPLETED', '2025-10-05 10:25:00+08', '2025-10-05 10:30:00+08', '2025-10-05 11:00:00+08');
 
@@ -261,15 +243,15 @@ INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_a
 -- SAMPLE CONVERSATIONS
 -- ============================================
 
-INSERT INTO conversations (patient_id, secretary_id, clinic_id, status) VALUES
+INSERT INTO conversations (patient_id, secretary_id, doctor_id, status) VALUES
 ((SELECT id FROM patients WHERE last_name = 'Reyes'),
  (SELECT id FROM secretaries WHERE last_name = 'Lim'),
- (SELECT id FROM clinics WHERE name = 'St. Luke''s Medical Center - BGC'),
+ (SELECT id FROM doctors WHERE last_name = 'Santos'),
  'OPEN'),
 
 ((SELECT id FROM patients WHERE last_name = 'Santos'),
  (SELECT id FROM secretaries WHERE last_name = 'Reyes'),
- (SELECT id FROM clinics WHERE name = 'The Medical City'),
+ (SELECT id FROM doctors WHERE last_name = 'Cruz'),
  'OPEN');
 
 -- ============================================
@@ -278,25 +260,25 @@ INSERT INTO conversations (patient_id, secretary_id, clinic_id, status) VALUES
 
 INSERT INTO messages (conversation_id, sender_user_id, message, sent_at, read_at) VALUES
 -- Messages in Juan Reyes - Grace Lim conversation
-((SELECT id FROM conversations WHERE patient_id = (SELECT id FROM patients WHERE last_name = 'Reyes')),
+((SELECT id FROM conversations WHERE patient_id = (SELECT id FROM patients WHERE last_name = 'Reyes') AND secretary_id = (SELECT id FROM secretaries WHERE last_name = 'Lim')),
  (SELECT id FROM users WHERE email = 'patient.reyes@gmail.com'),
  'Hello Secretary Grace, I have a question about my appointment on October 21st.',
  '2025-10-18 10:30:00+08',
  '2025-10-18 10:35:00+08'),
 
-((SELECT id FROM conversations WHERE patient_id = (SELECT id FROM patients WHERE last_name = 'Reyes')),
+((SELECT id FROM conversations WHERE patient_id = (SELECT id FROM patients WHERE last_name = 'Reyes') AND secretary_id = (SELECT id FROM secretaries WHERE last_name = 'Lim')),
  (SELECT id FROM users WHERE email = 'secretary.lim@stlukes.com'),
  'Hello Juan! I''d be happy to help. What would you like to know about your appointment?',
  '2025-10-18 10:32:00+08',
  NULL),
 
-((SELECT id FROM conversations WHERE patient_id = (SELECT id FROM patients WHERE last_name = 'Reyes')),
+((SELECT id FROM conversations WHERE patient_id = (SELECT id FROM patients WHERE last_name = 'Reyes') AND secretary_id = (SELECT id FROM secretaries WHERE last_name = 'Lim')),
  (SELECT id FROM users WHERE email = 'patient.reyes@gmail.com'),
  'What time should I arrive? And do I need to bring anything?',
  '2025-10-18 10:36:00+08',
  NULL),
 
-((SELECT id FROM conversations WHERE patient_id = (SELECT id FROM patients WHERE last_name = 'Reyes')),
+((SELECT id FROM conversations WHERE patient_id = (SELECT id FROM patients WHERE last_name = 'Reyes') AND secretary_id = (SELECT id FROM secretaries WHERE last_name = 'Lim')),
  (SELECT id FROM users WHERE email = 'secretary.lim@stlukes.com'),
  'Please arrive 15 minutes before your 9:45 AM appointment. Bring your ID and any previous medical records. Thank you!',
  '2025-10-18 10:38:00+08',
