@@ -21,11 +21,10 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
         SELECT 
           a.*,
           d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.specialty,
-          c.name as clinic_name, c.address as clinic_address,
+          d.practice_name, d.practice_address, d.practice_latitude, d.practice_longitude,
           q.queue_number, q.status as queue_status
         FROM appointments a
         JOIN doctors d ON a.doctor_id = d.id
-        JOIN clinics c ON a.clinic_id = c.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
         WHERE a.patient_id = (SELECT id FROM patients WHERE user_id = $1)
       `;
@@ -36,11 +35,11 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
         SELECT 
           a.*,
           p.first_name as patient_first_name, p.last_name as patient_last_name,
-          c.name as clinic_name,
+          d.practice_name,
           q.queue_number, q.status as queue_status
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
-        JOIN clinics c ON a.clinic_id = c.id
+        JOIN doctors d ON a.doctor_id = d.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
         WHERE a.doctor_id = (SELECT id FROM doctors WHERE user_id = $1)
       `;
@@ -151,10 +150,10 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
 
     // Create appointment
     const appointmentResult = await client.query(
-      `INSERT INTO appointments (patient_id, doctor_id, clinic_id, appointment_date, reason_for_visit, status)
-       VALUES ($1, $2, $3, $4, $5, 'SCHEDULED')
+      `INSERT INTO appointments (patient_id, doctor_id, appointment_date, reason_for_visit, status)
+       VALUES ($1, $2, $3, $4, 'SCHEDULED')
        RETURNING id`,
-      [patientId, doctorId, doctor.clinic_id, appointmentDate, reasonForVisit]
+      [patientId, doctorId, appointmentDate, reasonForVisit]
     );
 
     const appointmentId = appointmentResult.rows[0].id;
@@ -171,9 +170,9 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
 
     // Create queue entry
     await client.query(
-      `INSERT INTO queue_entries (patient_id, doctor_id, clinic_id, appointment_id, queue_date, queue_number, registration_source, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'ONLINE', 'WAITING')`,
-      [patientId, doctorId, doctor.clinic_id, appointmentId, appointmentDateOnly, queueNumber]
+      `INSERT INTO queue_entries (patient_id, doctor_id, appointment_id, queue_date, queue_number, registration_source, status)
+       VALUES ($1, $2, $3, $4, $5, 'ONLINE', 'WAITING')`,
+      [patientId, doctorId, appointmentId, appointmentDateOnly, queueNumber]
     );
 
     // Update registered count
@@ -219,11 +218,10 @@ router.get('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
     if (role === 'PATIENT') {
       queryText = `
         SELECT a.*, d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.specialty,
-               c.name as clinic_name, c.address as clinic_address, c.phone as clinic_phone,
+               d.practice_name, d.practice_address, d.practice_latitude, d.practice_longitude, d.practice_phone,
                q.queue_number, q.status as queue_status
         FROM appointments a
         JOIN doctors d ON a.doctor_id = d.id
-        JOIN clinics c ON a.clinic_id = c.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
         WHERE a.id = $1 AND a.patient_id = (SELECT id FROM patients WHERE user_id = $2)
       `;
@@ -231,11 +229,11 @@ router.get('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
     } else if (role === 'DOCTOR') {
       queryText = `
         SELECT a.*, p.first_name as patient_first_name, p.last_name as patient_last_name,
-               c.name as clinic_name,
+               d.practice_name,
                q.queue_number, q.status as queue_status
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
-        JOIN clinics c ON a.clinic_id = c.id
+        JOIN doctors d ON a.doctor_id = d.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
         WHERE a.id = $1 AND a.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)
       `;

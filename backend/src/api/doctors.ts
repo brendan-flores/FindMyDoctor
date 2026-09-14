@@ -8,16 +8,16 @@ const router = Router();
 // Get all doctors (public search)
 router.get('/', async (req: any, res: Response) => {
   try {
-    const { specialty, clinicId, search } = req.query;
+    const { specialty, search } = req.query;
 
     let queryText = `
       SELECT 
         d.id, d.first_name, d.last_name, d.specialty, d.credentials, 
         d.biography, d.consultation_fee, d.is_approved,
-        c.name as clinic_name, c.address as clinic_address, 
-        c.latitude, c.longitude, c.phone as clinic_phone
+        d.practice_name, d.practice_address, d.practice_latitude, d.practice_longitude,
+        d.practice_phone, d.practice_email, d.practice_description,
+        d.operating_hours_start, d.operating_hours_end
       FROM doctors d
-      LEFT JOIN clinics c ON d.clinic_id = c.id
       WHERE d.is_approved = true
     `;
     const params: any[] = [];
@@ -29,15 +29,9 @@ router.get('/', async (req: any, res: Response) => {
       params.push(specialty);
     }
 
-    if (clinicId) {
-      paramCount++;
-      queryText += ` AND d.clinic_id = $${paramCount}`;
-      params.push(clinicId);
-    }
-
     if (search) {
       paramCount++;
-      queryText += ` AND (d.first_name ILIKE $${paramCount} OR d.last_name ILIKE $${paramCount} OR d.specialty ILIKE $${paramCount})`;
+      queryText += ` AND (d.first_name ILIKE $${paramCount} OR d.last_name ILIKE $${paramCount} OR d.specialty ILIKE $${paramCount} OR d.practice_name ILIKE $${paramCount})`;
       params.push(`%${search}%`);
     }
 
@@ -58,12 +52,8 @@ router.get('/:id', async (req: any, res: Response) => {
 
     const result = await query(
       `SELECT 
-        d.*, 
-        c.name as clinic_name, c.address as clinic_address, 
-        c.latitude, c.longitude, c.phone as clinic_phone,
-        c.operating_hours_start, c.operating_hours_end
+        d.*
        FROM doctors d
-       LEFT JOIN clinics c ON d.clinic_id = c.id
        WHERE d.id = $1`,
       [id]
     );
@@ -202,9 +192,9 @@ router.post('/:id/capacity/:date', authenticate, authorize('DOCTOR', 'SECRETARY'
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Configured capacity is required'));
     }
 
-    // Get doctor's clinic and consultation duration
+    // Get doctor's consultation duration
     const doctorResult = await query(
-      'SELECT clinic_id, consultation_duration_minutes FROM doctors WHERE id = $1',
+      'SELECT consultation_duration_minutes FROM doctors WHERE id = $1',
       [id]
     );
 
@@ -235,9 +225,9 @@ router.post('/:id/capacity/:date', authenticate, authorize('DOCTOR', 'SECRETARY'
     } else {
       // Create new
       await query(
-        `INSERT INTO daily_capacities (doctor_id, clinic_id, date, consultation_duration_minutes, calculated_capacity, configured_capacity, final_capacity)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [id, doctor.clinic_id, date, 30, calculatedCapacity, configuredCapacity, finalCapacity]
+        `INSERT INTO daily_capacities (doctor_id, date, consultation_duration_minutes, calculated_capacity, configured_capacity, final_capacity)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [id, date, 30, calculatedCapacity, configuredCapacity, finalCapacity]
       );
     }
 

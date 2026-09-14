@@ -44,10 +44,9 @@ router.get('/:date/patient/:patientId', authenticate, async (req: AuthRequest, r
 
     const result = await query(
       `SELECT q.*, d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.specialty,
-              c.name as clinic_name
+              d.practice_name
        FROM queue_entries q
        JOIN doctors d ON q.doctor_id = d.id
-       JOIN clinics c ON q.clinic_id = c.id
        WHERE q.queue_date = $1 AND q.patient_id = $2`,
       [date, patientId]
     );

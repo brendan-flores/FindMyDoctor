@@ -172,18 +172,18 @@ router.post('/', authenticate, authorize('SECRETARY'), async (req: AuthRequest, 
 
     // Create appointment
     const appointmentResult = await client.query(
-      `INSERT INTO appointments (patient_id, doctor_id, clinic_id, appointment_date, reason_for_visit, status)
-       VALUES ($1, $2, $3, $4, $5, 'SCHEDULED')
+      `INSERT INTO appointments (patient_id, doctor_id, appointment_date, reason_for_visit, status)
+       VALUES ($1, $2, $3, $4, 'SCHEDULED')
        RETURNING id`,
-      [patientId, doctorId, doctor.clinic_id, appointmentDate, reasonForVisit]
+      [patientId, doctorId, appointmentDate, reasonForVisit]
     );
 
     const appointmentId = appointmentResult.rows[0].id;
 
     // Get next queue number (concurrency-safe)
     const queueResult = await client.query(
-      `SELECT COALESCE(MAX(queue_number), 0) + 1 as next_queue 
-       FROM queue_entries 
+      `SELECT COALESCE(MAX(queue_number), 0) + 1 as next_queue
+       FROM queue_entries
        WHERE queue_date = $1 AND doctor_id = $2`,
       [appointmentDateOnly, doctorId]
     );
@@ -192,9 +192,9 @@ router.post('/', authenticate, authorize('SECRETARY'), async (req: AuthRequest, 
 
     // Create queue entry with WALK_IN source
     await client.query(
-      `INSERT INTO queue_entries (patient_id, doctor_id, clinic_id, appointment_id, queue_date, queue_number, registration_source, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'WALK_IN', 'WAITING')`,
-      [patientId, doctorId, doctor.clinic_id, appointmentId, appointmentDateOnly, queueNumber]
+      `INSERT INTO queue_entries (patient_id, doctor_id, appointment_id, queue_date, queue_number, registration_source, status)
+       VALUES ($1, $2, $3, $4, $5, 'WALK_IN', 'WAITING')`,
+      [patientId, doctorId, appointmentId, appointmentDateOnly, queueNumber]
     );
 
     // Update registered count

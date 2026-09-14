@@ -16,26 +16,26 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     if (role === 'PATIENT') {
       queryText = `
-        SELECT c.*, 
+        SELECT c.*,
                s.first_name as secretary_first_name, s.last_name as secretary_last_name,
-               cl.name as clinic_name,
+               d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.practice_name,
                (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.read_at IS NULL) as unread_count
         FROM conversations c
         JOIN secretaries s ON c.secretary_id = s.id
-        JOIN clinics cl ON c.clinic_id = cl.id
+        JOIN doctors d ON c.doctor_id = d.id
         WHERE c.patient_id = (SELECT id FROM patients WHERE user_id = $1)
         ORDER BY c.updated_at DESC
       `;
       params.push(userId);
     } else if (role === 'SECRETARY') {
       queryText = `
-        SELECT c.*, 
+        SELECT c.*,
                p.first_name as patient_first_name, p.last_name as patient_last_name,
-               cl.name as clinic_name,
+               d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.practice_name,
                (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.read_at IS NULL AND m.sender_user_id != $1) as unread_count
         FROM conversations c
         JOIN patients p ON c.patient_id = p.id
-        JOIN clinics cl ON c.clinic_id = cl.id
+        JOIN doctors d ON c.doctor_id = d.id
         WHERE c.secretary_id = (SELECT id FROM secretaries WHERE user_id = $1)
         ORDER BY c.updated_at DESC
       `;
@@ -56,18 +56,18 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 router.post('/', authenticate, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { secretaryId, clinicId } = req.body;
+    const { secretaryId, doctorId } = req.body;
 
-    if (!secretaryId || !clinicId) {
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Secretary ID and clinic ID are required'));
+    if (!secretaryId || !doctorId) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Secretary ID and doctor ID are required'));
     }
 
     // Check if conversation already exists
     const existingResult = await query(
-      `SELECT * FROM conversations 
-       WHERE patient_id = (SELECT id FROM patients WHERE user_id = $1) 
-       AND secretary_id = $2 AND clinic_id = $3`,
-      [userId, secretaryId, clinicId]
+      `SELECT * FROM conversations
+       WHERE patient_id = (SELECT id FROM patients WHERE user_id = $1)
+       AND secretary_id = $2 AND doctor_id = $3`,
+      [userId, secretaryId, doctorId]
     );
 
     if (existingResult.rows.length > 0) {
@@ -76,10 +76,10 @@ router.post('/', authenticate, authorize('PATIENT'), async (req: AuthRequest, re
 
     // Create new conversation
     const result = await query(
-      `INSERT INTO conversations (patient_id, secretary_id, clinic_id, status)
+      `INSERT INTO conversations (patient_id, secretary_id, doctor_id, status)
        VALUES ((SELECT id FROM patients WHERE user_id = $1), $2, $3, 'OPEN')
        RETURNING *`,
-      [userId, secretaryId, clinicId]
+      [userId, secretaryId, doctorId]
     );
 
     res.status(201).json(success(result.rows[0], 'Conversation created'));

@@ -29,7 +29,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
       }
     } else if (role === 'DOCTOR') {
       const doctorResult = await query(
-        'SELECT d.*, c.name as clinic_name, c.address as clinic_address FROM doctors d LEFT JOIN clinics c ON d.clinic_id = c.id WHERE d.user_id = $1',
+        'SELECT d.* FROM doctors d WHERE d.user_id = $1',
         [userId]
       );
       if (doctorResult.rows.length > 0) {
@@ -37,7 +37,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
       }
     } else if (role === 'SECRETARY') {
       const secretaryResult = await query(
-        'SELECT s.*, c.name as clinic_name, c.address as clinic_address FROM secretaries s JOIN clinics c ON s.clinic_id = c.id WHERE s.user_id = $1',
+        'SELECT s.*, d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.practice_name FROM secretaries s JOIN doctors d ON s.doctor_id = d.id WHERE s.user_id = $1',
         [userId]
       );
       if (secretaryResult.rows.length > 0) {
