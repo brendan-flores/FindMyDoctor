@@ -32,7 +32,7 @@ export async function runMigrations() {
     // Read the sample data file
     const sampleDataPath = path.join(MIGRATIONS_DIR, '002_sample_data.sql');
     console.log('Reading sample data from:', sampleDataPath);
-    
+
     if (!fs.existsSync(sampleDataPath)) {
       console.warn('Sample data file not found, skipping...');
     } else {
