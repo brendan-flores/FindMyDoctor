@@ -38,8 +38,22 @@ ALTER TABLE secretaries ADD COLUMN IF NOT EXISTS doctor_id UUID REFERENCES docto
 ALTER TABLE conversations ADD COLUMN IF NOT EXISTS doctor_id UUID REFERENCES doctors(id) ON DELETE CASCADE;
 
 -- Update unique constraint on conversations
-ALTER TABLE conversations DROP CONSTRAINT IF EXISTS conversations_patient_id_secretary_id_clinic_id_key;
-ALTER TABLE conversations ADD CONSTRAINT conversations_patient_id_secretary_id_doctor_id_key UNIQUE(patient_id, secretary_id, doctor_id);
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'conversations_patient_id_secretary_id_clinic_id_key'
+    ) THEN
+        ALTER TABLE conversations DROP CONSTRAINT conversations_patient_id_secretary_id_clinic_id_key;
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'conversations_patient_id_secretary_id_doctor_id_key'
+    ) THEN
+        ALTER TABLE conversations ADD CONSTRAINT conversations_patient_id_secretary_id_doctor_id_key UNIQUE(patient_id, secretary_id, doctor_id);
+    END IF;
+END $$;
 
 -- Drop clinic-related indexes
 DROP INDEX IF EXISTS idx_doctors_clinic_id;

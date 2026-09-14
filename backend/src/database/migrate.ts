@@ -29,19 +29,8 @@ export async function runMigrations() {
     await query(schemaSQL);
     console.log('Initial schema created successfully');
 
-    // Read the sample data file
-    const sampleDataPath = path.join(MIGRATIONS_DIR, '002_sample_data.sql');
-    console.log('Reading sample data from:', sampleDataPath);
-
-    if (!fs.existsSync(sampleDataPath)) {
-      console.warn('Sample data file not found, skipping...');
-    } else {
-      const sampleDataSQL = fs.readFileSync(sampleDataPath, 'utf8');
-
-      console.log('Executing sample data...');
-      await query(sampleDataSQL);
-      console.log('Sample data inserted successfully');
-    }
+    // Skip sample data - using actual data instead
+    console.log('Skipping sample data insertion (using actual data)');
 
     console.log('Migrations completed successfully');
   } catch (error) {
