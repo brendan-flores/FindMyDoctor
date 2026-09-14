@@ -701,6 +701,30 @@ FiDo Web
 - Role verification on protected routes
 - API client includes Authorization header for authenticated requests
 
+### Admin Account Provisioning
+
+**Initial Admin Account:**
+- Created through backend seed script during initial setup
+- Seed script is idempotent - running it multiple times will not create duplicate Admin accounts
+- Default credentials provided and must be changed immediately after first login
+- Password securely hashed using bcrypt before storage
+
+**Additional Admin Accounts:**
+- Can only be created by authorized Admin users through Admin dashboard
+- Public registration endpoint does not allow Admin role registration
+- All Admin accounts use shared `users` table with `role = ADMIN`
+- Backend verifies `role = ADMIN` for all Admin API routes
+
+**Security Requirements:**
+- Passwords never stored in plaintext
+- All passwords hashed using bcrypt with salt rounds
+- Admin login verifies backend-returned role before granting access
+- Cross-role access blocked through backend verification
+
+**Seed Commands:**
+- `npm run seed:admin` - Create initial Admin account only
+- `npm run seed` - Run all seed scripts including Admin provisioning
+
 ---
 
 # 33. API Rules

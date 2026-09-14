@@ -1087,6 +1087,31 @@ Patient Views Professional Details
 - Approvals.
 - Basic appointment monitoring.
 
+### Admin Account Provisioning
+
+**Initial Admin Account:**
+- Created through a backend seed script during initial setup
+- Seed script is idempotent - running it multiple times will not create duplicate Admin accounts
+- Default credentials are provided and must be changed immediately after first login
+- Password is securely hashed using bcrypt before storage
+
+**Additional Admin Accounts:**
+- Can only be created by authorized Admin users through the Admin dashboard
+- Public registration endpoint does not allow Admin role registration
+- All Admin accounts must use the shared `users` table with `role = ADMIN`
+- Backend verifies `role = ADMIN` for all Admin API routes and functionality
+
+**Security Requirements:**
+- Passwords are never stored in plaintext
+- All passwords are hashed using bcrypt with salt rounds
+- Admin login at `/admin/login` verifies backend-returned role before granting access
+- Cross-role access is blocked through backend verification
+
+**Seed Process:**
+- Run `npm run seed:admin` to create the initial Admin account
+- Run `npm run seed` to run all seed scripts including Admin provisioning
+- The seed script checks for existing Admin accounts before creating new ones
+
 ### Web Application (Doctor, Secretary, Admin)
 
 The web application provides role-specific dashboards for doctors, secretaries, and administrators:
