@@ -39,16 +39,25 @@ CREATE TABLE patients (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Clinics table for clinic information and location data (must be before doctors/secretaries)
-CREATE TABLE clinics (
+-- Doctors table for doctor profiles and professional information
+-- Includes clinic/practice information directly in the doctor profile
+CREATE TABLE doctors (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    address TEXT NOT NULL,
-    latitude DECIMAL(10, 8) NOT NULL,
-    longitude DECIMAL(11, 8) NOT NULL,
-    phone VARCHAR(20),
-    email VARCHAR(255),
-    description TEXT,
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    specialty VARCHAR(100) NOT NULL,
+    credentials VARCHAR(255),
+    biography TEXT,
+    consultation_fee DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    -- Practice/clinic information embedded in doctor profile
+    practice_name VARCHAR(255) NOT NULL,
+    practice_address TEXT NOT NULL,
+    practice_latitude DECIMAL(10, 8) NOT NULL,
+    practice_longitude DECIMAL(11, 8) NOT NULL,
+    practice_phone VARCHAR(20),
+    practice_email VARCHAR(255),
+    practice_description TEXT,
     operating_hours_start TIME,
     operating_hours_end TIME,
     gcash_qr_code_url TEXT,
@@ -57,42 +66,17 @@ CREATE TABLE clinics (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Doctors table for doctor profiles and professional information
-CREATE TABLE doctors (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    clinic_id UUID REFERENCES clinics(id) ON DELETE SET NULL,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    specialty VARCHAR(100) NOT NULL,
-    credentials VARCHAR(255),
-    biography TEXT,
-    consultation_fee DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    is_approved BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Secretaries table for secretary profiles and clinic associations
+-- Secretaries table for secretary profiles
+-- Secretaries are associated directly with doctors, not clinics
 CREATE TABLE secretaries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
+    doctor_id UUID NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     is_approved BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Doctor-clinics junction table for doctors working at multiple clinics
-CREATE TABLE doctor_clinics (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    doctor_id UUID NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-    clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
-    is_primary BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(doctor_id, clinic_id)
 );
 
 -- ============================================
@@ -127,7 +111,6 @@ CREATE TABLE doctor_unavailability (
 CREATE TABLE daily_capacities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     doctor_id UUID NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-    clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     consultation_duration_minutes INTEGER DEFAULT 30,
     calculated_capacity INTEGER NOT NULL,
@@ -148,7 +131,6 @@ CREATE TABLE appointments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     doctor_id UUID NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-    clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
     appointment_date TIMESTAMP WITH TIME ZONE NOT NULL,
     end_time TIMESTAMP WITH TIME ZONE,
     status VARCHAR(20) NOT NULL DEFAULT 'SCHEDULED' CHECK (status IN ('SCHEDULED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW')),
@@ -163,7 +145,6 @@ CREATE TABLE queue_entries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     doctor_id UUID NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-    clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
     appointment_id UUID UNIQUE REFERENCES appointments(id) ON DELETE SET NULL,
     queue_date DATE NOT NULL,
     queue_number INTEGER NOT NULL,
@@ -264,11 +245,11 @@ CREATE TABLE conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     secretary_id UUID NOT NULL REFERENCES secretaries(id) ON DELETE CASCADE,
-    clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
+    doctor_id UUID NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
     status VARCHAR(20) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'CLOSED', 'ARCHIVED')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(patient_id, secretary_id, clinic_id)
+    UNIQUE(patient_id, secretary_id, doctor_id)
 );
 
 -- Messages table for individual chat messages
@@ -307,7 +288,6 @@ CREATE TABLE waitlists (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     doctor_id UUID NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-    clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
     preferred_date_start DATE NOT NULL,
     preferred_date_end DATE NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'FULFILLED', 'CANCELLED', 'EXPIRED')),
@@ -335,9 +315,8 @@ CREATE TABLE notifications (
 -- User and profile indexes
 CREATE INDEX idx_patients_user_id ON patients(user_id);
 CREATE INDEX idx_doctors_user_id ON doctors(user_id);
-CREATE INDEX idx_doctors_clinic_id ON doctors(clinic_id);
 CREATE INDEX idx_secretaries_user_id ON secretaries(user_id);
-CREATE INDEX idx_secretaries_clinic_id ON secretaries(clinic_id);
+CREATE INDEX idx_secretaries_doctor_id ON secretaries(doctor_id);
 
 -- Scheduling indexes
 CREATE INDEX idx_doctor_schedules_doctor_id ON doctor_schedules(doctor_id);
@@ -349,7 +328,6 @@ CREATE INDEX idx_daily_capacities_date ON daily_capacities(date);
 -- Appointment indexes
 CREATE INDEX idx_appointments_patient_id ON appointments(patient_id);
 CREATE INDEX idx_appointments_doctor_id ON appointments(doctor_id);
-CREATE INDEX idx_appointments_clinic_id ON appointments(clinic_id);
 CREATE INDEX idx_appointments_date ON appointments(appointment_date);
 CREATE INDEX idx_appointments_status ON appointments(status);
 
@@ -375,7 +353,7 @@ CREATE INDEX idx_payments_status ON payments(status);
 -- Communication indexes
 CREATE INDEX idx_conversations_patient_id ON conversations(patient_id);
 CREATE INDEX idx_conversations_secretary_id ON conversations(secretary_id);
-CREATE INDEX idx_conversations_clinic_id ON conversations(clinic_id);
+CREATE INDEX idx_conversations_doctor_id ON conversations(doctor_id);
 CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
 CREATE INDEX idx_messages_sender_user_id ON messages(sender_user_id);
 CREATE INDEX idx_ai_conversations_patient_id ON ai_conversations(patient_id);
@@ -411,9 +389,6 @@ CREATE TRIGGER update_doctors_updated_at BEFORE UPDATE ON doctors
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_secretaries_updated_at BEFORE UPDATE ON secretaries
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_clinics_updated_at BEFORE UPDATE ON clinics
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_doctor_schedules_updated_at BEFORE UPDATE ON doctor_schedules
