@@ -38,8 +38,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
     if (userStr) {
       const user = JSON.parse(userStr);
-      // Verify backend-returned role is ADMIN
-      if (user.role !== 'ADMIN') {
+      // Verify backend-returned role is ADMIN or SUPERADMIN
+      if (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
         // Cross-role access denied, redirect to appropriate login
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');

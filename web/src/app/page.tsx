@@ -13,7 +13,7 @@ export default function Home() {
     if (token && userStr) {
       const user = JSON.parse(userStr);
       // Redirect authenticated users to their correct dashboard
-      if (user.role === 'ADMIN') {
+      if (user.role === 'ADMIN' || user.role === 'SUPERADMIN') {
         router.push('/admin/dashboard');
       } else if (user.role === 'DOCTOR') {
         router.push('/doctor/dashboard');
