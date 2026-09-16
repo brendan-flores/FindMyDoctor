@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { query } from '../../database/connection';
+import { query, getClient } from '../../database/connection';
 import { config } from '../../config';
 import { error, ErrorCodes } from '../../utils/response';
 
@@ -15,6 +15,17 @@ export interface RegisterData {
 export interface LoginData {
   email: string;
   password: string;
+}
+
+export interface DoctorRegistrationData {
+  email: string;
+  password: string;
+  fullName: string;
+  specialty: string;
+  prcLicenseNumber: string;
+  clinic: string;
+  credentials?: string;
+  contactNumber?: string;
 }
 
 export async function register(data: RegisterData) {
@@ -141,6 +152,126 @@ export async function changePassword(userId: string, currentPassword: string, ne
   );
 
   return { success: true };
+}
+
+/**
+ * Doctor self-registration.
+ * Creates the user account and the doctor profile in a single transaction.
+ * Self-registered doctors are approved immediately, so they appear in the
+ * public doctor search (GET /api/v1/doctors).
+ */
+export async function registerDoctor(data: DoctorRegistrationData) {
+  const {
+    email,
+    password,
+    fullName,
+    specialty,
+    prcLicenseNumber,
+    clinic,
+    credentials,
+    contactNumber,
+  } = data;
+
+  // Validation
+  if (!email || !password || !fullName || !specialty || !prcLicenseNumber || !clinic) {
+    throw {
+      code: ErrorCodes.VALIDATION_ERROR,
+      message: 'Email, password, full name, specialty, PRC license number, and clinic are required',
+    };
+  }
+
+  if (password.length < 8) {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Password must be at least 8 characters' };
+  }
+
+  const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (nameParts.length < 2) {
+    throw {
+      code: ErrorCodes.VALIDATION_ERROR,
+      message: 'Full name must include a first and last name',
+    };
+  }
+
+  const firstName = nameParts[0];
+  const lastName = nameParts.slice(1).join(' ');
+  const licenseNumber = prcLicenseNumber.trim();
+
+  if (!/^\d{7}$/.test(licenseNumber)) {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'PRC license number must be 7 digits' };
+  }
+
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    // Email must be unique across all users
+    const existingUser = await client.query('SELECT id FROM users WHERE email = $1', [email]);
+
+    if (existingUser.rows.length > 0) {
+      throw { code: ErrorCodes.EMAIL_ALREADY_EXISTS, message: 'Email already registered' };
+    }
+
+    // A PRC license number may only be registered once
+    const existingLicense = await client.query(
+      'SELECT id FROM doctors WHERE prc_license_number = $1',
+      [licenseNumber]
+    );
+
+    if (existingLicense.rows.length > 0) {
+      throw { code: ErrorCodes.CONFLICT, message: 'PRC license number is already registered' };
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create the user account
+    const userResult = await client.query(
+      `INSERT INTO users (email, password_hash, role, must_change_password)
+       VALUES ($1, $2, 'DOCTOR', false)
+       RETURNING id, email, role`,
+      [email, passwordHash]
+    );
+
+    const user = userResult.rows[0];
+
+    // Create the doctor profile (auto-approved)
+    const doctorResult = await client.query(
+      `INSERT INTO doctors (
+         user_id, first_name, last_name, specialty, credentials,
+         prc_license_number, practice_name, practice_phone, practice_email, is_approved
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+       RETURNING id, first_name, last_name, specialty, credentials, prc_license_number,
+                 practice_name, practice_phone, practice_email, is_approved, created_at`,
+      [
+        user.id,
+        firstName,
+        lastName,
+        specialty,
+        credentials || null,
+        licenseNumber,
+        clinic,
+        contactNumber || null,
+        email,
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+      doctor: doctorResult.rows[0],
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export function generateAccessToken(user: any) {

@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "migrate": "tsx src/database/migrate.ts",
     "migrate:remove-clinics": "tsx src/database/removeClinics.ts",
+    "migrate:doctor-registration": "tsx src/database/applyDoctorRegistration.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",

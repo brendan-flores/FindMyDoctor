@@ -256,10 +256,12 @@ The web application uses Next.js 14 with App Router, TypeScript, and Tailwind CS
 FiDo Web
 ├── Admin
 │   └── `/admin/login` → `/admin/dashboard`
-└── Doctor/Secretary
-    └── `/auth/login`
-        ├── Doctor → `/doctor/dashboard`
-        └── Secretary → `/secretary/dashboard`
+├── Doctor/Secretary
+│   └── `/auth/login`
+│       ├── Doctor → `/doctor/dashboard`
+│       └── Secretary → `/secretary/dashboard`
+└── Doctor Sign-Up (Self-Registration)
+    └── `/auth/doctor-signup` → creates account → `/auth/login`
 ```
 
 ### Authentication Flow
@@ -282,6 +284,23 @@ FiDo Web
 - Doctor users → `/doctor/dashboard`
 - Secretary users → `/secretary/dashboard`
 - Admin users → Redirected to `/admin/login`
+
+### Doctor Sign-Up (Self-Registration)
+
+The doctor sign-up page at `/auth/doctor-signup` creates a doctor account:
+
+- Linked from the shared Doctor/Secretary login page at `/auth/login`.
+- Groups the form into Doctor Information, Contact Information, and Account Security sections.
+- Submits to `POST /api/v1/auth/register/doctor` (public, no token required).
+- The backend validates the payload, then inserts the `users` (`role = DOCTOR`) and `doctors` records inside a single transaction on one pooled client, rolling back on any failure.
+- The password is hashed with bcrypt and `must_change_password` is false because the doctor chooses their own password.
+- Field mapping: `fullName` is split into `first_name` and `last_name`, `clinic` maps to `practice_name`, `contactNumber` maps to `practice_phone`, and `email` is also stored as `practice_email`.
+- The PRC license number is stored in `doctors.prc_license_number`, added by migration `005_doctor_self_registration.sql`, and enforced unique by a partial unique index.
+- `practice_address` and the practice coordinates default to empty/zero, so a doctor can register before supplying a practice location.
+- Registered doctors are created with `is_approved = true`, so they are immediately returned by the public `GET /api/v1/doctors` search.
+- Duplicate email or PRC license number returns `409`; a successful registration returns `201` with the created user and doctor profile.
+
+Administrator-provisioned doctor and secretary accounts remain supported and now hash passwords with bcrypt as well.
 
 ### Role-Based Route Protection
 

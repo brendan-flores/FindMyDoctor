@@ -29,11 +29,13 @@ router.post('/doctors', authenticate, authorize('ADMIN'), async (req: AuthReques
     }
 
     // Create user
+    const passwordHash = await bcrypt.hash(password, 10);
+
     const userResult = await query(
       `INSERT INTO users (email, password_hash, role, must_change_password)
-       VALUES ($1, crypt(gen_salt(), $2), 'DOCTOR', false)
+       VALUES ($1, $2, 'DOCTOR', false)
        RETURNING id`,
-      [email, password]
+      [email, passwordHash]
     );
 
     const userId = userResult.rows[0].id;
@@ -88,11 +90,13 @@ router.post('/secretaries', authenticate, authorize('ADMIN'), async (req: AuthRe
     }
 
     // Create user
+    const passwordHash = await bcrypt.hash(password, 10);
+
     const userResult = await query(
       `INSERT INTO users (email, password_hash, role, must_change_password)
-       VALUES ($1, crypt(gen_salt(), $2), 'SECRETARY', false)
+       VALUES ($1, $2, 'SECRETARY', false)
        RETURNING id`,
-      [email, password]
+      [email, passwordHash]
     );
 
     const userId = userResult.rows[0].id;

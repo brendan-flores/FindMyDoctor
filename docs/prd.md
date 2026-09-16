@@ -1065,6 +1065,7 @@ Patient Views Professional Details
 - Authorized patient information.
 - Consultation history.
 - Prescription creation.
+- Self-registration (account created and approved immediately).
 
 ### Secretary
 
@@ -1146,10 +1147,12 @@ The web application uses role-based route namespaces with dedicated authenticati
 FiDo Web
 ├── Admin
 │   └── `/admin/login` → `/admin/dashboard`
-└── Doctor/Secretary
-    └── `/auth/login`
-        ├── Doctor → `/doctor/dashboard`
-        └── Secretary → `/secretary/dashboard`
+├── Doctor/Secretary
+│   └── `/auth/login`
+│       ├── Doctor → `/doctor/dashboard`
+│       └── Secretary → `/secretary/dashboard`
+└── Doctor Sign-Up (Self-Registration)
+    └── `/auth/doctor-signup` → creates account → `/auth/login`
 ```
 
 ### Authentication Behavior
@@ -1172,6 +1175,22 @@ FiDo Web
 - Doctor users redirect to `/doctor/dashboard`
 - Secretary users redirect to `/secretary/dashboard`
 - Admin users are redirected to `/admin/login`
+
+### Doctor Sign-Up (Self-Registration)
+
+The doctor sign-up page at `/auth/doctor-signup` allows a doctor to create an account without an Administrator:
+
+- Reachable from the shared Doctor/Secretary login page through the "Create an Account" link.
+- Collects doctor information (full name, specialty, credentials, PRC license number, clinic), contact information (email, contact number), and account security fields (password, confirm password).
+- Submits to `POST /api/v1/auth/register/doctor`, which creates the `users` record and the `doctors` profile in a single database transaction.
+- Passwords are hashed with bcrypt before storage and are never stored or logged in plaintext.
+- The PRC license number is stored on the doctor profile and may only be registered once.
+- Email address and PRC license number must be unique; duplicates are rejected.
+- Self-registered doctors are approved immediately (`is_approved = true`) and therefore appear in the public doctor search.
+- PRC license numbers are recorded but are not verified against a PRC registry; PRC verification remains out of scope.
+- A successful registration shows an account-created state with a link back to `/auth/login`.
+
+Administrator-provisioned doctor accounts remain available for accounts created on a doctor's behalf.
 
 ### Role-Based Protection
 
