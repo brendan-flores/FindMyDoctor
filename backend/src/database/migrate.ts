@@ -4,15 +4,31 @@ import { query } from './connection';
 
 const MIGRATIONS_DIR = path.join(__dirname, '../../database');
 
-export async function runMigrations() {
+export async function runMigrations(force = false) {
   console.log('Starting database migrations...');
 
   try {
-    // First, drop and recreate schema to ensure clean state
-    console.log('Cleaning up existing schema...');
-    await query('DROP SCHEMA IF EXISTS public CASCADE');
-    await query('CREATE SCHEMA public');
-    console.log('Schema cleaned successfully');
+    // Only drop schema if force flag is provided (for development/testing)
+    if (force) {
+      console.log('⚠️  Force mode enabled - dropping existing schema...');
+      await query('DROP SCHEMA IF EXISTS public CASCADE');
+      await query('CREATE SCHEMA public');
+      console.log('Schema cleaned successfully');
+    } else {
+      // Check if schema already exists
+      const schemaCheck = await query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public'
+        );
+      `);
+      
+      if (schemaCheck.rows[0].exists) {
+        console.log('⚠️  Schema already exists. Use force=true to reset.');
+        console.log('Skipping schema creation to preserve existing data.');
+        return;
+      }
+    }
 
     // Read the initial schema file
     const schemaPath = path.join(MIGRATIONS_DIR, '001_initial_schema.sql');
@@ -41,7 +57,12 @@ export async function runMigrations() {
 
 // Run migrations if this file is executed directly
 if (require.main === module) {
-  runMigrations()
+  const force = process.argv.includes('--force');
+  if (force) {
+    console.log('⚠️  WARNING: Force mode enabled - this will drop existing schema!');
+  }
+  
+  runMigrations(force)
     .then(() => {
       console.log('Migration process completed');
       process.exit(0);
