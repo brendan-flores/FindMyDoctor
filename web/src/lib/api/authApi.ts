@@ -76,3 +76,91 @@ export const authApi = {
     return apiClient.post<AuthResponse>('/auth/refresh', { refreshToken });
   },
 };
+
+// OTP Verification API for Doctor Signup
+export interface SendOtpRequest {
+  email: string;
+}
+
+export interface SendOtpData {
+  success: boolean;
+  message: string;
+}
+
+export interface SendOtpResponse {
+  success: boolean;
+  data?: SendOtpData | null;
+  error?: string;
+  message?: string;
+}
+
+export interface VerifyOtpRequest {
+  email: string;
+  otp: string;
+  password: string;
+  fullName: string;
+  specialty: string;
+  credentials?: string;
+  prcLicenseNumber: string;
+  clinic: string;
+  contactNumber?: string;
+}
+
+export interface VerifyOtpData {
+  user: {
+    id: string;
+    email: string;
+    role: string;
+  };
+  doctor: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    specialty: string;
+    credentials: string | null;
+    prc_license_number: string;
+    practice_name: string;
+    practice_phone: string | null;
+    practice_email: string | null;
+    is_approved: boolean;
+  };
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface VerifyOtpResponse {
+  success: boolean;
+  data?: VerifyOtpData | null;
+  error?: string;
+  message?: string;
+}
+
+export interface OtpStatusData {
+  isRegistered: boolean;
+  isVerified: boolean;
+}
+
+export interface OtpStatusResponse {
+  success: boolean;
+  data?: OtpStatusData | null;
+  error?: string;
+  message?: string;
+}
+
+export const otpApi = {
+  sendOtp: async (email: string): Promise<SendOtpResponse> => {
+    return apiClient.post<SendOtpData>('/auth/otp/send', { email });
+  },
+
+  verifyOtp: async (payload: VerifyOtpRequest): Promise<VerifyOtpResponse> => {
+    return apiClient.post<VerifyOtpData>('/auth/otp/verify', payload);
+  },
+
+  resendOtp: async (email: string): Promise<SendOtpResponse> => {
+    return apiClient.post<SendOtpData>('/auth/otp/resend', { email });
+  },
+
+  checkOtpStatus: async (email: string): Promise<OtpStatusResponse> => {
+    return apiClient.get<OtpStatusData>(`/auth/otp/status/${encodeURIComponent(email)}`);
+  },
+};

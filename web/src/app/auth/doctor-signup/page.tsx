@@ -1,615 +1,1171 @@
 'use client';
 
-import { useState } from 'react';
-import { authApi } from '@/lib/api/authApi';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 
-type FieldName =
-  | 'fullName'
-  | 'specialty'
-  | 'credentials'
-  | 'prcLicenseNumber'
-  | 'clinic'
-  | 'email'
-  | 'contactNumber'
-  | 'password'
-  | 'confirmPassword';
+import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/lib/api/apiClient';
 
-type FormValues = Record<FieldName, string>;
-type FormErrors = Partial<Record<FieldName, string>>;
-type FormStatus = 'idle' | 'submitting' | 'success';
-
-const FIELD_ORDER: FieldName[] = [
-  'fullName',
-  'specialty',
-  'credentials',
-  'prcLicenseNumber',
-  'clinic',
-  'email',
-  'contactNumber',
-  'password',
-  'confirmPassword',
-];
-
-const EMPTY_FORM: FormValues = {
-  fullName: '',
-  specialty: '',
-  credentials: '',
-  prcLicenseNumber: '',
-  clinic: '',
-  email: '',
-  contactNumber: '',
-  password: '',
-  confirmPassword: '',
-};
+type Step = 'signup' | 'otp' | 'success';
+type FormStatus = 'idle' | 'loading';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const CONTACT_PATTERN = /^[0-9+\-\s()]{7,}$/;
-const PRC_PATTERN = /^\d{7}$/;
+const OTP_PATTERN = /^\d{6}$/;
 
-/**
- * Client-side validation. The backend enforces the same rules, so this only
- * exists to give immediate feedback before the request is sent.
- */
-function validateForm(values: FormValues): FormErrors {
-  const errors: FormErrors = {};
+export default function DoctorSignupOtp() {
+  const router = useRouter();
 
-  if (!values.fullName.trim()) {
-    errors.fullName = 'Full name is required.';
-  } else if (values.fullName.trim().split(/\s+/).filter(Boolean).length < 2) {
-    errors.fullName = 'Enter your first and last name.';
-  }
+  const [step, setStep] = useState<Step>('signup');
 
-  if (!values.specialty.trim()) {
-    errors.specialty = 'Specialty is required.';
-  }
+  const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [emailStatus, setEmailStatus] = useState<FormStatus>('idle');
 
-  if (!values.credentials.trim()) {
-    errors.credentials = 'Credentials are required.';
-  }
+  const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
+  const [otpError, setOtpError] = useState('');
+  const [otpStatus, setOtpStatus] = useState<FormStatus>('idle');
+  const [activeOtpIndex, setActiveOtpIndex] = useState(0);
 
-  if (!values.prcLicenseNumber.trim()) {
-    errors.prcLicenseNumber = 'PRC license number is required.';
-  } else if (!PRC_PATTERN.test(values.prcLicenseNumber.trim())) {
-    errors.prcLicenseNumber = 'PRC license number must be 7 digits.';
-  }
+  // Refs for OTP input boxes to enable direct focus
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  if (!values.clinic.trim()) {
-    errors.clinic = 'Clinic is required.';
-  }
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendDisabled, setResendDisabled] = useState(false);
 
-  if (!values.email.trim()) {
-    errors.email = 'Email address is required.';
-  } else if (!EMAIL_PATTERN.test(values.email.trim())) {
-    errors.email = 'Enter a valid email address.';
-  }
+  const [formError, setFormError] = useState('');
 
-  if (!values.contactNumber.trim()) {
-    errors.contactNumber = 'Contact number is required.';
-  } else if (!CONTACT_PATTERN.test(values.contactNumber.trim())) {
-    errors.contactNumber = 'Enter a valid contact number.';
-  }
+  const [formData, setFormData] = useState({
+    fullName: '',
+    contactNumber: '',
+    specialty: '',
+    credentials: '',
+    prcLicenseNumber: '',
+    clinic: '',
+    password: '',
+    confirmPassword: '',
+  });
 
-  if (!values.password) {
-    errors.password = 'Password is required.';
-  } else if (values.password.length < 8) {
-    errors.password = 'Password must be at least 8 characters.';
-  }
+  const [otpExpiresIn, setOtpExpiresIn] = useState(600);
 
-  if (!values.confirmPassword) {
-    errors.confirmPassword = 'Please confirm your password.';
-  } else if (values.password !== values.confirmPassword) {
-    errors.confirmPassword = 'Passwords do not match.';
-  }
+  const [successData, setSuccessData] = useState<{
+    id: string;
+    email: string;
+    role: string;
+  } | null>(null);
 
-  return errors;
-}
+  // Container ref for scroll handling
+  const containerRef = useRef<HTMLDivElement>(null);
 
-/**
- * The backend returns errors as `{ code, message }` while the API client types
- * them as a string, so both shapes are handled here.
- */
-function getApiErrorMessage(error: unknown): string {
-  if (typeof error === 'string' && error.trim()) {
-    return error;
-  }
+  /*
+   * ============================================================
+   * OTP EXPIRATION TIMER
+   * ============================================================
+   */
 
-  if (error && typeof error === 'object' && 'message' in error) {
-    const message = (error as { message?: unknown }).message;
-
-    if (typeof message === 'string' && message.trim()) {
-      return message;
+  useEffect(() => {
+    if (step !== 'otp') {
+      return;
     }
-  }
 
-  return 'Unable to create your account right now. Please try again.';
-}
+    setOtpExpiresIn(600);
 
-/* Icons kept visually identical to the existing /auth/login page: 20px, 1.8 stroke. */
+    const timer = setInterval(() => {
+      setOtpExpiresIn((previous) => {
+        if (previous <= 1) {
+          return 0;
+        }
 
-function UserIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <circle cx="12" cy="8" r="4" strokeWidth="1.8"></circle>
-      <path d="M4.5 20a7.5 7.5 0 0 1 15 0" strokeLinecap="round" strokeWidth="1.8"></path>
-    </svg>
-  );
-}
+        return previous - 1;
+      });
+    }, 1000);
 
-function SpecialtyIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path d="M3 12h4l2-5 3 10 2-5h7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-    </svg>
-  );
-}
+    return () => clearInterval(timer);
+  }, [step]);
 
-function CredentialsIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path d="M3 9l9-4 9 4-9 4-9-4z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-      <path d="M7 11.5V16c0 1.1 2.2 2.5 5 2.5s5-1.4 5-2.5v-4.5" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-    </svg>
-  );
-}
+  /*
+   * ============================================================
+   * RESEND COOLDOWN TIMER
+   * ============================================================
+   */
 
-function LicenseIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <rect height="14" rx="2" strokeWidth="1.8" width="18" x="3" y="5"></rect>
-      <circle cx="9" cy="11" r="2" strokeWidth="1.8"></circle>
-      <path d="M14 9.5h4M14 13h4M6.5 16c.7-1 1.6-1.5 2.5-1.5s1.8.5 2.5 1.5" strokeLinecap="round" strokeWidth="1.8"></path>
-    </svg>
-  );
-}
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      return;
+    }
 
-function ClinicIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path d="M4 20.5V6.5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v14" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-      <path d="M16 10h2a2 2 0 0 1 2 2v8.5" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-      <path d="M8 8h2M8 12h2M8 16h2" strokeLinecap="round" strokeWidth="1.8"></path>
-    </svg>
-  );
-}
+    const timer = setInterval(() => {
+      setResendCooldown((previous) => {
+        if (previous <= 1) {
+          setResendDisabled(false);
+          return 0;
+        }
 
-function MailIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <rect height="16" rx="3" strokeWidth="1.8" width="20" x="2" y="4"></rect>
-      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" strokeLinecap="round" strokeWidth="1.8"></path>
-    </svg>
-  );
-}
+        return previous - 1;
+      });
+    }, 1000);
 
-function PhoneIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path d="M3.5 5.5c0-.8.7-1.5 1.5-1.5h2.2c.7 0 1.3.5 1.5 1.2l.6 2.4c.1.6-.1 1.2-.6 1.5l-1 .7a12.5 12.5 0 0 0 5.5 5.5l.7-1c.4-.5 1-.7 1.5-.6l2.4.6c.7.2 1.2.8 1.2 1.5v2.2c0 .8-.7 1.5-1.5 1.5A15.5 15.5 0 0 1 3.5 5.5z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-    </svg>
-  );
-}
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
-function LockIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-    </svg>
-  );
-}
+  /*
+   * ============================================================
+   * VALIDATION
+   * ============================================================
+   */
 
-function EyeIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-      <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-    </svg>
-  );
-}
+  const validateSignupForm = (): string => {
+    if (!formData.fullName.trim()) {
+      return 'Full Name is required.';
+    }
 
-function EyeOffIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-    </svg>
-  );
-}
+    if (!email.trim()) {
+      return 'Email address is required.';
+    }
 
-function AlertIcon() {
-  return (
-    <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="9" strokeWidth="1.8"></circle>
-      <path d="M12 8v4.5M12 16h.01" strokeLinecap="round" strokeWidth="1.8"></path>
-    </svg>
-  );
-}
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
 
-function SuccessIcon() {
-  return (
-    <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="9" strokeWidth="1.8"></circle>
-      <path d="m8.5 12.5 2.5 2.5 4.5-5" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-    </svg>
-  );
-}
+    if (!formData.contactNumber.trim()) {
+      return 'Contact Number is required.';
+    }
 
-interface FieldProps {
-  id: FieldName;
-  label: string;
-  value: string;
-  placeholder: string;
-  icon: React.ReactNode;
-  onChange: (value: string) => void;
-  error?: string;
-  type?: string;
-  autoComplete?: string;
-  trailing?: React.ReactNode;
-}
+    if (!formData.specialty.trim()) {
+      return 'Specialty is required.';
+    }
 
-function Field({
-  id,
-  label,
-  value,
-  placeholder,
-  icon,
-  onChange,
-  error,
-  type = 'text',
-  autoComplete,
-  trailing,
-}: FieldProps) {
-  return (
-    <div className="space-y-2">
-      <label htmlFor={id} className="block text-[15px] font-bold text-[#1A202C]">
-        {label} <span className="text-red-500">*</span>
-      </label>
-      <div className="relative rounded-2xl shadow-sm">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
-          {icon}
-        </div>
-        <input
-          id={id}
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          autoComplete={autoComplete}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? `${id}-error` : undefined}
-          className={`block w-full rounded-2xl border bg-white py-3.5 pl-12 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:bg-white focus:outline-none focus:ring-2 transition-all duration-150 ${
-            trailing ? 'pr-12' : 'pr-4'
-          } ${
-            error
-              ? 'border-red-300 focus:border-red-400 focus:ring-red-200'
-              : 'border-[#E2E8F0] focus:border-[#1A62CD] focus:ring-[#1A62CD]/20'
-          }`}
-        />
-        {trailing}
-      </div>
-      {error && (
-        <p id={`${id}-error`} className="text-[13px] font-medium text-red-600">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
+    if (!formData.credentials.trim()) {
+      return 'Credentials are required.';
+    }
 
-interface PasswordFieldProps {
-  id: FieldName;
-  label: string;
-  value: string;
-  placeholder: string;
-  autoComplete?: string;
-  onChange: (value: string) => void;
-  error?: string;
-}
+    if (!formData.prcLicenseNumber.trim()) {
+      return 'PRC License Number is required.';
+    }
 
-function PasswordField({ id, label, value, placeholder, autoComplete, onChange, error }: PasswordFieldProps) {
-  const [visible, setVisible] = useState(false);
+    if (!formData.clinic.trim()) {
+      return 'Clinic is required.';
+    }
 
-  return (
-    <Field
-      id={id}
-      label={label}
-      value={value}
-      placeholder={placeholder}
-      autoComplete={autoComplete}
-      onChange={onChange}
-      error={error}
-      type={visible ? 'text' : 'password'}
-      icon={<LockIcon />}
-      trailing={
-        <button
-          type="button"
-          onClick={() => setVisible(!visible)}
-          aria-label={visible ? 'Hide password' : 'Show password'}
-          className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#94A3B8] hover:text-[#64748B] focus:outline-none"
-        >
-          {visible ? <EyeIcon /> : <EyeOffIcon />}
-        </button>
+    if (!formData.password) {
+      return 'Password is required.';
+    }
+
+    if (formData.password.length < 6) {
+      return 'Password must be at least 6 characters.';
+    }
+
+    if (!formData.confirmPassword) {
+      return 'Confirm Password is required.';
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      return 'Passwords do not match.';
+    }
+
+    return '';
+  };
+
+  const validateOtp = (value: string[]): string => {
+    const otpString = value.join('');
+    if (!otpString.trim()) {
+      return 'OTP code is required.';
+    }
+
+    if (!OTP_PATTERN.test(otpString.trim())) {
+      return 'Enter a valid 6-digit OTP code.';
+    }
+
+    return '';
+  };
+
+  // OTP input handlers
+  const handleOtpChange = useCallback((index: number, value: string) => {
+    // Only allow single digit
+    const digit = value.replace(/\D/g, '').slice(-1);
+    
+    if (digit) {
+      const newOtp = [...otp];
+      newOtp[index] = digit;
+      setOtp(newOtp);
+      setOtpError('');
+      
+      // Auto-focus next box if not last
+      if (index < 5) {
+        setActiveOtpIndex(index + 1);
+        // Focus the next input after state update
+        setTimeout(() => {
+          otpInputRefs.current[index + 1]?.focus();
+        }, 0);
       }
-    />
-  );
-}
+    } else {
+      // Clear current box
+      const newOtp = [...otp];
+      newOtp[index] = '';
+      setOtp(newOtp);
+    }
+  }, [otp]);
 
-function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="w-full">
-      <div className="flex items-center gap-3">
-        <span className="text-[11px] font-bold text-[#8392A5] tracking-[0.18em] uppercase whitespace-nowrap">
-          {title}
-        </span>
-        <span className="h-px flex-1 bg-[#E2E8F0]" />
-      </div>
-      <div className="mt-4 space-y-5">{children}</div>
-    </div>
-  );
-}
+  const handleOtpKeyDown = useCallback((index: number, e: React.KeyboardEvent) => {
+    // Handle backspace - clear current and go to previous, or just go to previous
+    if (e.key === 'Backspace') {
+      if (!otp[index] && index > 0) {
+        // If current box is empty, clear previous box and focus it
+        const newOtp = [...otp];
+        newOtp[index - 1] = '';
+        setOtp(newOtp);
+        setActiveOtpIndex(index - 1);
+        
+        // Focus the previous input after state update
+        setTimeout(() => {
+          otpInputRefs.current[index - 1]?.focus();
+        }, 0);
+      } else if (index > 0) {
+        // If current box has value, just move focus to previous
+        setActiveOtpIndex(index - 1);
+        
+        // Focus the previous input after state update
+        setTimeout(() => {
+          otpInputRefs.current[index - 1]?.focus();
+        }, 0);
+      }
+    }
+    
+    // Handle left arrow - go to previous box
+    if (e.key === 'ArrowLeft' && index > 0) {
+      setActiveOtpIndex(index - 1);
+      
+      // Focus the previous input after state update
+      setTimeout(() => {
+        otpInputRefs.current[index - 1]?.focus();
+      }, 0);
+    }
+    
+    // Handle right arrow - go to next box
+    if (e.key === 'ArrowRight' && index < 5) {
+      setActiveOtpIndex(index + 1);
+      
+      // Focus the next input after state update
+      setTimeout(() => {
+        otpInputRefs.current[index + 1]?.focus();
+      }, 0);
+    }
+  }, [otp]);
 
-export default function DoctorSignUp() {
-  const [values, setValues] = useState<FormValues>(EMPTY_FORM);
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [status, setStatus] = useState<FormStatus>('idle');
-  const [serverError, setServerError] = useState('');
-
-  const hasErrors = Object.keys(errors).length > 0;
-
-  const handleChange = (field: FieldName, value: string) => {
-    setValues((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => {
-      if (!prev[field]) return prev;
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
+  const handleOtpFocus = (index: number) => {
+    setActiveOtpIndex(index);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setServerError('');
+  const getOtpValue = () => {
+    return otp.join('');
+  };
 
-    const nextErrors = validateForm(values);
-    setErrors(nextErrors);
+  /*
+   * ============================================================
+   * CREATE SUPABASE ACCOUNT + SEND OTP
+   * ============================================================
+   */
 
-    const firstInvalidField = FIELD_ORDER.find((field) => nextErrors[field]);
-    if (firstInvalidField) {
-      document.getElementById(firstInvalidField)?.focus();
+  const handleSignupSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+
+    setFormError('');
+    setEmailError('');
+
+    const validationError = validateSignupForm();
+
+    if (validationError) {
+      setFormError(validationError);
       return;
     }
 
-    setStatus('submitting');
+    setEmailStatus('loading');
 
-    const response = await authApi.registerDoctor({
-      email: values.email.trim(),
-      password: values.password,
-      fullName: values.fullName.trim(),
-      specialty: values.specialty.trim(),
-      credentials: values.credentials.trim() || undefined,
-      prcLicenseNumber: values.prcLicenseNumber.trim(),
-      clinic: values.clinic.trim(),
-      contactNumber: values.contactNumber.trim() || undefined,
-    });
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: formData.password,
 
-    if (response.success) {
-      setStatus('success');
+        options: {
+          data: {
+            role: 'doctor',
+            full_name: formData.fullName.trim(),
+            contact_number: formData.contactNumber.trim(),
+            specialty: formData.specialty.trim(),
+            credentials: formData.credentials.trim(),
+            prc_license_number: formData.prcLicenseNumber.trim(),
+            clinic: formData.clinic.trim(),
+          },
+        },
+      });
+
+      if (error) {
+        console.error('Supabase signup error:', error);
+        setFormError(error.message);
+        setEmailStatus('idle');
+        return;
+      }
+
+      if (!data.user) {
+        setFormError(
+          'The account could not be created. Please try again.'
+        );
+        setEmailStatus('idle');
+        return;
+      }
+
+      /*
+       * Confirm email is enabled in Supabase.
+       * Supabase now sends the confirmation OTP.
+       */
+
+      setOtp(['', '', '', '', '', '']);
+      setOtpError('');
+      setOtpExpiresIn(600);
+      setResendCooldown(0);
+      setResendDisabled(false);
+
+      setStep('otp');
+      setEmailStatus('idle');
+    } catch (error) {
+      console.error('Signup error:', error);
+
+      setFormError(
+        'Unable to create the account. Please try again.'
+      );
+
+      setEmailStatus('idle');
+    }
+  };
+
+  /*
+   * ============================================================
+   * VERIFY OTP
+   * ============================================================
+   */
+
+  const handleOtpSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+
+    setOtpError('');
+
+    const validationError = validateOtp(otp);
+
+    if (validationError) {
+      setOtpError(validationError);
       return;
     }
 
-    setServerError(getApiErrorMessage(response.error));
-    setStatus('idle');
+    if (otpExpiresIn <= 0) {
+      setOtpError(
+        'This verification code has expired. Please request a new code.'
+      );
+      return;
+    }
+
+    setOtpStatus('loading');
+
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: getOtpValue(),
+        type: 'email',
+      });
+
+      if (error) {
+        console.error('Supabase OTP verification error:', error);
+
+        setOtpError(error.message);
+        setOtpStatus('idle');
+        return;
+      }
+
+      if (!data.user || !data.session) {
+        setOtpError(
+          'Email verification succeeded, but no login session was created.'
+        );
+
+        setOtpStatus('idle');
+        return;
+      }
+
+      /*
+       * Store the Supabase session.
+       */
+
+      localStorage.setItem(
+        'token',
+        data.session.access_token
+      );
+
+      if (data.session.refresh_token) {
+        localStorage.setItem(
+          'refreshToken',
+          data.session.refresh_token
+        );
+      }
+
+      localStorage.setItem(
+        'user',
+        JSON.stringify(data.user)
+      );
+
+      /*
+       * Keep your existing API client synchronized.
+       */
+
+      apiClient.setToken(data.session.access_token);
+
+      setSuccessData({
+        id: data.user.id,
+        email: data.user.email || email.trim(),
+        role: 'doctor',
+      });
+
+      setStep('success');
+      setOtpStatus('idle');
+    } catch (error) {
+      console.error('OTP verification error:', error);
+
+      setOtpError(
+        'OTP verification failed. Please check your code and try again.'
+      );
+
+      setOtpStatus('idle');
+    }
   };
 
-  const handleBackToForm = () => {
-    setValues(EMPTY_FORM);
-    setErrors({});
-    setServerError('');
-    setStatus('idle');
+  /*
+   * ============================================================
+   * RESEND OTP
+   * ============================================================
+   */
+
+  const handleResendOtp = async () => {
+    if (resendDisabled) {
+      return;
+    }
+
+    setOtpError('');
+    setEmailStatus('loading');
+
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email.trim(),
+      });
+
+      if (error) {
+        console.error('Supabase resend error:', error);
+
+        setOtpError(error.message);
+        setEmailStatus('idle');
+        return;
+      }
+
+      setOtp(['', '', '', '', '', '']);
+      setOtpExpiresIn(600);
+
+      setResendCooldown(60);
+      setResendDisabled(true);
+
+      setEmailStatus('idle');
+    } catch (error) {
+      console.error('Resend OTP error:', error);
+
+      setOtpError(
+        'Failed to resend the verification code. Please try again.'
+      );
+
+      setEmailStatus('idle');
+    }
   };
 
-  return (
-    <div className="h-screen overflow-y-auto bg-[#F3F5F9] px-4 sm:px-6 lg:px-8">
-      <div className="min-h-full flex justify-center py-10">
-        <div className="w-full max-w-[460px] flex flex-col items-center">
-          {/* Brand Header */}
-          <div className="flex flex-col items-center mb-8 text-center">
-            {/* FiDo Logo */}
-            <div className="flex items-center gap-2.5 mb-1.5">
+  /*
+   * ============================================================
+   * GO BACK TO SIGNUP
+   * ============================================================
+   */
+
+  const handleBackToSignup = () => {
+    setStep('signup');
+
+    setOtp(['', '', '', '', '', '']);
+    setOtpError('');
+    setFormError('');
+
+    setOtpStatus('idle');
+    setEmailStatus('idle');
+  };
+
+  /*
+   * ============================================================
+   * ICONS
+   * ============================================================
+   */
+
+  const MailIcon = () => (
+    <svg
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <rect
+        x="3"
+        y="5"
+        width="18"
+        height="14"
+        rx="2"
+        strokeWidth="1.8"
+      />
+
+      <path
+        d="M3 5l9 6 9-6"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+
+  const ShieldIcon = () => (
+    <svg
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="M12 3l8 4v6c0 4-3.5 7-8 9-4.5-2-8-5-8-9V7l8-4z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+
+      <path
+        d="M9 12l2 2 4-4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+
+  const CheckIcon = () => (
+    <svg
+      className="h-8 w-8"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        strokeWidth="1.8"
+      />
+
+      <path
+        d="M8 12l2.5 2.5L16 9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+
+  const ArrowLeftIcon = () => (
+    <svg
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="M19 12H5"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+
+      <path
+        d="M12 19l-7-7 7-7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+
+  /*
+   * ============================================================
+   * SIGNUP STEP
+   * ============================================================
+   */
+
+  if (step === 'signup') {
+    return (
+      <div className="min-h-screen bg-[#F3F5F9]">
+        <div className="px-4 py-8 overflow-y-auto" style={{ height: '100vh' }}>
+          <div className="w-full max-w-[560px] mx-auto">
+
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-2.5 mb-1.5">
+
               <div className="w-12 h-12 bg-[#1A62CD] rounded-2xl flex items-center justify-center shadow-sm">
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24">
-                  <line x1="12" x2="12" y1="5" y2="19"></line>
-                  <line x1="5" x2="19" y1="12" y2="12"></line>
+                <svg
+                  className="w-7 h-7 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="3"
+                  viewBox="0 0 24 24"
+                >
+                  <line
+                    x1="12"
+                    x2="12"
+                    y1="5"
+                    y2="19"
+                  />
+
+                  <line
+                    x1="5"
+                    x2="19"
+                    y1="12"
+                    y2="12"
+                  />
                 </svg>
               </div>
-              <span className="text-4xl font-extrabold tracking-tight text-[#165CBE]">FiDo</span>
+
+              <span className="text-4xl font-extrabold tracking-tight text-[#165CBE]">
+                FiDo
+              </span>
             </div>
-            <span className="text-[11px] font-bold text-[#8392A5] tracking-[0.18em] uppercase pl-0.5">
+
+            <span className="text-[11px] font-bold text-[#8392A5] tracking-[0.18em] uppercase">
               FIND A DOCTOR
             </span>
           </div>
 
-          {status === 'success' ? (
-            /* Account created successfully */
-            <div className="w-full rounded-2xl border border-[#E2E8F0] bg-white px-6 py-8 text-center shadow-sm">
-              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                <SuccessIcon />
-              </div>
-              <h1 className="text-[26px] font-black tracking-tight text-[#0D1829] mb-2 leading-tight">
-                Account Created
+          {/* Card */}
+          <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8">
+
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-bold text-[#0F172A]">
+                Create Doctor Account
               </h1>
-              <p className="text-[15px] text-[#718096] font-normal leading-relaxed">
-                Your doctor account is ready. You can now sign in with your email and password.
+
+              <p className="text-[#64748B] mt-2 text-[15px]">
+                Complete all required information. A 6-digit verification
+                code will be sent to your email.
               </p>
-              <div className="mt-7 space-y-3">
+            </div>
+
+            <form onSubmit={handleSignupSubmit}>
+
+              {/* Full Name */}
+              <div className="mb-5">
+                <label
+                  htmlFor="fullName"
+                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                >
+                  Full Name
+                </label>
+
+                <input
+                  id="fullName"
+                  type="text"
+                  value={formData.fullName}
+                  onChange={(event) => {
+                    setFormData({
+                      ...formData,
+                      fullName: event.target.value,
+                    });
+
+                    setFormError('');
+                  }}
+                  placeholder="Enter your full name"
+                  autoComplete="name"
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                />
+              </div>
+
+              {/* Email */}
+              <div className="mb-5">
+                <label
+                  htmlFor="email"
+                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                >
+                  Email Address
+                </label>
+
+                <div className="relative">
+
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]">
+                    <MailIcon />
+                  </div>
+
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      setEmailError('');
+                      setFormError('');
+                    }}
+                    placeholder="doctor@example.com"
+                    autoComplete="email"
+                    className={`block w-full rounded-2xl border ${
+                      emailError
+                        ? 'border-red-500'
+                        : 'border-[#E2E8F0]'
+                    } bg-white py-3.5 pl-12 pr-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all`}
+                  />
+
+                </div>
+              </div>
+
+              {/* Contact Number */}
+              <div className="mb-5">
+                <label
+                  htmlFor="contactNumber"
+                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                >
+                  Contact Number
+                </label>
+
+                <input
+                  id="contactNumber"
+                  type="tel"
+                  value={formData.contactNumber}
+                  onChange={(event) => {
+                    setFormData({
+                      ...formData,
+                      contactNumber: event.target.value,
+                    });
+
+                    setFormError('');
+                  }}
+                  placeholder="09XXXXXXXXX"
+                  autoComplete="tel"
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                />
+              </div>
+
+              {/* Specialty */}
+              <div className="mb-5">
+                <label
+                  htmlFor="specialty"
+                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                >
+                  Specialty
+                </label>
+
+                <input
+                  id="specialty"
+                  type="text"
+                  value={formData.specialty}
+                  onChange={(event) => {
+                    setFormData({
+                      ...formData,
+                      specialty: event.target.value,
+                    });
+
+                    setFormError('');
+                  }}
+                  placeholder="e.g. Cardiology"
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                />
+              </div>
+
+              {/* Credentials */}
+              <div className="mb-5">
+                <label
+                  htmlFor="credentials"
+                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                >
+                  Credentials
+                </label>
+
+                <input
+                  id="credentials"
+                  type="text"
+                  value={formData.credentials}
+                  onChange={(event) => {
+                    setFormData({
+                      ...formData,
+                      credentials: event.target.value,
+                    });
+
+                    setFormError('');
+                  }}
+                  placeholder="e.g. MD, FPCP"
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                />
+              </div>
+
+              {/* PRC License Number */}
+              <div className="mb-5">
+                <label
+                  htmlFor="prcLicenseNumber"
+                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                >
+                  PRC License Number
+                </label>
+
+                <input
+                  id="prcLicenseNumber"
+                  type="text"
+                  value={formData.prcLicenseNumber}
+                  onChange={(event) => {
+                    setFormData({
+                      ...formData,
+                      prcLicenseNumber: event.target.value,
+                    });
+
+                    setFormError('');
+                  }}
+                  placeholder="Enter your PRC license number"
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                />
+              </div>
+
+              {/* Clinic */}
+              <div className="mb-5">
+                <label
+                  htmlFor="clinic"
+                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                >
+                  Clinic
+                </label>
+
+                <input
+                  id="clinic"
+                  type="text"
+                  value={formData.clinic}
+                  onChange={(event) => {
+                    setFormData({
+                      ...formData,
+                      clinic: event.target.value,
+                    });
+
+                    setFormError('');
+                  }}
+                  placeholder="Enter clinic or hospital name"
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                />
+              </div>
+
+              {/* Password */}
+              <div className="mb-5">
+                <label
+                  htmlFor="password"
+                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                >
+                  Password
+                </label>
+
+                <input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(event) => {
+                    setFormData({
+                      ...formData,
+                      password: event.target.value,
+                    });
+
+                    setFormError('');
+                  }}
+                  placeholder="Enter your password"
+                  autoComplete="new-password"
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                />
+
+                <p className="text-[12px] text-[#94A3B8] mt-1.5">
+                  Minimum 6 characters
+                </p>
+              </div>
+
+              {/* Confirm Password */}
+              <div className="mb-6">
+                <label
+                  htmlFor="confirmPassword"
+                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                >
+                  Confirm Password
+                </label>
+
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={(event) => {
+                    setFormData({
+                      ...formData,
+                      confirmPassword: event.target.value,
+                    });
+
+                    setFormError('');
+                  }}
+                  placeholder="Re-enter your password"
+                  autoComplete="new-password"
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                />
+              </div>
+
+              {/* Error */}
+              {(formError || emailError) && (
+                <div className="mb-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+                  <p className="text-red-600 text-[14px]">
+                    {formError || emailError}
+                  </p>
+                </div>
+              )}
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={emailStatus === 'loading'}
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {emailStatus === 'loading'
+                  ? 'Creating Account...'
+                  : 'Create Doctor Account'}
+              </button>
+
+            </form>
+
+            <div className="mt-6 text-center">
+              <p className="text-[15px] text-[#64748B]">
+                Already have an account?{' '}
+
                 <a
                   href="/auth/login"
-                  className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150"
+                  className="font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors"
                 >
-                  Return to Login
+                  Log In
                 </a>
-                <button
-                  type="button"
-                  onClick={handleBackToForm}
-                  className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl border border-[#E2E8F0] bg-white text-[16px] font-bold text-[#1967D2] hover:bg-[#F5F7FA] hover:text-[#0D3B75] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-colors duration-150"
-                >
-                  Register Another Doctor
-                </button>
-              </div>
+              </p>
             </div>
-          ) : (
-            <>
-              {/* Title Section */}
-              <div className="text-center mb-7 w-full">
-                <h1 className="text-[34px] font-black tracking-tight text-[#0D1829] mb-2 leading-tight">
-                  Create Doctor Account
-                </h1>
-                <p className="text-[15px] text-[#718096] font-normal leading-relaxed">
-                  Please provide your professional and account details.
-                </p>
-              </div>
 
-              {/* Sign Up Form */}
-              <form onSubmit={handleSubmit} noValidate className="w-full space-y-6">
-                {/* Required Fields Note */}
-                <p className="text-[13px] text-[#718096] font-normal">
-                  Fields marked with <span className="font-bold text-red-500">*</span> are required.
-                </p>
+          </div>
 
-                {/* Error Message */}
-                {(hasErrors || serverError) && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-2.5">
-                    <AlertIcon />
-                    <span>{serverError || 'Please correct the highlighted fields and try again.'}</span>
-                  </div>
-                )}
+          <p className="text-center text-[13px] text-[#94A3B8] mt-6">
+            By continuing, you agree to our Terms of Service and Privacy Policy
+          </p>
 
-                {/* Doctor Information */}
-                <FormSection title="Doctor Information">
-                  <Field
-                    id="fullName"
-                    label="Full Name"
-                    value={values.fullName}
-                    onChange={(value) => handleChange('fullName', value)}
-                    placeholder="Dr. Juan Dela Cruz"
-                    autoComplete="name"
-                    icon={<UserIcon />}
-                    error={errors.fullName}
-                  />
-                  <Field
-                    id="specialty"
-                    label="Specialty"
-                    value={values.specialty}
-                    onChange={(value) => handleChange('specialty', value)}
-                    placeholder="Cardiology"
-                    icon={<SpecialtyIcon />}
-                    error={errors.specialty}
-                  />
-                  <Field
-                    id="credentials"
-                    label="Credentials"
-                    value={values.credentials}
-                    onChange={(value) => handleChange('credentials', value)}
-                    placeholder="MD, FPCP"
-                    icon={<CredentialsIcon />}
-                    error={errors.credentials}
-                  />
-                  <Field
-                    id="prcLicenseNumber"
-                    label="PRC License Number"
-                    value={values.prcLicenseNumber}
-                    onChange={(value) => handleChange('prcLicenseNumber', value)}
-                    placeholder="1234567"
-                    icon={<LicenseIcon />}
-                    error={errors.prcLicenseNumber}
-                  />
-                  <Field
-                    id="clinic"
-                    label="Clinic"
-                    value={values.clinic}
-                    onChange={(value) => handleChange('clinic', value)}
-                    placeholder="FiDo Medical Center"
-                    icon={<ClinicIcon />}
-                    error={errors.clinic}
-                  />
-                </FormSection>
-
-                {/* Contact Information */}
-                <FormSection title="Contact Information">
-                  <Field
-                    id="email"
-                    label="Email Address"
-                    value={values.email}
-                    onChange={(value) => handleChange('email', value)}
-                    placeholder="doctor@example.com"
-                    type="email"
-                    autoComplete="email"
-                    icon={<MailIcon />}
-                    error={errors.email}
-                  />
-                  <Field
-                    id="contactNumber"
-                    label="Contact Number"
-                    value={values.contactNumber}
-                    onChange={(value) => handleChange('contactNumber', value)}
-                    placeholder="+63 912 345 6789"
-                    type="tel"
-                    autoComplete="tel"
-                    icon={<PhoneIcon />}
-                    error={errors.contactNumber}
-                  />
-                </FormSection>
-
-                {/* Account Security */}
-                <FormSection title="Account Security">
-                  <PasswordField
-                    id="password"
-                    label="Password"
-                    value={values.password}
-                    onChange={(value) => handleChange('password', value)}
-                    placeholder="••••••••"
-                    autoComplete="new-password"
-                    error={errors.password}
-                  />
-                  <PasswordField
-                    id="confirmPassword"
-                    label="Confirm Password"
-                    value={values.confirmPassword}
-                    onChange={(value) => handleChange('confirmPassword', value)}
-                    placeholder="••••••••"
-                    autoComplete="new-password"
-                    error={errors.confirmPassword}
-                  />
-                </FormSection>
-
-                {/* Submit Button */}
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={status === 'submitting'}
-                    className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {status === 'submitting' ? 'Creating account...' : 'Create Doctor Account'}
-                  </button>
-                </div>
-              </form>
-
-              {/* Log In Link */}
-              <div className="mt-6 text-center">
-                <p className="text-[15px] text-[#64748B] font-normal">
-                  Already have an account?{' '}
-                  <a
-                    href="/auth/login"
-                    className="font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors"
-                  >
-                    Log In
-                  </a>
-                </p>
-              </div>
-            </>
-          )}
         </div>
       </div>
     </div>
-  );
-}
+    );
+  }
 
+  /*
+   * ============================================================
+   * OTP STEP
+   * ============================================================
+   */
+
+  if (step === 'otp') {
+    return (
+      <div className="min-h-screen bg-[#F3F5F9]">
+        <div className="px-4 py-8 overflow-y-auto" style={{ height: '100vh' }}>
+          <div className="w-full max-w-[460px] mx-auto">
+
+          <div className="text-center mb-6">
+
+            <button
+              type="button"
+              onClick={handleBackToSignup}
+              className="flex items-center gap-2 text-[#64748B] hover:text-[#0D3B75] transition-colors mb-4"
+            >
+              <ArrowLeftIcon />
+
+              <span className="text-[15px]">
+                Back to signup
+              </span>
+            </button>
+
+            <h1 className="text-2xl font-bold text-[#0F172A]">
+              Verify Your Email
+            </h1>
+
+            <p className="text-[#64748B] mt-2 text-[15px]">
+              Enter the 6-digit code sent to{' '}
+              <strong>{email}</strong>
+            </p>
+
+            <p className="text-[#94A3B8] text-[13px] mt-1">
+              OTP expires in{' '}
+              {Math.floor(otpExpiresIn / 60)}:
+              {String(otpExpiresIn % 60).padStart(2, '0')}
+            </p>
+
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8">
+
+            <form onSubmit={handleOtpSubmit}>
+
+              <div className="mb-6">
+
+                <label
+                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                >
+                  Verification Code
+                </label>
+
+                <div className="flex justify-center gap-3">
+                  {otp.map((digit, index) => (
+                    <input
+                      key={index}
+                      ref={(el) => { otpInputRefs.current[index] = el; }}
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      value={digit}
+                      onChange={(e) => handleOtpChange(index, e.target.value)}
+                      onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                      onFocus={() => handleOtpFocus(index)}
+                      placeholder="•"
+                      maxLength={1}
+                      className={`w-14 h-16 text-center text-[28px] font-bold rounded-2xl border-2 ${
+                        otpError
+                          ? 'border-red-500 bg-red-50'
+                          : activeOtpIndex === index
+                            ? 'border-[#1A62CD] bg-white ring-2 ring-[#1A62CD]/20'
+                            : 'border-[#E2E8F0] bg-white hover:border-[#CBD5E1]'
+                      } text-gray-900 placeholder-[#CBD5E1] focus:outline-none focus:border-[#1A62CD] transition-all duration-150`}
+                    />
+                  ))}
+                </div>
+
+                {otpError && (
+                  <p className="text-red-500 text-[14px] mt-3 text-center">
+                    {otpError}
+                  </p>
+                )}
+
+              </div>
+
+              <button
+                type="submit"
+                disabled={otpStatus === 'loading'}
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {otpStatus === 'loading'
+                  ? 'Verifying...'
+                  : 'Verify & Create Account'}
+              </button>
+
+            </form>
+
+            <div className="text-center mt-6">
+
+              <p className="text-[15px] text-[#64748B]">
+                Didn't receive the code?{' '}
+
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={
+                    resendDisabled ||
+                    emailStatus === 'loading'
+                  }
+                  className="font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors disabled:text-[#94A3B8] disabled:cursor-not-allowed"
+                >
+                  {emailStatus === 'loading'
+                    ? 'Sending...'
+                    : resendDisabled
+                      ? `Resend in ${resendCooldown}s`
+                      : 'Resend OTP'}
+                </button>
+              </p>
+
+            </div>
+
+          </div>
+
+          <p className="text-center text-[13px] text-[#94A3B8] mt-6">
+            By continuing, you agree to our Terms of Service and Privacy Policy
+          </p>
+
+        </div>
+      </div>
+    </div>
+    );
+  }
+
+  /*
+   * ============================================================
+   * SUCCESS STEP
+   * ============================================================
+   */
+
+  if (step === 'success' && successData) {
+    return (
+      <div className="min-h-screen bg-[#F3F5F9]">
+        <div className="px-4 py-8 overflow-y-auto" style={{ height: '100vh' }}>
+          <div className="w-full max-w-[460px] mx-auto text-center">
+
+          <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8">
+
+            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckIcon />
+            </div>
+
+            <h1 className="text-2xl font-bold text-[#0F172A]">
+              Account Created!
+            </h1>
+
+            <p className="text-[#64748B] mt-2 text-[15px]">
+              Welcome, <strong>{successData.email}</strong>
+            </p>
+
+            <p className="text-[#64748B] text-[15px] mt-2">
+              Your email has been verified successfully.
+            </p>
+
+            <div className="mt-8">
+
+              <button
+                type="button"
+                onClick={() => router.push('/doctor/dashboard')}
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors"
+              >
+                Go to Dashboard
+              </button>
+
+            </div>
+
+            <div className="mt-6 text-center">
+
+              <p className="text-[15px] text-[#64748B]">
+                Need to log in again?{' '}
+
+                <a
+                  href="/auth/login"
+                  className="font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors"
+                >
+                  Sign In
+                </a>
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </div>
+    );
+  }
+
+  return null;
+}
