@@ -46,10 +46,32 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Request logging
-app.use((req, res, next) => {
+// Passwords and tokens are never logged (see ARCHITECTURE-ESSENTIALS.md section 41)
+const SENSITIVE_FIELDS = new Set([
+  'password',
+  'currentPassword',
+  'newPassword',
+  'confirmPassword',
+  'token',
+  'accessToken',
+  'refreshToken',
+  'authorization',
+]);
+
+function redactSensitiveValues(payload: Record<string, any>): Record<string, any> {
+  const redacted: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(payload)) {
+    redacted[key] = SENSITIVE_FIELDS.has(key) ? '[REDACTED]' : value;
+  }
+
+  return redacted;
+}
+
+app.use((req, _res, next) => {
   console.log(`🟢 ${req.method} ${req.path}`);
-  console.log(`🟢 Headers: ${JSON.stringify(req.headers)}`);
-  console.log(`🟢 Body: ${JSON.stringify(req.body)}`);
+  console.log(`🟢 Headers: ${JSON.stringify(redactSensitiveValues(req.headers))}`);
+  console.log(`🟢 Body: ${JSON.stringify(redactSensitiveValues(req.body || {}))}`);
   next();
 });
 

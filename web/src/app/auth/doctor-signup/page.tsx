@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { authApi } from '@/lib/api/authApi';
 
 type FieldName =
   | 'fullName'
@@ -46,17 +47,16 @@ const CONTACT_PATTERN = /^[0-9+\-\s()]{7,}$/;
 const PRC_PATTERN = /^\d{7}$/;
 
 /**
- * Prototype-only validation. This mirrors the field rules documented for doctor
- * accounts (password minimum length) but performs no PRC verification and no
- * backend registration.
+ * Client-side validation. The backend enforces the same rules, so this only
+ * exists to give immediate feedback before the request is sent.
  */
 function validateForm(values: FormValues): FormErrors {
   const errors: FormErrors = {};
 
   if (!values.fullName.trim()) {
     errors.fullName = 'Full name is required.';
-  } else if (values.fullName.trim().length < 2) {
-    errors.fullName = 'Full name must be at least 2 characters.';
+  } else if (values.fullName.trim().split(/\s+/).filter(Boolean).length < 2) {
+    errors.fullName = 'Enter your first and last name.';
   }
 
   if (!values.specialty.trim()) {
@@ -102,6 +102,26 @@ function validateForm(values: FormValues): FormErrors {
   }
 
   return errors;
+}
+
+/**
+ * The backend returns errors as `{ code, message }` while the API client types
+ * them as a string, so both shapes are handled here.
+ */
+function getApiErrorMessage(error: unknown): string {
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
+  }
+
+  return 'Unable to create your account right now. Please try again.';
 }
 
 /* Icons kept visually identical to the existing /auth/login page: 20px, 1.8 stroke. */
@@ -331,13 +351,7 @@ export default function DoctorSignUp() {
   const [values, setValues] = useState<FormValues>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const [status, setStatus] = useState<FormStatus>('idle');
-
-  // Prototype only: simulates submitting the request, then shows the success state.
-  useEffect(() => {
-    if (status !== 'submitting') return;
-    const timer = window.setTimeout(() => setStatus('success'), 900);
-    return () => window.clearTimeout(timer);
-  }, [status]);
+  const [serverError, setServerError] = useState('');
 
   const hasErrors = Object.keys(errors).length > 0;
 
@@ -351,8 +365,9 @@ export default function DoctorSignUp() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setServerError('');
 
     const nextErrors = validateForm(values);
     setErrors(nextErrors);
@@ -364,11 +379,31 @@ export default function DoctorSignUp() {
     }
 
     setStatus('submitting');
+
+    const response = await authApi.registerDoctor({
+      email: values.email.trim(),
+      password: values.password,
+      fullName: values.fullName.trim(),
+      specialty: values.specialty.trim(),
+      credentials: values.credentials.trim() || undefined,
+      prcLicenseNumber: values.prcLicenseNumber.trim(),
+      clinic: values.clinic.trim(),
+      contactNumber: values.contactNumber.trim() || undefined,
+    });
+
+    if (response.success) {
+      setStatus('success');
+      return;
+    }
+
+    setServerError(getApiErrorMessage(response.error));
+    setStatus('idle');
   };
 
   const handleBackToForm = () => {
     setValues(EMPTY_FORM);
     setErrors({});
+    setServerError('');
     setStatus('idle');
   };
 
@@ -394,19 +429,16 @@ export default function DoctorSignUp() {
           </div>
 
           {status === 'success' ? (
-            /* Prototype success state - no account is created */
+            /* Account created successfully */
             <div className="w-full rounded-2xl border border-[#E2E8F0] bg-white px-6 py-8 text-center shadow-sm">
               <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
                 <SuccessIcon />
               </div>
               <h1 className="text-[26px] font-black tracking-tight text-[#0D1829] mb-2 leading-tight">
-                Registration Complete
+                Account Created
               </h1>
               <p className="text-[15px] text-[#718096] font-normal leading-relaxed">
-                Your doctor account request has been submitted.
-              </p>
-              <p className="mt-3 text-[13px] text-[#8392A5] font-normal leading-relaxed">
-                Prototype screen only. No account was created, no data was saved, and no API request was made.
+                Your doctor account is ready. You can now sign in with your email and password.
               </p>
               <div className="mt-7 space-y-3">
                 <a
@@ -420,7 +452,7 @@ export default function DoctorSignUp() {
                   onClick={handleBackToForm}
                   className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl border border-[#E2E8F0] bg-white text-[16px] font-bold text-[#1967D2] hover:bg-[#F5F7FA] hover:text-[#0D3B75] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-colors duration-150"
                 >
-                  Back to Sign Up
+                  Register Another Doctor
                 </button>
               </div>
             </div>
@@ -444,10 +476,10 @@ export default function DoctorSignUp() {
                 </p>
 
                 {/* Error Message */}
-                {hasErrors && (
+                {(hasErrors || serverError) && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-2.5">
                     <AlertIcon />
-                    <span>Please correct the highlighted fields and try again.</span>
+                    <span>{serverError || 'Please correct the highlighted fields and try again.'}</span>
                   </div>
                 )}
 

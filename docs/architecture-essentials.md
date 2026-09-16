@@ -659,10 +659,12 @@ The web application provides role-specific dashboards for doctors, secretaries, 
 FiDo Web
 ├── Admin
 │   └── `/admin/login` → `/admin/dashboard`
-└── Doctor/Secretary
-    └── `/auth/login`
-        ├── Doctor → `/doctor/dashboard`
-        └── Secretary → `/secretary/dashboard`
+├── Doctor/Secretary
+│   └── `/auth/login`
+│       ├── Doctor → `/doctor/dashboard`
+│       └── Secretary → `/secretary/dashboard`
+└── Doctor Sign-Up (Self-Registration)
+    └── `/auth/doctor-signup` → creates account → `/auth/login`
 ```
 
 ### Authentication Rules
@@ -685,6 +687,21 @@ FiDo Web
 - Doctor users redirect to `/doctor/dashboard`
 - Secretary users redirect to `/secretary/dashboard`
 - Admin users are redirected to `/admin/login`
+
+### Doctor Sign-Up (Self-Registration)
+
+The doctor sign-up page at `/auth/doctor-signup` creates a doctor account:
+
+- Reached from the shared Doctor/Secretary login page at `/auth/login` through the "Create an Account" link.
+- Collects doctor information, contact information, and account security fields.
+- Uses the standard client pattern: the page calls the backend REST API at `POST /api/v1/auth/register/doctor` and never touches PostgreSQL directly.
+- Creates the `users` record and the `doctors` profile atomically in one database transaction.
+- Hashes the password with bcrypt; the plaintext password is never stored or logged.
+- Stores the PRC license number on the doctor profile and rejects duplicates.
+- Creates the doctor with `is_approved = true`, so the doctor appears in public doctor search immediately.
+- Does not verify PRC license numbers against an external registry.
+
+Administrator provisioning under Admin Account Provisioning remains available for accounts created on a doctor's behalf.
 
 ### Role-Based Protection
 
@@ -1082,6 +1099,8 @@ Log technical events without exposing sensitive information.
 32. Follow the architecture before introducing new patterns.
 
 33. When implementing features that modify requirements, update the relevant documentation (.md files) to keep implementation and documentation consistent.
+
+34. Doctor self-registration creates the `users` and `doctors` records in one transaction and auto-approves the doctor profile (`is_approved = true`).
 ```
 
 ---

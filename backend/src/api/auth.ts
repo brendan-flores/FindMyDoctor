@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { register, login, changePassword } from '../modules/auth/authService';
+import { register, registerDoctor, login, changePassword } from '../modules/auth/authService';
 import { success, error, ErrorCodes } from '../utils/response';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
@@ -52,6 +52,44 @@ router.post('/register', async (req: Request, res: Response) => {
     }
     
     res.status(500).json(error(errorCode, errorMessage));
+  }
+});
+
+// Register doctor (self-registration, auto-approved)
+router.post('/register/doctor', async (req: Request, res: Response) => {
+  try {
+    const { email, password, fullName, specialty, credentials, prcLicenseNumber, clinic, contactNumber } = req.body;
+
+    const result = await registerDoctor({
+      email,
+      password,
+      fullName,
+      specialty,
+      credentials,
+      prcLicenseNumber,
+      clinic,
+      contactNumber,
+    });
+
+    return res.status(201).json(success(result, 'Doctor account created successfully'));
+  } catch (err: any) {
+    const errorCode = err.code || ErrorCodes.SERVER_ERROR;
+    const errorMessage = err.message || 'Doctor registration failed';
+
+    if (errorCode === ErrorCodes.VALIDATION_ERROR) {
+      return res.status(400).json(error(errorCode, errorMessage));
+    }
+
+    if (errorCode === ErrorCodes.EMAIL_ALREADY_EXISTS || errorCode === ErrorCodes.CONFLICT) {
+      return res.status(409).json(error(errorCode, errorMessage));
+    }
+
+    // Unique constraint violation (email or PRC license number)
+    if (errorCode === '23505') {
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Email or PRC license number is already registered'));
+    }
+
+    return res.status(500).json(error(errorCode, errorMessage));
   }
 });
 

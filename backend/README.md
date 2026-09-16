@@ -110,6 +110,7 @@ npm run dev
 
 ### Authentication
 - `POST /api/v1/auth/register` - Register new user
+- `POST /api/v1/auth/register/doctor` - Register a doctor account (self-registration, auto-approved, no token required)
 - `POST /api/v1/auth/login` - Login
 - `POST /api/v1/auth/change-password` - Change password
 
@@ -357,6 +358,13 @@ CORS_ORIGIN=http://localhost:3000,http://localhost:8080
 ### Running Migrations
 ```bash
 npm run migrate
+```
+
+Additional migrations are applied individually:
+
+```bash
+npm run migrate:remove-clinics       # 003_remove_clinics.sql
+npm run migrate:doctor-registration  # 005_doctor_self_registration.sql
 ```
 
 ### Building for Production

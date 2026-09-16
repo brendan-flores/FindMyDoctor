@@ -16,6 +16,7 @@ web/
 +-- src/
 |   +-- app/              # Next.js app router pages
 |   |   +-- page.tsx      # Landing page with role selection
+|   |   +-- auth/         # Doctor/Secretary login and doctor self-registration
 |   |   +-- doctor/       # Doctor dashboard
 |   |   +-- secretary/   # Secretary dashboard
 |   |   +-- admin/        # Admin dashboard
