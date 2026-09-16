@@ -232,6 +232,19 @@ export default function AuthLogin() {
             </button>
           </div>
         </form>
+
+        {/* Sign Up Link */}
+        <div className="mt-6 text-center">
+          <p className="text-[15px] text-[#64748B] font-normal">
+            Don&apos;t have an account?{' '}
+            <a
+              href="/auth/doctor-signup"
+              className="font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors"
+            >
+              Create an Account
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );
