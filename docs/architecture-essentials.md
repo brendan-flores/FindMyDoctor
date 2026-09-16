@@ -50,6 +50,7 @@ PATIENT
 DOCTOR
 SECRETARY
 ADMIN
+SUPERADMIN
 ```
 
 Do not invent roles without changing the project requirements.
@@ -618,7 +619,7 @@ Do not bypass database integrity requirements.
 The architecture should support:
 
 ```text
-users
+users (including SUPERADMIN role)
 patients
 doctors
 secretaries
