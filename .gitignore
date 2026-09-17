@@ -60,6 +60,8 @@ web/node_modules/
 
 # Admin UI
 admin-ui/
+
+# User Mobile UI
 user-mobile-ui/
 
 # Backend specific
