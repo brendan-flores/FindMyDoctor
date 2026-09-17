@@ -16,6 +16,9 @@ const supabaseAdmin = config.supabase.url && config.supabase.serviceRoleKey
     )
   : null;
 
+console.log('Supabase initialized:', !!supabaseAdmin);
+console.log('Supabase URL:', config.supabase.url);
+
 /**
  * Send OTP to email for doctor signup
  * This uses Supabase's built-in email OTP functionality
@@ -26,19 +29,20 @@ export async function sendDoctorSignupOtp(email: string): Promise<{ success: boo
       throw { code: ErrorCodes.SERVER_ERROR, message: 'Supabase is not configured. Add the Supabase credentials to backend/.env.' };
     }
 
-    // Check if email is already registered in our system
-    // This check is done in the controller, but we add an extra layer here
-    
-    // Send OTP via Supabase Auth
-    const { data, error: supabaseError } = await supabaseAdmin.auth.admin.generateOtp({
+    console.log('Attempting to send OTP to:', email);
+    console.log('Supabase URL:', config.supabase.url);
+
+    // Send OTP via Supabase Auth using signInWithOtp (this actually sends emails)
+    const { data, error: supabaseError } = await supabaseAdmin.auth.signInWithOtp({
       email,
-      type: 'email',
       options: {
-        emailTemplate: 'doctor_signup_otp',
-        manageSession: false,
-        // OTP will be valid for 5 minutes (default Supabase setting)
+        emailRedirectTo: 'http://localhost:3001/auth/doctor-signup',
+        // This will send an email with an OTP code
       },
     });
+
+    console.log('Supabase response data:', data);
+    console.log('Supabase error:', supabaseError);
 
     if (supabaseError) {
       console.error('Supabase OTP error:', supabaseError);
@@ -58,6 +62,7 @@ export async function sendDoctorSignupOtp(email: string): Promise<{ success: boo
     // Supabase returns data with the OTP transaction details
     // The OTP is sent to the email automatically by Supabase
     console.log('OTP sent successfully to:', email);
+    console.log('OTP response:', data);
     
     return {
       success: true,
@@ -79,11 +84,8 @@ export async function verifyOtpToken(email: string, token: string): Promise<{ ve
       return { verified: false, error: 'Supabase is not configured' };
     }
 
-    // Verify the OTP by attempting to authenticate
-    // Note: In Supabase, the OTP verification happens when the user "logs in" with the magic link/OTP
-    // For our flow, we'll verify by checking if we can create a valid session
-    
-    const { data, error: supabaseError } = await supabaseAdmin.auth.admin.verifyOtp({
+    // Verify the OTP using Supabase's verifyOtp method
+    const { data, error: supabaseError } = await supabaseAdmin.auth.verifyOtp({
       email,
       token,
       type: 'email',
@@ -168,10 +170,16 @@ export async function deleteSupabaseUser(email: string): Promise<void> {
       return;
     }
 
-    const { data, error } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+    // First get the user by email using admin API
+    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
     
-    if (data && data.user) {
-      await supabaseAdmin.auth.admin.deleteUser(data.user.id);
+    if (userError) {
+      console.log('User not found in Supabase:', email);
+      return;
+    }
+
+    if (userData && userData.user) {
+      await supabaseAdmin.auth.admin.deleteUser(userData.user.id);
       console.log('Cleaned up Supabase user:', email);
     }
   } catch (err) {

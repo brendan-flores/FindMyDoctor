@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { sendDoctorSignupOtp, checkEmailVerificationStatus } from '../services/otpService';
+import { sendDoctorSignupOtp, verifyOtpToken, checkEmailVerificationStatus } from '../services/otpService';
 import { success, error, ErrorCodes } from '../utils/response';
 import { query, getClient } from '../database/connection';
 import bcrypt from 'bcryptjs';
@@ -54,6 +54,13 @@ router.post('/verify', async (req: Request, res: Response) => {
     if (nameParts.length < 2) {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Full name must include a first and last name'));
     }
+    
+    // Verify OTP with Supabase first
+    const otpVerification = await verifyOtpToken(email, otp);
+    if (!otpVerification.verified) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, otpVerification.error || 'Invalid or expired OTP code'));
+    }
+    
     const existingUser = await client.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       throw { code: ErrorCodes.EMAIL_ALREADY_EXISTS, message: 'Email already registered' };
