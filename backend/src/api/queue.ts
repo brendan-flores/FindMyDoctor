@@ -23,7 +23,7 @@ router.get('/:date', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMIN'), as
     const params = [date];
 
     if (doctorId) {
-      params.push(doctorId);
+      params.push(String(doctorId));
       queryText += ` AND q.doctor_id = $${params.length}`;
     }
 

@@ -132,7 +132,7 @@ router.get('/:id/capacity', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMI
 
     if (date) {
       queryText += ' AND date = $2';
-      params.push(date);
+      params.push(String(date));
     }
 
     queryText += ' ORDER BY date DESC LIMIT 30';
