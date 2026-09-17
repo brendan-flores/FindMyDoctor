@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../config';
-import { error, ErrorCodes } from '../utils/response';
+import { ErrorCodes } from '../utils/response';
 
 // Create Supabase admin client (using service role key for admin operations)
 const supabaseAdmin = config.supabase.url && config.supabase.serviceRoleKey
@@ -141,17 +141,23 @@ export async function checkEmailVerificationStatus(email: string): Promise<{ isV
       return { isVerified: false };
     }
 
-    const { data, error } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+    // Use listUsers to find user by email since getUserByEmail is not available
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers();
     
     if (error) {
       // User not found in Supabase means no OTP was sent
       return { isVerified: false };
     }
 
-    if (data && data.user) {
-      // Check if email is confirmed
-      const isConfirmed = data.user.email_confirmed_at !== null;
-      return { isVerified: isConfirmed };
+    if (data && data.users) {
+      // Find user by email
+      const user = data.users.find(u => u.email === email);
+      
+      if (user) {
+        // Check if email is confirmed
+        const isConfirmed = user.email_confirmed_at !== null;
+        return { isVerified: isConfirmed };
+      }
     }
 
     return { isVerified: false };
@@ -170,17 +176,22 @@ export async function deleteSupabaseUser(email: string): Promise<void> {
       return;
     }
 
-    // First get the user by email using admin API
-    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+    // Use listUsers to find user by email since getUserByEmail is not available
+    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.listUsers();
     
     if (userError) {
       console.log('User not found in Supabase:', email);
       return;
     }
 
-    if (userData && userData.user) {
-      await supabaseAdmin.auth.admin.deleteUser(userData.user.id);
-      console.log('Cleaned up Supabase user:', email);
+    if (userData && userData.users) {
+      // Find user by email
+      const user = userData.users.find(u => u.email === email);
+      
+      if (user) {
+        await supabaseAdmin.auth.admin.deleteUser(user.id);
+        console.log('Cleaned up Supabase user:', email);
+      }
     }
   } catch (err) {
     console.error('Error cleaning up Supabase user:', err);
