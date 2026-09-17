@@ -1,28 +1,30 @@
-import bcrypt from 'bcryptjs';
-import { query } from './connection';
+require('dotenv').config();
+const { Client } = require('pg');
+const bcrypt = require('bcryptjs');
 
-/**
- * Seed script for initial SuperAdmin and Admin accounts
- * This script is idempotent - running it multiple times will not create duplicate accounts
- */
+const client = new Client({
+  connectionString: process.env.DATABASE_URL
+});
 
-async function seedAdmin() {
+async function seedAdminAccounts() {
   try {
+    await client.connect();
+    console.log('✅ Connected to PostgreSQL database\n');
     console.log('🌱 Starting Admin account seed...');
 
     // Check if SuperAdmin already exists
-    const existingSuperAdmin = await query(
+    const existingSuperAdmin = await client.query(
       'SELECT id, email FROM users WHERE role = $1',
       ['SUPERADMIN']
     );
 
     if (existingSuperAdmin.rows.length === 0) {
       // Generate secure password hash for SuperAdmin
-      const superAdminPassword = 'SuperAdmin@FiDo2024'; // This should be changed immediately after first login
+      const superAdminPassword = 'SuperAdmin@FiDo2024';
       const superAdminPasswordHash = await bcrypt.hash(superAdminPassword, 10);
 
       // Create initial SuperAdmin account
-      const superAdminResult = await query(
+      const superAdminResult = await client.query(
         `INSERT INTO users (email, password_hash, role, is_active, must_change_password)
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (email) DO NOTHING
@@ -47,18 +49,18 @@ async function seedAdmin() {
     }
 
     // Check if regular Admin already exists
-    const existingAdmin = await query(
+    const existingAdmin = await client.query(
       'SELECT id, email FROM users WHERE role = $1 AND email != $2',
       ['ADMIN', 'superadmin@findmydoctor.local']
     );
 
     if (existingAdmin.rows.length === 0) {
       // Generate secure password hash for regular Admin
-      const adminPassword = 'Admin@FiDo2024'; // This should be changed immediately after first login
+      const adminPassword = 'Admin@FiDo2024';
       const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
 
       // Create initial regular Admin account
-      const adminResult = await query(
+      const adminResult = await client.query(
         `INSERT INTO users (email, password_hash, role, is_active, must_change_password)
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (email) DO NOTHING
@@ -82,23 +84,14 @@ async function seedAdmin() {
       console.log(`   ID: ${existingAdmin.rows[0].id}`);
     }
 
+    await client.end();
+    console.log('\n🎉 Admin seed completed successfully!');
+
   } catch (error) {
-    console.error('❌ Error seeding Admin accounts:', error);
-    throw error;
+    console.error('❌ Error seeding Admin accounts:', error.message);
+    await client.end();
+    process.exit(1);
   }
 }
 
-// Run seed if executed directly
-if (require.main === module) {
-  seedAdmin()
-    .then(() => {
-      console.log('🎉 Admin seed completed successfully!');
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('💥 Admin seed failed:', error);
-      process.exit(1);
-    });
-}
-
-export { seedAdmin };
+seedAdminAccounts();

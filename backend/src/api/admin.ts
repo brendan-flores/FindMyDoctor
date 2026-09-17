@@ -131,10 +131,12 @@ router.patch('/secretaries/:id/approve', authenticate, authorize('ADMIN'), async
   }
 });
 
-// Create additional Admin account (authorized Admin only)
-router.post('/admins', authenticate, authorize('ADMIN'), async (req: AuthRequest, res: Response) => {
+// Create additional Admin account (SUPERADMIN only)
+router.post('/admins', authenticate, authorize('SUPERADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { email, password } = req.body;
+
+    console.log('Creating admin account:', { email, role: 'ADMIN' });
 
     if (!email || !password) {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Email and password are required'));
@@ -142,18 +144,20 @@ router.post('/admins', authenticate, authorize('ADMIN'), async (req: AuthRequest
 
     // Check if email already exists
     const existingUser = await query(
-      'SELECT id FROM users WHERE email = $1',
+      'SELECT id, email, role FROM users WHERE email = $1',
       [email]
     );
 
     if (existingUser.rows.length > 0) {
+      console.log('Email already exists:', existingUser.rows[0]);
       return res.status(409).json(error(ErrorCodes.EMAIL_ALREADY_EXISTS, 'Email already registered'));
     }
 
     // Hash password securely
     const passwordHash = await bcrypt.hash(password, 10);
+    console.log('Password hashed successfully');
 
-    // Create Admin user
+    // Create Admin user (always ADMIN role)
     const userResult = await query(
       `INSERT INTO users (email, password_hash, role, is_active, must_change_password)
        VALUES ($1, $2, $3, $4, $5)
@@ -162,10 +166,96 @@ router.post('/admins', authenticate, authorize('ADMIN'), async (req: AuthRequest
     );
 
     const admin = userResult.rows[0];
+    console.log('Admin account created:', admin);
 
     res.status(201).json(success(admin, 'Admin account created successfully'));
   } catch (err: any) {
+    console.error('Error creating admin account:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create admin account'));
+  }
+});
+
+// Get all admin accounts (SUPERADMIN only) - excludes SUPERADMIN from list
+router.get('/admins', authenticate, authorize('SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await query(
+      `SELECT id, email, role, is_active, must_change_password, created_at 
+       FROM users 
+       WHERE role = 'ADMIN'
+       ORDER BY created_at DESC`
+    );
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch admin accounts'));
+  }
+});
+
+// Update admin account status (SUPERADMIN only)
+router.patch('/admins/:id', authenticate, authorize('SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { is_active } = req.body;
+
+    // Prevent SUPERADMIN from deactivating themselves
+    if (id === req.user.id && is_active === false) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot deactivate your own account'));
+    }
+
+    // Verify the target is an ADMIN account (not SUPERADMIN)
+    const targetUser = await query(
+      'SELECT role FROM users WHERE id = $1',
+      [id]
+    );
+
+    if (targetUser.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Admin account not found'));
+    }
+
+    if (targetUser.rows[0].role !== 'ADMIN') {
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Can only modify ADMIN accounts'));
+    }
+
+    await query(
+      "UPDATE users SET is_active = $1 WHERE id = $2",
+      [is_active, id]
+    );
+
+    res.json(success(null, 'Admin account updated successfully'));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update admin account'));
+  }
+});
+
+// Delete admin account (SUPERADMIN only)
+router.delete('/admins/:id', authenticate, authorize('SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Prevent SUPERADMIN from deleting themselves
+    if (id === req.user.id) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot delete your own account'));
+    }
+
+    // Verify the target is an ADMIN account (not SUPERADMIN)
+    const targetUser = await query(
+      'SELECT role FROM users WHERE id = $1',
+      [id]
+    );
+
+    if (targetUser.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Admin account not found'));
+    }
+
+    if (targetUser.rows[0].role !== 'ADMIN') {
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Can only delete ADMIN accounts'));
+    }
+
+    await query('DELETE FROM users WHERE id = $1', [id]);
+
+    res.json(success(null, 'Admin account deleted successfully'));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete admin account'));
   }
 });
 

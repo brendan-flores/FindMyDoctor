@@ -30,8 +30,8 @@ export default function AdminLogin() {
         // Set token in API client
         apiClient.setToken(response.data.accessToken);
 
-        // Verify backend-returned role is ADMIN
-        if (response.data.user.role === 'ADMIN') {
+        // Verify backend-returned role is ADMIN or SUPERADMIN
+        if (response.data.user.role === 'ADMIN' || response.data.user.role === 'SUPERADMIN') {
           router.push('/admin/dashboard');
         } else {
           setError('Access denied. Admin access required.');
