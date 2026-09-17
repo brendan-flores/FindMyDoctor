@@ -3,16 +3,18 @@ import { config } from '../config';
 import { error, ErrorCodes } from '../utils/response';
 
 // Create Supabase admin client (using service role key for admin operations)
-const supabaseAdmin = createClient(
-  config.supabase.url,
-  config.supabase.serviceRoleKey,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
+const supabaseAdmin = config.supabase.url && config.supabase.serviceRoleKey
+  ? createClient(
+      config.supabase.url,
+      config.supabase.serviceRoleKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    )
+  : null;
 
 /**
  * Send OTP to email for doctor signup
@@ -20,6 +22,10 @@ const supabaseAdmin = createClient(
  */
 export async function sendDoctorSignupOtp(email: string): Promise<{ success: boolean; message: string }> {
   try {
+    if (!supabaseAdmin) {
+      throw { code: ErrorCodes.SERVER_ERROR, message: 'Supabase is not configured. Add the Supabase credentials to backend/.env.' };
+    }
+
     // Check if email is already registered in our system
     // This check is done in the controller, but we add an extra layer here
     
@@ -69,6 +75,10 @@ export async function sendDoctorSignupOtp(email: string): Promise<{ success: boo
  */
 export async function verifyOtpToken(email: string, token: string): Promise<{ verified: boolean; error?: string }> {
   try {
+    if (!supabaseAdmin) {
+      return { verified: false, error: 'Supabase is not configured' };
+    }
+
     // Verify the OTP by attempting to authenticate
     // Note: In Supabase, the OTP verification happens when the user "logs in" with the magic link/OTP
     // For our flow, we'll verify by checking if we can create a valid session
@@ -125,6 +135,10 @@ export async function createSupabaseUser(email: string, userId: string): Promise
  */
 export async function checkEmailVerificationStatus(email: string): Promise<{ isVerified: boolean }> {
   try {
+    if (!supabaseAdmin) {
+      return { isVerified: false };
+    }
+
     const { data, error } = await supabaseAdmin.auth.admin.getUserByEmail(email);
     
     if (error) {
@@ -150,6 +164,10 @@ export async function checkEmailVerificationStatus(email: string): Promise<{ isV
  */
 export async function deleteSupabaseUser(email: string): Promise<void> {
   try {
+    if (!supabaseAdmin) {
+      return;
+    }
+
     const { data, error } = await supabaseAdmin.auth.admin.getUserByEmail(email);
     
     if (data && data.user) {
