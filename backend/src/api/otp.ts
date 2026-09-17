@@ -84,8 +84,8 @@ router.post('/verify', async (req: Request, res: Response) => {
       [user.id, firstName, lastName, specialty, credentials || null, licenseNumber, clinic, contactNumber || null, email]
     );
     await client.query('COMMIT');
-    const accessToken = jwt.sign({ id: user.id, email: user.email, role: user.role, mustChangePassword: user.must_change_password }, config.jwt.secret, { expiresIn: config.jwt.expiresIn as string });
-    const refreshToken = jwt.sign({ id: user.id, email: user.email }, config.jwt.secret, { expiresIn: config.jwt.refreshExpiresIn as string });
+    const accessToken = jwt.sign({ id: user.id, email: user.email, role: user.role, mustChangePassword: user.must_change_password }, config.jwt.secret, { expiresIn: config.jwt.expiresIn } as any);
+    const refreshToken = jwt.sign({ id: user.id, email: user.email }, config.jwt.secret, { expiresIn: config.jwt.refreshExpiresIn } as any);
     return res.status(201).json(success({ user: { id: user.id, email: user.email, role: user.role }, doctor: doctorResult.rows[0], accessToken, refreshToken }, 'Doctor account created and verified successfully'));
   } catch (err: any) {
     await client.query('ROLLBACK').catch(() => {});

@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query, getClient } from '../../database/connection';
 import { config } from '../../config';
-import { error, ErrorCodes } from '../../utils/response';
+import { ErrorCodes } from '../../utils/response';
 
 export interface RegisterData {
   email: string;
@@ -283,7 +283,7 @@ export function generateAccessToken(user: any) {
       mustChangePassword: user.must_change_password,
     },
     config.jwt.secret,
-    { expiresIn: config.jwt.expiresIn }
+    { expiresIn: config.jwt.expiresIn } as any
   );
 }
 
@@ -294,7 +294,7 @@ export function generateRefreshToken(user: any) {
       email: user.email,
     },
     config.jwt.secret,
-    { expiresIn: config.jwt.refreshExpiresIn }
+    { expiresIn: config.jwt.refreshExpiresIn } as any
   );
 }
 

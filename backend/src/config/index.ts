@@ -18,6 +18,10 @@ export const config = {
     secret: process.env.JWT_SECRET || 'your_super_secret_jwt_key',
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  } as {
+    secret: string;
+    expiresIn: string;
+    refreshExpiresIn: string;
   },
 
   // Application
