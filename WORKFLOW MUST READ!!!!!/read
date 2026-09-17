@@ -1,0 +1,55 @@
+Development Workflow Instructions
+
+Running the Application
+
+Always remember to run the backend first, then open a new terminal for each of the three.
+
+Backend:
+cd backend
+npm run dev
+
+Mobile:
+cd mobile
+flutter run
+
+Web:
+cd web
+npm run dev
+
+
+Branching
+
+1. First, go to the dev branch, then fetch and pull the latest changes using github application.
+
+2. If you are creating a new branch, the base branch must be dev.
+
+3. Branch names should use an appropriate prefix depending on the purpose:
+
+feature/ — new feature
+fix/ — bug fix
+refactor/ — code restructuring
+docs/ — documentation
+style/ — styling or formatting
+chore/ — maintenance/configuration
+test/ — tests
+perf/ — performance improvement
+hotfix/ — urgent fix
+
+Examples:
+feature/doctor-registration
+fix/appointment-status
+refactor/auth-service
+docs/update-documentation
+
+
+Changes to the Code
+
+1. Before making any changes, always prompt the AI:
+
+"Read all of the .md files inside the docs folder to know what to do, especially AGENTS.md."
+
+2. After finishing your assigned task, prompt the AI:
+
+"Read and perform GitHub_Desktop_Commit_Grouping_Instructions.md."
+
+3. The AI will provide the files that need to be CHECKED and UNCHECKED for each commit. Follow those instructions in GitHub Desktop, then use the provided commit message to commit and push your changes.
