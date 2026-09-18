@@ -825,7 +825,7 @@ The system shall provide relevant application notifications.
 
 Administrators shall be able to approve/reject doctors.
 
-Doctors who complete self-registration and email OTP verification are created with PENDING status and must wait for administrator approval before accessing the system. Administrators can view pending doctors through the Admin Doctors page, review complete doctor information, and either approve (setting status to ACTIVE) or reject (setting status to REJECTED) the registration. Only ACTIVE doctors can log in and access the Doctor Dashboard.
+Doctors who complete self-registration and email OTP verification are created with `approval_status = 'PENDING'` and `is_approved = false`, and must wait for administrator approval before accessing the system. Administrators can view pending doctors through the Admin Doctors page, review complete doctor information, and either approve (setting `approval_status = 'ACTIVE'` and `is_approved = true`) or reject (setting `approval_status = 'REJECTED'` and `is_approved = false`) the registration. Only ACTIVE doctors can log in and access the Doctor Dashboard.
 
 ## FR-041 — Secretary Management
 
@@ -1067,7 +1067,7 @@ Patient Views Professional Details
 - Authorized patient information.
 - Consultation history.
 - Prescription creation.
-- Self-registration (account created and approved immediately).
+- Self-registration (account created with PENDING status, requires admin approval).
 
 ### Secretary
 
@@ -1191,9 +1191,10 @@ The doctor sign-up page at `/auth/doctor-signup` allows a doctor to create an ac
 - Passwords are hashed with bcrypt before storage and are never stored or logged in plaintext.
 - The PRC license number is stored on the doctor profile and may only be registered once.
 - Email address and PRC license number must be unique; duplicates are rejected.
-- Self-registered doctors are approved immediately (`is_approved = true`) and therefore appear in the public doctor search.
+- Self-registered doctors are created with `approval_status = 'PENDING'` and `is_approved = false`, requiring administrator approval before they can access the system.
+- The doctor sees a "Registration Submitted Successfully" message after OTP verification and cannot log in until an administrator approves the account.
 - PRC license numbers are recorded but are not verified against a PRC registry; PRC verification remains out of scope.
-- A successful verification returns the PostgreSQL-issued JWT and takes the doctor to `/doctor/dashboard`.
+- A successful verification returns a success message and directs the doctor to wait for admin approval.
 
 Administrator-provisioned doctor accounts remain available for accounts created on a doctor's behalf.
 

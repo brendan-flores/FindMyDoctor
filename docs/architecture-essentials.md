@@ -621,7 +621,7 @@ The architecture should support:
 ```text
 users (including SUPERADMIN role)
 patients
-doctors
+doctors (with approval_status: PENDING, ACTIVE, REJECTED)
 secretaries
 
 doctor_schedules
@@ -646,6 +646,8 @@ ai_messages
 
 waitlists
 notifications
+
+pending_doctor_signups (for OTP staging)
 ```
 
 ---
@@ -717,11 +719,12 @@ After a doctor completes self-registration and email OTP verification:
 - The doctor cannot log in or access the Doctor Dashboard while in PENDING status.
 - Administrators can view pending doctors through the Admin Doctors page at `/admin/doctors`.
 - Administrators can review complete doctor information and either:
-  - Approve the doctor: Sets `approval_status = 'ACTIVE'`, allowing the doctor to log in and access the Doctor Dashboard.
-  - Reject the doctor: Sets `approval_status = 'REJECTED'`, permanently blocking login access.
+  - Approve the doctor: Sets `approval_status = 'ACTIVE'` and `is_approved = true`, allowing the doctor to log in and access the Doctor Dashboard.
+  - Reject the doctor: Sets `approval_status = 'REJECTED'` and `is_approved = false`, permanently blocking login access.
 - Only users with `role = ADMIN` can approve or reject doctor accounts.
 - The public doctor search (`GET /api/v1/doctors`) only returns doctors with `approval_status = 'ACTIVE'`.
 - Login attempts by PENDING or REJECTED doctors are blocked with appropriate error messages.
+- The backend API includes endpoints for doctor approval: `PATCH /api/v1/admin/doctors/:id/approve` and `PATCH /api/v1/admin/doctors/:id/reject`.
 
 `POST /api/v1/auth/register/doctor` remains available for Administrator-provisioned doctor accounts, but the self-registration page no longer uses it.
 
@@ -1124,7 +1127,7 @@ Log technical events without exposing sensitive information.
 
 33. When implementing features that modify requirements, update the relevant documentation (.md files) to keep implementation and documentation consistent.
 
-34. Doctor self-registration creates the `users` and `doctors` records in one transaction and auto-approves the doctor profile (`is_approved = true`).
+34. Doctor self-registration creates the `users` and `doctors` records in one transaction with `approval_status = 'PENDING'`, requiring administrator approval before the doctor can access the system.
 ```
 
 ---
