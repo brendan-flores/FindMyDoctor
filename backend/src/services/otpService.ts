@@ -2,6 +2,14 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from '../config';
 import { ErrorCodes } from '../utils/response';
 
+/*
+ * Supabase is used ONLY as the email OTP service for doctor sign-up.
+ *
+ * It never stores the doctor's application account, credentials or profile data.
+ * The doctor account (`users`) and doctor profile (`doctors`) are created in
+ * PostgreSQL, and only after the OTP has been verified here.
+ */
+
 // Create Supabase admin client (using service role key for admin operations)
 const supabaseAdmin = config.supabase.url && config.supabase.serviceRoleKey
   ? createClient(
@@ -21,7 +29,9 @@ console.log('Supabase URL:', config.supabase.url);
 
 /**
  * Send OTP to email for doctor signup
- * This uses Supabase's built-in email OTP functionality
+ *
+ * Supabase only sends the verification email. It does not create the doctor's
+ * application account - that happens in PostgreSQL after verification succeeds.
  */
 export async function sendDoctorSignupOtp(email: string): Promise<{ success: boolean; message: string }> {
   try {
@@ -76,7 +86,10 @@ export async function sendDoctorSignupOtp(email: string): Promise<{ success: boo
 
 /**
  * Verify OTP token from Supabase
- * This verifies that the OTP was valid and creates a session
+ *
+ * This only verifies the OTP that Supabase emailed to the doctor. The Supabase
+ * session it returns is intentionally discarded: the doctor authenticates with
+ * the PostgreSQL-backed application account, not with Supabase Auth.
  */
 export async function verifyOtpToken(email: string, token: string): Promise<{ verified: boolean; error?: string }> {
   try {
@@ -114,25 +127,6 @@ export async function verifyOtpToken(email: string, token: string): Promise<{ ve
 }
 
 /**
- * Create a user in Supabase Auth (for managing users)
- * This is used to create the user in Supabase after our backend creates them
- */
-export async function createSupabaseUser(email: string, userId: string): Promise<void> {
-  try {
-    // We don't actually create the user in Supabase Auth for this flow
-    // The OTP verification already creates a temporary user in Supabase
-    // We just need to track that the user has been verified
-    
-    // Note: For our hybrid approach, we rely on the OTP flow for email verification
-    // and our backend for actual user management
-    console.log('User verification tracked for:', email, 'with backend user ID:', userId);
-  } catch (err) {
-    console.error('Error creating Supabase user:', err);
-    // Non-fatal error - our backend user creation is the source of truth
-  }
-}
-
-/**
  * Check if email has a valid OTP session
  */
 export async function checkEmailVerificationStatus(email: string): Promise<{ isVerified: boolean }> {
@@ -164,37 +158,5 @@ export async function checkEmailVerificationStatus(email: string): Promise<{ isV
   } catch (err) {
     console.error('Error checking verification status:', err);
     return { isVerified: false };
-  }
-}
-
-/**
- * Delete a user from Supabase Auth (cleanup for failed registrations)
- */
-export async function deleteSupabaseUser(email: string): Promise<void> {
-  try {
-    if (!supabaseAdmin) {
-      return;
-    }
-
-    // Use listUsers to find user by email since getUserByEmail is not available
-    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (userError) {
-      console.log('User not found in Supabase:', email);
-      return;
-    }
-
-    if (userData && userData.users) {
-      // Find user by email
-      const user = userData.users.find(u => u.email === email);
-      
-      if (user) {
-        await supabaseAdmin.auth.admin.deleteUser(user.id);
-        console.log('Cleaned up Supabase user:', email);
-      }
-    }
-  } catch (err) {
-    console.error('Error cleaning up Supabase user:', err);
-    // Non-fatal - cleanup is best-effort
   }
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { supabase } from '@/lib/supabase';
+import { otpApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
 
 type Step = 'signup' | 'otp' | 'success';
@@ -11,6 +11,7 @@ type FormStatus = 'idle' | 'loading';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_PATTERN = /^\d{6}$/;
+const PRC_LICENSE_PATTERN = /^\d{7}$/;
 
 export default function DoctorSignupOtp() {
   const router = useRouter();
@@ -142,6 +143,10 @@ export default function DoctorSignupOtp() {
       return 'PRC License Number is required.';
     }
 
+    if (!PRC_LICENSE_PATTERN.test(formData.prcLicenseNumber.trim())) {
+      return 'PRC License Number must be 7 digits.';
+    }
+
     if (!formData.clinic.trim()) {
       return 'Clinic is required.';
     }
@@ -150,8 +155,8 @@ export default function DoctorSignupOtp() {
       return 'Password is required.';
     }
 
-    if (formData.password.length < 6) {
-      return 'Password must be at least 6 characters.';
+    if (formData.password.length < 8) {
+      return 'Password must be at least 8 characters.';
     }
 
     if (!formData.confirmPassword) {
@@ -261,8 +266,11 @@ export default function DoctorSignupOtp() {
 
   /*
    * ============================================================
-   * CREATE SUPABASE ACCOUNT + SEND OTP
+   * VALIDATE FORM + SEND OTP
    * ============================================================
+   * The form is validated first and the sign-up data is staged
+   * server-side (PostgreSQL). Supabase is only used to email the OTP.
+   * No doctor account is created at this step.
    */
 
   const handleSignupSubmit = async (
@@ -283,41 +291,31 @@ export default function DoctorSignupOtp() {
     setEmailStatus('loading');
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const response = await otpApi.sendOtp({
         email: email.trim(),
+        fullName: formData.fullName.trim(),
+        contactNumber: formData.contactNumber.trim(),
+        specialty: formData.specialty.trim(),
+        credentials: formData.credentials.trim(),
+        prcLicenseNumber: formData.prcLicenseNumber.trim(),
+        clinic: formData.clinic.trim(),
         password: formData.password,
-
-        options: {
-          data: {
-            role: 'doctor',
-            full_name: formData.fullName.trim(),
-            contact_number: formData.contactNumber.trim(),
-            specialty: formData.specialty.trim(),
-            credentials: formData.credentials.trim(),
-            prc_license_number: formData.prcLicenseNumber.trim(),
-            clinic: formData.clinic.trim(),
-          },
-        },
+        confirmPassword: formData.confirmPassword,
       });
 
-      if (error) {
-        console.error('Supabase signup error:', error);
-        setFormError(error.message);
-        setEmailStatus('idle');
-        return;
-      }
-
-      if (!data.user) {
+      if (!response.success) {
         setFormError(
-          'The account could not be created. Please try again.'
+          response.error ||
+            'Unable to send the verification code. Please try again.'
         );
+
         setEmailStatus('idle');
         return;
       }
 
       /*
-       * Confirm email is enabled in Supabase.
-       * Supabase now sends the confirmation OTP.
+       * The OTP was sent by Supabase. The doctor account is created in
+       * PostgreSQL only after the code is verified.
        */
 
       setOtp(['', '', '', '', '', '']);
@@ -332,7 +330,7 @@ export default function DoctorSignupOtp() {
       console.error('Signup error:', error);
 
       setFormError(
-        'Unable to create the account. Please try again.'
+        'Unable to send the verification code. Please try again.'
       );
 
       setEmailStatus('idle');
@@ -343,6 +341,15 @@ export default function DoctorSignupOtp() {
    * ============================================================
    * VERIFY OTP
    * ============================================================
+   */
+
+  /*
+   * ============================================================
+   * VERIFY OTP + CREATE POSTGRESQL ACCOUNT
+   * ============================================================
+   * The OTP is verified by the backend through Supabase. The
+   * PostgreSQL doctor account is created only when verification
+   * succeeds, and the backend returns the application JWT.
    */
 
   const handleOtpSubmit = async (
@@ -369,23 +376,14 @@ export default function DoctorSignupOtp() {
     setOtpStatus('loading');
 
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
+      const response = await otpApi.verifyOtp({
         email: email.trim(),
-        token: getOtpValue(),
-        type: 'email',
+        otp: getOtpValue(),
       });
 
-      if (error) {
-        console.error('Supabase OTP verification error:', error);
-
-        setOtpError(error.message);
-        setOtpStatus('idle');
-        return;
-      }
-
-      if (!data.user || !data.session) {
+      if (!response.success || !response.data) {
         setOtpError(
-          'Email verification succeeded, but no login session was created.'
+          response.error || 'Invalid or expired OTP code.'
         );
 
         setOtpStatus('idle');
@@ -393,36 +391,26 @@ export default function DoctorSignupOtp() {
       }
 
       /*
-       * Store the Supabase session.
+       * The backend verified the OTP and created the doctor account in
+       * PostgreSQL. Store the application tokens used for authentication.
        */
 
-      localStorage.setItem(
-        'token',
-        data.session.access_token
-      );
+      const { accessToken, refreshToken, user } = response.data;
 
-      if (data.session.refresh_token) {
-        localStorage.setItem(
-          'refreshToken',
-          data.session.refresh_token
-        );
+      localStorage.setItem('token', accessToken);
+
+      if (refreshToken) {
+        localStorage.setItem('refreshToken', refreshToken);
       }
 
-      localStorage.setItem(
-        'user',
-        JSON.stringify(data.user)
-      );
+      localStorage.setItem('user', JSON.stringify(user));
 
-      /*
-       * Keep your existing API client synchronized.
-       */
-
-      apiClient.setToken(data.session.access_token);
+      apiClient.setToken(accessToken);
 
       setSuccessData({
-        id: data.user.id,
-        email: data.user.email || email.trim(),
-        role: 'doctor',
+        id: user.id,
+        email: user.email,
+        role: user.role,
       });
 
       setStep('success');
@@ -453,15 +441,14 @@ export default function DoctorSignupOtp() {
     setEmailStatus('loading');
 
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email.trim(),
-      });
+      const response = await otpApi.resendOtp(email.trim());
 
-      if (error) {
-        console.error('Supabase resend error:', error);
+      if (!response.success) {
+        setOtpError(
+          response.error ||
+            'Failed to resend the verification code. Please try again.'
+        );
 
-        setOtpError(error.message);
         setEmailStatus('idle');
         return;
       }

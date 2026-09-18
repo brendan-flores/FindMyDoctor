@@ -10,6 +10,7 @@
     "migrate": "tsx src/database/migrate.ts",
     "migrate:remove-clinics": "tsx src/database/removeClinics.ts",
     "migrate:doctor-registration": "tsx src/database/applyDoctorRegistration.ts",
+    "migrate:doctor-signup-otp": "tsx src/database/applyDoctorSignupOtp.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",
