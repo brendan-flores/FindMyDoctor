@@ -3,7 +3,6 @@ import { sendDoctorSignupOtp, verifyOtpToken, checkEmailVerificationStatus } fro
 import { success, error, ErrorCodes } from '../utils/response';
 import { query, getClient } from '../database/connection';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { config } from '../config';
 
 /*
@@ -288,11 +287,11 @@ router.post('/verify', async (req: Request, res: Response) => {
     const doctorResult = await client.query(
       `INSERT INTO doctors (
          user_id, first_name, last_name, specialty, credentials,
-         prc_license_number, practice_name, practice_phone, practice_email, is_approved
+         prc_license_number, practice_name, practice_phone, practice_email, is_approved, approval_status
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, 'PENDING')
        RETURNING id, first_name, last_name, specialty, credentials, prc_license_number,
-                 practice_name, practice_phone, practice_email, is_approved, created_at`,
+                 practice_name, practice_phone, practice_email, is_approved, approval_status, created_at`,
       [
         user.id,
         pending.first_name,
@@ -311,28 +310,14 @@ router.post('/verify', async (req: Request, res: Response) => {
 
     await client.query('COMMIT');
 
-    // The doctor authenticates with the PostgreSQL account, not Supabase Auth
-    const accessToken = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, mustChangePassword: user.must_change_password },
-      config.jwt.secret,
-      { expiresIn: config.jwt.expiresIn } as any
-    );
-
-    const refreshToken = jwt.sign(
-      { id: user.id, email: user.email },
-      config.jwt.secret,
-      { expiresIn: config.jwt.refreshExpiresIn } as any
-    );
-
+    // Return success message - doctor must wait for admin approval
     return res.status(201).json(
       success(
         {
           user: { id: user.id, email: user.email, role: user.role },
           doctor: doctorResult.rows[0],
-          accessToken,
-          refreshToken,
         },
-        'Doctor account created and verified successfully'
+        'Doctor account created successfully. Your registration is pending administrator approval.'
       )
     );
   } catch (err: any) {

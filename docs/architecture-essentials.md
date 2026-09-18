@@ -704,9 +704,24 @@ The doctor sign-up page at `/auth/doctor-signup` creates a doctor account:
 - Field mapping: `fullName` is split into `first_name` and `last_name`, `clinic` maps to `practice_name`, `contactNumber` maps to `practice_phone`, and `email` is also stored as `practice_email`.
 - The PRC license number is stored in `doctors.prc_license_number`, added by migration `005_doctor_self_registration.sql`, and enforced unique by a partial unique index.
 - `practice_address` and the practice coordinates default to empty/zero, so a doctor can register before supplying a practice location.
-- Registered doctors are created with `is_approved = true`, so they are immediately returned by the public `GET /api/v1/doctors` search.
-- Duplicate email or PRC license number returns `409`. A successful verification returns the PostgreSQL-issued JWT and takes the doctor to `/doctor/dashboard`.
+- Registered doctors are created with `approval_status = 'PENDING'`, so they must wait for administrator approval before accessing the system.
+- The doctor sees a "Registration Submitted Successfully" message after OTP verification and cannot log in until an administrator approves the account.
+- Duplicate email or PRC license number returns `409`. A successful verification returns a success message and directs the doctor to wait for admin approval.
 - PostgreSQL is the single source of truth for doctor accounts, credentials and profile data. Supabase never stores the doctor's application account - it only sends and verifies the email OTP.
+
+### Doctor Approval Workflow
+
+After a doctor completes self-registration and email OTP verification:
+
+- The doctor account is created with `approval_status = 'PENDING'`.
+- The doctor cannot log in or access the Doctor Dashboard while in PENDING status.
+- Administrators can view pending doctors through the Admin Doctors page at `/admin/doctors`.
+- Administrators can review complete doctor information and either:
+  - Approve the doctor: Sets `approval_status = 'ACTIVE'`, allowing the doctor to log in and access the Doctor Dashboard.
+  - Reject the doctor: Sets `approval_status = 'REJECTED'`, permanently blocking login access.
+- Only users with `role = ADMIN` can approve or reject doctor accounts.
+- The public doctor search (`GET /api/v1/doctors`) only returns doctors with `approval_status = 'ACTIVE'`.
+- Login attempts by PENDING or REJECTED doctors are blocked with appropriate error messages.
 
 `POST /api/v1/auth/register/doctor` remains available for Administrator-provisioned doctor accounts, but the self-registration page no longer uses it.
 

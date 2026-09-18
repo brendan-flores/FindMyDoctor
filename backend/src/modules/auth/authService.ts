@@ -106,6 +106,32 @@ export async function login(data: LoginData) {
     throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' };
   }
 
+  // Check doctor approval status
+  if (user.role === 'DOCTOR') {
+    const doctorResult = await query(
+      'SELECT approval_status FROM doctors WHERE user_id = $1',
+      [user.id]
+    );
+    
+    if (doctorResult.rows.length > 0) {
+      const approvalStatus = doctorResult.rows[0].approval_status;
+      
+      if (approvalStatus === 'PENDING') {
+        throw { 
+          code: ErrorCodes.DOCTOR_PENDING_APPROVAL, 
+          message: 'Your account is awaiting administrator approval' 
+        };
+      }
+      
+      if (approvalStatus === 'REJECTED') {
+        throw { 
+          code: ErrorCodes.DOCTOR_REJECTED, 
+          message: 'Your doctor account has not been approved and you cannot sign in' 
+        };
+      }
+    }
+  }
+
   // Generate tokens
   const accessToken = generateAccessToken(user);
   const refreshToken = generateRefreshToken(user);

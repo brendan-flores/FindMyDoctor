@@ -10,6 +10,8 @@ export default function DoctorManagement() {
   const [specialtyFilter, setSpecialtyFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   useEffect(() => {
     loadDoctors();
@@ -31,13 +33,48 @@ export default function DoctorManagement() {
   };
 
   const handleApproveDoctor = async (doctorId: string) => {
+    if (!confirm('Are you sure you want to approve this doctor account? Once confirmed, the doctor will be authorized to sign in and access the Doctor Dashboard.')) {
+      return;
+    }
+    
     try {
       const response = await adminApi.approveDoctor(doctorId);
       if (response.success) {
         loadDoctors();
+        setShowDetailModal(false);
       }
     } catch (error) {
       console.error('Failed to approve doctor:', error);
+    }
+  };
+
+  const handleViewDoctor = async (doctorId: string) => {
+    try {
+      const response = await adminApi.getDoctorById(doctorId);
+      if (response.success && response.data) {
+        setSelectedDoctor(response.data);
+        setShowDetailModal(true);
+      }
+    } catch (error) {
+      console.error('Failed to fetch doctor details:', error);
+    }
+  };
+
+  const handleRejectDoctor = async (doctorId: string) => {
+    const reason = prompt('Reason for rejection (optional):');
+    
+    if (!confirm('Are you sure you want to reject this doctor registration? The doctor will not be authorized to sign in.')) {
+      return;
+    }
+    
+    try {
+      const response = await adminApi.rejectDoctor(doctorId, reason || '');
+      if (response.success) {
+        loadDoctors();
+        setShowDetailModal(false);
+      }
+    } catch (error) {
+      console.error('Failed to reject doctor:', error);
     }
   };
 
@@ -47,15 +84,17 @@ export default function DoctorManagement() {
       .includes(searchTerm.toLowerCase());
     const matchesSpecialty = specialtyFilter === 'all' || doctor.specialty === specialtyFilter;
     const matchesStatus = statusFilter === 'all' ||
-      (statusFilter === 'Active' && doctor.isApproved) ||
-      (statusFilter === 'Inactive' && !doctor.isApproved);
+      (statusFilter === 'Active' && doctor.approvalStatus === 'ACTIVE') ||
+      (statusFilter === 'Pending' && doctor.approvalStatus === 'PENDING') ||
+      (statusFilter === 'Rejected' && doctor.approvalStatus === 'REJECTED');
     return matchesSearch && matchesSpecialty && matchesStatus;
   });
 
   const stats = {
     total: doctors.length,
-    active: doctors.filter(d => d.isApproved).length,
-    inactive: doctors.filter(d => !d.isApproved).length,
+    active: doctors.filter(d => d.approvalStatus === 'ACTIVE').length,
+    pending: doctors.filter(d => d.approvalStatus === 'PENDING').length,
+    rejected: doctors.filter(d => d.approvalStatus === 'REJECTED').length,
   };
 
   // Get unique specialties for filter dropdown
@@ -94,7 +133,7 @@ export default function DoctorManagement() {
       </div>
 
       {/* Summary Metric Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: TOTAL PHYSICIANS */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 transition-all">
           <div className="flex items-center gap-3.5">
@@ -128,19 +167,35 @@ export default function DoctorManagement() {
           </span>
         </div>
 
-        {/* Card 3: INACTIVE / SUSPENDED */}
+        {/* Card 3: PENDING APPROVAL */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-amber-300 transition-all">
           <div className="flex items-center gap-3.5">
             <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[22px]">pause_circle</span>
+              <span className="material-symbols-outlined text-[22px]">schedule</span>
             </div>
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">INACTIVE / SUSPENDED</div>
-              <div className="text-2xl font-bold text-amber-700 mt-0.5">{stats.inactive} Inactive</div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">PENDING APPROVAL</div>
+              <div className="text-2xl font-bold text-amber-700 mt-0.5">{stats.pending} Pending</div>
             </div>
           </div>
           <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-            <span className="material-symbols-outlined text-[14px]">warning</span> Action Required
+            <span className="material-symbols-outlined text-[14px]">pending</span> Awaiting Review
+          </span>
+        </div>
+
+        {/* Card 4: REJECTED */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-red-300 transition-all">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[22px]">cancel</span>
+            </div>
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">REJECTED</div>
+              <div className="text-2xl font-bold text-red-700 mt-0.5">{stats.rejected} Rejected</div>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">
+            <span className="material-symbols-outlined text-[14px]">block</span> Not Approved
           </span>
         </div>
       </div>
@@ -188,7 +243,8 @@ export default function DoctorManagement() {
             >
               <option value="all">All Statuses</option>
               <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
+              <option value="Pending">Pending</option>
+              <option value="Rejected">Rejected</option>
             </select>
           </div>
         </div>
@@ -244,29 +300,29 @@ export default function DoctorManagement() {
                       )}
                     </td>
                     <td className="px-5 py-4">
-                      {doctor.isApproved ? (
+                      {doctor.approvalStatus === 'ACTIVE' ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                           Active
                         </span>
-                      ) : (
+                      ) : doctor.approvalStatus === 'PENDING' ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                          <span className="material-symbols-outlined text-[14px]">warning</span>
+                          <span className="material-symbols-outlined text-[14px]">schedule</span>
                           Pending
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                          <span className="material-symbols-outlined text-[14px]">cancel</span>
+                          Rejected
                         </span>
                       )}
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        {!doctor.isApproved && (
-                          <button
-                            onClick={() => handleApproveDoctor(doctor.id)}
-                            className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
-                          >
-                            Approve
-                          </button>
-                        )}
-                        <button className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors">
+                        <button 
+                          onClick={() => handleViewDoctor(doctor.id)}
+                          className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+                        >
                           View
                         </button>
                       </div>
@@ -279,28 +335,84 @@ export default function DoctorManagement() {
         </div>
       </div>
 
-      {/* Create Doctor Modal */}
-      {showCreateModal && (
+      {/* Doctor Detail Modal */}
+      {showDetailModal && selectedDoctor && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-slate-200">
-              <h2 className="text-lg font-bold text-slate-900">Add New Doctor</h2>
-              <p className="text-sm text-slate-500 mt-1">Create a new doctor account with practice information</p>
+              <h2 className="text-lg font-bold text-slate-900">Doctor Details</h2>
             </div>
-            <div className="p-6">
-              <p className="text-sm text-slate-600">Doctor creation form would go here.</p>
-              <p className="text-xs text-slate-400 mt-2">Note: This requires a dedicated backend endpoint for creating doctor profiles with practice information.</p>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-500">Name</label>
+                <p className="text-sm text-slate-900">{selectedDoctor.firstName} {selectedDoctor.lastName}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500">Email</label>
+                <p className="text-sm text-slate-900">{selectedDoctor.email}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500">Email Verified</label>
+                <p className="text-sm text-slate-900">{selectedDoctor.emailVerified ? 'Yes' : 'No'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500">Specialty</label>
+                <p className="text-sm text-slate-900">{selectedDoctor.specialty}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500">Credentials</label>
+                <p className="text-sm text-slate-900">{selectedDoctor.credentials || 'N/A'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500">PRC License Number</label>
+                <p className="text-sm text-slate-900">{selectedDoctor.prcLicenseNumber}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500">Practice Name</label>
+                <p className="text-sm text-slate-900">{selectedDoctor.practiceName || 'N/A'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500">Practice Address</label>
+                <p className="text-sm text-slate-900">{selectedDoctor.practiceAddress || 'N/A'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500">Practice Phone</label>
+                <p className="text-sm text-slate-900">{selectedDoctor.practicePhone || 'N/A'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500">Status</label>
+                <p className="text-sm text-slate-900">{selectedDoctor.approvalStatus}</p>
+              </div>
+              {selectedDoctor.rejectionReason && (
+                <div>
+                  <label className="text-xs font-semibold text-slate-500">Rejection Reason</label>
+                  <p className="text-sm text-slate-900">{selectedDoctor.rejectionReason}</p>
+                </div>
+              )}
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-slate-200 flex justify-between gap-3">
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => setShowDetailModal(false)}
                 className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
               >
-                Cancel
+                Close
               </button>
-              <button className="px-4 py-2 text-sm font-semibold text-white bg-[#1b5eb8] hover:bg-[#14468f] rounded-lg transition-colors">
-                Create Doctor
-              </button>
+              {selectedDoctor.approvalStatus === 'PENDING' && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleRejectDoctor(selectedDoctor.id)}
+                    className="px-4 py-2 text-sm font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    onClick={() => handleApproveDoctor(selectedDoctor.id)}
+                    className="px-4 py-2 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
+                  >
+                    Confirm Doctor
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

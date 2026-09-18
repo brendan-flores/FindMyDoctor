@@ -18,6 +18,7 @@ export interface Doctor {
   credentials?: string;
   prcLicenseNumber: string;
   isApproved: boolean;
+  approvalStatus?: 'PENDING' | 'ACTIVE' | 'REJECTED';
   practiceName?: string;
   practiceAddress?: string;
   practiceLatitude?: number;
@@ -28,6 +29,9 @@ export interface Doctor {
   operatingHoursStart?: string;
   operatingHoursEnd?: string;
   gcashQrCodeUrl?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  rejectionReason?: string;
   createdAt?: string;
 }
 
@@ -73,6 +77,14 @@ export const adminApi = {
 
   approveDoctor: async (doctorId: string) => {
     return apiClient.patch<{ doctor: Doctor }>(`/admin/doctors/${doctorId}/approve`, {});
+  },
+
+  getDoctorById: async (doctorId: string) => {
+    return apiClient.get<Doctor>(`/admin/doctors/${doctorId}`);
+  },
+
+  rejectDoctor: async (doctorId: string, reason: string) => {
+    return apiClient.patch(`/admin/doctors/${doctorId}/reject`, { reason });
   },
 
   // Secretary Management

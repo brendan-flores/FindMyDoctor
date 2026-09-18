@@ -825,6 +825,8 @@ The system shall provide relevant application notifications.
 
 Administrators shall be able to approve/reject doctors.
 
+Doctors who complete self-registration and email OTP verification are created with PENDING status and must wait for administrator approval before accessing the system. Administrators can view pending doctors through the Admin Doctors page, review complete doctor information, and either approve (setting status to ACTIVE) or reject (setting status to REJECTED) the registration. Only ACTIVE doctors can log in and access the Doctor Dashboard.
+
 ## FR-041 — Secretary Management
 
 Administrators shall be able to manage secretary accounts.

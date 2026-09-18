@@ -48,12 +48,6 @@ export default function DoctorSignupOtp() {
 
   const [otpExpiresIn, setOtpExpiresIn] = useState(600);
 
-  const [successData, setSuccessData] = useState<{
-    id: string;
-    email: string;
-    role: string;
-  } | null>(null);
-
   // Container ref for scroll handling
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -392,26 +386,8 @@ export default function DoctorSignupOtp() {
 
       /*
        * The backend verified the OTP and created the doctor account in
-       * PostgreSQL. Store the application tokens used for authentication.
+       * PostgreSQL with PENDING status. Doctor must wait for admin approval.
        */
-
-      const { accessToken, refreshToken, user } = response.data;
-
-      localStorage.setItem('token', accessToken);
-
-      if (refreshToken) {
-        localStorage.setItem('refreshToken', refreshToken);
-      }
-
-      localStorage.setItem('user', JSON.stringify(user));
-
-      apiClient.setToken(accessToken);
-
-      setSuccessData({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      });
 
       setStep('success');
       setOtpStatus('idle');
@@ -1056,7 +1032,7 @@ export default function DoctorSignupOtp() {
             <div className="text-center mt-6">
 
               <p className="text-[15px] text-[#64748B]">
-                Didn't receive the code?{' '}
+                Didn&apos;t receive the code?{' '}
 
                 <button
                   type="button"
@@ -1095,62 +1071,40 @@ export default function DoctorSignupOtp() {
    * ============================================================
    */
 
-  if (step === 'success' && successData) {
+  if (step === 'success') {
     return (
       <div className="min-h-screen bg-[#F3F5F9]">
         <div className="px-4 py-8 overflow-y-auto" style={{ height: '100vh' }}>
           <div className="w-full max-w-[460px] mx-auto text-center">
-
-          <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8">
-
-            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckIcon />
-            </div>
-
-            <h1 className="text-2xl font-bold text-[#0F172A]">
-              Account Created!
-            </h1>
-
-            <p className="text-[#64748B] mt-2 text-[15px]">
-              Welcome, <strong>{successData.email}</strong>
-            </p>
-
-            <p className="text-[#64748B] text-[15px] mt-2">
-              Your email has been verified successfully.
-            </p>
-
-            <div className="mt-8">
-
-              <button
-                type="button"
-                onClick={() => router.push('/doctor/dashboard')}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors"
-              >
-                Go to Dashboard
-              </button>
-
-            </div>
-
-            <div className="mt-6 text-center">
-
-              <p className="text-[15px] text-[#64748B]">
-                Need to log in again?{' '}
-
-                <a
-                  href="/auth/login"
-                  className="font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors"
-                >
-                  Sign In
-                </a>
+            <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8">
+              <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckIcon />
+              </div>
+              <h1 className="text-2xl font-bold text-[#0F172A]">
+                Registration Submitted Successfully
+              </h1>
+              <p className="text-[#64748B] mt-2 text-[15px]">
+                Your email address has been successfully verified and your doctor registration has been submitted for review.
               </p>
-
+              <p className="text-[#64748B] text-[15px] mt-2">
+                Our administrator will review your information and verify your account.
+              </p>
+              <p className="text-[#64748B] text-[15px] mt-2">
+                Please wait for an email confirming that your account has been approved. You cannot sign in until your account has been approved.
+              </p>
+              <div className="mt-8">
+                <button
+                  type="button"
+                  onClick={() => router.push('/auth/login')}
+                  className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors"
+                >
+                  Back to Login
+                </button>
+              </div>
             </div>
-
           </div>
-
         </div>
       </div>
-    </div>
     );
   }
 

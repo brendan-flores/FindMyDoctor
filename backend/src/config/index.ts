@@ -63,4 +63,18 @@ export const config = {
     anonKey: process.env.SUPABASE_ANON_KEY || '',
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   },
+
+  // Email (for approval/rejection notifications)
+  email: {
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.EMAIL_PORT || '587'),
+    user: process.env.EMAIL_USER || '',
+    password: process.env.EMAIL_PASSWORD || '',
+    from: process.env.EMAIL_FROM || 'FindMyDoctor <noreply@findmydoctor.com>',
+  },
+
+  // Frontend URL for email links
+  frontend: {
+    url: process.env.FRONTEND_URL || 'http://localhost:3001',
+  },
 };
