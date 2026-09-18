@@ -825,6 +825,8 @@ The system shall provide relevant application notifications.
 
 Administrators shall be able to approve/reject doctors.
 
+Doctors who complete self-registration and email OTP verification are created with `approval_status = 'PENDING'` and `is_approved = false`, and must wait for administrator approval before accessing the system. Administrators can view pending doctors through the Admin Doctors page, review complete doctor information, and either approve (setting `approval_status = 'ACTIVE'` and `is_approved = true`) or reject (setting `approval_status = 'REJECTED'` and `is_approved = false`) the registration. Only ACTIVE doctors can log in and access the Doctor Dashboard.
+
 ## FR-041 — Secretary Management
 
 Administrators shall be able to manage secretary accounts.
@@ -1065,7 +1067,7 @@ Patient Views Professional Details
 - Authorized patient information.
 - Consultation history.
 - Prescription creation.
-- Self-registration (account created and approved immediately).
+- Self-registration (account created with PENDING status, requires admin approval).
 
 ### Secretary
 
@@ -1152,7 +1154,7 @@ FiDo Web
 │       ├── Doctor → `/doctor/dashboard`
 │       └── Secretary → `/secretary/dashboard`
 └── Doctor Sign-Up (Self-Registration)
-    └── `/auth/doctor-signup` → creates account → `/auth/login`
+    └── `/auth/doctor-signup` → Supabase email OTP → PostgreSQL account → `/doctor/dashboard`
 ```
 
 ### Authentication Behavior
@@ -1182,13 +1184,17 @@ The doctor sign-up page at `/auth/doctor-signup` allows a doctor to create an ac
 
 - Reachable from the shared Doctor/Secretary login page through the "Create an Account" link.
 - Collects doctor information (full name, specialty, credentials, PRC license number, clinic), contact information (email, contact number), and account security fields (password, confirm password).
-- Submits to `POST /api/v1/auth/register/doctor`, which creates the `users` record and the `doctors` profile in a single database transaction.
+- Submits to `POST /api/v1/auth/otp/send`, which validates the payload and stages the sign-up - including the bcrypt-hashed password - in the `pending_doctor_signups` table. No account is created at this step.
+- Supabase is used only to email the 6-digit OTP to the doctor's address.
+- `POST /api/v1/auth/otp/verify` verifies the OTP with Supabase and, only when verification succeeds, creates the `users` record (`role = DOCTOR`, `email_verified = true`) and the `doctors` profile in a single PostgreSQL transaction.
+- PostgreSQL is the single source of truth for doctor accounts, credentials and profile data; Supabase stores no application account or profile data.
 - Passwords are hashed with bcrypt before storage and are never stored or logged in plaintext.
 - The PRC license number is stored on the doctor profile and may only be registered once.
 - Email address and PRC license number must be unique; duplicates are rejected.
-- Self-registered doctors are approved immediately (`is_approved = true`) and therefore appear in the public doctor search.
+- Self-registered doctors are created with `approval_status = 'PENDING'` and `is_approved = false`, requiring administrator approval before they can access the system.
+- The doctor sees a "Registration Submitted Successfully" message after OTP verification and cannot log in until an administrator approves the account.
 - PRC license numbers are recorded but are not verified against a PRC registry; PRC verification remains out of scope.
-- A successful registration shows an account-created state with a link back to `/auth/login`.
+- A successful verification returns a success message and directs the doctor to wait for admin approval.
 
 Administrator-provisioned doctor accounts remain available for accounts created on a doctor's behalf.
 

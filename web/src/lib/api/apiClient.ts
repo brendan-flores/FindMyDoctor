@@ -4,7 +4,24 @@ interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  errorCode?: string;
   message?: string;
+}
+
+/**
+ * The backend returns errors as `{ success: false, error: { code, message } }`.
+ * Normalize that into the flat shape the pages consume so error messages can be
+ * displayed directly.
+ */
+function normalizeApiResponse<T>(payload: any): ApiResponse<T> {
+  if (payload && payload.success === false && payload.error && typeof payload.error === 'object') {
+    const code = typeof payload.error.code === 'string' ? payload.error.code : undefined;
+    const message = typeof payload.error.message === 'string' ? payload.error.message : 'Request failed';
+
+    return { success: false, error: message, errorCode: code };
+  }
+
+  return payload as ApiResponse<T>;
 }
 
 class ApiClient {
@@ -38,7 +55,7 @@ class ApiClient {
       });
 
       const data = await response.json();
-      return data;
+      return normalizeApiResponse<T>(data);
     } catch (error) {
       return {
         success: false,
@@ -56,7 +73,7 @@ class ApiClient {
       });
 
       const data = await response.json();
-      return data;
+      return normalizeApiResponse<T>(data);
     } catch (error) {
       return {
         success: false,
@@ -74,7 +91,7 @@ class ApiClient {
       });
 
       const data = await response.json();
-      return data;
+      return normalizeApiResponse<T>(data);
     } catch (error) {
       return {
         success: false,
@@ -92,7 +109,7 @@ class ApiClient {
       });
 
       const data = await response.json();
-      return data;
+      return normalizeApiResponse<T>(data);
     } catch (error) {
       return {
         success: false,
@@ -109,7 +126,7 @@ class ApiClient {
       });
 
       const data = await response.json();
-      return data;
+      return normalizeApiResponse<T>(data);
     } catch (error) {
       return {
         success: false,

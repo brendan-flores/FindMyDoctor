@@ -78,32 +78,34 @@ export const authApi = {
 };
 
 // OTP Verification API for Doctor Signup
+//
+// Supabase handles only the email OTP. The doctor account itself is created in
+// PostgreSQL by the backend after the OTP is verified, and the backend returns
+// the application JWT used for subsequent requests.
+
 export interface SendOtpRequest {
   email: string;
-}
-
-export interface SendOtpData {
-  success: boolean;
-  message: string;
+  fullName: string;
+  contactNumber: string;
+  specialty: string;
+  credentials: string;
+  prcLicenseNumber: string;
+  clinic: string;
+  password: string;
+  confirmPassword: string;
 }
 
 export interface SendOtpResponse {
   success: boolean;
-  data?: SendOtpData | null;
+  data?: null;
   error?: string;
+  errorCode?: string;
   message?: string;
 }
 
 export interface VerifyOtpRequest {
   email: string;
   otp: string;
-  password: string;
-  fullName: string;
-  specialty: string;
-  credentials?: string;
-  prcLicenseNumber: string;
-  clinic: string;
-  contactNumber?: string;
 }
 
 export interface VerifyOtpData {
@@ -132,6 +134,7 @@ export interface VerifyOtpResponse {
   success: boolean;
   data?: VerifyOtpData | null;
   error?: string;
+  errorCode?: string;
   message?: string;
 }
 
@@ -144,20 +147,24 @@ export interface OtpStatusResponse {
   success: boolean;
   data?: OtpStatusData | null;
   error?: string;
+  errorCode?: string;
   message?: string;
 }
 
 export const otpApi = {
-  sendOtp: async (email: string): Promise<SendOtpResponse> => {
-    return apiClient.post<SendOtpData>('/auth/otp/send', { email });
+  // Validates the sign-up form, stages it server-side and asks the backend to
+  // send the OTP through Supabase. No account is created yet.
+  sendOtp: async (payload: SendOtpRequest): Promise<SendOtpResponse> => {
+    return apiClient.post<null>('/auth/otp/send', payload);
   },
 
+  // Verifies the OTP and, on success, creates the doctor account in PostgreSQL.
   verifyOtp: async (payload: VerifyOtpRequest): Promise<VerifyOtpResponse> => {
     return apiClient.post<VerifyOtpData>('/auth/otp/verify', payload);
   },
 
   resendOtp: async (email: string): Promise<SendOtpResponse> => {
-    return apiClient.post<SendOtpData>('/auth/otp/resend', { email });
+    return apiClient.post<null>('/auth/otp/resend', { email });
   },
 
   checkOtpStatus: async (email: string): Promise<OtpStatusResponse> => {

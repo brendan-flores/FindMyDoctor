@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { supabase } from '@/lib/supabase';
+import { otpApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
 
 type Step = 'signup' | 'otp' | 'success';
@@ -11,6 +11,7 @@ type FormStatus = 'idle' | 'loading';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_PATTERN = /^\d{6}$/;
+const PRC_LICENSE_PATTERN = /^\d{7}$/;
 
 export default function DoctorSignupOtp() {
   const router = useRouter();
@@ -46,12 +47,6 @@ export default function DoctorSignupOtp() {
   });
 
   const [otpExpiresIn, setOtpExpiresIn] = useState(600);
-
-  const [successData, setSuccessData] = useState<{
-    id: string;
-    email: string;
-    role: string;
-  } | null>(null);
 
   // Container ref for scroll handling
   const containerRef = useRef<HTMLDivElement>(null);
@@ -142,6 +137,10 @@ export default function DoctorSignupOtp() {
       return 'PRC License Number is required.';
     }
 
+    if (!PRC_LICENSE_PATTERN.test(formData.prcLicenseNumber.trim())) {
+      return 'PRC License Number must be 7 digits.';
+    }
+
     if (!formData.clinic.trim()) {
       return 'Clinic is required.';
     }
@@ -150,8 +149,8 @@ export default function DoctorSignupOtp() {
       return 'Password is required.';
     }
 
-    if (formData.password.length < 6) {
-      return 'Password must be at least 6 characters.';
+    if (formData.password.length < 8) {
+      return 'Password must be at least 8 characters.';
     }
 
     if (!formData.confirmPassword) {
@@ -261,8 +260,11 @@ export default function DoctorSignupOtp() {
 
   /*
    * ============================================================
-   * CREATE SUPABASE ACCOUNT + SEND OTP
+   * VALIDATE FORM + SEND OTP
    * ============================================================
+   * The form is validated first and the sign-up data is staged
+   * server-side (PostgreSQL). Supabase is only used to email the OTP.
+   * No doctor account is created at this step.
    */
 
   const handleSignupSubmit = async (
@@ -283,41 +285,31 @@ export default function DoctorSignupOtp() {
     setEmailStatus('loading');
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const response = await otpApi.sendOtp({
         email: email.trim(),
+        fullName: formData.fullName.trim(),
+        contactNumber: formData.contactNumber.trim(),
+        specialty: formData.specialty.trim(),
+        credentials: formData.credentials.trim(),
+        prcLicenseNumber: formData.prcLicenseNumber.trim(),
+        clinic: formData.clinic.trim(),
         password: formData.password,
-
-        options: {
-          data: {
-            role: 'doctor',
-            full_name: formData.fullName.trim(),
-            contact_number: formData.contactNumber.trim(),
-            specialty: formData.specialty.trim(),
-            credentials: formData.credentials.trim(),
-            prc_license_number: formData.prcLicenseNumber.trim(),
-            clinic: formData.clinic.trim(),
-          },
-        },
+        confirmPassword: formData.confirmPassword,
       });
 
-      if (error) {
-        console.error('Supabase signup error:', error);
-        setFormError(error.message);
-        setEmailStatus('idle');
-        return;
-      }
-
-      if (!data.user) {
+      if (!response.success) {
         setFormError(
-          'The account could not be created. Please try again.'
+          response.error ||
+            'Unable to send the verification code. Please try again.'
         );
+
         setEmailStatus('idle');
         return;
       }
 
       /*
-       * Confirm email is enabled in Supabase.
-       * Supabase now sends the confirmation OTP.
+       * The OTP was sent by Supabase. The doctor account is created in
+       * PostgreSQL only after the code is verified.
        */
 
       setOtp(['', '', '', '', '', '']);
@@ -332,7 +324,7 @@ export default function DoctorSignupOtp() {
       console.error('Signup error:', error);
 
       setFormError(
-        'Unable to create the account. Please try again.'
+        'Unable to send the verification code. Please try again.'
       );
 
       setEmailStatus('idle');
@@ -343,6 +335,15 @@ export default function DoctorSignupOtp() {
    * ============================================================
    * VERIFY OTP
    * ============================================================
+   */
+
+  /*
+   * ============================================================
+   * VERIFY OTP + CREATE POSTGRESQL ACCOUNT
+   * ============================================================
+   * The OTP is verified by the backend through Supabase. The
+   * PostgreSQL doctor account is created only when verification
+   * succeeds, and the backend returns the application JWT.
    */
 
   const handleOtpSubmit = async (
@@ -369,23 +370,14 @@ export default function DoctorSignupOtp() {
     setOtpStatus('loading');
 
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
+      const response = await otpApi.verifyOtp({
         email: email.trim(),
-        token: getOtpValue(),
-        type: 'email',
+        otp: getOtpValue(),
       });
 
-      if (error) {
-        console.error('Supabase OTP verification error:', error);
-
-        setOtpError(error.message);
-        setOtpStatus('idle');
-        return;
-      }
-
-      if (!data.user || !data.session) {
+      if (!response.success || !response.data) {
         setOtpError(
-          'Email verification succeeded, but no login session was created.'
+          response.error || 'Invalid or expired OTP code.'
         );
 
         setOtpStatus('idle');
@@ -393,37 +385,9 @@ export default function DoctorSignupOtp() {
       }
 
       /*
-       * Store the Supabase session.
+       * The backend verified the OTP and created the doctor account in
+       * PostgreSQL with PENDING status. Doctor must wait for admin approval.
        */
-
-      localStorage.setItem(
-        'token',
-        data.session.access_token
-      );
-
-      if (data.session.refresh_token) {
-        localStorage.setItem(
-          'refreshToken',
-          data.session.refresh_token
-        );
-      }
-
-      localStorage.setItem(
-        'user',
-        JSON.stringify(data.user)
-      );
-
-      /*
-       * Keep your existing API client synchronized.
-       */
-
-      apiClient.setToken(data.session.access_token);
-
-      setSuccessData({
-        id: data.user.id,
-        email: data.user.email || email.trim(),
-        role: 'doctor',
-      });
 
       setStep('success');
       setOtpStatus('idle');
@@ -453,15 +417,14 @@ export default function DoctorSignupOtp() {
     setEmailStatus('loading');
 
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email.trim(),
-      });
+      const response = await otpApi.resendOtp(email.trim());
 
-      if (error) {
-        console.error('Supabase resend error:', error);
+      if (!response.success) {
+        setOtpError(
+          response.error ||
+            'Failed to resend the verification code. Please try again.'
+        );
 
-        setOtpError(error.message);
         setEmailStatus('idle');
         return;
       }
@@ -1069,7 +1032,7 @@ export default function DoctorSignupOtp() {
             <div className="text-center mt-6">
 
               <p className="text-[15px] text-[#64748B]">
-                Didn't receive the code?{' '}
+                Didn&apos;t receive the code?{' '}
 
                 <button
                   type="button"
@@ -1108,62 +1071,40 @@ export default function DoctorSignupOtp() {
    * ============================================================
    */
 
-  if (step === 'success' && successData) {
+  if (step === 'success') {
     return (
       <div className="min-h-screen bg-[#F3F5F9]">
         <div className="px-4 py-8 overflow-y-auto" style={{ height: '100vh' }}>
           <div className="w-full max-w-[460px] mx-auto text-center">
-
-          <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8">
-
-            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckIcon />
-            </div>
-
-            <h1 className="text-2xl font-bold text-[#0F172A]">
-              Account Created!
-            </h1>
-
-            <p className="text-[#64748B] mt-2 text-[15px]">
-              Welcome, <strong>{successData.email}</strong>
-            </p>
-
-            <p className="text-[#64748B] text-[15px] mt-2">
-              Your email has been verified successfully.
-            </p>
-
-            <div className="mt-8">
-
-              <button
-                type="button"
-                onClick={() => router.push('/doctor/dashboard')}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors"
-              >
-                Go to Dashboard
-              </button>
-
-            </div>
-
-            <div className="mt-6 text-center">
-
-              <p className="text-[15px] text-[#64748B]">
-                Need to log in again?{' '}
-
-                <a
-                  href="/auth/login"
-                  className="font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors"
-                >
-                  Sign In
-                </a>
+            <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8">
+              <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckIcon />
+              </div>
+              <h1 className="text-2xl font-bold text-[#0F172A]">
+                Registration Submitted Successfully
+              </h1>
+              <p className="text-[#64748B] mt-2 text-[15px]">
+                Your email address has been successfully verified and your doctor registration has been submitted for review.
               </p>
-
+              <p className="text-[#64748B] text-[15px] mt-2">
+                Our administrator will review your information and verify your account.
+              </p>
+              <p className="text-[#64748B] text-[15px] mt-2">
+                Please wait for an email confirming that your account has been approved. You cannot sign in until your account has been approved.
+              </p>
+              <div className="mt-8">
+                <button
+                  type="button"
+                  onClick={() => router.push('/auth/login')}
+                  className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors"
+                >
+                  Back to Login
+                </button>
+              </div>
             </div>
-
           </div>
-
         </div>
       </div>
-    </div>
     );
   }
 

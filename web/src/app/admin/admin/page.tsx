@@ -54,7 +54,7 @@ export default function AdminManagement() {
       console.log('Admin API response:', response);
       
       if (response.success) {
-        setAdmins(response.data);
+        setAdmins(response.data as Admin[]);
         console.log('Admins set:', response.data);
       } else {
         console.error('Admin API error:', response.error);

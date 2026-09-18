@@ -13,12 +13,12 @@ router.get('/', async (req: any, res: Response) => {
     let queryText = `
       SELECT 
         d.id, d.first_name, d.last_name, d.specialty, d.credentials, 
-        d.biography, d.consultation_fee, d.is_approved,
+        d.biography, d.consultation_fee, d.is_approved, d.approval_status,
         d.practice_name, d.practice_address, d.practice_latitude, d.practice_longitude,
         d.practice_phone, d.practice_email, d.practice_description,
         d.operating_hours_start, d.operating_hours_end
       FROM doctors d
-      WHERE d.is_approved = true
+      WHERE d.approval_status = 'ACTIVE'
     `;
     const params: any[] = [];
     let paramCount = 0;
