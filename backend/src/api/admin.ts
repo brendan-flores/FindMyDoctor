@@ -19,10 +19,62 @@ router.get('/users', authenticate, authorize('ADMIN'), async (req: AuthRequest, 
   }
 });
 
+// Get all doctors with complete profile information
+router.get('/doctors', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await query(
+      `SELECT 
+        d.id,
+        d.user_id,
+        u.email,
+        u.email_verified,
+        d.first_name,
+        d.last_name,
+        d.specialty,
+        d.credentials,
+        d.prc_license_number,
+        d.practice_name,
+        d.practice_address,
+        d.practice_phone,
+        d.practice_email,
+        d.is_approved,
+        d.created_at
+       FROM doctors d
+       JOIN users u ON d.user_id = u.id
+       WHERE u.role = 'DOCTOR'
+       ORDER BY d.created_at DESC`
+    );
+
+    // Ensure data is properly formatted with default values for null fields
+    // Convert snake_case to camelCase to match frontend interface
+    const formattedDoctors = result.rows.map(doctor => ({
+      id: doctor.id,
+      userId: doctor.user_id,
+      email: doctor.email || '',
+      emailVerified: doctor.email_verified || false,
+      firstName: doctor.first_name || '',
+      lastName: doctor.last_name || '',
+      specialty: doctor.specialty || '',
+      credentials: doctor.credentials || null,
+      prcLicenseNumber: doctor.prc_license_number || '',
+      practiceName: doctor.practice_name || '',
+      practiceAddress: doctor.practice_address || '',
+      practicePhone: doctor.practice_phone || '',
+      practiceEmail: doctor.practice_email || '',
+      isApproved: doctor.is_approved || false,
+      createdAt: doctor.created_at
+    }));
+
+    res.json(success(formattedDoctors));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctors'));
+  }
+});
+
 // Create doctor
 router.post('/doctors', authenticate, authorize('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password, firstName, lastName, specialty, credentials, biography, consultationFee, practiceName, practiceAddress, practiceLatitude, practiceLongitude, practicePhone, practiceEmail, practiceDescription, operatingHoursStart, operatingHoursEnd } = req.body;
+    const { email, password, firstName, lastName, specialty, credentials, biography, consultationFee, prcLicenseNumber, practiceName, practiceAddress, practiceLatitude, practiceLongitude, practicePhone, practiceEmail, practiceDescription, operatingHoursStart, operatingHoursEnd } = req.body;
 
     if (!email || !password || !firstName || !lastName || !specialty || !consultationFee || !practiceName || !practiceAddress || !practiceLatitude || !practiceLongitude) {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Required fields missing'));
@@ -42,10 +94,10 @@ router.post('/doctors', authenticate, authorize('ADMIN'), async (req: AuthReques
 
     // Create doctor profile with practice information
     const doctorResult = await query(
-      `INSERT INTO doctors (user_id, first_name, last_name, specialty, credentials, biography, consultation_fee, practice_name, practice_address, practice_latitude, practice_longitude, practice_phone, practice_email, practice_description, operating_hours_start, operating_hours_end, is_approved)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, true)
+      `INSERT INTO doctors (user_id, first_name, last_name, specialty, credentials, biography, consultation_fee, prc_license_number, practice_name, practice_address, practice_latitude, practice_longitude, practice_phone, practice_email, practice_description, operating_hours_start, operating_hours_end, is_approved)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, true)
        RETURNING *`,
-      [userId, firstName, lastName, specialty, credentials, biography, consultationFee, practiceName, practiceAddress, practiceLatitude, practiceLongitude, practicePhone, practiceEmail, practiceDescription, operatingHoursStart, operatingHoursEnd]
+      [userId, firstName, lastName, specialty, credentials, biography, consultationFee, prcLicenseNumber, practiceName, practiceAddress, practiceLatitude, practiceLongitude, practicePhone, practiceEmail, practiceDescription, operatingHoursStart, operatingHoursEnd]
     );
 
     res.status(201).json(success(doctorResult.rows[0], 'Doctor created successfully'));

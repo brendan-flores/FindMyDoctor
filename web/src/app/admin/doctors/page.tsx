@@ -17,21 +17,11 @@ export default function DoctorManagement() {
 
   const loadDoctors = async () => {
     try {
-      const response = await adminApi.getAllUsers();
+      const response = await adminApi.getAllDoctors();
       if (response.success && response.data) {
-        const doctorUsers = response.data.filter(u => u.role === 'DOCTOR');
-        // Note: This is a simplified approach. In production, we'd need a dedicated endpoint
-        // that returns full doctor profiles with their practice information
-        const doctorProfiles: Doctor[] = doctorUsers.map(user => ({
-          id: user.id,
-          userId: user.id,
-          firstName: 'Doctor',
-          lastName: 'Name',
-          specialty: 'General Medicine',
-          prcLicense: 'N/A',
-          isApproved: true,
-        }));
-        setDoctors(doctorProfiles);
+        // The backend now returns data in camelCase format that matches the Doctor interface
+        // so we can use it directly without remapping
+        setDoctors(response.data);
       }
     } catch (error) {
       console.error('Failed to load doctors:', error);
@@ -52,7 +42,7 @@ export default function DoctorManagement() {
   };
 
   const filteredDoctors = doctors.filter(doctor => {
-    const matchesSearch = `${doctor.firstName} ${doctor.lastName} ${doctor.prcLicense} ${doctor.specialty}`
+    const matchesSearch = `${doctor.firstName || ''} ${doctor.lastName || ''} ${doctor.prcLicenseNumber || ''} ${doctor.specialty || ''}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
     const matchesSpecialty = specialtyFilter === 'all' || doctor.specialty === specialtyFilter;
@@ -67,6 +57,9 @@ export default function DoctorManagement() {
     active: doctors.filter(d => d.isApproved).length,
     inactive: doctors.filter(d => !d.isApproved).length,
   };
+
+  // Get unique specialties for filter dropdown
+  const specialties = Array.from(new Set(doctors.map(d => d.specialty).filter(Boolean))).sort();
 
   if (isLoading) {
     return (
@@ -179,11 +172,9 @@ export default function DoctorManagement() {
               onChange={(e) => setSpecialtyFilter(e.target.value)}
             >
               <option value="all">All Specialties</option>
-              <option value="Cardiology">Cardiology</option>
-              <option value="Internal Medicine">Internal Medicine</option>
-              <option value="Neurology">Neurology</option>
-              <option value="Pediatrics">Pediatrics</option>
-              <option value="Dermatology">Dermatology</option>
+              {specialties.map(specialty => (
+                <option key={specialty} value={specialty}>{specialty}</option>
+              ))}
             </select>
           </div>
 
@@ -230,13 +221,13 @@ export default function DoctorManagement() {
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-sm">
-                          {doctor.firstName[0]}{doctor.lastName[0]}
+                          {(doctor.firstName || 'D')[0]}{(doctor.lastName || '')[0]}
                         </div>
                         <div>
                           <div className="text-sm font-semibold text-slate-900">
-                            {doctor.firstName} {doctor.lastName}
+                            {doctor.firstName || 'Unknown'} {doctor.lastName || 'Doctor'}
                           </div>
-                          <div className="text-xs text-slate-500">ID: {doctor.id.slice(0, 8)}...</div>
+                          <div className="text-xs text-slate-500">ID: {doctor.id?.slice(0, 8) || 'N/A'}...</div>
                         </div>
                       </div>
                     </td>
@@ -244,7 +235,7 @@ export default function DoctorManagement() {
                       <span className="text-sm text-slate-700">{doctor.specialty}</span>
                     </td>
                     <td className="px-5 py-4">
-                      <span className="text-sm font-mono text-slate-600">{doctor.prcLicense}</span>
+                      <span className="text-sm font-mono text-slate-600">{doctor.prcLicenseNumber || 'N/A'}</span>
                     </td>
                     <td className="px-5 py-4">
                       <div className="text-sm text-slate-700">{doctor.practiceName || 'Not set'}</div>

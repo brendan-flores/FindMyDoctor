@@ -10,10 +10,13 @@ export interface User {
 export interface Doctor {
   id: string;
   userId: string;
+  email: string;
+  emailVerified: boolean;
   firstName: string;
   lastName: string;
   specialty: string;
-  prcLicense: string;
+  credentials?: string;
+  prcLicenseNumber: string;
   isApproved: boolean;
   practiceName?: string;
   practiceAddress?: string;
@@ -25,6 +28,7 @@ export interface Doctor {
   operatingHoursStart?: string;
   operatingHoursEnd?: string;
   gcashQrCodeUrl?: string;
+  createdAt?: string;
 }
 
 export interface Secretary {
@@ -43,13 +47,16 @@ export const adminApi = {
   },
 
   // Doctor Management
+  getAllDoctors: async () => {
+    return apiClient.get<Doctor[]>('/admin/doctors');
+  },
   createDoctor: async (doctorData: {
     email: string;
     password: string;
     firstName: string;
     lastName: string;
     specialty: string;
-    prcLicense: string;
+    prcLicenseNumber: string;
     practiceName?: string;
     practiceAddress?: string;
     practiceLatitude?: number;
