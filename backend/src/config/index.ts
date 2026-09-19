@@ -62,6 +62,7 @@ export const config = {
     url: process.env.SUPABASE_URL || '',
     anonKey: process.env.SUPABASE_ANON_KEY || '',
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    functionSecret: process.env.FUNCTION_SECRET || '',
   },
 
   // Email (for approval/rejection notifications)

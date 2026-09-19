@@ -1,78 +1,67 @@
-// Using require for nodemailer to avoid TypeScript import issues
-const nodemailer = require('nodemailer');
 import { config } from '../config';
 
-// Email configuration
-const transporter = nodemailer.createTransport({
-  host: config.email.host,
-  port: config.email.port,
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: config.email.user,
-    pass: config.email.password,
-  },
-});
-
-export async function sendApprovalEmail(doctorEmail: string, doctorName: string): Promise<{ success: boolean; message: string }> {
+/**
+ * Call the existing Supabase Edge Function to send doctor confirmation emails
+ * 
+ * This function calls the deployed Supabase Edge Function "send-doctor-confirmation-email"
+ * which handles both approval and rejection emails using Resend.
+ * 
+ * @param doctorEmail - Doctor's email address
+ * @param doctorName - Doctor's full name
+ * @param status - Either "approved" or "rejected"
+ * @param reason - Optional rejection reason (only used when status is "rejected")
+ */
+async function callSupabaseEdgeFunction(
+  doctorEmail: string,
+  doctorName: string,
+  status: 'approved' | 'rejected',
+  reason?: string
+): Promise<{ success: boolean; message: string }> {
   try {
-    const mailOptions = {
-      from: config.email.from,
+    if (!config.supabase.url || !config.supabase.functionSecret) {
+      console.error('Supabase Edge Function not configured: missing SUPABASE_URL or FUNCTION_SECRET');
+      return { success: false, message: 'Email service not configured' };
+    }
+
+    const edgeFunctionUrl = `${config.supabase.url}/functions/v1/send-doctor-confirmation-email`;
+    
+    const payload: any = {
       to: doctorEmail,
-      subject: 'FindMyDoctor — Your Doctor Account Has Been Approved',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #0D3B75;">Congratulations, Dr. ${doctorName}!</h2>
-          <p>Your FindMyDoctor doctor account has been successfully verified and approved.</p>
-          <p><strong>Account Details:</strong></p>
-          <ul>
-            <li>Email: ${doctorEmail}</li>
-            <li>Status: Active</li>
-          </ul>
-          <p>You can now sign in to access your Doctor Dashboard using the email address you registered with.</p>
-          <p style="margin-top: 30px; color: #666; font-size: 12px;">
-            If you did not request this approval, please ignore this email.
-          </p>
-          <p style="color: #666; font-size: 12px;">
-            FindMyDoctor Administration
-          </p>
-        </div>
-      `,
+      doctorName: doctorName,
+      status: status,
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Approval email sent to ${doctorEmail}`);
-    return { success: true, message: 'Approval email sent successfully' };
+    if (status === 'rejected' && reason) {
+      payload.reason = reason;
+    }
+
+    const response = await fetch(edgeFunctionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-function-secret': config.supabase.functionSecret,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Supabase Edge Function error:', response.status, errorText);
+      return { success: false, message: 'Failed to send email via Edge Function' };
+    }
+
+    console.log(`✅ Email sent via Supabase Edge Function to ${doctorEmail} (status: ${status})`);
+    return { success: true, message: 'Email sent successfully' };
   } catch (error) {
-    console.error('Failed to send approval email:', error);
-    return { success: false, message: 'Failed to send approval email' };
+    console.error('Error calling Supabase Edge Function:', error);
+    return { success: false, message: 'Failed to send email' };
   }
 }
 
-export async function sendRejectionEmail(doctorEmail: string, doctorName: string, reason?: string): Promise<{ success: boolean; message: string }> {
-  try {
-    const mailOptions = {
-      from: config.email.from,
-      to: doctorEmail,
-      subject: 'FindMyDoctor — Your Doctor Registration Status',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #dc2626;">Doctor Registration Status Update</h2>
-          <p>Dear Dr. ${doctorName},</p>
-          <p>Your FindMyDoctor doctor registration has been reviewed. Unfortunately, your registration was not approved at this time.</p>
-          ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
-          <p>If you believe this is an error or would like to resubmit your registration, please contact our support team.</p>
-          <p style="margin-top: 30px; color: #666; font-size: 12px;">
-            FindMyDoctor Administration
-          </p>
-        </div>
-      `,
-    };
+export async function sendApprovalEmail(doctorEmail: string, doctorName: string): Promise<{ success: boolean; message: string }> {
+  return callSupabaseEdgeFunction(doctorEmail, doctorName, 'approved');
+}
 
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Rejection email sent to ${doctorEmail}`);
-    return { success: true, message: 'Rejection email sent successfully' };
-  } catch (error) {
-    console.error('Failed to send rejection email:', error);
-    return { success: false, message: 'Failed to send rejection email' };
-  }
+export async function sendRejectionEmail(doctorEmail: string, doctorName: string, reason?: string): Promise<{ success: boolean; message: string }> {
+  return callSupabaseEdgeFunction(doctorEmail, doctorName, 'rejected', reason);
 }
