@@ -2,29 +2,20 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from '../config';
 import { ErrorCodes } from '../utils/response';
 
-// Using require for nodemailer to avoid TypeScript import issues
-const nodemailer = require('nodemailer');
-
-// Email transporter for custom OTP emails
-const emailTransporter = nodemailer.createTransport({
-  host: config.email.host,
-  port: config.email.port,
-  secure: false,
-  auth: {
-    user: config.email.user,
-    pass: config.email.password,
-  },
-});
-
 /*
- * Supabase is used ONLY for OTP verification (not email sending).
- *
+ * Supabase Auth is used for OTP generation, email delivery, and verification.
+ * 
  * It never stores the doctor's application account, credentials or profile data.
  * The doctor account (`users`) and doctor profile (`doctors`) are created in
- * PostgreSQL, and only after the OTP has been verified here.
+ * PostgreSQL, and only after the OTP has been verified.
+ * 
+ * Supabase Auth may create a temporary identity for OTP delivery. This temporary
+ * identity is used for passwordless OTP authentication only and must NEVER become
+ * the FindMyDoctor application account source of truth.
+ * 
+ * PostgreSQL users table is the source of truth for FindMyDoctor application accounts.
  */
 
-// Create Supabase admin client (using service role key for OTP verification only)
 const supabaseAdmin = config.supabase.url && config.supabase.serviceRoleKey
   ? createClient(
       config.supabase.url,
@@ -38,98 +29,36 @@ const supabaseAdmin = config.supabase.url && config.supabase.serviceRoleKey
     )
   : null;
 
-console.log('Supabase initialized:', !!supabaseAdmin);
-console.log('Supabase URL:', config.supabase.url);
-
-// Generate a 6-digit OTP code
-function generateOtpCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-// Store OTP codes temporarily (in production, use Redis or database)
-const otpStore = new Map<string, { code: string; expiresAt: number }>();
-
 /**
  * Send OTP to email for doctor signup
  *
- * Uses nodemailer to send a custom email with the OTP code.
- * The OTP is stored temporarily for verification.
+ * Uses Supabase Auth to generate and send the OTP email.
+ * Supabase handles OTP generation, email delivery, and expiration.
  */
 export async function sendDoctorSignupOtp(email: string): Promise<{ success: boolean; message: string }> {
   try {
-    if (!config.email.user || !config.email.password) {
-      throw { code: ErrorCodes.SERVER_ERROR, message: 'Email is not configured. Add the email credentials to backend/.env.' };
+    if (!supabaseAdmin) {
+      throw { code: ErrorCodes.SERVER_ERROR, message: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to backend/.env.' };
     }
 
-    console.log('Attempting to send OTP to:', email);
+    console.log('Attempting to send OTP via Supabase Auth to:', email);
 
-    // Generate a 6-digit OTP code
-    const otpCode = generateOtpCode();
-    const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes expiration
+    // Use Supabase Auth to send OTP email
+    // Supabase will automatically create a temporary Auth user if the email doesn't exist
+    // This temporary user is used for passwordless OTP authentication only
+    const { data, error } = await supabaseAdmin.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: undefined, // No redirect link needed - user enters OTP manually
+      }
+    });
 
-    // Store the OTP code
-    otpStore.set(email, { code: otpCode, expiresAt });
+    if (error) {
+      console.error('Supabase Auth OTP send error:', error);
+      throw { code: ErrorCodes.SERVER_ERROR, message: error.message || 'Failed to send OTP' };
+    }
 
-    // Clean up expired OTPs
-    cleanupExpiredOtps();
-
-    // Create custom email template matching the design
-    const mailOptions = {
-      from: config.email.from,
-      to: email,
-      subject: 'FindMyDoctor Verification Code',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f5f5f5;">
-          <!-- Header with FindMyDoctor branding -->
-          <div style="background-color: #0D3B75; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 24px; font-weight: bold;">FindMyDoctor</h1>
-          </div>
-
-          <!-- Main content -->
-          <div style="background-color: white; padding: 30px; margin: 20px; border-radius: 8px;">
-            <h2 style="color: #333; margin-top: 0;">Verify Your Email Address</h2>
-            
-            <p style="color: #666; line-height: 1.6;">
-              Thank you for signing up as a doctor on FindMyDoctor. We're excited to have you join our healthcare community!
-            </p>
-
-            <!-- Verification code section with teal background -->
-            <div style="background-color: #008080; padding: 25px; border-radius: 8px; text-align: center; margin: 25px 0;">
-              <p style="color: white; margin: 0 0 10px 0; font-size: 14px; font-weight: bold; letter-spacing: 1px;">
-                YOUR VERIFICATION CODE
-              </p>
-              <p style="color: white; margin: 0; font-size: 36px; font-weight: bold; letter-spacing: 4px;">
-                ${otpCode}
-              </p>
-            </div>
-
-            <!-- How to verify section -->
-            <div style="margin-top: 30px;">
-              <h3 style="color: #333; margin-bottom: 15px;">How to verify your account:</h3>
-              <ol style="color: #666; line-height: 1.8; padding-left: 20px;">
-                <li style="margin-bottom: 10px;">Return to the FindMyDoctor signup page.</li>
-                <li style="margin-bottom: 10px;">Enter the 6-digit code shown above.</li>
-                <li>Complete your registration.</li>
-              </ol>
-            </div>
-
-            <p style="color: #999; font-size: 12px; margin-top: 30px;">
-              This code will expire in 15 minutes for your security.
-            </p>
-          </div>
-
-          <!-- Footer -->
-          <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
-            <p style="margin: 0;">FindMyDoctor Healthcare Platform</p>
-          </div>
-        </div>
-      `,
-    };
-
-    await emailTransporter.sendMail(mailOptions);
-    console.log('Custom OTP email sent successfully to:', email);
-    console.log('OTP code:', otpCode);
-
+    console.log('OTP sent successfully via Supabase Auth to:', email);
     return {
       success: true,
       message: 'OTP sent successfully. Please check your email.',
@@ -140,47 +69,33 @@ export async function sendDoctorSignupOtp(email: string): Promise<{ success: boo
   }
 }
 
-// Clean up expired OTPs
-function cleanupExpiredOtps() {
-  const now = Date.now();
-  for (const [email, data] of otpStore.entries()) {
-    if (data.expiresAt < now) {
-      otpStore.delete(email);
-    }
-  }
-}
-
 /**
- * Verify OTP token from locally stored codes
+ * Verify OTP token using Supabase Auth
  *
- * This verifies the OTP that was sent via email and stored temporarily.
+ * This verifies the OTP that was sent via Supabase Auth.
  * The doctor account is created in PostgreSQL after verification succeeds.
  */
 export async function verifyOtpToken(email: string, token: string): Promise<{ verified: boolean; error?: string }> {
   try {
-    const storedData = otpStore.get(email);
-
-    if (!storedData) {
-      console.log('No OTP found for email:', email);
-      return { verified: false, error: 'No OTP request found for this email. Please complete the sign-up form again.' };
+    if (!supabaseAdmin) {
+      return { verified: false, error: 'Supabase is not configured' };
     }
 
-    // Check if OTP has expired
-    if (Date.now() > storedData.expiresAt) {
-      otpStore.delete(email);
-      console.log('OTP expired for email:', email);
-      return { verified: false, error: 'This OTP has expired. Please request a new code.' };
+    console.log('Verifying OTP via Supabase Auth for:', email);
+
+    // Verify the OTP with Supabase Auth
+    const { data, error } = await supabaseAdmin.auth.verifyOtp({
+      email,
+      token,
+      type: 'email'
+    });
+
+    if (error) {
+      console.log('Supabase Auth OTP verification failed:', error);
+      return { verified: false, error: error.message || 'Invalid or expired OTP code' };
     }
 
-    // Verify the OTP code
-    if (storedData.code !== token) {
-      console.log('Invalid OTP for email:', email);
-      return { verified: false, error: 'Invalid OTP code' };
-    }
-
-    // OTP is valid - remove it from store
-    otpStore.delete(email);
-    console.log('OTP verified successfully for:', email);
+    console.log('OTP verified successfully via Supabase Auth for:', email);
     return { verified: true };
   } catch (err: any) {
     console.error('Error verifying OTP:', err);
@@ -190,24 +105,60 @@ export async function verifyOtpToken(email: string, token: string): Promise<{ ve
 
 /**
  * Check if email has a valid OTP session
- * Since we're using local OTP storage, this checks if an OTP was recently sent
+ * 
+ * MANDATORY REQUIREMENT: Use PostgreSQL pending_doctor_signups only.
+ * Do NOT use Supabase Auth user existence, Auth sessions, listUsers(), getUserById(),
+ * or any other Supabase Auth identity/session check to determine whether an OTP was successfully sent.
+ * 
+ * Reason: A Supabase Auth user/session does NOT reliably prove that the OTP email was
+ * successfully delivered. User existence and OTP email delivery are separate states.
+ * 
+ * Implementation using PostgreSQL only:
+ * 1. If email exists in PostgreSQL users table:
+ *    Return { isRegistered: true, isVerified: <users.email_verified value> }
+ * 2. If email does NOT exist in users table:
+ *    Check pending_doctor_signups for active record:
+ *    WHERE email = $1 AND expires_at > CURRENT_TIMESTAMP
+ * 3. If active pending signup exists:
+ *    Return { isRegistered: false, isVerified: true }
+ * 4. If no active pending signup exists:
+ *    Return { isRegistered: false, isVerified: false }
+ * 
+ * NOTE: The frontend does NOT call this endpoint. The function exists for API completeness
+ * but is not used in the current doctor signup flow.
+ * 
+ * No new database columns, no new persistent state, no OTP delivery tracking mechanism.
  */
 export async function checkEmailVerificationStatus(email: string): Promise<{ isVerified: boolean }> {
   try {
-    const storedData = otpStore.get(email);
+    // Import query function here to avoid circular dependency
+    const { query } = await import('../database/connection');
+    
+    // Step 1: Check if email exists in PostgreSQL users table
+    const existingUser = await query(
+      'SELECT id, email_verified FROM users WHERE email = $1',
+      [email]
+    );
 
-    if (!storedData) {
-      return { isVerified: false };
+    if (existingUser.rows.length > 0) {
+      // Email is registered - return its verification status
+      return { isVerified: existingUser.rows[0].email_verified === true };
     }
 
-    // Check if OTP has expired
-    if (Date.now() > storedData.expiresAt) {
-      otpStore.delete(email);
-      return { isVerified: false };
+    // Step 2: Email not in users table - check pending_doctor_signups
+    const pendingSignup = await query(
+      `SELECT id FROM pending_doctor_signups
+       WHERE email = $1 AND expires_at > CURRENT_TIMESTAMP`,
+      [email]
+    );
+
+    if (pendingSignup.rows.length > 0) {
+      // Email has a pending signup awaiting OTP verification
+      return { isVerified: true };
     }
 
-    // OTP exists and is still valid
-    return { isVerified: true };
+    // Step 3: No pending signup found
+    return { isVerified: false };
   } catch (err) {
     console.error('Error checking verification status:', err);
     return { isVerified: false };
