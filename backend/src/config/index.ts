@@ -57,21 +57,12 @@ export const config = {
     origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(','),
   },
 
-  // Supabase (for OTP email verification)
+  // Supabase (for OTP email verification and Edge Functions)
   supabase: {
     url: process.env.SUPABASE_URL || '',
     anonKey: process.env.SUPABASE_ANON_KEY || '',
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     functionSecret: process.env.FUNCTION_SECRET || '',
-  },
-
-  // Email (for approval/rejection notifications)
-  email: {
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.EMAIL_PORT || '587'),
-    user: process.env.EMAIL_USER || '',
-    password: process.env.EMAIL_PASSWORD || '',
-    from: process.env.EMAIL_FROM || 'FindMyDoctor <noreply@findmydoctor.com>',
   },
 
   // Frontend URL for email links
