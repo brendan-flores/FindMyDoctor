@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>FiDo - Manage Your Health</title>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#EEF4FF',
+              100: '#E0EAFF',
+              200: '#C7D7FE',
+              600: '#004FD6',
+              700: '#0046BF',
+              800: '#063B9E',
+              900: '#0A2558',
+              navy: '#0C1E40'
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+<!-- Custom Styles for Mobile Shell and Effects -->
+<style data-purpose="mobile-viewport">
+    /* iOS frame simulation & smooth typography */
+    body {
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
+      background-color: #f1f5f9;
+    }
+    .screen-container {
+      width: 100%;
+      max-width: 390px;
+      min-height: 844px;
+      height: 100vh;
+      max-height: 844px;
+    }
+    @media (max-height: 850px) {
+      .screen-container {
+        height: 100vh;
+        max-height: none;
+      }
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen text-slate-800 p-0 sm:p-4">
+<!-- BEGIN: MobileDeviceFrame -->
+<main class="screen-container bg-white flex flex-col justify-between px-7 py-8 relative overflow-hidden shadow-2xl sm:rounded-[44px]">
+<!-- BEGIN: TopBar -->
+<header class="w-full flex justify-end items-center pt-2 pb-4 z-10">
+<!-- Skip Action Button -->
+<a class="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors duration-150 px-2 py-1" href="#skip">
+        Skip
+      </a>
+</header>
+<!-- END: TopBar -->
+<!-- BEGIN: VisualAndContentSection -->
+<section class="flex-1 flex flex-col items-center justify-center -mt-6">
+<!-- Central Graphic with Concentric Rings -->
+<div class="relative flex items-center justify-center mb-10" data-purpose="illustration-container">
+<!-- Outermost Subtle Ring -->
+<div class="w-60 h-60 rounded-full bg-blue-50/60 flex items-center justify-center">
+<!-- Inner Soft Ring -->
+<div class="w-48 h-48 rounded-full bg-blue-100/50 flex items-center justify-center">
+<!-- Center Solid Badge Icon -->
+<div class="w-24 h-24 rounded-2xl bg-[#004FD6] flex items-center justify-center shadow-lg shadow-blue-500/20">
+<!-- First-Aid Kit Medical Icon -->
+<svg class="w-12 h-12 text-white" fill="none" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<!-- Case Handle -->
+<path d="M18 14V11C18 9.34315 19.3431 8 21 8H27C28.6569 8 30 9.34315 30 11V14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path>
+<!-- Kit Box -->
+<rect fill="currentColor" height="26" rx="6" width="34" x="7" y="14"></rect>
+<!-- Medical Cross (Cutout effect) -->
+<path d="M24 21V33M18 27H30" stroke="#004FD6" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5"></path>
+</svg>
+</div>
+</div>
+</div>
+</div>
+<!-- Text Content Area -->
+<div class="text-center px-2 space-y-3" data-purpose="text-content">
+<h1 class="text-[26px] font-bold tracking-tight text-[#0A2558] leading-tight">
+          Manage your health
+        </h1>
+<p class="text-slate-500 text-[15px] leading-relaxed max-w-[260px] mx-auto font-normal">
+          Keep track of your appointments and prescriptions in one place.
+        </p>
+</div>
+</section>
+<!-- END: VisualAndContentSection -->
+<!-- BEGIN: BottomNavigation -->
+<footer class="w-full flex flex-col items-center gap-6 pb-4">
+<!-- Primary Action Button -->
+<button class="w-full py-4 px-6 bg-[#004FD6] hover:bg-[#0046BF] active:scale-[0.98] text-white text-[16px] font-semibold rounded-2xl shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 transition-all duration-150" type="button">
+<span>Get Started</span>
+<svg class="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Pagination Dots (Screen 2 of 3 active) -->
+<nav aria-label="Onboarding Steps" class="flex items-center justify-center gap-2 py-1">
+<!-- Screen 1 Dot (Inactive) -->
+<span class="w-2 h-2 rounded-full bg-slate-300 transition-colors"></span>
+<!-- Screen 2 Dot (Active) -->
+<span aria-current="step" class="w-6 h-2 rounded-full bg-[#004FD6] transition-all duration-200"></span>
+<!-- Screen 3 Dot (Inactive) -->
+<span class="w-2 h-2 rounded-full bg-slate-300 transition-colors"></span>
+</nav>
+</footer>
+<!-- END: BottomNavigation -->
+</main>
+<!-- END: MobileDeviceFrame -->
+</body></html>
