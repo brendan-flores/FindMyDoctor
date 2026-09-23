@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
 
-export default function SecretaryLogin() {
+export default function DoctorLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -27,10 +27,20 @@ export default function SecretaryLogin() {
         localStorage.setItem('user', JSON.stringify(response.data.user));
         apiClient.setToken(response.data.accessToken);
 
-        if (response.data.user.role === 'SECRETARY') {
-          router.push('/secretary');
+        if (response.data.user.role === 'DOCTOR') {
+          router.push('/doctor/dashboard');
+        } else if (response.data.user.role === 'ADMIN') {
+          setError('Please use the Admin login portal at /admin/login');
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          apiClient.clearToken();
         } else {
-          setError('Access denied. Secretary access required.');
+          setError('Access denied. Doctor access required.');
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          apiClient.clearToken();
         }
       } else {
         setError(response.error || 'Login failed. Please try again.');
@@ -62,10 +72,10 @@ export default function SecretaryLogin() {
 
         <div className="text-center mb-7 w-full">
           <h1 className="text-[34px] font-black tracking-tight text-[#0D1829] mb-2 leading-tight">
-            Secretary Portal
+            Doctor Portal
           </h1>
           <p className="text-[15px] text-[#718096] font-normal leading-relaxed">
-            Please enter your secretary credentials to sign in.
+            Please enter your doctor credentials to sign in.
           </p>
         </div>
 
@@ -74,7 +84,7 @@ export default function SecretaryLogin() {
             <svg className="w-4 h-4 text-[#1A62CD]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
             </svg>
-            <span className="text-[#1A62CD] font-bold text-[15px] tracking-wide">Secretary Access</span>
+            <span className="text-[#1A62CD] font-bold text-[15px] tracking-wide">Doctor Access</span>
           </div>
         </div>
 
@@ -101,7 +111,7 @@ export default function SecretaryLogin() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="secretary@example.com"
+                placeholder="doctor@example.com"
                 required
                 className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150"
               />
@@ -175,6 +185,19 @@ export default function SecretaryLogin() {
             </button>
           </div>
         </form>
+
+        {/* Sign Up Link */}
+        <div className="mt-6 text-center">
+          <p className="text-[15px] text-[#64748B] font-normal">
+            Don&apos;t have an account?{' '}
+            <a
+              href="/doctor-signup"
+              className="font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors"
+            >
+              Create an Account
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

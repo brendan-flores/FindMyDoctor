@@ -22,7 +22,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
     const userStr = localStorage.getItem('user');
 
     if (!token) {
-      router.push('/auth/login');
+      router.push('/secretary-login');
       return;
     }
 
@@ -35,7 +35,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         apiClient.clearToken();
-        router.push('/auth/login');
+        router.push('/secretary-login');
         return;
       }
       setUserName(user.email.split('@')[0] || 'Secretary');

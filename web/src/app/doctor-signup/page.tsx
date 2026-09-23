@@ -909,7 +909,7 @@ export default function DoctorSignupOtp() {
                 Already have an account?{' '}
 
                 <a
-                  href="/auth/login"
+                  href="/doctor-login"
                   className="font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors"
                 >
                   Log In
@@ -1095,7 +1095,7 @@ export default function DoctorSignupOtp() {
               <div className="mt-8">
                 <button
                   type="button"
-                  onClick={() => router.push('/auth/login')}
+                  onClick={() => router.push('/doctor-login')}
                   className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors"
                 >
                   Back to Login

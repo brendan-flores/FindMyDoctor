@@ -46,7 +46,7 @@ Changes to the Code
 
 1. Before making any changes, always prompt the AI:
 
-"Read all of the .md files inside the docs folder to know what to do, especially AGENTS.md."
+"Read all of the .md files inside the docs folder to know what to do, especially AGENTS.md because it has a task for the model after changing the code."
 
 2. After finishing your assigned task, prompt the AI:
 

@@ -22,7 +22,7 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
     const userStr = localStorage.getItem('user');
 
     if (!token) {
-      router.push('/auth/login');
+      router.push('/doctor-login');
       return;
     }
 
@@ -35,7 +35,7 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         apiClient.clearToken();
-        router.push('/auth/login');
+        router.push('/doctor-login');
         return;
       }
       setUserName(user.email.split('@')[0] || 'Doctor');

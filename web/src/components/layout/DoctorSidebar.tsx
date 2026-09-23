@@ -38,7 +38,7 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
-    router.push('/auth/doctor-login');
+    router.push('/doctor-login');
   };
 
   return (
@@ -103,7 +103,7 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
       {/* Bottom Actions */}
       <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-1">
         <a
-          href="/auth/doctor-login"
+          href="/doctor-login"
           className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
           onClick={handleLogout}
         >

@@ -40,12 +40,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       const user = JSON.parse(userStr);
       // Verify backend-returned role is ADMIN or SUPERADMIN
       if (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
-        // Cross-role access denied, redirect to appropriate login
+        // Cross-role access denied, redirect to admin login
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         apiClient.clearToken();
-        router.push('/auth/login');
+        router.push('/admin/login');
         return;
       }
       setUserName(user.email.split('@')[0] || 'Admin');
