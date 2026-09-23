@@ -256,18 +256,18 @@ The web application uses Next.js 14 with App Router, TypeScript, and Tailwind CS
 FiDo Web
 ├── Admin
 │   └── `/admin/login` → `/admin/dashboard`
-├── Doctor/Secretary
-│   └── `/auth/login`
-│       ├── Doctor → `/doctor/dashboard`
-│       └── Secretary → `/secretary/dashboard`
+├── Doctor
+│   └── `/doctor-login` → `/doctor/dashboard`
+├── Secretary
+│   └── `/secretary-login` → `/secretary/dashboard`
 └── Doctor Sign-Up (Self-Registration)
-    └── `/auth/doctor-signup` → Supabase email OTP → PostgreSQL account → `/doctor/dashboard`
+    └── `/doctor-signup` → Supabase email OTP → PostgreSQL account → `/doctor/dashboard`
 ```
 
 ### Authentication Flow
 
 **Root (`/`):**
-- Unauthenticated users → `/auth/login`
+- Unauthenticated users → `/doctor-login` (default login)
 - Authenticated users → Redirect to role-specific dashboard
 
 **Admin Authentication:**
@@ -277,19 +277,25 @@ FiDo Web
 - Success → `/admin/dashboard`
 - Non-Admin login → Access denied
 
-**Doctor/Secretary Authentication:**
-- Shared login at `/auth/login`
-- Doctor/Secretary selector for login intent (not authorization)
-- Verifies backend-returned role independently of selector
-- Doctor users → `/doctor/dashboard`
-- Secretary users → `/secretary/dashboard`
-- Admin users → Redirected to `/admin/login`
+**Doctor Authentication:**
+- Dedicated login at `/doctor-login`
+- Doctor-only UI (no role selector)
+- Verifies backend-returned role is DOCTOR
+- Success → `/doctor/dashboard`
+- Non-Doctor login → Access denied
+
+**Secretary Authentication:**
+- Dedicated login at `/secretary-login`
+- Secretary-only UI (no role selector)
+- Verifies backend-returned role is SECRETARY
+- Success → `/secretary/dashboard`
+- Non-Secretary login → Access denied
 
 ### Doctor Sign-Up (Self-Registration)
 
-The doctor sign-up page at `/auth/doctor-signup` creates a doctor account:
+The doctor sign-up page at `/doctor-signup` creates a doctor account:
 
-- Linked from the shared Doctor/Secretary login page at `/auth/login`.
+- Linked from the Doctor login page at `/doctor-login`.
 - Groups the form into Doctor Information, Contact Information, and Account Security sections.
 - Submits the completed form to `POST /api/v1/auth/otp/send` (public, no token required).
 - The backend validates the payload (required fields, email format, password length, password/confirm-password match, 7-digit PRC license number, first and last name), then stages the sign-up - including the bcrypt-hashed password - in the `pending_doctor_signups` table added by migration `006_doctor_signup_otp_flow.sql`. No account is created at this step.

@@ -662,18 +662,18 @@ The web application provides role-specific dashboards for doctors, secretaries, 
 FiDo Web
 ├── Admin
 │   └── `/admin/login` → `/admin/dashboard`
-├── Doctor/Secretary
-│   └── `/auth/login`
-│       ├── Doctor → `/doctor/dashboard`
-│       └── Secretary → `/secretary/dashboard`
+├── Doctor
+│   └── `/doctor-login` → `/doctor/dashboard`
+├── Secretary
+│   └── `/secretary-login` → `/secretary/dashboard`
 └── Doctor Sign-Up (Self-Registration)
-    └── `/auth/doctor-signup` → Supabase email OTP → PostgreSQL account → `/doctor/dashboard`
+    └── `/doctor-signup` → Supabase email OTP → PostgreSQL account → `/doctor/dashboard`
 ```
 
 ### Authentication Rules
 
 **Root Route (`/`):**
-- Unauthenticated users redirect to `/auth/login`
+- Unauthenticated users redirect to `/doctor-login` (default login)
 - Authenticated users redirect to their role-specific dashboard
 
 **Admin Authentication:**
@@ -683,19 +683,25 @@ FiDo Web
 - Successful login redirects to `/admin/dashboard`
 - Non-Admin login attempts are denied
 
-**Doctor/Secretary Authentication:**
-- Shared login at `/auth/login`
-- Doctor/Secretary selector for login intent (not authorization)
-- Verifies backend-returned role independently of selector
-- Doctor users redirect to `/doctor/dashboard`
-- Secretary users redirect to `/secretary/dashboard`
-- Admin users are redirected to `/admin/login`
+**Doctor Authentication:**
+- Dedicated login at `/doctor-login`
+- Doctor-only UI with no role selector
+- Verifies backend-returned role is DOCTOR
+- Successful login redirects to `/doctor/dashboard`
+- Non-Doctor login attempts are denied
+
+**Secretary Authentication:**
+- Dedicated login at `/secretary-login`
+- Secretary-only UI with no role selector
+- Verifies backend-returned role is SECRETARY
+- Successful login redirects to `/secretary/dashboard`
+- Non-Secretary login attempts are denied
 
 ### Doctor Sign-Up (Self-Registration)
 
-The doctor sign-up page at `/auth/doctor-signup` creates a doctor account:
+The doctor sign-up page at `/doctor-signup` creates a doctor account:
 
-- Reached from the shared Doctor/Secretary login page at `/auth/login` through the "Create an Account" link.
+- Reached from the Doctor login page at `/doctor-login` through the "Create an Account" link.
 - Collects doctor information (full name, specialty, credentials, PRC license number, clinic), contact information (email, contact number) and account security fields (password, confirm password).
 - Uses the standard client pattern: the page calls the backend REST API and never touches PostgreSQL or Supabase directly.
 - Step 1 - `POST /api/v1/auth/otp/send` validates the form (required fields, email format, password length, password/confirm-password match, 7-digit PRC license number, first and last name) and checks that the email and PRC license number are not already registered.
