@@ -20,12 +20,15 @@ export default function Home() {
       } else if (user.role === 'SECRETARY') {
         router.push('/secretary/dashboard');
       } else {
-        // Unauthenticated or unknown role, redirect to shared login
-        router.push('/auth/login');
+        // Unknown role, clear credentials and redirect to doctor login
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        router.push('/doctor-login');
       }
     } else {
-      // Unauthenticated, redirect to shared login
-      router.push('/auth/login');
+      // Unauthenticated, redirect to doctor login as default
+      router.push('/doctor-login');
     }
   }, [router]);
 
