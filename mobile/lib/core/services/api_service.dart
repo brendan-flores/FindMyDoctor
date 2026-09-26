@@ -31,6 +31,11 @@ class ApiService {
     }
   }
 
+  // Public method to save token (for use after OTP verification)
+  Future<void> saveToken(String token) async {
+    await _saveToken(token);
+  }
+
   // Clear token from storage
   Future<void> _clearToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -212,6 +217,56 @@ class ApiService {
 
   Future<void> logout() async {
     await _clearToken();
+  }
+
+  // ===========================
+  // PATIENT OTP METHODS
+  // ===========================
+
+  Future<Map<String, dynamic>> sendPatientOtp({
+    required String email,
+    required String fullName,
+    required String phone,
+    required String password,
+    required String confirmPassword,
+  }) async {
+    return await post(
+      ApiConstants.patientOtpSend,
+      body: {
+        'email': email,
+        'fullName': fullName,
+        'phone': phone,
+        'password': password,
+        'confirmPassword': confirmPassword,
+      },
+      requireAuth: false,
+    );
+  }
+
+  Future<Map<String, dynamic>> verifyPatientOtp({
+    required String email,
+    required String otp,
+  }) async {
+    return await post(
+      ApiConstants.patientOtpVerify,
+      body: {
+        'email': email,
+        'otp': otp,
+      },
+      requireAuth: false,
+    );
+  }
+
+  Future<Map<String, dynamic>> resendPatientOtp({
+    required String email,
+  }) async {
+    return await post(
+      ApiConstants.patientOtpResend,
+      body: {
+        'email': email,
+      },
+      requireAuth: false,
+    );
   }
 
   Future<Map<String, dynamic>> changePassword(

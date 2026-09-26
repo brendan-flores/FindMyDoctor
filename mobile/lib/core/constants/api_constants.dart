@@ -65,4 +65,9 @@ class ApiConstants {
   // Notifications endpoints
   static const String notifications = '/notifications';
   static const String notificationRead = '/read';
+
+  // Patient OTP endpoints
+  static const String patientOtpSend = '/auth/patient/otp/send';
+  static const String patientOtpVerify = '/auth/patient/otp/verify';
+  static const String patientOtpResend = '/auth/patient/otp/resend';
 }

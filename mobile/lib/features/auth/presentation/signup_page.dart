@@ -5,8 +5,8 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
-import '../../../core/services/auth_service.dart';
 import '../../../core/services/api_service.dart';
+import 'otp_verification_page.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -33,7 +33,9 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _hasNumber = false;
   bool _hasUppercase = false;
 
-  final AuthService _authService = AuthService();
+  final ApiService _apiService = ApiService();
+
+
 
   @override
   void dispose() {
@@ -66,8 +68,6 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   Future<void> _handleSignUp() async {
-    print('🔵 Form validation: ${_formKey.currentState!.validate()}');
-    
     if (_formKey.currentState!.validate()) {
       if (!_agreeToTerms) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -89,30 +89,36 @@ class _SignUpPageState extends State<SignUpPage> {
         return;
       }
 
+      // Validate phone number is not empty
+      if (_phoneController.text.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter your mobile number'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
       setState(() {
         _isLoading = true;
       });
 
       try {
-        final nameParts = _fullNameController.text.trim().split(' ');
-        final firstName = nameParts.isNotEmpty ? nameParts[0] : '';
-        final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+        final fullName = _fullNameController.text.trim();
+        final email = _emailController.text.trim();
+        final phone = _phoneController.text;
+        final password = _passwordController.text;
+        final confirmPassword = _confirmPasswordController.text;
 
-        print('🔵 Starting registration...');
-        print('🔵 Email: ${_emailController.text.trim()}');
-        print('🔵 First Name: $firstName');
-        print('🔵 Last Name: $lastName');
-        print('🔵 API Base URL: ${_authService.baseUrl}');
-
-        final response = await _authService.register(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-          role: 'PATIENT',
-          firstName: firstName,
-          lastName: lastName,
+        // Call the backend API to send OTP
+        final response = await _apiService.sendPatientOtp(
+          email: email,
+          fullName: fullName,
+          phone: phone,
+          password: password,
+          confirmPassword: confirmPassword,
         );
-
-        print('🟢 Registration response received: $response');
 
         if (mounted) {
           setState(() {
@@ -120,25 +126,32 @@ class _SignUpPageState extends State<SignUpPage> {
           });
 
           if (response['success'] == true) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Account created successfully!'),
-                backgroundColor: AppColors.medicalTeal,
+            // Navigate to OTP verification page
+            final nameParts = fullName.split(' ');
+            final firstName = nameParts.isNotEmpty ? nameParts[0] : '';
+            final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => OTPVerificationPage(
+                  email: email,
+                  firstName: firstName,
+                  lastName: lastName,
+                  phone: phone,
+                  password: password,
+                ),
               ),
             );
-            // Navigate to home screen on successful registration
-            Navigator.of(context).pushReplacementNamed('/home');
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(response['error']?['message'] ?? 'Registration failed'),
+                content: Text(response['error']?['message'] ?? 'Failed to send OTP'),
                 backgroundColor: AppColors.error,
               ),
             );
           }
         }
       } catch (e) {
-        print('🔴 Registration error: $e');
         if (mounted) {
           setState(() {
             _isLoading = false;
