@@ -31,6 +31,10 @@ class Doctor {
     this.longitude,
   });
 
+  String get fullName => '$firstName $lastName';
+  String get practiceName => clinicName ?? 'Private Practice';
+  String? get consultationFeeText => consultationFee > 0 ? consultationFee.toStringAsFixed(0) : null;
+
   factory Doctor.fromJson(Map<String, dynamic> json) {
     return Doctor(
       id: json['id'] ?? '',

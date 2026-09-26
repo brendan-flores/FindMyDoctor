@@ -45,6 +45,7 @@ class AppColors {
   static const Color surfaceContainer = Color(0xFFE5EEFF);
   static const Color surfaceContainerHigh = Color(0xFFDCE9FF);
   static const Color surfaceContainerHighest = Color(0xFFD3E4FE);
+  static const Color surfaceContainerLowest = Color(0xFFFFFFFF);
   static const Color surfaceTint = Color(0xFF006591);
 
   // Inverse Colors
