@@ -17,7 +17,7 @@ router.get('/search', authenticate, authorize('SECRETARY'), async (req: AuthRequ
 
     const result = await query(
       `SELECT u.id, u.email, u.role, u.must_change_password,
-              p.first_name, p.last_name, p.phone
+              p.first_name, p.last_name
        FROM users u
        LEFT JOIN patients p ON u.id = p.user_id
        WHERE u.email = $1 AND u.role = 'PATIENT'
@@ -38,7 +38,7 @@ router.get('/search', authenticate, authorize('SECRETARY'), async (req: AuthRequ
 // Create account for walk-in patient
 router.post('/create-account', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
-    const { email, firstName, lastName, phone } = req.body;
+    const { email, firstName, lastName } = req.body;
 
     if (!email || !firstName || !lastName) {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Email, first name, and last name are required'));
@@ -79,10 +79,10 @@ router.post('/create-account', authenticate, authorize('SECRETARY'), async (req:
 
     // Create patient profile
     const patientResult = await query(
-      `INSERT INTO patients (user_id, first_name, last_name, phone) 
-       VALUES ($1, $2, $3, $4) 
+      `INSERT INTO patients (user_id, first_name, last_name)
+       VALUES ($1, $2, $3)
        RETURNING id`,
-      [user.id, firstName, lastName, phone]
+      [user.id, firstName, lastName]
     );
 
     res.status(201).json(success({

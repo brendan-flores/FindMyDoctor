@@ -100,7 +100,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     if (!email || !password) {
       return res.status(400).json(
-        error(ErrorCodes.VALIDATION_ERROR, 'Email and password are required')
+        error(ErrorCodes.VALIDATION_ERROR, 'Email or username and password are required')
       );
     }
 
@@ -112,11 +112,11 @@ router.post('/login', async (req: Request, res: Response) => {
   } catch (err: any) {
     const errorCode = err.code || ErrorCodes.SERVER_ERROR;
     const errorMessage = err.message || 'Login failed';
-    
+
     if (errorCode === ErrorCodes.INVALID_CREDENTIALS) {
       return res.status(401).json(error(errorCode, errorMessage));
     }
-    
+
     res.status(500).json(error(errorCode, errorMessage));
   }
 });

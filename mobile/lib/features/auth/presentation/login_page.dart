@@ -4,6 +4,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/services/api_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,6 +18,7 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  final _apiService = ApiService();
 
   @override
   void dispose() {
@@ -25,39 +27,53 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
 
-      // Hardcoded login credentials
-      const String hardcodedUsername = 'user@gmail.com';
-      const String hardcodedPassword = '123456';
+      try {
+        final email = _emailController.text.trim();
+        final password = _passwordController.text;
 
-      Future.delayed(const Duration(seconds: 1), () {
-        if (!mounted) return;
-        
-        if (_emailController.text == hardcodedUsername && 
-            _passwordController.text == hardcodedPassword) {
+        final response = await _apiService.login(email, password);
+
+        if (mounted) {
           setState(() {
             _isLoading = false;
           });
-          // Navigate to home screen on successful login
-          Navigator.of(context).pushReplacementNamed('/home');
-        } else {
+
+          if (response['success'] == true) {
+            // Navigate to home screen on successful login
+            Navigator.of(context).pushReplacementNamed('/home');
+          } else {
+            // Show error message from backend
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(response['error']['message'] ?? 'Login failed'),
+                backgroundColor: AppColors.error,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
           setState(() {
             _isLoading = false;
           });
-          // Show error message for invalid credentials
+
+          // Show error message for network/error
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Invalid username or password'),
+              content: Text('Login failed. Please check your connection and try again.'),
               backgroundColor: AppColors.error,
+              duration: Duration(seconds: 3),
             ),
           );
         }
-      });
+      }
     }
   }
 
@@ -202,17 +218,14 @@ class _LoginPageState extends State<LoginPage> {
     return Column(
       children: [
         CustomTextField(
-          label: 'Email',
-          hint: 'Enter your email',
+          label: 'Email or Username',
+          hint: 'Enter your email or username',
           controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          prefixIcon: Icons.email_outlined,
+          keyboardType: TextInputType.text,
+          prefixIcon: Icons.person_outline,
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Please enter your email';
-            }
-            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-              return 'Please enter a valid email';
+              return 'Please enter your email or username';
             }
             return null;
           },

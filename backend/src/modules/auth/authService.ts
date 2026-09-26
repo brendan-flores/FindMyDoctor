@@ -87,9 +87,11 @@ export async function register(data: RegisterData) {
 export async function login(data: LoginData) {
   const { email, password } = data;
 
-  // Find user by email
+  // Find user by email or username
   const userResult = await query(
-    'SELECT * FROM users WHERE email = $1 AND is_active = true',
+    `SELECT * FROM users 
+     WHERE (email = $1 OR username = $1) 
+     AND is_active = true`,
     [email]
   );
 

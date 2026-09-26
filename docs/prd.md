@@ -673,7 +673,7 @@ The system shall allow users to register accounts.
 
 Patients shall be able to register accounts through email OTP verification. The registration flow shall:
 
-1. Collect patient information (full name, email, mobile number, password)
+1. Collect patient information (full name, email, username, password)
 2. Send a 6-digit OTP code to the patient's email via Supabase
 3. Verify the OTP code before creating the patient account
 4. Create the patient account in PostgreSQL upon successful OTP verification

@@ -5,6 +5,7 @@ import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/signup_page.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/doctors/presentation/doctor_schedule_page.dart';
+import '../features/doctors/presentation/doctors_page.dart';
 import '../features/appointments/presentation/booking_confirmation_page.dart';
 
 class MyApp extends StatelessWidget {
@@ -20,6 +21,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignUpPage(),
         '/home': (context) => const HomePage(),
+        '/doctors': (context) => const DoctorsPage(),
         '/doctor-schedule': (context) => const DoctorSchedulePage(),
         '/booking-confirmation': (context) => const BookingConfirmationPage(),
       },

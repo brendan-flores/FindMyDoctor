@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/api_service.dart';
 import 'otp_verification_page.dart';
@@ -19,19 +17,24 @@ class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
-  
+
   // Password requirement indicators
   bool _hasMinLength = false;
   bool _hasNumber = false;
   bool _hasUppercase = false;
+
+  // Field validation states
+  bool _isFullNameValid = false;
+  bool _isEmailValid = false;
+  bool _isUsernameValid = false;
 
   final ApiService _apiService = ApiService();
 
@@ -41,7 +44,7 @@ class _SignUpPageState extends State<SignUpPage> {
   void dispose() {
     _fullNameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -67,6 +70,24 @@ class _SignUpPageState extends State<SignUpPage> {
     });
   }
 
+  void _validateFullName(String value) {
+    setState(() {
+      _isFullNameValid = value.trim().split(' ').length >= 2;
+    });
+  }
+
+  void _validateEmail(String value) {
+    setState(() {
+      _isEmailValid = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value);
+    });
+  }
+
+  void _validateUsername(String value) {
+    setState(() {
+      _isUsernameValid = value.trim().length >= 3;
+    });
+  }
+
   Future<void> _handleSignUp() async {
     if (_formKey.currentState!.validate()) {
       if (!_agreeToTerms) {
@@ -89,11 +110,11 @@ class _SignUpPageState extends State<SignUpPage> {
         return;
       }
 
-      // Validate phone number is not empty
-      if (_phoneController.text.isEmpty) {
+      // Validate username is not empty
+      if (_usernameController.text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please enter your mobile number'),
+            content: Text('Please enter a username'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -107,7 +128,7 @@ class _SignUpPageState extends State<SignUpPage> {
       try {
         final fullName = _fullNameController.text.trim();
         final email = _emailController.text.trim();
-        final phone = _phoneController.text;
+        final username = _usernameController.text.trim();
         final password = _passwordController.text;
         final confirmPassword = _confirmPasswordController.text;
 
@@ -115,7 +136,7 @@ class _SignUpPageState extends State<SignUpPage> {
         final response = await _apiService.sendPatientOtp(
           email: email,
           fullName: fullName,
-          phone: phone,
+          username: username,
           password: password,
           confirmPassword: confirmPassword,
         );
@@ -137,7 +158,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   email: email,
                   firstName: firstName,
                   lastName: lastName,
-                  phone: phone,
+                  username: username,
                   password: password,
                 ),
               ),
@@ -177,7 +198,7 @@ class _SignUpPageState extends State<SignUpPage> {
             SnackBar(
               content: Text(errorMessage),
               backgroundColor: AppColors.error,
-              duration: const Duration(seconds: 5),
+              duration: Duration(seconds: 5),
             ),
           );
         }
@@ -200,11 +221,29 @@ class _SignUpPageState extends State<SignUpPage> {
                 children: [
                   const SizedBox(height: AppSpacing.gutterMd),
                   // Back button
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back_ios_new),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.slate200.withValues(alpha: 0.8),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.brandNavy.withValues(alpha: 0.06),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.gutterLg),
 
@@ -322,12 +361,14 @@ class _SignUpPageState extends State<SignUpPage> {
     return Column(
       children: [
         // Full Name Field
-        CustomTextField(
+        _buildInputField(
           label: 'Full Name',
           hint: 'e.g. Juan Michael Reyes',
           controller: _fullNameController,
           keyboardType: TextInputType.name,
-          prefixIcon: Icons.person,
+          icon: Icons.person,
+          isValid: _isFullNameValid,
+          onChanged: _validateFullName,
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'Please enter your full name';
@@ -341,12 +382,14 @@ class _SignUpPageState extends State<SignUpPage> {
         const SizedBox(height: AppSpacing.gutterMd),
 
         // Email Address Field
-        CustomTextField(
+        _buildInputField(
           label: 'Email Address',
           hint: 'Enter your email',
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
-          prefixIcon: Icons.email_outlined,
+          icon: Icons.email_outlined,
+          isValid: _isEmailValid,
+          onChanged: _validateEmail,
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'Please enter your email';
@@ -359,8 +402,25 @@ class _SignUpPageState extends State<SignUpPage> {
         ),
         const SizedBox(height: AppSpacing.gutterMd),
 
-        // Mobile Number Field with Philippine prefix
-        _buildMobileNumberField(),
+        // Username Field
+        _buildInputField(
+          label: 'Username',
+          hint: 'e.g. juanreyes',
+          controller: _usernameController,
+          keyboardType: TextInputType.text,
+          icon: Icons.badge,
+          isValid: _isUsernameValid,
+          onChanged: _validateUsername,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter a username';
+            }
+            if (value.trim().length < 3) {
+              return 'Username must be at least 3 characters';
+            }
+            return null;
+          },
+        ),
         const SizedBox(height: AppSpacing.gutterMd),
 
         // Password Field
@@ -377,82 +437,55 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
-  Widget _buildMobileNumberField() {
+  Widget _buildInputField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    required TextInputType keyboardType,
+    required IconData icon,
+    required bool isValid,
+    required Function(String) onChanged,
+    String? Function(String?)? validator,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Mobile Number',
-              style: AppTextStyles.labelMd.copyWith(
-                color: AppColors.brandNavy,
-              ),
-            ),
-            Text(
-              'For SMS queue alerts',
-              style: AppTextStyles.labelSm.copyWith(
-                color: AppColors.slate400,
-              ),
-            ),
-          ],
+        Text(
+          label,
+          style: AppTextStyles.labelMd.copyWith(
+            color: AppColors.brandNavy,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: AppSpacing.gutterXs),
         Container(
           decoration: BoxDecoration(
-            color: AppColors.slate100,
-            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-            border: Border.all(color: AppColors.slate300),
+            color: AppColors.slate100.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            border: Border.all(
+              color: isValid ? AppColors.brandPrimary.withValues(alpha: 0.3) : AppColors.slate200,
+            ),
           ),
-          child: Row(
-            children: [
-              // Philippine flag and country code
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.gutterSm,
-                  vertical: AppSpacing.gutterSm,
-                ),
-                decoration: BoxDecoration(
-                  border: const Border(
-                    right: BorderSide(color: AppColors.slate300),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Text('🇵🇭', style: TextStyle(fontSize: 18)),
-                    const SizedBox(width: 6),
-                    Text(
-                      '+63',
-                      style: AppTextStyles.labelSm.copyWith(
-                        color: AppColors.slate700,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+          child: TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            onChanged: onChanged,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: AppTextStyles.bodyMd.copyWith(
+                color: AppColors.slate400,
+                fontSize: 15,
               ),
-              Expanded(
-                child: TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    hintText: '917 123 4567',
-                    hintStyle: AppTextStyles.bodyMd.copyWith(
-                      color: AppColors.slate400,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.gutterMd,
-                      vertical: AppSpacing.gutterSm,
-                    ),
-                  ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
-                ),
+              prefixIcon: Icon(icon, color: AppColors.slate400, size: 20),
+              suffixIcon: isValid
+                  ? const Icon(Icons.check_circle, color: AppColors.brandTealBadge, size: 20)
+                  : null,
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.gutterMd,
+                vertical: AppSpacing.gutterSm,
               ),
-            ],
+            ),
           ),
         ),
       ],
@@ -467,35 +500,40 @@ class _SignUpPageState extends State<SignUpPage> {
           'Password',
           style: AppTextStyles.labelMd.copyWith(
             color: AppColors.brandNavy,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: AppSpacing.gutterXs),
-        TextField(
-          controller: _passwordController,
-          obscureText: _obscurePassword,
-          onChanged: _validatePassword,
-          decoration: InputDecoration(
-            hintText: 'Create password (min. 8 characters)',
-            hintStyle: AppTextStyles.bodyMd.copyWith(
-              color: AppColors.slate400,
-            ),
-            prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.slate400),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.slate100.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            border: Border.all(color: AppColors.slate200),
+          ),
+          child: TextField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            onChanged: _validatePassword,
+            decoration: InputDecoration(
+              hintText: 'Create password (min. 8 characters)',
+              hintStyle: AppTextStyles.bodyMd.copyWith(
                 color: AppColors.slate400,
+                fontSize: 15,
               ),
-              onPressed: _togglePasswordVisibility,
-            ),
-            filled: true,
-            fillColor: AppColors.slate100,
-            border: OutlineInputBorder(
-              borderSide: BorderSide(color: AppColors.slate300),
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.gutterMd,
-              vertical: AppSpacing.gutterSm,
+              prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.slate400, size: 20),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  color: AppColors.slate400,
+                  size: 20,
+                ),
+                onPressed: _togglePasswordVisibility,
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.gutterMd,
+                vertical: AppSpacing.gutterSm,
+              ),
             ),
           ),
         ),
@@ -514,34 +552,39 @@ class _SignUpPageState extends State<SignUpPage> {
           'Confirm Password',
           style: AppTextStyles.labelMd.copyWith(
             color: AppColors.brandNavy,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: AppSpacing.gutterXs),
-        TextField(
-          controller: _confirmPasswordController,
-          obscureText: _obscureConfirmPassword,
-          decoration: InputDecoration(
-            hintText: 'Confirm your password',
-            hintStyle: AppTextStyles.bodyMd.copyWith(
-              color: AppColors.slate400,
-            ),
-            prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.slate400),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.slate100.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            border: Border.all(color: AppColors.slate200),
+          ),
+          child: TextField(
+            controller: _confirmPasswordController,
+            obscureText: _obscureConfirmPassword,
+            decoration: InputDecoration(
+              hintText: 'Confirm your password',
+              hintStyle: AppTextStyles.bodyMd.copyWith(
                 color: AppColors.slate400,
+                fontSize: 15,
               ),
-              onPressed: _toggleConfirmPasswordVisibility,
-            ),
-            filled: true,
-            fillColor: AppColors.slate100,
-            border: OutlineInputBorder(
-              borderSide: BorderSide(color: AppColors.slate300),
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.gutterMd,
-              vertical: AppSpacing.gutterSm,
+              prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.slate400, size: 20),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                  color: AppColors.slate400,
+                  size: 20,
+                ),
+                onPressed: _toggleConfirmPasswordVisibility,
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.gutterMd,
+                vertical: AppSpacing.gutterSm,
+              ),
             ),
           ),
         ),
@@ -567,9 +610,9 @@ class _SignUpPageState extends State<SignUpPage> {
         vertical: 2,
       ),
       decoration: BoxDecoration(
-        color: isMet ? AppColors.brandAccentBlue.withValues(alpha: 0.1) : AppColors.slate100,
+        color: isMet ? AppColors.brandTealBadge.withValues(alpha: 0.1) : AppColors.slate100,
         border: Border.all(
-          color: isMet ? AppColors.brandPrimary.withValues(alpha: 0.3) : AppColors.slate300,
+          color: isMet ? AppColors.brandTealBadge.withValues(alpha: 0.6) : AppColors.slate300,
         ),
         borderRadius: BorderRadius.circular(999),
       ),
@@ -577,16 +620,17 @@ class _SignUpPageState extends State<SignUpPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            isMet ? Icons.check_circle : Icons.circle,
+            isMet ? Icons.check : Icons.circle,
             size: 12,
-            color: isMet ? AppColors.brandPrimary : AppColors.slate400,
+            color: isMet ? AppColors.brandTealBadge : AppColors.slate400,
           ),
           const SizedBox(width: 4),
           Text(
             text,
             style: AppTextStyles.labelSm.copyWith(
-              color: isMet ? AppColors.brandPrimary : AppColors.slate600,
+              color: isMet ? AppColors.brandTealBadge : AppColors.slate600,
               fontWeight: FontWeight.w500,
+              fontSize: 11,
             ),
           ),
         ],

@@ -4,6 +4,7 @@ import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../appointments/presentation/appointments_page.dart';
+import '../../doctors/presentation/doctors_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -24,6 +25,7 @@ class _HomePageState extends State<HomePage> {
           index: _currentIndex,
           children: [
             _buildHomeContent(),
+            _buildDoctorsContent(),
             _buildAppointmentsContent(),
             _buildChatContent(),
             _buildProfileContent(),
@@ -57,6 +59,16 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDoctorsContent() {
+    return DoctorsPage(
+      onNavigateToTab: (index) {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
     );
   }
 
@@ -358,7 +370,7 @@ class _HomePageState extends State<HomePage> {
         _buildQuickActionCard(
           'Find a Doctor',
           'By specialty',
-          Icons.medical_services,
+          Icons.local_hospital,
           AppColors.primaryFixed,
           AppColors.primary,
         ),
@@ -397,7 +409,9 @@ class _HomePageState extends State<HomePage> {
     return AppCard(
       onTap: () {
         if (title == 'Find a Doctor') {
-          Navigator.of(context).pushNamed('/doctor-schedule');
+          setState(() {
+            _currentIndex = 1;
+          });
         }
       },
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
@@ -528,7 +542,9 @@ class _HomePageState extends State<HomePage> {
             width: 60,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pushNamed('/doctor-schedule');
+                setState(() {
+                  _currentIndex = 1;
+                });
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -675,10 +691,11 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(Icons.local_hospital, 'Home', 0),
-              _buildNavItem(Icons.calendar_month, 'Appointments', 1),
-              _buildNavItem(Icons.chat_bubble, 'Chat', 2),
-              _buildNavItem(Icons.account_circle, 'Profile', 3),
+              _buildNavItem(Icons.home, 'Home', 0),
+              _buildNavItem(Icons.local_hospital, 'Doctors', 1),
+              _buildNavItem(Icons.calendar_month, 'Appointments', 2),
+              _buildNavItem(Icons.chat_bubble, 'Chat', 3),
+              _buildNavItem(Icons.account_circle, 'Profile', 4),
             ],
           ),
         ),

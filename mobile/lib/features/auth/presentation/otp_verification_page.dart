@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -11,7 +12,7 @@ class OTPVerificationPage extends StatefulWidget {
   final String email;
   final String? firstName;
   final String? lastName;
-  final String? phone;
+  final String? username;
   final String? password;
 
   const OTPVerificationPage({
@@ -19,7 +20,7 @@ class OTPVerificationPage extends StatefulWidget {
     required this.email,
     this.firstName,
     this.lastName,
-    this.phone,
+    this.username,
     this.password,
   });
 
@@ -40,6 +41,7 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
   bool _isLoading = false;
   int _resendCountdown = 30;
   bool _canResend = false;
+  String? _errorMessage;
 
   final ApiService _apiService = ApiService();
 
@@ -47,6 +49,10 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
   void initState() {
     super.initState();
     _startResendTimer();
+    // Add listeners to OTP controllers
+    for (var controller in _otpControllers) {
+      controller.addListener(_onOTPChanged);
+    }
     // Auto-focus the first OTP field
     Future.delayed(const Duration(milliseconds: 100), () {
       _focusNodes[0].requestFocus();
@@ -56,12 +62,22 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
   @override
   void dispose() {
     for (var controller in _otpControllers) {
+      controller.removeListener(_onOTPChanged);
       controller.dispose();
     }
     for (var node in _focusNodes) {
       node.dispose();
     }
     super.dispose();
+  }
+
+  void _onOTPChanged() {
+    // Clear error message when user starts typing
+    if (_errorMessage != null) {
+      setState(() {
+        _errorMessage = null;
+      });
+    }
   }
 
   void _startResendTimer() {
@@ -90,6 +106,9 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
   }
 
   void _handleOTPChange(int index, String value) {
+    setState(() {
+      // Trigger rebuild to update button state
+    });
     if (value.isNotEmpty && index < 5) {
       // Move to next field
       _focusNodes[index + 1].requestFocus();
@@ -126,17 +145,15 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
 
   Future<void> _handleVerify() async {
     if (!_isOTPValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid 6-digit OTP code'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      setState(() {
+        _errorMessage = 'Please enter a valid 6-digit OTP code';
+      });
       return;
     }
 
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
@@ -157,6 +174,10 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
             await _apiService.saveToken(response['data']['accessToken']);
           }
 
+          // Clear onboarding completion flag for new users
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('has_completed_onboarding', false);
+
           if (mounted) {
             // Show success message
             ScaffoldMessenger.of(context).showSnackBar(
@@ -174,12 +195,9 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
             );
           }
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response['error']?['message'] ?? 'Verification failed'),
-              backgroundColor: AppColors.error,
-            ),
-          );
+          setState(() {
+            _errorMessage = response['error']?['message'] ?? 'Invalid or expired OTP code';
+          });
         }
       }
     } catch (e) {
@@ -203,12 +221,9 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
           errorMessage = errorString;
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        setState(() {
+          _errorMessage = errorMessage;
+        });
       }
     }
   }
@@ -316,6 +331,31 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
 
                 // OTP Input Fields
                 _buildOTPInputFields(),
+                const SizedBox(height: AppSpacing.gutterMd),
+
+                // Error Message
+                if (_errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.gutterMd),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: AppColors.error,
+                          size: 16,
+                        ),
+                        const SizedBox(width: AppSpacing.gutterXs),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: AppTextStyles.bodySm.copyWith(
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 const SizedBox(height: AppSpacing.gutter2xl),
 
                 // Resend OTP Timer
@@ -325,7 +365,7 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                 // Verify Button
                 PrimaryButton(
                   text: 'Verify Email',
-                  onPressed: _isOTPValid ? _handleVerify : null,
+                  onPressed: _handleVerify,
                   isLoading: _isLoading,
                   icon: const Icon(Icons.arrow_forward, size: 20),
                 ),
