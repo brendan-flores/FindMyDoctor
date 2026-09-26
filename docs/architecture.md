@@ -412,7 +412,7 @@ Patients can register accounts through email OTP verification:
 ```text
 Patient Registration Form
         ↓
-Collect Information (name, email, phone, password)
+Collect Information (name, email, username, password)
         ↓
 Send OTP via Supabase
         ↓

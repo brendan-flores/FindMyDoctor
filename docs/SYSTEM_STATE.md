@@ -6,9 +6,13 @@ Current System State (September 2026):
 - Doctor self-registration creates accounts with `approval_status = 'PENDING'` requiring admin approval
 - Three-state doctor approval workflow: PENDING → ACTIVE (approved) or REJECTED
 - Patient registration uses email OTP verification via Supabase for account creation
+- Patient registration requires username (minimum 3 characters, alphanumeric + underscores only)
+- User login accepts either email or username for authentication
 - Supabase is used only for OTP email verification, not for storing application data
 - Backend API includes comprehensive endpoints for doctors, admin, OTP, appointments, queue, payments, etc.
-- Database schema includes approval status fields, pending doctor signups staging table, and pending patient signups staging table
+- Database schema includes approval status fields, pending doctor signups staging table, and pending patient signups staging table (with username)
+- Users table includes username field (unique) for patient identification
+- Patients table does not include phone field (removed in favor of username)
 - Backend API endpoints for patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
 - Web application provides role-specific dashboards for Doctor, Secretary, and Admin users
