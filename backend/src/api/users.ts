@@ -65,17 +65,16 @@ router.put('/me', authenticate, async (req: AuthRequest, res: Response) => {
 
     // Update role-specific profile
     if (role === 'PATIENT') {
-      const { firstName, lastName, phone, address, emergencyContactName, emergencyContactPhone } = updates;
+      const { firstName, lastName, address, emergencyContactName, emergencyContactPhone } = updates;
       await query(
-        `UPDATE patients 
+        `UPDATE patients
          SET first_name = COALESCE($1, first_name),
              last_name = COALESCE($2, last_name),
-             phone = COALESCE($3, phone),
-             address = COALESCE($4, address),
-             emergency_contact_name = COALESCE($5, emergency_contact_name),
-             emergency_contact_phone = COALESCE($6, emergency_contact_phone)
-         WHERE user_id = $7`,
-        [firstName, lastName, phone, address, emergencyContactName, emergencyContactPhone, userId]
+             address = COALESCE($3, address),
+             emergency_contact_name = COALESCE($4, emergency_contact_name),
+             emergency_contact_phone = COALESCE($5, emergency_contact_phone)
+         WHERE user_id = $6`,
+        [firstName, lastName, address, emergencyContactName, emergencyContactPhone, userId]
       );
     }
 

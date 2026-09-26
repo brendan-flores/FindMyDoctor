@@ -32,7 +32,7 @@ interface ValidatedPatientSignup {
   password: string;
   firstName: string;
   lastName: string;
-  phone: string;
+  username: string;
 }
 
 /**
@@ -41,16 +41,24 @@ interface ValidatedPatientSignup {
 function validatePatientSignupPayload(body: any): ValidatedPatientSignup {
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
   const fullName = typeof body?.fullName === 'string' ? body.fullName.trim() : '';
-  const phone = typeof body?.phone === 'string' ? body.phone.trim() : '';
+  const username = typeof body?.username === 'string' ? body.username.trim() : '';
   const password = typeof body?.password === 'string' ? body.password : '';
   const confirmPassword = typeof body?.confirmPassword === 'string' ? body.confirmPassword : '';
 
-  if (!email || !fullName || !phone || !password || !confirmPassword) {
+  if (!email || !fullName || !username || !password || !confirmPassword) {
     throw { code: ErrorCodes.VALIDATION_ERROR, message: 'All fields are required' };
   }
 
   if (!EMAIL_PATTERN.test(email)) {
     throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Invalid email address' };
+  }
+
+  if (username.length < 3) {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Username must be at least 3 characters' };
+  }
+
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Username can only contain letters, numbers, and underscores' };
   }
 
   if (password.length < 8) {
@@ -72,7 +80,7 @@ function validatePatientSignupPayload(body: any): ValidatedPatientSignup {
     password,
     firstName: nameParts[0],
     lastName: nameParts.slice(1).join(' '),
-    phone,
+    username,
   };
 }
 
@@ -100,7 +108,7 @@ router.post('/send', async (req: Request, res: Response) => {
 
     await query(
       `INSERT INTO pending_patient_signups (
-         email, password_hash, first_name, last_name, phone, expires_at
+         email, password_hash, first_name, last_name, username, expires_at
        )
        VALUES (
          $1, $2, $3, $4, $5,
@@ -110,7 +118,7 @@ router.post('/send', async (req: Request, res: Response) => {
          password_hash = EXCLUDED.password_hash,
          first_name = EXCLUDED.first_name,
          last_name = EXCLUDED.last_name,
-         phone = EXCLUDED.phone,
+         username = EXCLUDED.username,
          expires_at = EXCLUDED.expires_at,
          updated_at = CURRENT_TIMESTAMP`,
       [
@@ -118,7 +126,7 @@ router.post('/send', async (req: Request, res: Response) => {
         passwordHash,
         payload.firstName,
         payload.lastName,
-        payload.phone,
+        payload.username,
         PENDING_SIGNUP_TTL_MINUTES,
       ]
     );
@@ -211,24 +219,23 @@ router.post('/verify', async (req: Request, res: Response) => {
 
     // Application account (credentials) - bcrypt hash, verified email
     const userResult = await client.query(
-      `INSERT INTO users (email, password_hash, role, must_change_password, email_verified, email_verified_at)
-       VALUES ($1, $2, 'PATIENT', false, true, CURRENT_TIMESTAMP)
-       RETURNING id, email, role, must_change_password, email_verified`,
-      [email, pending.password_hash]
+      `INSERT INTO users (email, password_hash, role, must_change_password, email_verified, email_verified_at, username)
+       VALUES ($1, $2, 'PATIENT', false, true, CURRENT_TIMESTAMP, $3)
+       RETURNING id, email, role, must_change_password, email_verified, username`,
+      [email, pending.password_hash, pending.username]
     );
 
     const user = userResult.rows[0];
 
     // Patient profile - every field captured by the sign-up page
     const patientResult = await client.query(
-      `INSERT INTO patients (user_id, first_name, last_name, phone)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, user_id, first_name, last_name, phone, created_at`,
+      `INSERT INTO patients (user_id, first_name, last_name)
+       VALUES ($1, $2, $3)
+       RETURNING id, user_id, first_name, last_name, created_at`,
       [
         user.id,
         pending.first_name,
         pending.last_name,
-        pending.phone,
       ]
     );
 
