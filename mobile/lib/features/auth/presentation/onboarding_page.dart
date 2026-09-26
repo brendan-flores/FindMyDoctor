@@ -7,7 +7,9 @@ import '../../../core/widgets/primary_button.dart';
 import '../../home/presentation/home_page.dart';
 
 class OnboardingPage extends StatefulWidget {
-  const OnboardingPage({super.key});
+  final bool forceShow;
+
+  const OnboardingPage({super.key, this.forceShow = false});
 
   @override
   State<OnboardingPage> createState() => _OnboardingPageState();
@@ -42,9 +44,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Future<void> _checkOnboardingStatus() async {
+    // If forceShow is true, skip the check and always show onboarding
+    if (widget.forceShow) return;
+
     final prefs = await SharedPreferences.getInstance();
     final hasCompletedOnboarding = prefs.getBool('has_completed_onboarding') ?? false;
-    
+
     if (hasCompletedOnboarding && mounted) {
       // If onboarding already completed, go directly to home
       Navigator.of(context).pushAndRemoveUntil(

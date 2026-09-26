@@ -125,9 +125,9 @@ class SuccessfulRegistrationPage extends StatelessWidget {
         child: PrimaryButton(
           text: 'Continue',
           onPressed: () {
-            Navigator.of(context).push(
+            Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (context) => const OnboardingPage(),
+                builder: (context) => const OnboardingPage(forceShow: true),
               ),
             );
           },
