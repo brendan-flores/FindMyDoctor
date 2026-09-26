@@ -669,6 +669,46 @@ Notifications may be generated for:
 
 The system shall allow users to register accounts.
 
+## FR-001-A — Patient Registration with OTP
+
+Patients shall be able to register accounts through email OTP verification. The registration flow shall:
+
+1. Collect patient information (full name, email, mobile number, password)
+2. Send a 6-digit OTP code to the patient's email via Supabase
+3. Verify the OTP code before creating the patient account
+4. Create the patient account in PostgreSQL upon successful OTP verification
+5. PostgreSQL remains the single source of truth for patient account data
+6. Supabase is used only for OTP email delivery and verification, not for storing patient data
+
+**Backend API Endpoints:**
+- `POST /api/v1/auth/patient/otp/send` - Send OTP to patient email
+- `POST /api/v1/auth/patient/otp/verify` - Verify OTP and create patient account
+- `POST /api/v1/auth/patient/otp/resend` - Resend OTP for existing staged signup
+
+**Backend Implementation:**
+- Service: `patientOtpService.ts` handles Supabase OTP operations
+- Router: `patientOtp.ts` provides API endpoints
+- Database: `pending_patient_signups` table stages registration data
+- Migration: `008_patient_signup_otp_flow.sql` creates staging table
+
+**Security Requirements:**
+- Password hashed with bcrypt before storage
+- Email verified through OTP before account activation
+- Temporary patient data staged during OTP process
+- Single PostgreSQL transaction for account creation after OTP verification
+- 15-minute expiration for staged sign-up data
+- Automatic cleanup of expired staged sign-ups
+
+**Mobile Implementation:**
+- Page: `otp_verification_page.dart` provides 6-digit OTP input interface
+- Page: `successful_registration_page.dart` displays registration success message
+- Page: `onboarding_page.dart` provides 3-screen onboarding flow (Find doctor, Manage health, Book appointments)
+- API Service: `api_service.dart` includes patient OTP methods and token management
+- Integration: `signup_page.dart` calls backend to send OTP and navigate to verification
+- Features: Auto-focus, paste support, resend timer, error handling
+- Flow: OTP verification → Successful registration → Onboarding → Home dashboard (authenticated)
+- Authentication: After successful OTP verification, user is automatically authenticated and can access the app directly
+
 ## FR-002 — Authentication
 
 The system shall authenticate users before protected access.

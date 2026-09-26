@@ -648,7 +648,15 @@ waitlists
 notifications
 
 pending_doctor_signups (for OTP staging)
+pending_patient_signups (for OTP staging)
 ```
+
+**Database Migrations:**
+- `001_initial_schema.sql` - Core database schema
+- `005_doctor_self_registration.sql` - Doctor self-registration fields
+- `006_doctor_signup_otp_flow.sql` - Doctor OTP staging table
+- `007_doctor_approval_states.sql` - Doctor approval workflow
+- `008_patient_signup_otp_flow.sql` - Patient OTP staging table
 
 ---
 
@@ -736,6 +744,71 @@ After a doctor completes self-registration and email OTP verification:
 
 Administrator provisioning under Admin Account Provisioning remains available for accounts created on a doctor's behalf.
 
+### Patient Registration with OTP
+
+Patients can register accounts through email OTP verification:
+
+**Registration Flow:**
+```text
+Patient Registration Form
+        ↓
+Collect Information (name, email, phone, password)
+        ↓
+Send OTP via Supabase
+        ↓
+Patient Enters OTP
+        ↓
+Verify OTP with Supabase
+        ↓
+Create Patient Account in PostgreSQL
+        ↓
+Patient Can Login
+```
+
+**OTP Verification Requirements:**
+- 6-digit OTP code sent to patient's email
+- OTP expires after a defined time period
+- Patient can request OTP resend after timer expires
+- Account creation only occurs after successful OTP verification
+- PostgreSQL is the single source of truth for patient data
+- Supabase is used only for OTP delivery and verification
+
+**Backend API Endpoints:**
+- `POST /api/v1/auth/patient/otp/send` - Send OTP to patient email
+- `POST /api/v1/auth/patient/otp/verify` - Verify OTP and create patient account
+- `POST /api/v1/auth/patient/otp/resend` - Resend OTP for existing staged signup
+
+**Security Requirements:**
+- Password hashed with bcrypt before storage
+- Email verified through OTP before account activation
+- Temporary patient data staged during OTP process
+- Single PostgreSQL transaction for account creation after OTP verification
+- 15-minute expiration for staged sign-up data
+- Automatic cleanup of expired staged sign-ups
+
+**Backend Implementation:**
+- Service: `patientOtpService.ts` handles Supabase OTP operations
+- Router: `patientOtp.ts` provides API endpoints
+- Database: `pending_patient_signups` table stages registration data
+- Migration: `008_patient_signup_otp_flow.sql` creates staging table
+
+**Mobile Implementation:**
+- Page: `otp_verification_page.dart` provides 6-digit OTP input interface
+- Page: `successful_registration_page.dart` displays registration success message
+- Page: `onboarding_page.dart` provides 3-screen onboarding flow (Find doctor, Manage health, Book appointments)
+- API Service: `api_service.dart` includes patient OTP methods and token management
+- Integration: `signup_page.dart` calls backend to send OTP and navigate to verification
+- Features: Auto-focus, paste support, resend timer, error handling
+- Flow: OTP verification → Successful registration → Onboarding → Home dashboard (authenticated)
+- Authentication: After successful OTP verification, user is automatically authenticated and can access the app directly
+- Onboarding: Only displayed for newly created accounts after registration, not for returning users
+
+**Key Differences from Doctor Registration:**
+- Patient accounts do not require admin approval
+- Patients can access the system immediately after successful OTP verification
+- Patient registration uses the same Supabase OTP infrastructure as doctor registration
+- Both patient and doctor registration maintain PostgreSQL as the single source of truth
+
 ### Role-Based Protection
 
 - `/admin/*` routes - Allow only ADMIN users
@@ -788,6 +861,10 @@ Use:
 Do not expose database access directly to the mobile app.
 
 All important operations must pass through backend authorization and validation.
+
+**OTP Endpoints:**
+- Doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
+- Patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
 
 ---
 
