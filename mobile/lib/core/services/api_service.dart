@@ -226,7 +226,7 @@ class ApiService {
   Future<Map<String, dynamic>> sendPatientOtp({
     required String email,
     required String fullName,
-    required String phone,
+    required String username,
     required String password,
     required String confirmPassword,
   }) async {
@@ -235,7 +235,7 @@ class ApiService {
       body: {
         'email': email,
         'fullName': fullName,
-        'phone': phone,
+        'username': username,
         'password': password,
         'confirmPassword': confirmPassword,
       },
