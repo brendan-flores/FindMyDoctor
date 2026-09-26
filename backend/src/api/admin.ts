@@ -222,7 +222,7 @@ router.patch('/doctors/:id/reject', authenticate, authorize('ADMIN'), async (req
     }
     
     if (current.rows[0].approval_status === 'REJECTED') {
-      return res.status(400).json(ErrorCodes.VALIDATION_ERROR, 'Doctor is already rejected');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Doctor is already rejected'));
     }
     
     await query(

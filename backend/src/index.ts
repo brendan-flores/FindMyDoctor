@@ -10,6 +10,7 @@ import { pool } from './database/connection';
 // Import routers
 import authRouter from './api/auth';
 import otpRouter from './api/otp';
+import patientOtpRouter from './api/patientOtp';
 import usersRouter from './api/users';
 import doctorsRouter from './api/doctors';
 import appointmentsRouter from './api/appointments';
@@ -85,6 +86,7 @@ app.get('/health', (req, res) => {
 const apiVersion = config.app.apiVersion;
 app.use(`/api/${apiVersion}/auth`, authRouter);
 app.use(`/api/${apiVersion}/auth/otp`, otpRouter);
+app.use(`/api/${apiVersion}/auth/patient/otp`, patientOtpRouter);
 app.use(`/api/${apiVersion}/users`, authenticate, usersRouter);
 app.use(`/api/${apiVersion}/doctors`, doctorsRouter);
 app.use(`/api/${apiVersion}/appointments`, authenticate, appointmentsRouter);
