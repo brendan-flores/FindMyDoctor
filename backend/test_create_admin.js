@@ -14,7 +14,7 @@ async function testCreateAdmin() {
       },
       body: JSON.stringify({
         email: 'superadmin@findmydoctor.local',
-        password: 'SuperAdmin@FiDo2024'
+        password: 'SuperAdmin@2026'
       })
     });
 
@@ -31,7 +31,7 @@ async function testCreateAdmin() {
     // Test creating a new admin
     console.log('📡 Creating new admin account...');
     const testEmail = `testadmin${Date.now()}@findmydoctor.local`;
-    const testPassword = 'TestAdmin@2024';
+    const testPassword = 'TestAdmin@2026';
 
     const createResponse = await fetch('http://localhost:3000/api/v1/admin/admins', {
       method: 'POST',

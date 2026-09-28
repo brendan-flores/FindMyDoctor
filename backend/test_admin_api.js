@@ -13,7 +13,7 @@ async function testAdminAPI() {
       },
       body: JSON.stringify({
         email: 'superadmin@findmydoctor.local',
-        password: 'SuperAdmin@FiDo2024'
+        password: 'SuperAdmin@2026'
       })
     });
 
