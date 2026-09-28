@@ -20,7 +20,7 @@ async function seedAdminAccounts() {
 
     if (existingSuperAdmin.rows.length === 0) {
       // Generate secure password hash for SuperAdmin
-      const superAdminPassword = 'SuperAdmin@FiDo2024';
+      const superAdminPassword = 'SuperAdmin@2026';
       const superAdminPasswordHash = await bcrypt.hash(superAdminPassword, 10);
 
       // Create initial SuperAdmin account
@@ -43,8 +43,18 @@ async function seedAdminAccounts() {
         console.log('⚠️  IMPORTANT: Please change the default password immediately after first login!');
       }
     } else {
-      console.log('✅ SuperAdmin account already exists. Skipping seed.');
+      // Update existing SuperAdmin password
+      const superAdminPassword = 'SuperAdmin@2026';
+      const superAdminPasswordHash = await bcrypt.hash(superAdminPassword, 10);
+
+      await client.query(
+        'UPDATE users SET password_hash = $1 WHERE role = $2',
+        [superAdminPasswordHash, 'SUPERADMIN']
+      );
+
+      console.log('✅ SuperAdmin account password updated successfully!');
       console.log(`   Email: ${existingSuperAdmin.rows[0].email}`);
+      console.log(`   Password: ${superAdminPassword}`);
       console.log(`   ID: ${existingSuperAdmin.rows[0].id}`);
     }
 
@@ -56,7 +66,7 @@ async function seedAdminAccounts() {
 
     if (existingAdmin.rows.length === 0) {
       // Generate secure password hash for regular Admin
-      const adminPassword = 'Admin@FiDo2024';
+      const adminPassword = 'Admin@2026';
       const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
 
       // Create initial regular Admin account
@@ -79,8 +89,18 @@ async function seedAdminAccounts() {
         console.log('⚠️  IMPORTANT: Please change the default password immediately after first login!');
       }
     } else {
-      console.log('✅ Regular Admin account already exists. Skipping seed.');
+      // Update existing admin password
+      const adminPassword = 'Admin@2026';
+      const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
+
+      await client.query(
+        'UPDATE users SET password_hash = $1 WHERE role = $2 AND email != $3',
+        [adminPasswordHash, 'ADMIN', 'superadmin@findmydoctor.local']
+      );
+
+      console.log('✅ Regular Admin account password updated successfully!');
       console.log(`   Email: ${existingAdmin.rows[0].email}`);
+      console.log(`   Password: ${adminPassword}`);
       console.log(`   ID: ${existingAdmin.rows[0].id}`);
     }
 

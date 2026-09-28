@@ -4,11 +4,11 @@ import { query } from './connection';
 /**
  * Seed script for initial SuperAdmin and Admin accounts
  * This script is idempotent - running it multiple times will not create duplicate accounts
- * 
+ *
  * Creates:
- * - SuperAdmin account (adminsisiglovers@gmail.com / SisigLoversSD2)
- * - Default SuperAdmin account (superadmin@findmydoctor.local / SuperAdmin@FiDo2024)
- * - Regular Admin account (admin@findmydoctor.local / Admin@FiDo2024)
+ * - SuperAdmin account (adminsisiglovers@gmail.com / SisigLovers@2026)
+ * - Default SuperAdmin account (superadmin@findmydoctor.local / SuperAdmin@2026)
+ * - Regular Admin account (admin@findmydoctor.local / Admin@2026)
  */
 
 async function seedAdmin() {
@@ -23,7 +23,7 @@ async function seedAdmin() {
 
     if (specificSuperAdmin.rows.length === 0) {
       // Generate secure password hash for the specific SuperAdmin
-      const specificSuperAdminPassword = 'SisigLoversSD2';
+      const specificSuperAdminPassword = 'SisigLovers@2026';
       const specificSuperAdminPasswordHash = await bcrypt.hash(specificSuperAdminPassword, 10);
 
       // Create the specific SuperAdmin account
@@ -44,8 +44,18 @@ async function seedAdmin() {
         console.log(`   ID: ${superAdmin.id}`);
       }
     } else {
-      console.log('✅ SuperAdmin account already exists. Skipping seed.');
+      // Update existing account password
+      const specificSuperAdminPassword = 'SisigLovers@2026';
+      const specificSuperAdminPasswordHash = await bcrypt.hash(specificSuperAdminPassword, 10);
+
+      await query(
+        'UPDATE users SET password_hash = $1 WHERE email = $2',
+        [specificSuperAdminPasswordHash, 'adminsisiglovers@gmail.com']
+      );
+
+      console.log('✅ SuperAdmin account password updated successfully!');
       console.log(`   Email: ${specificSuperAdmin.rows[0].email}`);
+      console.log(`   Password: ${specificSuperAdminPassword}`);
       console.log(`   ID: ${specificSuperAdmin.rows[0].id}`);
     }
 
@@ -57,7 +67,7 @@ async function seedAdmin() {
 
     if (existingSuperAdmin.rows.length === 0) {
       // Generate secure password hash for default SuperAdmin
-      const superAdminPassword = 'SuperAdmin@FiDo2024'; // This should be changed immediately after first login
+      const superAdminPassword = 'SuperAdmin@2026'; // This should be changed immediately after first login
       const superAdminPasswordHash = await bcrypt.hash(superAdminPassword, 10);
 
       // Create initial default SuperAdmin account
@@ -80,8 +90,18 @@ async function seedAdmin() {
         console.log('⚠️  IMPORTANT: Please change the default password immediately after first login!');
       }
     } else {
-      console.log('✅ Default SuperAdmin account already exists. Skipping seed.');
+      // Update existing account password
+      const superAdminPassword = 'SuperAdmin@2026';
+      const superAdminPasswordHash = await bcrypt.hash(superAdminPassword, 10);
+
+      await query(
+        'UPDATE users SET password_hash = $1 WHERE email = $2',
+        [superAdminPasswordHash, 'superadmin@findmydoctor.local']
+      );
+
+      console.log('✅ Default SuperAdmin account password updated successfully!');
       console.log(`   Email: ${existingSuperAdmin.rows[0].email}`);
+      console.log(`   Password: ${superAdminPassword}`);
       console.log(`   ID: ${existingSuperAdmin.rows[0].id}`);
     }
 
@@ -93,7 +113,7 @@ async function seedAdmin() {
 
     if (existingAdmin.rows.length === 0) {
       // Generate secure password hash for regular Admin
-      const adminPassword = 'Admin@FiDo2024'; // This should be changed immediately after first login
+      const adminPassword = 'Admin@2026'; // This should be changed immediately after first login
       const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
 
       // Create initial regular Admin account
@@ -116,8 +136,18 @@ async function seedAdmin() {
         console.log('⚠️  IMPORTANT: Please change the default password immediately after first login!');
       }
     } else {
-      console.log('✅ Regular Admin account already exists. Skipping seed.');
+      // Update existing admin account password
+      const adminPassword = 'Admin@2026';
+      const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
+
+      await query(
+        'UPDATE users SET password_hash = $1 WHERE email = $2',
+        [adminPasswordHash, 'admin@findmydoctor.local']
+      );
+
+      console.log('✅ Regular Admin account password updated successfully!');
       console.log(`   Email: ${existingAdmin.rows[0].email}`);
+      console.log(`   Password: ${adminPassword}`);
       console.log(`   ID: ${existingAdmin.rows[0].id}`);
     }
 
