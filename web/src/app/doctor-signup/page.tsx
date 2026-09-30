@@ -41,7 +41,9 @@ export default function DoctorSignupOtp() {
   const [formError, setFormError] = useState('');
 
   const [formData, setFormData] = useState({
-    fullName: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
     contactNumber: '',
     specialty: '',
     credentials: '',
@@ -152,8 +154,12 @@ export default function DoctorSignupOtp() {
    */
 
   const validateSignupForm = (): string => {
-    if (!formData.fullName.trim()) {
-      return 'Full Name is required.';
+    if (!formData.firstName.trim()) {
+      return 'First Name is required.';
+    }
+
+    if (!formData.lastName.trim()) {
+      return 'Last Name is required.';
     }
 
     if (!email.trim()) {
@@ -351,7 +357,9 @@ export default function DoctorSignupOtp() {
     try {
       const response = await otpApi.sendOtp({
         email: email.trim(),
-        fullName: formData.fullName.trim(),
+        firstName: formData.firstName.trim(),
+        middleName: formData.middleName.trim(),
+        lastName: formData.lastName.trim(),
         contactNumber: formData.contactNumber.trim(),
         specialty: formData.specialty.trim(),
         credentials: formData.credentials.trim(),
@@ -695,29 +703,83 @@ export default function DoctorSignupOtp() {
 
             <form onSubmit={handleSignupSubmit}>
 
-              {/* Full Name */}
+              {/* First Name */}
               <div className="mb-5">
                 <label
-                  htmlFor="fullName"
+                  htmlFor="firstName"
                   className="block text-[15px] font-semibold text-[#334155] mb-2"
                 >
-                  Full Name
+                  First Name
                 </label>
 
                 <input
-                  id="fullName"
+                  id="firstName"
                   type="text"
-                  value={formData.fullName}
+                  value={formData.firstName}
                   onChange={(event) => {
                     setFormData({
                       ...formData,
-                      fullName: event.target.value,
+                      firstName: event.target.value,
                     });
 
                     setFormError('');
                   }}
-                  placeholder="Enter your full name"
-                  autoComplete="name"
+                  placeholder="Enter your first name"
+                  autoComplete="given-name"
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                />
+              </div>
+
+              {/* Middle Name */}
+              <div className="mb-5">
+                <label
+                  htmlFor="middleName"
+                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                >
+                  Middle Name (Optional)
+                </label>
+
+                <input
+                  id="middleName"
+                  type="text"
+                  value={formData.middleName}
+                  onChange={(event) => {
+                    setFormData({
+                      ...formData,
+                      middleName: event.target.value,
+                    });
+
+                    setFormError('');
+                  }}
+                  placeholder="Enter your middle name"
+                  autoComplete="additional-name"
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                />
+              </div>
+
+              {/* Last Name */}
+              <div className="mb-5">
+                <label
+                  htmlFor="lastName"
+                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                >
+                  Last Name
+                </label>
+
+                <input
+                  id="lastName"
+                  type="text"
+                  value={formData.lastName}
+                  onChange={(event) => {
+                    setFormData({
+                      ...formData,
+                      lastName: event.target.value,
+                    });
+
+                    setFormError('');
+                  }}
+                  placeholder="Enter your last name"
+                  autoComplete="family-name"
                   className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
                 />
               </div>

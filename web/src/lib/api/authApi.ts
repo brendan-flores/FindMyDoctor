@@ -45,6 +45,7 @@ export interface DoctorRegistrationResponse {
   doctor: {
     id: string;
     first_name: string;
+    middle_name: string | null;
     last_name: string;
     specialty: string;
     credentials: string | null;
@@ -86,7 +87,9 @@ export const authApi = {
 
 export interface SendOtpRequest {
   email: string;
-  fullName: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
   contactNumber: string;
   specialty: string;
   credentials: string;
@@ -119,6 +122,7 @@ export interface VerifyOtpData {
   doctor: {
     id: string;
     first_name: string;
+    middle_name: string | null;
     last_name: string;
     specialty: string;
     credentials: string | null;
