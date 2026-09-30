@@ -83,3 +83,5 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+logo/
