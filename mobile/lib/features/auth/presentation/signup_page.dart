@@ -89,7 +89,7 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   Future<void> _handleSignUp() async {
-    if (_formKey.currentState!.validate()) {
+    if (_formKey.currentState?.validate() ?? false) {
       if (!_agreeToTerms) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
