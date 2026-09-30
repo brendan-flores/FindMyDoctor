@@ -32,6 +32,7 @@ export interface DoctorRegistrationRequest {
   credentials?: string;
   prcLicenseNumber: string;
   clinic: string;
+  roomNumber?: string;
   contactNumber?: string;
 }
 
@@ -91,6 +92,7 @@ export interface SendOtpRequest {
   credentials: string;
   prcLicenseNumber: string;
   clinic: string;
+  roomNumber?: string;
   password: string;
   confirmPassword: string;
 }

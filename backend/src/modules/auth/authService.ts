@@ -24,6 +24,7 @@ export interface DoctorRegistrationData {
   specialty: string;
   prcLicenseNumber: string;
   clinic: string;
+  roomNumber?: string;
   credentials?: string;
   contactNumber?: string;
 }
@@ -196,6 +197,7 @@ export async function registerDoctor(data: DoctorRegistrationData) {
     specialty,
     prcLicenseNumber,
     clinic,
+    roomNumber,
     credentials,
     contactNumber,
   } = data;
@@ -210,6 +212,18 @@ export async function registerDoctor(data: DoctorRegistrationData) {
 
   if (password.length < 8) {
     throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Password must be at least 8 characters' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Password must contain at least one uppercase letter' };
+  }
+  if (!/[a-z]/.test(password)) {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Password must contain at least one lowercase letter' };
+  }
+  if (!/[0-9]/.test(password)) {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Password must contain at least one number' };
+  }
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Password must contain at least one special character' };
   }
 
   const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -266,11 +280,11 @@ export async function registerDoctor(data: DoctorRegistrationData) {
     const doctorResult = await client.query(
       `INSERT INTO doctors (
          user_id, first_name, last_name, specialty, credentials,
-         prc_license_number, practice_name, practice_phone, practice_email, is_approved
+         prc_license_number, practice_name, practice_phone, practice_email, room_number, is_approved
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)
        RETURNING id, first_name, last_name, specialty, credentials, prc_license_number,
-                 practice_name, practice_phone, practice_email, is_approved, created_at`,
+                 practice_name, practice_phone, practice_email, room_number, is_approved, created_at`,
       [
         user.id,
         firstName,
@@ -281,6 +295,7 @@ export async function registerDoctor(data: DoctorRegistrationData) {
         clinic,
         contactNumber || null,
         email,
+        roomNumber || null,
       ]
     );
 

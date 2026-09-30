@@ -38,6 +38,7 @@ interface ValidatedDoctorSignup {
   credentials: string | null;
   prcLicenseNumber: string;
   clinic: string;
+  roomNumber: string | null;
 }
 
 /**
@@ -53,6 +54,7 @@ function validateDoctorSignupPayload(body: any): ValidatedDoctorSignup {
   const credentials = typeof body?.credentials === 'string' ? body.credentials.trim() : '';
   const prcLicenseNumber = typeof body?.prcLicenseNumber === 'string' ? body.prcLicenseNumber.trim() : '';
   const clinic = typeof body?.clinic === 'string' ? body.clinic.trim() : '';
+  const roomNumber = typeof body?.roomNumber === 'string' ? body.roomNumber.trim() : '';
   const password = typeof body?.password === 'string' ? body.password : '';
   const confirmPassword = typeof body?.confirmPassword === 'string' ? body.confirmPassword : '';
 
@@ -74,8 +76,21 @@ function validateDoctorSignupPayload(body: any): ValidatedDoctorSignup {
     throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Invalid email address' };
   }
 
+  // Password requirements validation
   if (password.length < 8) {
     throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Password must be at least 8 characters' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Password must contain at least one uppercase letter' };
+  }
+  if (!/[a-z]/.test(password)) {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Password must contain at least one lowercase letter' };
+  }
+  if (!/[0-9]/.test(password)) {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Password must contain at least one number' };
+  }
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Password must contain at least one special character' };
   }
 
   if (password !== confirmPassword) {
@@ -102,6 +117,7 @@ function validateDoctorSignupPayload(body: any): ValidatedDoctorSignup {
     credentials: credentials || null,
     prcLicenseNumber,
     clinic,
+    roomNumber: roomNumber || null,
   };
 }
 
@@ -150,11 +166,11 @@ router.post('/send', async (req: Request, res: Response) => {
     await query(
       `INSERT INTO pending_doctor_signups (
          email, password_hash, first_name, last_name, specialty, credentials,
-         prc_license_number, practice_name, practice_phone, expires_at
+         prc_license_number, practice_name, practice_phone, room_number, expires_at
        )
        VALUES (
-         $1, $2, $3, $4, $5, $6, $7, $8, $9,
-         CURRENT_TIMESTAMP + ($10::int * INTERVAL '1 minute')
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+         CURRENT_TIMESTAMP + ($11::int * INTERVAL '1 minute')
        )
        ON CONFLICT (email) DO UPDATE SET
          password_hash = EXCLUDED.password_hash,
@@ -165,6 +181,7 @@ router.post('/send', async (req: Request, res: Response) => {
          prc_license_number = EXCLUDED.prc_license_number,
          practice_name = EXCLUDED.practice_name,
          practice_phone = EXCLUDED.practice_phone,
+         room_number = EXCLUDED.room_number,
          expires_at = EXCLUDED.expires_at,
          updated_at = CURRENT_TIMESTAMP`,
       [
@@ -177,6 +194,7 @@ router.post('/send', async (req: Request, res: Response) => {
         payload.prcLicenseNumber,
         payload.clinic,
         payload.contactNumber,
+        payload.roomNumber,
         PENDING_SIGNUP_TTL_MINUTES,
       ]
     );
@@ -287,11 +305,11 @@ router.post('/verify', async (req: Request, res: Response) => {
     const doctorResult = await client.query(
       `INSERT INTO doctors (
          user_id, first_name, last_name, specialty, credentials,
-         prc_license_number, practice_name, practice_phone, practice_email, is_approved, approval_status
+         prc_license_number, practice_name, practice_phone, practice_email, room_number, is_approved, approval_status
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, 'PENDING')
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, 'PENDING')
        RETURNING id, first_name, last_name, specialty, credentials, prc_license_number,
-                 practice_name, practice_phone, practice_email, is_approved, approval_status, created_at`,
+                 practice_name, practice_phone, practice_email, room_number, is_approved, approval_status, created_at`,
       [
         user.id,
         pending.first_name,
@@ -302,6 +320,7 @@ router.post('/verify', async (req: Request, res: Response) => {
         pending.practice_name,
         pending.practice_phone,
         email,
+        pending.room_number,
       ]
     );
 
