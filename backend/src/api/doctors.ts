@@ -11,8 +11,8 @@ router.get('/', async (req: any, res: Response) => {
     const { specialty, search } = req.query;
 
     let queryText = `
-      SELECT 
-        d.id, d.first_name, d.last_name, d.specialty, d.credentials, 
+      SELECT
+        d.id, d.first_name, d.middle_name, d.last_name, d.specialty, d.credentials,
         d.biography, d.consultation_fee, d.is_approved, d.approval_status,
         d.practice_name, d.practice_address, d.practice_latitude, d.practice_longitude,
         d.practice_phone, d.practice_email, d.practice_description,
@@ -31,7 +31,7 @@ router.get('/', async (req: any, res: Response) => {
 
     if (search) {
       paramCount++;
-      queryText += ` AND (d.first_name ILIKE $${paramCount} OR d.last_name ILIKE $${paramCount} OR d.specialty ILIKE $${paramCount} OR d.practice_name ILIKE $${paramCount})`;
+      queryText += ` AND (d.first_name ILIKE $${paramCount} OR d.middle_name ILIKE $${paramCount} OR d.last_name ILIKE $${paramCount} OR d.specialty ILIKE $${paramCount} OR d.practice_name ILIKE $${paramCount})`;
       params.push(`%${search}%`);
     }
 

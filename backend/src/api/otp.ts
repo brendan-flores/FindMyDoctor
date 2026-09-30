@@ -32,6 +32,7 @@ interface ValidatedDoctorSignup {
   email: string;
   password: string;
   firstName: string;
+  middleName: string | null;
   lastName: string;
   contactNumber: string;
   specialty: string;
@@ -48,7 +49,9 @@ interface ValidatedDoctorSignup {
  */
 function validateDoctorSignupPayload(body: any): ValidatedDoctorSignup {
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
-  const fullName = typeof body?.fullName === 'string' ? body.fullName.trim() : '';
+  const firstName = typeof body?.firstName === 'string' ? body.firstName.trim() : '';
+  const middleName = typeof body?.middleName === 'string' ? body.middleName.trim() : '';
+  const lastName = typeof body?.lastName === 'string' ? body.lastName.trim() : '';
   const contactNumber = typeof body?.contactNumber === 'string' ? body.contactNumber.trim() : '';
   const specialty = typeof body?.specialty === 'string' ? body.specialty.trim() : '';
   const credentials = typeof body?.credentials === 'string' ? body.credentials.trim() : '';
@@ -60,7 +63,8 @@ function validateDoctorSignupPayload(body: any): ValidatedDoctorSignup {
 
   if (
     !email ||
-    !fullName ||
+    !firstName ||
+    !lastName ||
     !contactNumber ||
     !specialty ||
     !credentials ||
@@ -69,7 +73,7 @@ function validateDoctorSignupPayload(body: any): ValidatedDoctorSignup {
     !password ||
     !confirmPassword
   ) {
-    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'All fields are required' };
+    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'All required fields must be filled' };
   }
 
   if (!EMAIL_PATTERN.test(email)) {
@@ -101,17 +105,12 @@ function validateDoctorSignupPayload(body: any): ValidatedDoctorSignup {
     throw { code: ErrorCodes.VALIDATION_ERROR, message: 'PRC license number must be 7 digits' };
   }
 
-  const nameParts = fullName.split(/\s+/).filter(Boolean);
-
-  if (nameParts.length < 2) {
-    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Full name must include a first and last name' };
-  }
-
   return {
     email,
     password,
-    firstName: nameParts[0],
-    lastName: nameParts.slice(1).join(' '),
+    firstName,
+    middleName: middleName || null,
+    lastName,
     contactNumber,
     specialty,
     credentials: credentials || null,
@@ -165,16 +164,17 @@ router.post('/send', async (req: Request, res: Response) => {
 
     await query(
       `INSERT INTO pending_doctor_signups (
-         email, password_hash, first_name, last_name, specialty, credentials,
+         email, password_hash, first_name, middle_name, last_name, specialty, credentials,
          prc_license_number, practice_name, practice_phone, room_number, expires_at
        )
        VALUES (
-         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-         CURRENT_TIMESTAMP + ($11::int * INTERVAL '1 minute')
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+         CURRENT_TIMESTAMP + ($12::int * INTERVAL '1 minute')
        )
        ON CONFLICT (email) DO UPDATE SET
          password_hash = EXCLUDED.password_hash,
          first_name = EXCLUDED.first_name,
+         middle_name = EXCLUDED.middle_name,
          last_name = EXCLUDED.last_name,
          specialty = EXCLUDED.specialty,
          credentials = EXCLUDED.credentials,
@@ -188,6 +188,7 @@ router.post('/send', async (req: Request, res: Response) => {
         email,
         passwordHash,
         payload.firstName,
+        payload.middleName,
         payload.lastName,
         payload.specialty,
         payload.credentials,
@@ -304,15 +305,16 @@ router.post('/verify', async (req: Request, res: Response) => {
     // Doctor profile - every field captured by the sign-up page
     const doctorResult = await client.query(
       `INSERT INTO doctors (
-         user_id, first_name, last_name, specialty, credentials,
+         user_id, first_name, middle_name, last_name, specialty, credentials,
          prc_license_number, practice_name, practice_phone, practice_email, room_number, is_approved, approval_status
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, 'PENDING')
-       RETURNING id, first_name, last_name, specialty, credentials, prc_license_number,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, 'PENDING')
+       RETURNING id, first_name, middle_name, last_name, specialty, credentials, prc_license_number,
                  practice_name, practice_phone, practice_email, room_number, is_approved, approval_status, created_at`,
       [
         user.id,
         pending.first_name,
+        pending.middle_name,
         pending.last_name,
         pending.specialty,
         pending.credentials,
