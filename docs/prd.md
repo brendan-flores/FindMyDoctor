@@ -1229,7 +1229,7 @@ FiDo Web
 The doctor sign-up page at `/doctor-signup` allows a doctor to create an account without an Administrator:
 
 - Reachable from the Doctor login page at `/doctor-login` through the "Create an Account" link.
-- Collects doctor information (full name, specialty, credentials, PRC license number, clinic), contact information (email, contact number), and account security fields (password, confirm password).
+- Collects doctor information (full name, specialty via searchable dropdown of recognized Philippine medical specialties, credentials via searchable multi-select dropdown of recognized physician credentials/suffixes, PRC license number, and Hospital/Clinic via searchable dropdown of legitimate Cebu hospitals and clinics), contact information (email, contact number), and account security fields (password, confirm password). All dropdowns support typing, partial-name filtering, and keyboard navigation.
 - Submits to `POST /api/v1/auth/otp/send`, which validates the payload and stages the sign-up - including the bcrypt-hashed password - in the `pending_doctor_signups` table. No account is created at this step.
 - Supabase is used only to email the 6-digit OTP to the doctor's address.
 - `POST /api/v1/auth/otp/verify` verifies the OTP with Supabase and, only when verification succeeds, creates the `users` record (`role = DOCTOR`, `email_verified = true`) and the `doctors` profile in a single PostgreSQL transaction.

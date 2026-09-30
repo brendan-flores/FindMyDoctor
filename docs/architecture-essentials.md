@@ -710,14 +710,14 @@ FiDo Web
 The doctor sign-up page at `/doctor-signup` creates a doctor account:
 
 - Reached from the Doctor login page at `/doctor-login` through the "Create an Account" link.
-- Collects doctor information (full name, specialty, credentials, PRC license number, clinic), contact information (email, contact number) and account security fields (password, confirm password).
+- Collects doctor information (full name, specialty via searchable dropdown of recognized Philippine medical specialties, credentials via searchable multi-select dropdown of recognized physician credentials/suffixes, PRC license number, and Hospital/Clinic via searchable dropdown of legitimate Cebu hospitals and clinics), contact information (email, contact number) and account security fields (password, confirm password). All dropdowns support typing, partial-name search, and keyboard navigation.
 - Uses the standard client pattern: the page calls the backend REST API and never touches PostgreSQL or Supabase directly.
 - Step 1 - `POST /api/v1/auth/otp/send` validates the form (required fields, email format, password length, password/confirm-password match, 7-digit PRC license number, first and last name) and checks that the email and PRC license number are not already registered.
 - The validated payload - with the password already hashed using bcrypt - is staged server-side in the `pending_doctor_signups` table (added by migration `006_doctor_signup_otp_flow.sql`, 15-minute expiry). No `users` or `doctors` row is created at this step.
 - Supabase is then used only to email the 6-digit OTP to the doctor's address.
 - Step 2 - `POST /api/v1/auth/otp/verify` verifies the OTP with Supabase and, only when verification succeeds, creates the `users` record (`role = DOCTOR`, `email_verified = true`) and the `doctors` profile atomically in one PostgreSQL transaction, then deletes the staged row.
 - The password is hashed with bcrypt and `must_change_password` is false because the doctor chooses their own password.
-- Field mapping: `fullName` is split into `first_name` and `last_name`, `clinic` maps to `practice_name`, `contactNumber` maps to `practice_phone`, and `email` is also stored as `practice_email`.
+- Field mapping: `fullName` is split into `first_name` and `last_name`, `clinic` (Hospital/Clinic selection) maps to `practice_name`, `contactNumber` maps to `practice_phone`, and `email` is also stored as `practice_email`.
 - The PRC license number is stored in `doctors.prc_license_number`, added by migration `005_doctor_self_registration.sql`, and enforced unique by a partial unique index.
 - `practice_address` and the practice coordinates default to empty/zero, so a doctor can register before supplying a practice location.
 - Registered doctors are created with `approval_status = 'PENDING'`, so they must wait for administrator approval before accessing the system.

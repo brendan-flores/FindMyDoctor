@@ -17,3 +17,4 @@ Current System State (September 2026):
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
 - Web application provides role-specific dashboards for Doctor, Secretary, and Admin users
 - Mobile application includes OTP verification page for patient registration with full backend integration
+- Doctor self-registration form at `/doctor-signup` features searchable dropdowns/autocompletes for Hospital/Clinic (legitimate Cebu outpatient clinics, consultation centers, primary care polyclinics, and medical arts buildings), Specialty (recognized Philippine medical specialties), and Credentials (searchable multi-select for recognized suffixes such as MD, FPCP, FPSGS, etc.) with partial-name filtering and keyboard navigation

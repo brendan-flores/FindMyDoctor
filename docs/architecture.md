@@ -296,13 +296,13 @@ FiDo Web
 The doctor sign-up page at `/doctor-signup` creates a doctor account:
 
 - Linked from the Doctor login page at `/doctor-login`.
-- Groups the form into Doctor Information, Contact Information, and Account Security sections.
+- Groups the form into Doctor Information (Full Name, Specialty via searchable dropdown, Credentials via searchable multi-select dropdown, PRC License Number, Hospital/Clinic via searchable dropdown of Cebu facilities), Contact Information, and Account Security sections.
 - Submits the completed form to `POST /api/v1/auth/otp/send` (public, no token required).
 - The backend validates the payload (required fields, email format, password length, password/confirm-password match, 7-digit PRC license number, first and last name), then stages the sign-up - including the bcrypt-hashed password - in the `pending_doctor_signups` table added by migration `006_doctor_signup_otp_flow.sql`. No account is created at this step.
 - Supabase is then used only to email the 6-digit OTP to the doctor's address.
 - The doctor enters the OTP and the page calls `POST /api/v1/auth/otp/verify`. Only after Supabase confirms the OTP does the backend create the `users` (`role = DOCTOR`, `email_verified = true`) and `doctors` records inside a single transaction on one pooled client, rolling back on any failure and then clearing the staged row.
 - The password is hashed with bcrypt and `must_change_password` is false because the doctor chooses their own password.
-- Field mapping: `fullName` is split into `first_name` and `last_name`, `clinic` maps to `practice_name`, `contactNumber` maps to `practice_phone`, and `email` is also stored as `practice_email`.
+- Field mapping: `fullName` is split into `first_name` and `last_name`, `clinic` (Hospital/Clinic selection) maps to `practice_name`, `contactNumber` maps to `practice_phone`, and `email` is also stored as `practice_email`.
 - The PRC license number is stored in `doctors.prc_license_number` and is enforced unique by a partial unique index.
 - `practice_address` and the practice coordinates default to empty/zero, so a doctor can register before supplying a practice location.
 - Registered doctors are created with `approval_status = 'PENDING'` and `is_approved = false`, so they must wait for administrator approval before accessing the system.
