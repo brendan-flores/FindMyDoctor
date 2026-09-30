@@ -1,10 +1,15 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { otpApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
+import { CEBU_FACILITIES } from '@/data/cebuFacilities';
+import { MEDICAL_SPECIALTIES } from '@/data/medicalSpecialties';
+import { MEDICAL_CREDENTIALS } from '@/data/medicalCredentials';
+import SearchableSelect from '@/components/ui/SearchableSelect';
+import SearchableMultiSelect from '@/components/ui/SearchableMultiSelect';
 
 type Step = 'signup' | 'otp' | 'success';
 type FormStatus = 'idle' | 'loading';
@@ -42,14 +47,52 @@ export default function DoctorSignupOtp() {
     credentials: '',
     prcLicenseNumber: '',
     clinic: '',
+    roomNumber: '',
     password: '',
     confirmPassword: '',
   });
 
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Password requirement indicators
+  const [hasMinLength, setHasMinLength] = useState(false);
+  const [hasUppercase, setHasUppercase] = useState(false);
+  const [hasLowercase, setHasLowercase] = useState(false);
+  const [hasNumber, setHasNumber] = useState(false);
+  const [hasSpecialChar, setHasSpecialChar] = useState(false);
+
   const [otpExpiresIn, setOtpExpiresIn] = useState(600);
+
+  // Cebu hospital and clinic options for dropdown with area sublabels
+  const cebuFacilityOptions = useMemo(() => {
+    return CEBU_FACILITIES.map((facility) => ({
+      value: facility.name,
+      label: facility.name,
+      sublabel: `${facility.type} • ${facility.area}`,
+      hasRoomNumber: facility.hasRoomNumber || false,
+    }));
+  }, []);
+
+  // Check if selected facility has room number requirement
+  const selectedFacility = useMemo(() => {
+    return CEBU_FACILITIES.find(f => f.name === formData.clinic);
+  }, [formData.clinic]);
+
+  const showRoomNumberField = selectedFacility?.hasRoomNumber === true;
 
   // Container ref for scroll handling
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Update password requirements in real-time
+  useEffect(() => {
+    const password = formData.password;
+    setHasMinLength(password.length >= 8);
+    setHasUppercase(/[A-Z]/.test(password));
+    setHasLowercase(/[a-z]/.test(password));
+    setHasNumber(/[0-9]/.test(password));
+    setHasSpecialChar(/[!@#$%^&*(),.?":{}|<>]/.test(password));
+  }, [formData.password]);
 
   /*
    * ============================================================
@@ -142,7 +185,12 @@ export default function DoctorSignupOtp() {
     }
 
     if (!formData.clinic.trim()) {
-      return 'Clinic is required.';
+      return 'Hospital/Clinic is required.';
+    }
+
+    // Validate room number if the selected facility requires it
+    if (showRoomNumberField && !formData.roomNumber.trim()) {
+      return 'Room/Clinic Number is required for this facility.';
     }
 
     if (!formData.password) {
@@ -151,6 +199,22 @@ export default function DoctorSignupOtp() {
 
     if (formData.password.length < 8) {
       return 'Password must be at least 8 characters.';
+    }
+
+    if (!/[A-Z]/.test(formData.password)) {
+      return 'Password must contain at least one uppercase letter.';
+    }
+
+    if (!/[a-z]/.test(formData.password)) {
+      return 'Password must contain at least one lowercase letter.';
+    }
+
+    if (!/[0-9]/.test(formData.password)) {
+      return 'Password must contain at least one number.';
+    }
+
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
+      return 'Password must contain at least one special character.';
     }
 
     if (!formData.confirmPassword) {
@@ -293,6 +357,7 @@ export default function DoctorSignupOtp() {
         credentials: formData.credentials.trim(),
         prcLicenseNumber: formData.prcLicenseNumber.trim(),
         clinic: formData.clinic.trim(),
+        roomNumber: formData.roomNumber.trim(),
         password: formData.password,
         confirmPassword: formData.confirmPassword,
       });
@@ -729,20 +794,19 @@ export default function DoctorSignupOtp() {
                   Specialty
                 </label>
 
-                <input
+                <SearchableSelect
                   id="specialty"
-                  type="text"
                   value={formData.specialty}
-                  onChange={(event) => {
+                  onChange={(val) => {
                     setFormData({
                       ...formData,
-                      specialty: event.target.value,
+                      specialty: val,
                     });
-
                     setFormError('');
                   }}
-                  placeholder="e.g. Cardiology"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  options={MEDICAL_SPECIALTIES}
+                  placeholder="Search and select medical specialty..."
+                  noResultsText="No matching medical specialties found"
                 />
               </div>
 
@@ -755,20 +819,23 @@ export default function DoctorSignupOtp() {
                   Credentials
                 </label>
 
-                <input
+                <SearchableMultiSelect
                   id="credentials"
-                  type="text"
-                  value={formData.credentials}
-                  onChange={(event) => {
+                  value={
+                    formData.credentials
+                      ? formData.credentials.split(',').map((c) => c.trim()).filter(Boolean)
+                      : []
+                  }
+                  onChange={(selectedList) => {
                     setFormData({
                       ...formData,
-                      credentials: event.target.value,
+                      credentials: selectedList.join(', '),
                     });
-
                     setFormError('');
                   }}
-                  placeholder="e.g. MD, FPCP"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  options={MEDICAL_CREDENTIALS}
+                  placeholder="Search & select credentials (e.g., MD, FPCP, FPSGS)..."
+                  noResultsText="No matching physician credentials found"
                 />
               </div>
 
@@ -784,11 +851,16 @@ export default function DoctorSignupOtp() {
                 <input
                   id="prcLicenseNumber"
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={7}
                   value={formData.prcLicenseNumber}
                   onChange={(event) => {
+                    // Allow only numeric input
+                    const numericValue = event.target.value.replace(/\D/g, '');
                     setFormData({
                       ...formData,
-                      prcLicenseNumber: event.target.value,
+                      prcLicenseNumber: numericValue,
                     });
 
                     setFormError('');
@@ -798,31 +870,60 @@ export default function DoctorSignupOtp() {
                 />
               </div>
 
-              {/* Clinic */}
+              {/* Hospital/Clinic */}
               <div className="mb-5">
                 <label
                   htmlFor="clinic"
                   className="block text-[15px] font-semibold text-[#334155] mb-2"
                 >
-                  Clinic
+                  Hospital/Clinic
                 </label>
 
-                <input
+                <SearchableSelect
                   id="clinic"
-                  type="text"
                   value={formData.clinic}
-                  onChange={(event) => {
+                  onChange={(val) => {
                     setFormData({
                       ...formData,
-                      clinic: event.target.value,
+                      clinic: val,
+                      roomNumber: '', // Reset room number when clinic changes
                     });
-
                     setFormError('');
                   }}
-                  placeholder="Enter clinic or hospital name"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  options={cebuFacilityOptions}
+                  placeholder="Search and select Cebu hospital or clinic..."
+                  noResultsText="No matching hospital or clinic found in Cebu"
                 />
               </div>
+
+              {/* Room Number - Conditionally shown for facilities with room numbers */}
+              {showRoomNumberField && (
+                <div className="mb-5">
+                  <label
+                    htmlFor="roomNumber"
+                    className="block text-[15px] font-semibold text-[#334155] mb-2"
+                  >
+                    Room/Clinic Number
+                  </label>
+                  <input
+                    id="roomNumber"
+                    type="text"
+                    value={formData.roomNumber}
+                    onChange={(event) => {
+                      setFormData({
+                        ...formData,
+                        roomNumber: event.target.value,
+                      });
+                      setFormError('');
+                    }}
+                    placeholder="e.g., Room 406, Suite 302"
+                    className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Enter your specific room or suite number at this facility
+                  </p>
+                </div>
+              )}
 
               {/* Password */}
               <div className="mb-5">
@@ -833,26 +934,95 @@ export default function DoctorSignupOtp() {
                   Password
                 </label>
 
-                <input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(event) => {
-                    setFormData({
-                      ...formData,
-                      password: event.target.value,
-                    });
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(event) => {
+                      setFormData({
+                        ...formData,
+                        password: event.target.value,
+                      });
 
-                    setFormError('');
-                  }}
-                  placeholder="Enter your password"
-                  autoComplete="new-password"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
-                />
+                      setFormError('');
+                    }}
+                    placeholder="Enter your password"
+                    autoComplete="new-password"
+                    className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 pr-12 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569] p-0.5 transition-colors"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
 
-                <p className="text-[12px] text-[#94A3B8] mt-1.5">
-                  Minimum 6 characters
-                </p>
+                {/* Password Requirements Checklist */}
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex items-center gap-2 text-[12px]">
+                    {hasMinLength ? (
+                      <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-[#94A3B8] shrink-0" />
+                    )}
+                    <span className={hasMinLength ? 'text-green-600' : 'text-[#94A3B8]'}>At least 8 characters</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[12px]">
+                    {hasUppercase ? (
+                      <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-[#94A3B8] shrink-0" />
+                    )}
+                    <span className={hasUppercase ? 'text-green-600' : 'text-[#94A3B8]'}>At least one uppercase letter</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[12px]">
+                    {hasLowercase ? (
+                      <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-[#94A3B8] shrink-0" />
+                    )}
+                    <span className={hasLowercase ? 'text-green-600' : 'text-[#94A3B8]'}>At least one lowercase letter</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[12px]">
+                    {hasNumber ? (
+                      <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-[#94A3B8] shrink-0" />
+                    )}
+                    <span className={hasNumber ? 'text-green-600' : 'text-[#94A3B8]'}>At least one number</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[12px]">
+                    {hasSpecialChar ? (
+                      <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-[#94A3B8] shrink-0" />
+                    )}
+                    <span className={hasSpecialChar ? 'text-green-600' : 'text-[#94A3B8]'}>At least one special character</span>
+                  </div>
+                </div>
               </div>
 
               {/* Confirm Password */}
@@ -864,22 +1034,41 @@ export default function DoctorSignupOtp() {
                   Confirm Password
                 </label>
 
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={(event) => {
-                    setFormData({
-                      ...formData,
-                      confirmPassword: event.target.value,
-                    });
+                <div className="relative">
+                  <input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={formData.confirmPassword}
+                    onChange={(event) => {
+                      setFormData({
+                        ...formData,
+                        confirmPassword: event.target.value,
+                      });
 
-                    setFormError('');
-                  }}
-                  placeholder="Re-enter your password"
-                  autoComplete="new-password"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
-                />
+                      setFormError('');
+                    }}
+                    placeholder="Re-enter your password"
+                    autoComplete="new-password"
+                    className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 pr-12 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569] p-0.5 transition-colors"
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showConfirmPassword ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Error */}
