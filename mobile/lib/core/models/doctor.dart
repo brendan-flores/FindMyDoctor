@@ -1,56 +1,77 @@
 class Doctor {
   final String id;
   final String userId;
-  final String? clinicId;
   final String firstName;
+  final String? middleName;
   final String lastName;
   final String specialty;
   final String? credentials;
   final String? biography;
   final double consultationFee;
   final bool isApproved;
-  final String? clinicName;
-  final String? clinicAddress;
-  final double? latitude;
-  final double? longitude;
+  final String? practiceName;
+  final String? practiceAddress;
+  final double? practiceLatitude;
+  final double? practiceLongitude;
+  final String? practicePhone;
+  final String? practiceEmail;
 
   Doctor({
     required this.id,
     required this.userId,
-    this.clinicId,
     required this.firstName,
+    this.middleName,
     required this.lastName,
     required this.specialty,
     this.credentials,
     this.biography,
     required this.consultationFee,
     required this.isApproved,
-    this.clinicName,
-    this.clinicAddress,
-    this.latitude,
-    this.longitude,
+    this.practiceName,
+    this.practiceAddress,
+    this.practiceLatitude,
+    this.practiceLongitude,
+    this.practicePhone,
+    this.practiceEmail,
   });
 
-  String get fullName => '$firstName $lastName';
-  String get practiceName => clinicName ?? 'Private Practice';
+  String get fullName {
+    if (middleName != null && middleName!.isNotEmpty) {
+      return '$firstName $middleName $lastName';
+    }
+    return '$firstName $lastName';
+  }
+  String get clinicName => practiceName ?? 'Private Practice';
+  String get clinicAddress => practiceAddress ?? '';
   String? get consultationFeeText => consultationFee > 0 ? consultationFee.toStringAsFixed(0) : null;
 
   factory Doctor.fromJson(Map<String, dynamic> json) {
+    // Helper function to safely convert to double
+    double toDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
     return Doctor(
-      id: json['id'] ?? '',
-      userId: json['user_id'] ?? '',
-      clinicId: json['clinic_id'],
-      firstName: json['first_name'] ?? '',
-      lastName: json['last_name'] ?? '',
-      specialty: json['specialty'] ?? '',
-      credentials: json['credentials'],
-      biography: json['biography'],
-      consultationFee: (json['consultation_fee'] ?? 0).toDouble(),
-      isApproved: json['is_approved'] ?? false,
-      clinicName: json['clinic_name'],
-      clinicAddress: json['clinic_address'],
-      latitude: json['latitude']?.toDouble(),
-      longitude: json['longitude']?.toDouble(),
+      id: json['id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      firstName: json['first_name']?.toString() ?? '',
+      middleName: json['middle_name']?.toString(),
+      lastName: json['last_name']?.toString() ?? '',
+      specialty: json['specialty']?.toString() ?? '',
+      credentials: json['credentials']?.toString(),
+      biography: json['biography']?.toString(),
+      consultationFee: toDouble(json['consultation_fee']),
+      isApproved: json['is_approved'] == true,
+      practiceName: json['practice_name']?.toString(),
+      practiceAddress: json['practice_address']?.toString(),
+      practiceLatitude: json['practice_latitude'] != null ? toDouble(json['practice_latitude']) : null,
+      practiceLongitude: json['practice_longitude'] != null ? toDouble(json['practice_longitude']) : null,
+      practicePhone: json['practice_phone']?.toString(),
+      practiceEmail: json['practice_email']?.toString(),
     );
   }
 }
