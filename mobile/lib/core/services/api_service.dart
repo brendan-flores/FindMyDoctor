@@ -328,8 +328,8 @@ class ApiService {
       ApiConstants.appointments,
       queryParams: {
         if (status != null) 'status': status,
-        if (startDate != null) 'startDate': startDate,
-        if (endDate != null) 'endDate': endDate,
+if (startDate != null) 'startDate': startDate,
+if (endDate != null) 'endDate': endDate,
       },
     );
   }
