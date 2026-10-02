@@ -9,7 +9,7 @@ import '../../../core/services/doctor_service.dart';
 class DoctorsPage extends StatefulWidget {
   final Function(int)? onNavigateToTab;
 
-  const DoctorsPage({super.key, this.onNavigateToTab = null});
+  const DoctorsPage({super.key, this.onNavigateToTab});
 
   @override
   State<DoctorsPage> createState() => _DoctorsPageState();
@@ -19,7 +19,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
   final DoctorService _doctorService = DoctorService();
   final TextEditingController _searchController = TextEditingController();
   String _selectedSpecialty = 'All';
-  String _selectedHospital = 'All';
+  final String _selectedHospital = 'All';
   List<Doctor> _doctors = [];
   List<String> _specialties = ['All'];
   List<String> _hospitals = ['All'];

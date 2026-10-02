@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { apiClient } from '@/lib/api/apiClient';
 
 export default function DoctorDashboard() {
   const [stats, setStats] = useState({
@@ -9,6 +10,16 @@ export default function DoctorDashboard() {
     totalPatients: 0,
     activePrescriptions: 0,
   });
+
+  // Add Secretary modal state
+  const [showAddSecretaryModal, setShowAddSecretaryModal] = useState(false);
+  const [secretaryForm, setSecretaryForm] = useState({
+    email: '',
+    password: '',
+  });
+  const [isCreatingSecretary, setIsCreatingSecretary] = useState(false);
+  const [secretaryError, setSecretaryError] = useState('');
+  const [secretarySuccess, setSecretarySuccess] = useState('');
 
   useEffect(() => {
     // Load dashboard data from backend
@@ -20,6 +31,46 @@ export default function DoctorDashboard() {
       activePrescriptions: 8,
     });
   }, []);
+
+  const handleAddSecretary = async () => {
+    // Basic validation
+    if (!secretaryForm.email || !secretaryForm.password) {
+      setSecretaryError('Email and password are required');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(secretaryForm.email)) {
+      setSecretaryError('Invalid email format');
+      return;
+    }
+
+    setIsCreatingSecretary(true);
+    setSecretaryError('');
+    setSecretarySuccess('');
+
+    try {
+      const response = await apiClient.post('/doctors/secretaries', {
+        email: secretaryForm.email,
+        password: secretaryForm.password,
+      });
+
+      if (response.success) {
+        setSecretarySuccess('Secretary created successfully');
+        setSecretaryForm({ email: '', password: '' });
+        setTimeout(() => {
+          setShowAddSecretaryModal(false);
+          setSecretarySuccess('');
+        }, 2000);
+      } else {
+        setSecretaryError(response.error || 'Failed to create secretary');
+      }
+    } catch (err) {
+      setSecretaryError('Failed to create secretary');
+    } finally {
+      setIsCreatingSecretary(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -127,8 +178,82 @@ export default function DoctorDashboard() {
             <span className="material-symbols-outlined text-[20px] text-amber-600">schedule</span>
             <span className="text-sm font-medium text-slate-700">Manage Schedule</span>
           </button>
+          <button
+            onClick={() => setShowAddSecretaryModal(true)}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors text-left"
+          >
+            <span className="material-symbols-outlined text-[20px] text-[#1b5eb8]">badge</span>
+            <span className="text-sm font-medium text-slate-700">Add Secretary</span>
+          </button>
         </div>
       </div>
+
+      {/* Add Secretary Modal */}
+      {showAddSecretaryModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full">
+            <div className="p-6 border-b border-slate-200">
+              <h2 className="text-lg font-bold text-slate-900">Add Secretary</h2>
+              <p className="text-sm text-slate-500 mt-1">Create a secretary account for your practice</p>
+            </div>
+            <div className="p-6 space-y-4">
+              {secretaryError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {secretaryError}
+                </div>
+              )}
+              {secretarySuccess && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm">
+                  {secretarySuccess}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={secretaryForm.email}
+                  onChange={(e) => setSecretaryForm({ ...secretaryForm, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20 focus:border-[#1b5eb8] text-slate-900"
+                  placeholder="secretary@example.com"
+                  disabled={isCreatingSecretary}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Temporary Password</label>
+                <input
+                  type="password"
+                  value={secretaryForm.password}
+                  onChange={(e) => setSecretaryForm({ ...secretaryForm, password: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20 focus:border-[#1b5eb8] text-slate-900"
+                  placeholder="Enter temporary password"
+                  disabled={isCreatingSecretary}
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowAddSecretaryModal(false);
+                  setSecretaryForm({ email: '', password: '' });
+                  setSecretaryError('');
+                  setSecretarySuccess('');
+                }}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+                disabled={isCreatingSecretary}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddSecretary}
+                className="px-4 py-2 text-sm font-semibold text-white bg-[#1b5eb8] hover:bg-[#14468f] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isCreatingSecretary}
+              >
+                {isCreatingSecretary ? 'Creating...' : 'Create Secretary'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

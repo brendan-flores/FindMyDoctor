@@ -201,8 +201,8 @@ class ApiService {
         'email': email,
         'password': password,
         'role': role,
-        if (firstName != null) 'firstName': firstName,
-        if (lastName != null) 'lastName': lastName,
+        'firstName': ?firstName,
+        'lastName': ?lastName,
       },
       requireAuth: false,
     );
@@ -303,9 +303,9 @@ class ApiService {
     return await get(
       ApiConstants.doctors,
       queryParams: {
-        if (specialty != null) 'specialty': specialty,
-        if (clinicId != null) 'clinicId': clinicId,
-        if (search != null) 'search': search,
+        'specialty': ?specialty,
+        'clinicId': ?clinicId,
+        'search': ?search,
       },
       requireAuth: false,
     );
@@ -327,9 +327,9 @@ class ApiService {
     return await get(
       ApiConstants.appointments,
       queryParams: {
-        if (status != null) 'status': status,
-        if (startDate != null) 'startDate': startDate,
-        if (endDate != null) 'endDate': endDate,
+        'status': ?status,
+        'startDate': ?startDate,
+        'endDate': ?endDate,
       },
     );
   }
@@ -344,7 +344,7 @@ class ApiService {
       body: {
         'doctorId': doctorId,
         'appointmentDate': appointmentDate,
-        if (reasonForVisit != null) 'reasonForVisit': reasonForVisit,
+        'reasonForVisit': ?reasonForVisit,
       },
     );
   }
@@ -380,7 +380,7 @@ class ApiService {
       ApiConstants.aiChat,
       body: {
         'message': message,
-        if (conversationId != null) 'conversationId': conversationId,
+        'conversationId': ?conversationId,
       },
     );
   }

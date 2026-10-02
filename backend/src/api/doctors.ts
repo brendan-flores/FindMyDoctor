@@ -1,7 +1,8 @@
 import { Router, Response } from 'express';
-import { query } from '../database/connection';
+import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
 
@@ -234,6 +235,100 @@ router.post('/:id/capacity/:date', authenticate, authorize('DOCTOR', 'SECRETARY'
     res.json(success(null, 'Capacity set successfully'));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to set capacity'));
+  }
+});
+
+// Create secretary for authenticated doctor
+router.post('/secretaries', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { email, password } = req.body;
+
+    // Validation
+    if (!email || !password) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Email and password are required'));
+    }
+
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid email format'));
+    }
+
+    // Get authenticated doctor's doctor_id
+    const doctorResult = await client.query(
+      'SELECT id FROM doctors WHERE user_id = $1 AND approval_status = $2',
+      [req.user!.id, 'ACTIVE']
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Only active doctors can create secretaries'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Check for duplicate email
+    const existingUser = await client.query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (existingUser.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json(error(ErrorCodes.EMAIL_ALREADY_EXISTS, 'Email already registered'));
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create user with SECRETARY role
+    const userResult = await client.query(
+      `INSERT INTO users (email, password_hash, role, is_active, must_change_password)
+       VALUES ($1, $2, 'SECRETARY', true, true)
+       RETURNING id, email, role, is_active, must_change_password`,
+      [email, passwordHash]
+    );
+
+    const userId = userResult.rows[0].id;
+
+    // Create secretary profile with NULL names (to be completed in Step 3)
+    const secretaryResult = await client.query(
+      `INSERT INTO secretaries (user_id, doctor_id, first_name, last_name, is_approved)
+       VALUES ($1, $2, NULL, NULL, true)
+       RETURNING id, user_id, doctor_id, first_name, last_name, is_approved, created_at`,
+      [userId, doctorId]
+    );
+
+    await client.query('COMMIT');
+
+    res.status(201).json(
+      success({
+        secretary: secretaryResult.rows[0],
+        user: {
+          id: userId,
+          email: userResult.rows[0].email,
+          role: userResult.rows[0].role,
+        },
+      }, 'Secretary created successfully')
+    );
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Secretary creation error:', err);
+
+    // Handle unique constraint violation (race condition)
+    if (err.code === '23505') {
+      return res.status(409).json(error(ErrorCodes.EMAIL_ALREADY_EXISTS, 'Email already registered'));
+    }
+
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create secretary'));
+  } finally {
+    client.release();
   }
 });
 
