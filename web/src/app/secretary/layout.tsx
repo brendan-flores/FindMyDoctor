@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import SecretarySidebar from '@/components/layout/SecretarySidebar';
 import SecretaryHeader from '@/components/layout/SecretaryHeader';
 import { apiClient } from '@/lib/api/apiClient';
@@ -12,6 +12,7 @@ interface SecretaryLayoutProps {
 
 export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [userName, setUserName] = useState('Secretary');
   const [userRole, setUserRole] = useState('Secretary');
   const [isLoading, setIsLoading] = useState(true);
@@ -38,13 +39,21 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
         router.push('/secretary-login');
         return;
       }
+
+      // Check if password change is required
+      // Exclude the change-password page itself to avoid redirect loop
+      if (user.mustChangePassword === true && !pathname.includes('/change-password')) {
+        router.push('/secretary/change-password');
+        return;
+      }
+
       setUserName(user.email.split('@')[0] || 'Secretary');
       setUserRole(user.role || 'Secretary');
       apiClient.setToken(token);
     }
 
     setIsLoading(false);
-  }, [router]);
+  }, [router, pathname]);
 
   if (isLoading) {
     return (
@@ -58,7 +67,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
     <div className="min-h-screen bg-[#f8f9ff]">
       <SecretarySidebar userName={userName} userRole={userRole} />
       <SecretaryHeader userName={userName} userRole={userRole} />
-      <main className="ml-64 pt-20 min-h-screen bg-[#f8f9ff] p-6">
+      <main className="ml-64 pt-20 bg-[#f8f9ff] p-6">
         <div className="max-w-[1600px] mx-auto">
           {children}
         </div>

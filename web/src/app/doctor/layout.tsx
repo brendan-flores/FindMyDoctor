@@ -58,7 +58,7 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
     <div className="min-h-screen bg-[#f8f9ff]">
       <DoctorSidebar userName={userName} userRole={userRole} />
       <DoctorHeader userName={userName} userRole={userRole} />
-      <main className="ml-64 pt-20 min-h-screen bg-[#f8f9ff] p-6">
+      <main className="ml-64 pt-20 bg-[#f8f9ff] p-6">
         <div className="max-w-[1600px] mx-auto">
           {children}
         </div>

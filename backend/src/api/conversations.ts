@@ -1,12 +1,12 @@
 import { Router, Response } from 'express';
 import { query } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
-import { AuthRequest, authenticate, authorize } from '../middleware/auth';
+import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange } from '../middleware/auth';
 
 const router = Router();
 
 // Get conversations for current user
-router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, requireSecretaryPasswordChange, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const role = req.user!.role;
@@ -53,7 +53,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // Create conversation
-router.post('/', authenticate, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, requireSecretaryPasswordChange, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { secretaryId, doctorId } = req.body;
@@ -89,7 +89,7 @@ router.post('/', authenticate, authorize('PATIENT'), async (req: AuthRequest, re
 });
 
 // Get conversation by ID
-router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:id', authenticate, requireSecretaryPasswordChange, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;
@@ -127,7 +127,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // Get messages for conversation
-router.get('/:id/messages', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:id/messages', authenticate, requireSecretaryPasswordChange, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;
@@ -168,7 +168,7 @@ router.get('/:id/messages', authenticate, async (req: AuthRequest, res: Response
 });
 
 // Send message
-router.post('/:id/messages', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:id/messages', authenticate, requireSecretaryPasswordChange, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { message } = req.body;
@@ -227,7 +227,7 @@ router.post('/:id/messages', authenticate, async (req: AuthRequest, res: Respons
 });
 
 // Mark conversation as read
-router.patch('/:id/read', authenticate, async (req: AuthRequest, res: Response) => {
+router.patch('/:id/read', authenticate, requireSecretaryPasswordChange, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;

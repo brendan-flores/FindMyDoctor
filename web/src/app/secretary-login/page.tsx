@@ -28,7 +28,11 @@ export default function SecretaryLogin() {
         apiClient.setToken(response.data.accessToken);
 
         if (response.data.user.role === 'SECRETARY') {
-          router.push('/secretary/dashboard');
+          if (response.data.user.mustChangePassword === true) {
+            router.push('/secretary/change-password');
+          } else {
+            router.push('/secretary/dashboard');
+          }
         } else if (response.data.user.role === 'ADMIN') {
           setError('Please use the Admin login portal at /admin/login');
           localStorage.removeItem('token');

@@ -1,12 +1,12 @@
 import { Router, Response } from 'express';
 import { query } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
-import { AuthRequest, authenticate, authorize } from '../middleware/auth';
+import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange } from '../middleware/auth';
 
 const router = Router();
 
 // Get payment for appointment
-router.get('/:appointmentId', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:appointmentId', authenticate, requireSecretaryPasswordChange, async (req: AuthRequest, res: Response) => {
   try {
     const { appointmentId } = req.params;
     const userId = req.user!.id;
@@ -117,7 +117,7 @@ router.post('/:appointmentId/receipt', authenticate, authorize('PATIENT'), async
 });
 
 // Verify payment (secretary only)
-router.patch('/:id/verify', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+router.patch('/:id/verify', authenticate, requireSecretaryPasswordChange, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const secretaryId = req.user!.id;
@@ -155,7 +155,7 @@ router.patch('/:id/verify', authenticate, authorize('SECRETARY'), async (req: Au
 });
 
 // Reject payment (secretary only)
-router.patch('/:id/reject', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+router.patch('/:id/reject', authenticate, requireSecretaryPasswordChange, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const secretaryId = req.user!.id;
@@ -189,7 +189,7 @@ router.patch('/:id/reject', authenticate, authorize('SECRETARY'), async (req: Au
 });
 
 // Add additional charge (secretary only)
-router.post('/:id/charges', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { description, amount } = req.body;

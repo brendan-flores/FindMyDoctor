@@ -66,3 +66,14 @@ export function authorize(...allowedRoles: string[]) {
     next();
   };
 }
+
+// Require password change only for SECRETARY role
+// This allows shared routes (DOCTOR, SECRETARY, ADMIN) to work for non-Secretary users
+export function requireSecretaryPasswordChange(req: AuthRequest, res: Response, next: NextFunction) {
+  if (req.user?.role === 'SECRETARY' && req.user?.mustChangePassword) {
+    return res.status(403).json(
+      error(ErrorCodes.MUST_CHANGE_PASSWORD, 'Password change required')
+    );
+  }
+  next();
+}

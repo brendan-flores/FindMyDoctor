@@ -1,12 +1,12 @@
 import { Router, Response } from 'express';
 import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
-import { AuthRequest, authenticate, authorize } from '../middleware/auth';
+import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange } from '../middleware/auth';
 
 const router = Router();
 
 // Get queue for a specific date
-router.get('/:date', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+router.get('/:date', authenticate, requireSecretaryPasswordChange, authorize('DOCTOR', 'SECRETARY', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { date } = req.params;
     const { doctorId } = req.query;
@@ -62,7 +62,7 @@ router.get('/:date/patient/:patientId', authenticate, async (req: AuthRequest, r
 });
 
 // Call next patient
-router.post('/:date/next', authenticate, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
+router.post('/:date/next', authenticate, requireSecretaryPasswordChange, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { date } = req.params;
     const { doctorId } = req.body;
@@ -100,7 +100,7 @@ router.post('/:date/next', authenticate, authorize('DOCTOR', 'SECRETARY'), async
 });
 
 // Update queue status
-router.patch('/:id/status', authenticate, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
+router.patch('/:id/status', authenticate, requireSecretaryPasswordChange, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -138,7 +138,7 @@ router.patch('/:id/status', authenticate, authorize('DOCTOR', 'SECRETARY'), asyn
 });
 
 // Start checkup
-router.post('/:id/start-checkup', authenticate, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/start-checkup', authenticate, requireSecretaryPasswordChange, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -156,7 +156,7 @@ router.post('/:id/start-checkup', authenticate, authorize('DOCTOR', 'SECRETARY')
 });
 
 // Complete checkup
-router.post('/:id/complete', authenticate, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/complete', authenticate, requireSecretaryPasswordChange, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -174,7 +174,7 @@ router.post('/:id/complete', authenticate, authorize('DOCTOR', 'SECRETARY'), asy
 });
 
 // Skip patient
-router.post('/:id/skip', authenticate, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/skip', authenticate, requireSecretaryPasswordChange, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -192,7 +192,7 @@ router.post('/:id/skip', authenticate, authorize('DOCTOR', 'SECRETARY'), async (
 });
 
 // Mark as not present
-router.post('/:id/not-present', authenticate, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/not-present', authenticate, requireSecretaryPasswordChange, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
