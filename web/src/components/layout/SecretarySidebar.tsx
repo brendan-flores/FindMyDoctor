@@ -23,6 +23,7 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
     { id: 'walk-ins', label: 'Walk-ins', icon: 'person_add' },
     { id: 'conversations', label: 'Conversations', icon: 'chat' },
     { id: 'payments', label: 'Payments', icon: 'payments' },
+    { id: 'profile', label: 'Profile', icon: 'account_circle' },
   ];
 
   const handleNavClick = (tabId: string) => {
@@ -102,14 +103,13 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
 
       {/* Bottom Actions */}
       <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-1">
-        <a
-          href="/secretary-login"
-          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+        <button
           onClick={handleLogout}
+          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
         >
           <span className="material-symbols-outlined text-[18px]">logout</span>
           <span>Sign Out</span>
-        </a>
+        </button>
       </div>
     </aside>
   );

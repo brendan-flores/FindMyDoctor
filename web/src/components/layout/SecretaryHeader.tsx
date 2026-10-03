@@ -1,11 +1,18 @@
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
 interface SecretaryHeaderProps {
   userName?: string;
   userRole?: string;
 }
 
 export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Secretary' }: SecretaryHeaderProps) {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -27,6 +34,42 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
     minute: '2-digit',
     timeZoneName: 'short'
   });
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleProfileClick = () => {
+    setIsDropdownOpen(!isDropdownOpen);
+  };
+
+  const handleViewProfile = () => {
+    setIsDropdownOpen(false);
+    router.push('/secretary/profile');
+  };
+
+  const handleChangePassword = () => {
+    setIsDropdownOpen(false);
+    router.push('/secretary/change-password');
+  };
+
+  const handleSignOut = () => {
+    setIsDropdownOpen(false);
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    router.push('/secretary-login');
+  };
 
   return (
     <header className="fixed top-0 left-64 right-0 h-16 bg-white border-b border-slate-200 z-20 flex items-center justify-between px-8">
@@ -56,15 +99,48 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
           <span className="material-symbols-outlined text-[20px]">notifications</span>
         </button>
 
-        {/* Secretary Avatar */}
-        <div className="flex items-center gap-2.5 pl-1 border-l border-slate-200">
-          <div className="w-8 h-8 rounded-full bg-[#1b5eb8] text-white flex items-center justify-center font-semibold text-xs shadow-sm">
-            {getInitials(userName)}
-          </div>
-          <div className="hidden lg:block text-left leading-none">
-            <div className="text-xs font-semibold text-slate-800">{userName}</div>
-            <div className="text-[10px] text-slate-400">{userRole}</div>
-          </div>
+        {/* Secretary Avatar with Dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={handleProfileClick}
+            className="flex items-center gap-2.5 pl-1 border-l border-slate-200 hover:bg-slate-50 rounded-lg px-2 py-1 transition-colors"
+          >
+            <div className="w-8 h-8 rounded-full bg-[#1b5eb8] text-white flex items-center justify-center font-semibold text-xs shadow-sm">
+              {getInitials(userName)}
+            </div>
+            <div className="hidden lg:block text-left leading-none">
+              <div className="text-xs font-semibold text-slate-800">{userName}</div>
+              <div className="text-[10px] text-slate-400">{userRole}</div>
+            </div>
+          </button>
+
+          {/* Dropdown Menu */}
+          {isDropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg border border-slate-200 shadow-lg py-1 z-50">
+              <button
+                onClick={handleViewProfile}
+                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">account_circle</span>
+                View Profile
+              </button>
+              <button
+                onClick={handleChangePassword}
+                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">lock</span>
+                Change Password
+              </button>
+              <div className="border-t border-slate-100 my-1"></div>
+              <button
+                onClick={handleSignOut}
+                className="w-full px-4 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">logout</span>
+                Sign Out
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
