@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { query } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
-import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange } from '../middleware/auth';
+import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, requireSecretaryProfileCompletion } from '../middleware/auth';
 
 const router = Router();
 
@@ -89,7 +89,7 @@ router.post('/', authenticate, requireSecretaryPasswordChange, authorize('PATIEN
 });
 
 // Get conversation by ID
-router.get('/:id', authenticate, requireSecretaryPasswordChange, async (req: AuthRequest, res: Response) => {
+router.get('/:id', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;
@@ -127,7 +127,7 @@ router.get('/:id', authenticate, requireSecretaryPasswordChange, async (req: Aut
 });
 
 // Get messages for conversation
-router.get('/:id/messages', authenticate, requireSecretaryPasswordChange, async (req: AuthRequest, res: Response) => {
+router.get('/:id/messages', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;
@@ -168,7 +168,7 @@ router.get('/:id/messages', authenticate, requireSecretaryPasswordChange, async 
 });
 
 // Send message
-router.post('/:id/messages', authenticate, requireSecretaryPasswordChange, async (req: AuthRequest, res: Response) => {
+router.post('/:id/messages', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { message } = req.body;
@@ -227,7 +227,7 @@ router.post('/:id/messages', authenticate, requireSecretaryPasswordChange, async
 });
 
 // Mark conversation as read
-router.patch('/:id/read', authenticate, requireSecretaryPasswordChange, async (req: AuthRequest, res: Response) => {
+router.patch('/:id/read', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;

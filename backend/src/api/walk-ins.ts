@@ -1,13 +1,13 @@
 import { Router, Response } from 'express';
 import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
-import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange } from '../middleware/auth';
+import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, requireSecretaryProfileCompletion } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
 
 // Search for patient by email
-router.get('/search', authenticate, requireSecretaryPasswordChange, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+router.get('/search', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { email } = req.query;
 
@@ -36,7 +36,7 @@ router.get('/search', authenticate, requireSecretaryPasswordChange, authorize('S
 });
 
 // Create account for walk-in patient
-router.post('/create-account', authenticate, requireSecretaryPasswordChange, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+router.post('/create-account', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { email, firstName, lastName } = req.body;
 
@@ -100,7 +100,7 @@ router.post('/create-account', authenticate, requireSecretaryPasswordChange, aut
 });
 
 // Register walk-in patient (atomic transaction)
-router.post('/', authenticate, requireSecretaryPasswordChange, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
   const client = await getClient();
   
   try {

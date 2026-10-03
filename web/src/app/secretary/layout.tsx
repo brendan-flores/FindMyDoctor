@@ -47,6 +47,34 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
         return;
       }
 
+      // Check if profile completion is required (only after password change)
+      if (user.mustChangePassword === false && !pathname.includes('/complete-profile')) {
+        // Fetch secretary profile to check completion status
+        apiClient.get('/users/me')
+          .then((response) => {
+            if (response.success && response.data) {
+              const secretary = response.data as any;
+              // Check if required fields are complete
+              const isComplete =
+                secretary.first_name &&
+                secretary.first_name.trim() !== '' &&
+                secretary.last_name &&
+                secretary.last_name.trim() !== '' &&
+                secretary.contact_number &&
+                secretary.contact_number.trim() !== '';
+
+              if (!isComplete) {
+                router.push('/secretary/complete-profile');
+                return;
+              }
+            }
+          })
+          .catch((err) => {
+            console.error('Error checking profile completion:', err);
+            // On error, allow access to avoid blocking
+          });
+      }
+
       setUserName(user.email.split('@')[0] || 'Secretary');
       setUserRole(user.role || 'Secretary');
       apiClient.setToken(token);
