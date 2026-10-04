@@ -24,6 +24,20 @@ export interface AuthResponse {
   refreshToken: string;
 }
 
+export interface LoginOtpRequiredResponse {
+  requiresOtp: true;
+  challengeId: string;
+}
+
+export interface VerifyLoginOtpRequest {
+  challengeId: string;
+  otp: string;
+}
+
+export interface ResendLoginOtpRequest {
+  challengeId: string;
+}
+
 export interface DoctorRegistrationRequest {
   email: string;
   password: string;
@@ -59,7 +73,15 @@ export interface DoctorRegistrationResponse {
 
 export const authApi = {
   login: async (credentials: LoginCredentials) => {
-    return apiClient.post<AuthResponse>('/auth/login', credentials);
+    return apiClient.post<AuthResponse | LoginOtpRequiredResponse>('/auth/login', credentials);
+  },
+
+  verifyLoginOtp: async (payload: VerifyLoginOtpRequest) => {
+    return apiClient.post<AuthResponse>('/auth/verify-login-otp', payload);
+  },
+
+  resendLoginOtp: async (payload: ResendLoginOtpRequest) => {
+    return apiClient.post('/auth/resend-login-otp', payload);
   },
 
   register: async (credentials: RegisterCredentials) => {

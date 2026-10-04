@@ -6,6 +6,31 @@ import bcrypt from 'bcryptjs';
 
 const router = Router();
 
+// Get current doctor (authenticated)
+router.get('/me', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    const result = await query(
+      `SELECT
+        d.id, d.user_id, d.first_name, d.middle_name, d.last_name, d.specialty, d.credentials,
+        d.prc_license_number, d.practice_name, d.practice_phone, d.practice_email, d.room_number,
+        d.two_factor_enabled, d.is_approved, d.approval_status
+       FROM doctors d
+       WHERE d.user_id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    res.json(success(result.rows[0]));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor profile'));
+  }
+});
+
 // Get all doctors (public search)
 router.get('/', async (req: any, res: Response) => {
   try {
@@ -52,7 +77,7 @@ router.get('/:id', async (req: any, res: Response) => {
     const { id } = req.params;
 
     const result = await query(
-      `SELECT 
+      `SELECT
         d.*
        FROM doctors d
        WHERE d.id = $1`,
@@ -97,8 +122,8 @@ router.get('/:id/availability', async (req: any, res: Response) => {
 
     // Get unavailability periods
     const unavailabilityResult = await query(
-      `SELECT * FROM doctor_unavailability 
-       WHERE doctor_id = $1 
+      `SELECT * FROM doctor_unavailability
+       WHERE doctor_id = $1
        AND (start_date <= $2 AND end_date >= $3)
        ORDER BY start_date`,
       [id, endDate, startDate]
@@ -106,8 +131,8 @@ router.get('/:id/availability', async (req: any, res: Response) => {
 
     // Get daily capacities
     const capacityResult = await query(
-      `SELECT date, final_capacity, registered_count 
-       FROM daily_capacities 
+      `SELECT date, final_capacity, registered_count
+       FROM daily_capacities
        WHERE doctor_id = $1 AND date >= $2 AND date <= $3
        ORDER BY date`,
       [id, startDate, endDate]
@@ -170,8 +195,8 @@ router.put('/:id/capacity', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMI
     const finalCapacity = Math.min(capacity.calculated_capacity, configuredCapacity);
 
     await query(
-      `UPDATE daily_capacities 
-       SET configured_capacity = $1, final_capacity = $2, updated_at = CURRENT_TIMESTAMP 
+      `UPDATE daily_capacities
+       SET configured_capacity = $1, final_capacity = $2, updated_at = CURRENT_TIMESTAMP
        WHERE doctor_id = $3 AND date = $4`,
       [configuredCapacity, finalCapacity, id, date]
     );
@@ -218,8 +243,8 @@ router.post('/:id/capacity/:date', authenticate, authorize('DOCTOR', 'SECRETARY'
     if (existingResult.rows.length > 0) {
       // Update existing
       await query(
-        `UPDATE daily_capacities 
-         SET configured_capacity = $1, final_capacity = $2, updated_at = CURRENT_TIMESTAMP 
+        `UPDATE daily_capacities
+         SET configured_capacity = $1, final_capacity = $2, updated_at = CURRENT_TIMESTAMP
          WHERE doctor_id = $3 AND date = $4`,
         [configuredCapacity, finalCapacity, id, date]
       );
@@ -329,6 +354,37 @@ router.post('/secretaries', authenticate, authorize('DOCTOR'), async (req: AuthR
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create secretary'));
   } finally {
     client.release();
+  }
+});
+
+// Update Doctor two-factor authentication setting
+router.put('/me/two-factor', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { twoFactorEnabled } = req.body;
+
+    if (typeof twoFactorEnabled !== 'boolean') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'twoFactorEnabled must be a boolean'));
+    }
+
+    const result = await query(
+      `UPDATE doctors
+       SET two_factor_enabled = $1
+       WHERE user_id = $2
+       RETURNING id, two_factor_enabled`,
+      [twoFactorEnabled, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    res.json(success({
+      twoFactorEnabled: result.rows[0].two_factor_enabled
+    }, 'Two-factor authentication setting updated'));
+  } catch (err: any) {
+    console.error('Doctor 2FA setting update error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update two-factor setting'));
   }
 });
 

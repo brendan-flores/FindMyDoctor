@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
+import OtpVerification from '@/components/auth/OtpVerification';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -11,6 +12,8 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showOtp, setShowOtp] = useState(false);
+  const [challengeId, setChallengeId] = useState('');
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -22,16 +25,27 @@ export default function AdminLogin() {
       const response = await authApi.login({ email, password });
 
       if (response.success && response.data) {
+        // Check if OTP is required
+        if ('requiresOtp' in response.data && response.data.requiresOtp) {
+          setShowOtp(true);
+          setChallengeId(response.data.challengeId);
+          setIsLoading(false);
+          return;
+        }
+
+        // Type guard: this is now AuthResponse (not LoginOtpRequiredResponse)
+        const authData = response.data as { user: any; accessToken: string; refreshToken: string };
+
         // Store token in localStorage
-        localStorage.setItem('token', response.data.accessToken);
-        localStorage.setItem('refreshToken', response.data.refreshToken);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        localStorage.setItem('token', authData.accessToken);
+        localStorage.setItem('refreshToken', authData.refreshToken);
+        localStorage.setItem('user', JSON.stringify(authData.user));
 
         // Set token in API client
-        apiClient.setToken(response.data.accessToken);
+        apiClient.setToken(authData.accessToken);
 
         // Verify backend-returned role is ADMIN or SUPERADMIN
-        if (response.data.user.role === 'ADMIN' || response.data.user.role === 'SUPERADMIN') {
+        if (authData.user.role === 'ADMIN' || authData.user.role === 'SUPERADMIN') {
           router.push('/admin/dashboard');
         } else {
           setError('Access denied. Admin access required.');
@@ -49,6 +63,30 @@ export default function AdminLogin() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleOtpVerifySuccess = (data: any) => {
+    // Verify backend-returned role is ADMIN or SUPERADMIN
+    if (data.user.role === 'ADMIN' || data.user.role === 'SUPERADMIN') {
+      router.push('/admin/dashboard');
+    } else {
+      setError('Access denied. Admin access required.');
+      // Clear credentials on role mismatch
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      apiClient.clearToken();
+    }
+  };
+
+  const handleOtpVerifyError = (errorMessage: string) => {
+    setError(errorMessage);
+  };
+
+  const handleOtpCancel = () => {
+    setShowOtp(false);
+    setChallengeId('');
+    setError('');
   };
 
   return (
@@ -92,108 +130,118 @@ export default function AdminLogin() {
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="w-full space-y-5">
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* Email Field */}
-          <div className="space-y-2">
-            <label htmlFor="email" className="block text-[15px] font-bold text-[#1A202C]">
-              Email Address
-            </label>
-            <div className="relative rounded-2xl shadow-sm">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <rect height="16" rx="3" strokeWidth="1.8" width="20" x="2" y="4"></rect>
-                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" strokeLinecap="round" strokeWidth="1.8"></path>
-                </svg>
+        {!showOtp ? (
+          <form onSubmit={handleSubmit} className="w-full space-y-5">
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                {error}
               </div>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@example.com"
-                required
-                className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150"
-              />
-            </div>
-          </div>
+            )}
 
-          {/* Password Field */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label htmlFor="password" className="block text-[15px] font-bold text-[#1A202C]">
-                Password
+            {/* Email Field */}
+            <div className="space-y-2">
+              <label htmlFor="email" className="block text-[15px] font-bold text-[#1A202C]">
+                Email Address
               </label>
-              <a href="#" className="text-[14px] font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors">
-                Forgot Password?
-              </a>
-            </div>
-            <div className="relative rounded-2xl shadow-sm">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-                </svg>
+              <div className="relative rounded-2xl shadow-sm">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect height="16" rx="3" strokeWidth="1.8" width="20" x="2" y="4"></rect>
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" strokeLinecap="round" strokeWidth="1.8"></path>
+                  </svg>
+                </div>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                  required
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150"
+                />
               </div>
-              <input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-12 text-[15px] tracking-wider text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150"
-              />
+            </div>
+
+            {/* Password Field */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="block text-[15px] font-bold text-[#1A202C]">
+                  Password
+                </label>
+                <a href="#" className="text-[14px] font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors">
+                  Forgot Password?
+                </a>
+              </div>
+              <div className="relative rounded-2xl shadow-sm">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
+                  </svg>
+                </div>
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-12 text-[15px] tracking-wider text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#94A3B8] hover:text-[#64748B] focus:outline-none"
+                >
+                  {showPassword ? (
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
+                      <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Remember Me */}
+            <div className="flex items-center pt-1">
+              <label className="flex items-center cursor-pointer select-none" htmlFor="remember-me">
+                <input
+                  id="remember-me"
+                  type="checkbox"
+                  defaultChecked
+                  className="h-5 w-5 rounded-md border-[#CBD5E1] text-[#0D3B75] focus:ring-[#0D3B75] focus:ring-offset-0 transition duration-150 cursor-pointer"
+                />
+                <span className="ml-2.5 text-[15px] font-normal text-[#64748B]">Remember me</span>
+              </label>
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-2">
               <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#94A3B8] hover:text-[#64748B] focus:outline-none"
+                type="submit"
+                disabled={isLoading}
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {showPassword ? (
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-                    <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-                  </svg>
-                ) : (
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-                  </svg>
-                )}
+                {isLoading ? 'Signing in...' : 'Sign In'}
               </button>
             </div>
-          </div>
-
-          {/* Remember Me */}
-          <div className="flex items-center pt-1">
-            <label className="flex items-center cursor-pointer select-none" htmlFor="remember-me">
-              <input
-                id="remember-me"
-                type="checkbox"
-                defaultChecked
-                className="h-5 w-5 rounded-md border-[#CBD5E1] text-[#0D3B75] focus:ring-[#0D3B75] focus:ring-offset-0 transition duration-150 cursor-pointer"
-              />
-              <span className="ml-2.5 text-[15px] font-normal text-[#64748B]">Remember me</span>
-            </label>
-          </div>
-
-          {/* Submit Button */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Signing in...' : 'Sign In'}
-            </button>
-          </div>
-        </form>
+          </form>
+        ) : (
+          <OtpVerification
+            email={email}
+            challengeId={challengeId}
+            onVerifySuccess={handleOtpVerifySuccess}
+            onVerifyError={handleOtpVerifyError}
+            onCancel={handleOtpCancel}
+          />
+        )}
       </div>
     </div>
   );

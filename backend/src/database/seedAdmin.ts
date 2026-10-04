@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { query } from './connection';
+import * as otpService from '../services/otpService';
 
 /**
  * Seed script for initial SuperAdmin and Admin accounts
@@ -22,6 +23,17 @@ async function seedAdmin() {
     );
 
     if (specificSuperAdmin.rows.length === 0) {
+      // SAFETY: Ensure Supabase Auth identity exists BEFORE creating PostgreSQL account
+      // Admin OTP is mandatory with NO bypass, so we must not create a broken Admin account
+      try {
+        await otpService.ensureAdminSupabaseIdentity('adminsisiglovers@gmail.com');
+        console.log('✅ Supabase identity ensured for SuperAdmin');
+      } catch (supabaseErr: any) {
+        console.error('❌ Failed to ensure Supabase identity:', supabaseErr.message);
+        console.log('❌ HALTING: Cannot create SuperAdmin without Supabase identity for mandatory OTP');
+        throw new Error('Supabase identity provisioning failed. Cannot create SuperAdmin account.');
+      }
+
       // Generate secure password hash for the specific SuperAdmin
       const specificSuperAdminPassword = 'SisigLovers@2026';
       const specificSuperAdminPasswordHash = await bcrypt.hash(specificSuperAdminPassword, 10);
@@ -57,6 +69,16 @@ async function seedAdmin() {
       console.log(`   Email: ${specificSuperAdmin.rows[0].email}`);
       console.log(`   Password: ${specificSuperAdminPassword}`);
       console.log(`   ID: ${specificSuperAdmin.rows[0].id}`);
+
+      // Ensure Supabase Auth identity exists for mandatory OTP (for existing accounts)
+      try {
+        await otpService.ensureAdminSupabaseIdentity('adminsisiglovers@gmail.com');
+        console.log('✅ Supabase identity ensured for SuperAdmin');
+      } catch (supabaseErr: any) {
+        console.error('⚠️  Failed to ensure Supabase identity:', supabaseErr.message);
+        console.log('⚠️  WARNING: Existing SuperAdmin may not be able to complete mandatory OTP login');
+        console.log('   Manually create Supabase user for this email to fix');
+      }
     }
 
     // Check if default SuperAdmin already exists (for backward compatibility)
@@ -66,6 +88,17 @@ async function seedAdmin() {
     );
 
     if (existingSuperAdmin.rows.length === 0) {
+      // SAFETY: Ensure Supabase Auth identity exists BEFORE creating PostgreSQL account
+      // Admin OTP is mandatory with NO bypass, so we must not create a broken Admin account
+      try {
+        await otpService.ensureAdminSupabaseIdentity('superadmin@findmydoctor.local');
+        console.log('✅ Supabase identity ensured for default SuperAdmin');
+      } catch (supabaseErr: any) {
+        console.error('❌ Failed to ensure Supabase identity:', supabaseErr.message);
+        console.log('❌ HALTING: Cannot create SuperAdmin without Supabase identity for mandatory OTP');
+        throw new Error('Supabase identity provisioning failed. Cannot create SuperAdmin account.');
+      }
+
       // Generate secure password hash for default SuperAdmin
       const superAdminPassword = 'SuperAdmin@2026'; // This should be changed immediately after first login
       const superAdminPasswordHash = await bcrypt.hash(superAdminPassword, 10);
@@ -103,6 +136,16 @@ async function seedAdmin() {
       console.log(`   Email: ${existingSuperAdmin.rows[0].email}`);
       console.log(`   Password: ${superAdminPassword}`);
       console.log(`   ID: ${existingSuperAdmin.rows[0].id}`);
+
+      // Ensure Supabase Auth identity exists for mandatory OTP (for existing accounts)
+      try {
+        await otpService.ensureAdminSupabaseIdentity('superadmin@findmydoctor.local');
+        console.log('✅ Supabase identity ensured for default SuperAdmin');
+      } catch (supabaseErr: any) {
+        console.error('⚠️  Failed to ensure Supabase identity:', supabaseErr.message);
+        console.log('⚠️  WARNING: Existing SuperAdmin may not be able to complete mandatory OTP login');
+        console.log('   Manually create Supabase user for this email to fix');
+      }
     }
 
     // Check if regular Admin already exists
@@ -112,6 +155,17 @@ async function seedAdmin() {
     );
 
     if (existingAdmin.rows.length === 0) {
+      // SAFETY: Ensure Supabase Auth identity exists BEFORE creating PostgreSQL account
+      // Admin OTP is mandatory with NO bypass, so we must not create a broken Admin account
+      try {
+        await otpService.ensureAdminSupabaseIdentity('admin@findmydoctor.local');
+        console.log('✅ Supabase identity ensured for regular Admin');
+      } catch (supabaseErr: any) {
+        console.error('❌ Failed to ensure Supabase identity:', supabaseErr.message);
+        console.log('❌ HALTING: Cannot create Admin without Supabase identity for mandatory OTP');
+        throw new Error('Supabase identity provisioning failed. Cannot create Admin account.');
+      }
+
       // Generate secure password hash for regular Admin
       const adminPassword = 'Admin@2026'; // This should be changed immediately after first login
       const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
@@ -149,6 +203,16 @@ async function seedAdmin() {
       console.log(`   Email: ${existingAdmin.rows[0].email}`);
       console.log(`   Password: ${adminPassword}`);
       console.log(`   ID: ${existingAdmin.rows[0].id}`);
+
+      // Ensure Supabase Auth identity exists for mandatory OTP (for existing accounts)
+      try {
+        await otpService.ensureAdminSupabaseIdentity('admin@findmydoctor.local');
+        console.log('✅ Supabase identity ensured for regular Admin');
+      } catch (supabaseErr: any) {
+        console.error('⚠️  Failed to ensure Supabase identity:', supabaseErr.message);
+        console.log('⚠️  WARNING: Existing Admin may not be able to complete mandatory OTP login');
+        console.log('   Manually create Supabase user for this email to fix');
+      }
     }
 
   } catch (error) {

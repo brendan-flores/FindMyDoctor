@@ -4,6 +4,7 @@ import { query } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 import { sendApprovalEmail, sendRejectionEmail } from '../services/emailService';
+import * as otpService from '../services/otpService';
 
 const router = Router();
 
@@ -269,6 +270,22 @@ router.post('/secretaries', authenticate, authorize('ADMIN'), async (req: AuthRe
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor not found'));
     }
 
+    // SAFETY: Ensure Supabase Auth identity exists BEFORE creating PostgreSQL account
+    // Secretary 2FA is optional, but if enabled, OTP requires the user to exist in Supabase Auth
+    // This is idempotent - will not create duplicate identities
+    try {
+      const { ensureSecretarySupabaseIdentity } = await import('../services/otpService');
+      await ensureSecretarySupabaseIdentity(email);
+      console.log('Supabase identity ensured for secretary:', email);
+    } catch (supabaseErr: any) {
+      console.error('Failed to ensure Supabase identity:', supabaseErr);
+      // FAIL FAST: Do not create PostgreSQL account if Supabase provisioning fails
+      // This prevents creating a Secretary that cannot complete 2FA login if enabled
+      return res.status(500).json(
+        error(ErrorCodes.SERVER_ERROR, 'Failed to create Supabase identity for OTP. Secretary account not created.')
+      );
+    }
+
     // Create user
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -333,6 +350,21 @@ router.post('/admins', authenticate, authorize('SUPERADMIN'), async (req: AuthRe
       return res.status(409).json(error(ErrorCodes.EMAIL_ALREADY_EXISTS, 'Email already registered'));
     }
 
+    // SAFETY: Ensure Supabase Auth identity exists BEFORE creating PostgreSQL account
+    // Admin OTP is mandatory with NO bypass, so we must not create a broken Admin account
+    // This is idempotent - will not create duplicate identities
+    try {
+      await otpService.ensureAdminSupabaseIdentity(email);
+      console.log('Supabase identity ensured for admin:', email);
+    } catch (supabaseErr: any) {
+      console.error('Failed to ensure Supabase identity:', supabaseErr);
+      // FAIL FAST: Do not create PostgreSQL account if Supabase provisioning fails
+      // This prevents creating an Admin that cannot complete mandatory OTP login
+      return res.status(500).json(
+        error(ErrorCodes.SERVER_ERROR, 'Failed to create Supabase identity for OTP. Admin account not created.')
+      );
+    }
+
     // Hash password securely
     const passwordHash = await bcrypt.hash(password, 10);
     console.log('Password hashed successfully');
@@ -368,6 +400,89 @@ router.get('/admins', authenticate, authorize('SUPERADMIN'), async (req: AuthReq
     res.json(success(result.rows));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch admin accounts'));
+  }
+});
+
+// Reconcile Admin Supabase identities (SUPERADMIN only)
+// This endpoint provisions Supabase Auth identities for existing Admin accounts
+// that don't have them yet. This is server-side, idempotent, and duplicate-safe.
+router.post('/admins/reconcile-supabase', authenticate, authorize('SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    console.log('Reconciling Supabase identities for Admin accounts');
+
+    // Get all Admin and SuperAdmin accounts
+    const adminUsers = await query(
+      `SELECT id, email, role FROM users WHERE role IN ('ADMIN', 'SUPERADMIN')`
+    );
+
+    let successCount = 0;
+    let skippedCount = 0;
+    let failureCount = 0;
+    const failures: { email: string; error: string }[] = [];
+
+    for (const admin of adminUsers.rows) {
+      try {
+        const result = await otpService.ensureAdminSupabaseIdentity(admin.email);
+        successCount++;
+        console.log(`✅ Supabase identity ensured for ${admin.email} (${admin.role})`);
+      } catch (err: any) {
+        failureCount++;
+        failures.push({ email: admin.email, error: err.message || 'Unknown error' });
+        console.error(`❌ Failed to ensure Supabase identity for ${admin.email}:`, err.message);
+      }
+    }
+
+    res.json(success({
+      successCount,
+      skippedCount,
+      failureCount,
+      failures
+    }, `Reconciliation complete: ${successCount} succeeded, ${failureCount} failed`));
+  } catch (err: any) {
+    console.error('Error reconciling Supabase identities:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to reconcile Supabase identities'));
+  }
+});
+
+// Reconcile Secretary Supabase identities (ADMIN or SUPERADMIN only)
+// This endpoint provisions Supabase Auth identities for existing Secretary accounts
+// that don't have them yet. This is server-side, idempotent, and duplicate-safe.
+router.post('/secretaries/reconcile-supabase', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    console.log('Reconciling Supabase identities for Secretary accounts');
+
+    // Get all Secretary accounts
+    const secretaryUsers = await query(
+      `SELECT id, email, role FROM users WHERE role = 'SECRETARY'`
+    );
+
+    let successCount = 0;
+    let skippedCount = 0;
+    let failureCount = 0;
+    const failures: { email: string; error: string }[] = [];
+
+    for (const secretary of secretaryUsers.rows) {
+      try {
+        const { ensureSecretarySupabaseIdentity } = await import('../services/otpService');
+        const result = await ensureSecretarySupabaseIdentity(secretary.email);
+        successCount++;
+        console.log(`✅ Supabase identity ensured for ${secretary.email} (${secretary.role})`);
+      } catch (err: any) {
+        failureCount++;
+        failures.push({ email: secretary.email, error: err.message || 'Unknown error' });
+        console.error(`❌ Failed to ensure Supabase identity for ${secretary.email}:`, err.message);
+      }
+    }
+
+    res.json(success({
+      successCount,
+      skippedCount,
+      failureCount,
+      failures
+    }, `Reconciliation complete: ${successCount} succeeded, ${failureCount} failed`));
+  } catch (err: any) {
+    console.error('Error reconciling Supabase identities:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to reconcile Supabase identities'));
   }
 });
 

@@ -5,6 +5,35 @@ import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
+// Get current secretary (authenticated)
+router.get('/me', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    const result = await query(
+      `SELECT
+        s.id, s.user_id, s.doctor_id, s.first_name, s.middle_name, s.last_name, s.contact_number,
+        s.two_factor_enabled, s.is_approved,
+        u.email, u.role, u.must_change_password,
+        d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.practice_name
+       FROM secretaries s
+       INNER JOIN users u ON s.user_id = u.id
+       INNER JOIN doctors d ON s.doctor_id = d.id
+       WHERE s.user_id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    res.json(success(result.rows[0]));
+  } catch (err: any) {
+    console.error('Secretary profile fetch error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch secretary profile'));
+  }
+});
+
 // Update current secretary profile
 router.put('/me', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
@@ -82,6 +111,37 @@ router.put('/me', authenticate, authorize('SECRETARY'), async (req: AuthRequest,
   } catch (err: any) {
     console.error('Secretary profile update error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update profile'));
+  }
+});
+
+// Update Secretary two-factor authentication setting
+router.put('/me/two-factor', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { twoFactorEnabled } = req.body;
+
+    if (typeof twoFactorEnabled !== 'boolean') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'twoFactorEnabled must be a boolean'));
+    }
+
+    const result = await query(
+      `UPDATE secretaries
+       SET two_factor_enabled = $1
+       WHERE user_id = $2
+       RETURNING id, two_factor_enabled`,
+      [twoFactorEnabled, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    res.json(success({
+      twoFactorEnabled: result.rows[0].two_factor_enabled
+    }, 'Two-factor authentication setting updated'));
+  } catch (err: any) {
+    console.error('Secretary 2FA setting update error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update two-factor setting'));
   }
 });
 

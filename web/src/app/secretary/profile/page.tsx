@@ -36,7 +36,7 @@ export default function SecretaryProfile() {
 
   const fetchProfile = async () => {
     try {
-      const response = await apiClient.get('/users/me');
+      const response = await apiClient.get('/secretaries/me');
       if (response.success && response.data) {
         const data = response.data as SecretaryProfile;
         setProfile(data);
@@ -45,8 +45,11 @@ export default function SecretaryProfile() {
         setMiddleName(data.middle_name || '');
         setLastName(data.last_name || '');
         setContactNumber(data.contact_number || '');
+      } else {
+        setError('Failed to load profile');
       }
     } catch (err) {
+      console.error('Error fetching secretary profile:', err);
       setError('Failed to load profile');
     } finally {
       setIsLoading(false);

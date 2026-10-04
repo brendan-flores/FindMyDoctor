@@ -24,6 +24,7 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
     { id: 'conversations', label: 'Conversations', icon: 'chat' },
     { id: 'payments', label: 'Payments', icon: 'payments' },
     { id: 'profile', label: 'Profile', icon: 'account_circle' },
+    { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
   const handleNavClick = (tabId: string) => {

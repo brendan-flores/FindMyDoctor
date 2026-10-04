@@ -23,6 +23,7 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
     { id: 'schedule', label: 'Schedule', icon: 'schedule' },
     { id: 'patients', label: 'Patients', icon: 'people' },
     { id: 'prescriptions', label: 'Prescriptions', icon: 'medication' },
+    { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
   const handleNavClick = (tabId: string) => {

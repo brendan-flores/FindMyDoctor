@@ -1,8 +1,10 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { query, getClient } from '../../database/connection';
 import { config } from '../../config';
 import { ErrorCodes } from '../../utils/response';
+import * as otpService from '../../services/otpService';
 
 export interface RegisterData {
   email: string;
@@ -52,8 +54,8 @@ export async function register(data: RegisterData) {
 
   // Create user
   const userResult = await query(
-    `INSERT INTO users (email, password_hash, role, must_change_password) 
-     VALUES ($1, $2, $3, false) 
+    `INSERT INTO users (email, password_hash, role, must_change_password)
+     VALUES ($1, $2, $3, false)
      RETURNING id, email, role, must_change_password, created_at`,
     [email, passwordHash, role]
   );
@@ -63,7 +65,7 @@ export async function register(data: RegisterData) {
   // Create role-specific profile
   if (role === 'PATIENT' && firstName && lastName) {
     await query(
-      `INSERT INTO patients (user_id, first_name, last_name) 
+      `INSERT INTO patients (user_id, first_name, last_name)
        VALUES ($1, $2, $3)`,
       [user.id, firstName, lastName]
     );
@@ -90,8 +92,8 @@ export async function login(data: LoginData) {
 
   // Find user by email or username
   const userResult = await query(
-    `SELECT * FROM users 
-     WHERE (email = $1 OR username = $1) 
+    `SELECT * FROM users
+     WHERE (email = $1 OR username = $1)
      AND is_active = true`,
     [email]
   );
@@ -115,27 +117,65 @@ export async function login(data: LoginData) {
       'SELECT approval_status FROM doctors WHERE user_id = $1',
       [user.id]
     );
-    
+
     if (doctorResult.rows.length > 0) {
       const approvalStatus = doctorResult.rows[0].approval_status;
-      
+
       if (approvalStatus === 'PENDING') {
-        throw { 
-          code: ErrorCodes.DOCTOR_PENDING_APPROVAL, 
-          message: 'Your account is awaiting administrator approval' 
+        throw {
+          code: ErrorCodes.DOCTOR_PENDING_APPROVAL,
+          message: 'Your account is awaiting administrator approval'
         };
       }
-      
+
       if (approvalStatus === 'REJECTED') {
-        throw { 
-          code: ErrorCodes.DOCTOR_REJECTED, 
-          message: 'Your doctor account has not been approved and you cannot sign in' 
+        throw {
+          code: ErrorCodes.DOCTOR_REJECTED,
+          message: 'Your doctor account has not been approved and you cannot sign in'
         };
       }
     }
   }
 
-  // Generate tokens
+  // Server-side OTP requirement decision
+  let requiresOtp = false;
+
+  if (user.role === 'ADMIN' || user.role === 'SUPERADMIN') {
+    // OTP ALWAYS required for Admin - no setting, no bypass
+    requiresOtp = true;
+  } else if (user.role === 'DOCTOR') {
+    // Check Doctor two_factor_enabled setting
+    const doctorResult = await query(
+      'SELECT two_factor_enabled FROM doctors WHERE user_id = $1',
+      [user.id]
+    );
+
+    if (doctorResult.rows.length > 0 && doctorResult.rows[0].two_factor_enabled === true) {
+      requiresOtp = true;
+    }
+  } else if (user.role === 'SECRETARY') {
+    // Check Secretary two_factor_enabled setting
+    const secretaryResult = await query(
+      'SELECT two_factor_enabled FROM secretaries WHERE user_id = $1',
+      [user.id]
+    );
+
+    if (secretaryResult.rows.length > 0 && secretaryResult.rows[0].two_factor_enabled === true) {
+      requiresOtp = true;
+    }
+  }
+
+  // If OTP is required, create challenge and return opaque token
+  if (requiresOtp) {
+    const challengeToken = await createLoginOtpChallenge(user.id, user.email);
+
+    return {
+      requiresOtp: true,
+      challengeId: challengeToken,
+    };
+  }
+
+  // Otherwise, normal login without OTP
   const accessToken = generateAccessToken(user);
   const refreshToken = generateRefreshToken(user);
 
@@ -343,4 +383,139 @@ export function generateRefreshToken(user: any) {
 
 export function verifyToken(token: string) {
   return jwt.verify(token, config.jwt.secret);
+}
+
+/**
+ * Generate opaque cryptographically random challenge token
+ * This is NOT a JWT - it's an opaque identifier for server-side challenge state
+ */
+export function generateChallengeToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+/**
+ * Hash challenge token for secure storage in PostgreSQL
+ * We store only the hash, not the raw token
+ */
+export function hashChallengeToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+/**
+ * Create LOGIN_OTP challenge in PostgreSQL
+ * Stores server-side state for true one-time use guarantee
+ */
+export async function createLoginOtpChallenge(userId: string, email: string): Promise<string> {
+  const challengeToken = generateChallengeToken();
+  const challengeTokenHash = hashChallengeToken(challengeToken);
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+  const lastOtpSentAt = new Date(); // Track when OTP was last sent for this challenge
+
+  await query(
+    `INSERT INTO login_otp_challenges (challenge_token_hash, user_id, email, expires_at, last_otp_sent_at)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [challengeTokenHash, userId, email, expiresAt, lastOtpSentAt]
+  );
+
+  return challengeToken;
+}
+
+/**
+ * Increment challenge attempt count on failed OTP verification
+ */
+export async function incrementChallengeAttempt(challengeToken: string): Promise<void> {
+  const challengeTokenHash = hashChallengeToken(challengeToken);
+
+  await query(
+    `UPDATE login_otp_challenges
+     SET attempt_count = attempt_count + 1
+     WHERE challenge_token_hash = $1 AND used_at IS NULL`,
+    [challengeTokenHash]
+  );
+}
+
+/**
+ * Send login OTP to user's email
+ * Called when OTP is required for login
+ */
+export async function sendLoginOtpForLogin(email: string): Promise<void> {
+  await otpService.sendLoginOtp(email);
+}
+
+/**
+ * Verify login OTP and issue authenticated session
+ * This is called after the user submits challengeId + OTP
+ */
+export async function verifyLoginOtp(challengeId: string, otp: string) {
+  const challengeTokenHash = hashChallengeToken(challengeId);
+
+  // First, verify OTP with Supabase (before consuming challenge)
+  // Get the email from the challenge
+  const challengeResult = await query(
+    `SELECT * FROM login_otp_challenges
+     WHERE challenge_token_hash = $1
+     AND expires_at > CURRENT_TIMESTAMP
+     AND used_at IS NULL
+     AND attempt_count < 5`,
+    [challengeTokenHash]
+  );
+
+  if (challengeResult.rows.length === 0) {
+    throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid or expired login challenge' };
+  }
+
+  const challenge = challengeResult.rows[0];
+
+  // Verify OTP with Supabase
+  const otpVerification = await otpService.verifyLoginOtp(challenge.email, otp);
+
+  if (!otpVerification.verified) {
+    // Increment attempt count on failure
+    await incrementChallengeAttempt(challengeId);
+    throw {
+      code: ErrorCodes.INVALID_CREDENTIALS,
+      message: otpVerification.error || 'Invalid or expired OTP code'
+    };
+  }
+
+  // OTP verified successfully - now atomically consume challenge
+  const updateResult = await query(
+    `UPDATE login_otp_challenges
+     SET used_at = CURRENT_TIMESTAMP
+     WHERE id = $1 AND used_at IS NULL
+     RETURNING id`,
+    [challenge.id]
+  );
+
+  if (updateResult.rows.length === 0) {
+    // Another request already consumed this challenge
+    throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Login challenge already used' };
+  }
+
+  // Get user and generate tokens
+  const userResult = await query(
+    `SELECT * FROM users WHERE id = $1`,
+    [challenge.user_id]
+  );
+
+  if (userResult.rows.length === 0) {
+    throw { code: ErrorCodes.NOT_FOUND, message: 'User not found' };
+  }
+
+  const user = userResult.rows[0];
+
+  // Generate FindMyDoctor tokens (ignore Supabase session)
+  const accessToken = generateAccessToken(user);
+  const refreshToken = generateRefreshToken(user);
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      mustChangePassword: user.must_change_password,
+    },
+    accessToken,
+    refreshToken,
+  };
 }

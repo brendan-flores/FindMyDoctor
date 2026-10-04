@@ -50,6 +50,9 @@ export async function sendPatientSignupOtp(email: string): Promise<{ success: bo
       email,
       options: {
         emailRedirectTo: undefined, // No redirect link needed - user enters OTP manually
+        data: {
+          auth_flow: 'patient_signup'
+        }
       }
     });
 
