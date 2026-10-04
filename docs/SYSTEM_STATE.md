@@ -29,3 +29,31 @@ Current System State (October 2026):
 - Doctor self-registration form includes optional room number field for facilities with room/suite numbers
 - Doctor self-registration form includes password visibility toggle and real-time password strength requirements (8+ chars, uppercase, lowercase, number, special character)
 - Doctor self-registration form enforces 7-digit numeric PRC license number with maximum length enforcement
+- Doctors can create Secretary accounts via `POST /api/v1/doctors/secretaries` (requires Doctor authentication and ACTIVE approval status)
+- Secretary accounts created by Doctors have `must_change_password = true` and NULL first_name/last_name (to be completed by Secretary)
+- Secretary accounts are automatically linked to the Doctor who created them via `doctor_id` foreign key
+- Secretary accounts created by Doctors are automatically approved (`is_approved = true`)
+- Secretary accounts are created with Supabase Auth identity to support optional 2FA (server-side provisioning via `ensureSecretarySupabaseIdentity`)
+- Secretary must complete profile information (first name, last name, contact number) via `PUT /api/v1/secretaries/me`
+- Secretary must change password on first login (enforced by `must_change_password` flag)
+- Secretary profile page at `/secretary/profile` allows viewing and editing profile information
+- Secretary settings page at `/secretary/settings` provides optional two-factor authentication toggle
+- Doctor settings page at `/doctor/settings` provides optional two-factor authentication toggle
+- Role-based login OTP/2FA is implemented with server-side challenge state in PostgreSQL
+- Admin/SuperAdmin login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
+- Doctor login requires OTP only if `doctors.two_factor_enabled = true` (optional 2FA)
+- Secretary login requires OTP only if `secretaries.two_factor_enabled = true` (optional 2FA)
+- PostgreSQL `login_otp_challenges` table stores server-side OTP challenge state with hashed challenge tokens (migration 014_add_login_otp_challenges.sql)
+- PostgreSQL `doctors` and `secretaries` tables include `two_factor_enabled` column (migration 013_add_two_factor_settings.sql)
+- Login OTP flow: user submits credentials → backend checks role-specific OTP requirement → if required, creates challenge → sends OTP via Supabase → returns opaque challenge token → user submits OTP → backend verifies with Supabase → consumes challenge → issues application JWT
+- Login OTP verification endpoint: `POST /api/v1/auth/verify-login-otp` (accepts challengeId and OTP)
+- Login OTP resend endpoint: `POST /api/v1/auth/resend-login-otp` (accepts challengeId, enforces 60-second cooldown, invalidates previous challenges)
+- Login OTP challenges expire after 5 minutes, support up to 5 failed attempts, and are marked as used after successful verification
+- Admin account creation via `POST /api/v1/admin/admins` includes Supabase Auth identity provisioning via `ensureAdminSupabaseIdentity` (idempotent, duplicate-safe)
+- Secretary account creation via Admin or Doctor includes Supabase Auth identity provisioning via `ensureSecretarySupabaseIdentity` (idempotent, duplicate-safe)
+- Admin reconciliation endpoint `POST /api/v1/admin/admins/reconcile-supabase` provisions Supabase identities for existing Admin accounts (SUPERADMIN only)
+- Secretary reconciliation endpoint `POST /api/v1/admin/secretaries/reconcile-supabase` provisions Supabase identities for existing Secretary accounts (ADMIN or SUPERADMIN)
+- PostgreSQL remains the single source of truth for all application account data (users, doctors, secretaries, patients)
+- Supabase Auth is used only for OTP delivery and verification, not for storing application accounts or credentials
+- Login OTP uses `shouldCreateUser: false` to prevent Supabase from creating application accounts
+- Web application includes shared `OtpVerification` component for login OTP verification (6-digit input, auto-focus, paste support, resend timer)

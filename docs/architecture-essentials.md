@@ -621,8 +621,8 @@ The architecture should support:
 ```text
 users (including SUPERADMIN role)
 patients
-doctors (with approval_status: PENDING, ACTIVE, REJECTED)
-secretaries
+doctors (with approval_status: PENDING, ACTIVE, REJECTED, two_factor_enabled: boolean)
+secretaries (with two_factor_enabled: boolean)
 
 doctor_schedules
 doctor_unavailability
@@ -649,6 +649,7 @@ notifications
 
 pending_doctor_signups (for OTP staging)
 pending_patient_signups (for OTP staging)
+login_otp_challenges (for login OTP challenge state)
 ```
 
 **Database Migrations:**
@@ -657,6 +658,8 @@ pending_patient_signups (for OTP staging)
 - `006_doctor_signup_otp_flow.sql` - Doctor OTP staging table
 - `007_doctor_approval_states.sql` - Doctor approval workflow
 - `008_patient_signup_otp_flow.sql` - Patient OTP staging table
+- `013_add_two_factor_settings.sql` - Adds `two_factor_enabled` column to `doctors` and `secretaries` tables
+- `014_add_login_otp_challenges.sql` - Creates `login_otp_challenges` table for server-side OTP challenge state
 
 ---
 
@@ -848,6 +851,39 @@ Patient Can Login
 - `npm run seed:admin` - Create initial Admin account only
 - `npm run seed` - Run all seed scripts including Admin provisioning
 
+### Secretary Account Creation by Doctors
+
+Doctors can create Secretary accounts through the Doctor Dashboard:
+
+- Endpoint: `POST /api/v1/doctors/secretaries` (requires Doctor authentication)
+- Doctor must have `approval_status = 'ACTIVE'` to create secretaries
+- Required fields: email, password
+- Secretary account is automatically linked to Doctor via `doctor_id` foreign key
+- Secretary account is created with `must_change_password = true` (forced password change)
+- Secretary account is created with NULL `first_name` and `last_name` (to be completed)
+- Secretary account is automatically approved (`is_approved = true`)
+- Secretary account is provisioned with Supabase Auth identity (server-side)
+- Duplicate email returns `409` conflict error
+
+Do not:
+- Allow Doctors to create secretaries without ACTIVE approval status
+- Create Secretary accounts without Supabase Auth identity
+- Skip `must_change_password` flag for Doctor-created secretaries
+
+### Secretary Profile Completion
+
+Secretaries created by Doctors must complete their profile:
+
+- Secretary profile page at `/secretary/profile` allows viewing and editing profile
+- Secretary must provide: first name, last name, contact number
+- Profile update endpoint: `PUT /api/v1/secretaries/me` (requires Secretary authentication)
+- Secretary cannot access normal dashboard features until profile is completed
+- Secretary must change password on first login (enforced by `must_change_password` flag)
+
+Do not:
+- Allow Secretary dashboard access without completed profile
+- Skip password change enforcement for secretaries with `must_change_password = true`
+
 ---
 
 # 33. API Rules
@@ -865,10 +901,125 @@ All important operations must pass through backend authorization and validation.
 **OTP Endpoints:**
 - Doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
 - Patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
+- Login OTP: `/api/v1/auth/login` (returns challenge if OTP required), `/api/v1/auth/verify-login-otp`, `/api/v1/auth/resend-login-otp`
 
 ---
 
-# 34. Doctor Chat Restriction
+# 34. Role-Based Login OTP and Two-Factor Authentication
+
+The system implements role-based login OTP with server-side challenge state.
+
+### OTP Requirement Rules
+
+These are non-negotiable role-based OTP requirements:
+
+```text
+Admin/SuperAdmin: OTP ALWAYS mandatory (no setting, no bypass)
+Doctor: OTP optional - required only if two_factor_enabled = true
+Secretary: OTP optional - required only if two_factor_enabled = true
+```
+
+Do not create:
+- Admin 2FA settings or toggles (OTP is always mandatory)
+- Frontend-only OTP requirement checks (must be enforced by backend)
+- OTP bypass mechanisms for Admin/SuperAdmin
+
+### Login OTP Flow
+
+The login OTP flow must follow this sequence:
+
+```text
+1. User submits credentials to POST /api/v1/auth/login
+2. Backend validates credentials
+3. Backend checks role-specific OTP requirement
+4. If OTP required:
+   - Create server-side challenge in login_otp_challenges table
+   - Generate opaque challenge token (not a JWT)
+   - Send 6-digit OTP via Supabase Auth
+   - Return { requiresOtp: true, challengeId: <opaque token> }
+5. User enters OTP and submits to POST /api/v1/auth/verify-login-otp
+6. Backend verifies OTP with Supabase Auth
+7. If valid, consume challenge (mark as used) and issue application JWT
+8. User authenticated and redirected to dashboard
+```
+
+### Server-Side Challenge State
+
+Use PostgreSQL `login_otp_challenges` table for OTP challenge state:
+
+- Challenge tokens must be hashed before storage (SHA-256)
+- Challenges expire after 5 minutes
+- Challenges support up to 5 failed attempts
+- Challenges are marked as used after successful verification
+- Challenges are one-time use only (cannot be reused even if not expired)
+
+Do not:
+- Store raw challenge tokens in PostgreSQL
+- Use client-side state for OTP challenge tracking
+- Allow challenge token reuse
+
+### OTP Resend Rules
+
+When resending OTP:
+
+- Enforce 60-second cooldown between resends (server-side)
+- Invalidate all previous unused challenges for the user
+- Create new challenge and send new OTP
+- Return new challengeId to the user
+
+Do not:
+- Allow unlimited resend attempts without cooldown
+- Reuse existing challenge tokens when resending
+- Skip invalidating previous challenges
+
+### Supabase Auth Identity Provisioning
+
+Admin and Secretary accounts must have Supabase Auth identities for OTP:
+
+- Provision identities during account creation (server-side)
+- Use `ensureAdminSupabaseIdentity` for Admin accounts
+- Use `ensureSecretarySupabaseIdentity` for Secretary accounts
+- Both functions are idempotent and duplicate-safe
+- Reconciliation endpoints exist for existing accounts
+
+Do not:
+- Create Supabase Auth identities from the frontend
+- Skip Supabase identity provisioning for Admin/SuperAdmin
+- Allow Admin account creation without Supabase identity
+
+### PostgreSQL as Source of Truth
+
+PostgreSQL is the single source of truth for all application accounts:
+
+- `users` table stores all user accounts
+- `doctors` table stores doctor profiles with `two_factor_enabled` column
+- `secretaries` table stores secretary profiles with `two_factor_enabled` column
+- Supabase Auth is used only for OTP delivery and verification
+- Supabase Auth never stores application account data or credentials
+
+Do not:
+- Use Supabase Auth as the source of truth for application accounts
+- Store application credentials in Supabase Auth
+- Allow Supabase to create application accounts (use `shouldCreateUser: false`)
+
+### Two-Factor Authentication Settings
+
+Doctor and Secretary 2FA settings:
+
+- `doctors.two_factor_enabled` column (boolean, default false)
+- `secretaries.two_factor_enabled` column (boolean, default false)
+- Doctor 2FA toggle: `PUT /api/v1/doctors/me/two-factor`
+- Secretary 2FA toggle: `PUT /api/v1/secretaries/me/two-factor`
+- Web settings pages: `/doctor/settings` and `/secretary/settings`
+
+Do not:
+- Create 2FA settings for Admin/SuperAdmin (OTP is always mandatory)
+- Allow frontend to override backend OTP requirement decision
+- Skip backend role check when determining OTP requirement
+
+---
+
+# 35. Doctor Chat Restriction
 
 Never add generic messaging logic that accidentally allows:
 
@@ -886,7 +1037,7 @@ Patient → Doctor = Blocked
 
 ---
 
-# 35. AI Coding Agent Rules
+# 36. AI Coding Agent Rules
 
 When an AI coding agent changes the project:
 
