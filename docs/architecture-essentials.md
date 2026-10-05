@@ -664,6 +664,7 @@ login_otp_challenges (for login OTP challenge state)
 - `008_patient_signup_otp_flow.sql` - Patient OTP staging table
 - `013_add_two_factor_settings.sql` - Adds `two_factor_enabled` column to `doctors` and `secretaries` tables
 - `014_add_login_otp_challenges.sql` - Creates `login_otp_challenges` table for server-side OTP challenge state
+- `015_enforce_secretary_doctor_relationship.sql` - Enforces required foreign key and non-null assignment for `secretaries.doctor_id`
 
 ---
 
@@ -828,7 +829,7 @@ Patient Can Login
 
 - A Secretary's required `doctor_id` foreign key stores their permanent Doctor assignment.
 - Doctor-created Secretary records use the Doctor ID resolved from the authenticated Doctor account.
-- The Doctor Secretary list query filters by that authenticated user's Doctor profile; it must never return a global Secretary list to Doctors.
+- The Doctor Secretary list endpoint `GET /api/v1/doctors/secretaries` filters by that authenticated user's Doctor profile; it must never return a global Secretary list to Doctors.
 - Secretary password/profile setup does not modify the stored Doctor assignment.
 - App data is accessed through the backend PostgreSQL connection, not directly through Supabase; enforce this access boundary in backend authorization and queries.
 

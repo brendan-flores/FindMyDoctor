@@ -8,7 +8,7 @@ Current System State (October 2026):
 - Patient registration uses email OTP verification via Supabase for account creation
 - Patient registration requires username (minimum 3 characters, alphanumeric + underscores only)
 - User login accepts either email or username for authentication
-- SuperAdmins log in directly without OTP; regular Admins always require login OTP
+- SuperAdmins log in directly without OTP; regular Admins always require login OTP (no setting, no bypass)
 - Each Secretary has a required `doctor_id` relationship to one Doctor; Doctors can list only their own Secretaries via the authenticated backend API
 - Supabase is used only for OTP email verification, not for storing application data
 - Backend API includes comprehensive endpoints for doctors, admin, OTP, appointments, queue, payments, etc.
@@ -32,6 +32,7 @@ Current System State (October 2026):
 - Doctor self-registration form includes password visibility toggle and real-time password strength requirements (8+ chars, uppercase, lowercase, number, special character)
 - Doctor self-registration form enforces 7-digit numeric PRC license number with maximum length enforcement
 - Doctors can create Secretary accounts via `POST /api/v1/doctors/secretaries` (requires Doctor authentication and ACTIVE approval status)
+- Doctors can list their assigned Secretaries via `GET /api/v1/doctors/secretaries` (requires Doctor authentication)
 - Secretary accounts created by Doctors have `must_change_password = true` and NULL first_name/last_name (to be completed by Secretary)
 - Secretary accounts are automatically linked to the Doctor who created them via `doctor_id` foreign key
 - Secretary accounts created by Doctors are automatically approved (`is_approved = true`)
@@ -47,14 +48,17 @@ Current System State (October 2026):
 - Secretary login requires OTP only if `secretaries.two_factor_enabled = true` (optional 2FA)
 - PostgreSQL `login_otp_challenges` table stores server-side OTP challenge state with hashed challenge tokens (migration 014_add_login_otp_challenges.sql)
 - PostgreSQL `doctors` and `secretaries` tables include `two_factor_enabled` column (migration 013_add_two_factor_settings.sql)
+- Migration `015_enforce_secretary_doctor_relationship.sql` enforces the required foreign key and non-null assignment for `secretaries.doctor_id`
 - Login OTP flow: user submits credentials → backend checks role-specific OTP requirement → if required, creates challenge → sends OTP via Supabase → returns opaque challenge token → user submits OTP → backend verifies with Supabase → consumes challenge → issues application JWT
 - Login OTP verification endpoint: `POST /api/v1/auth/verify-login-otp` (accepts challengeId and OTP)
 - Login OTP resend endpoint: `POST /api/v1/auth/resend-login-otp` (accepts challengeId, enforces 60-second cooldown, invalidates previous challenges)
 - Login OTP challenges expire after 5 minutes, support up to 5 failed attempts, and are marked as used after successful verification
-- Admin account creation via `POST /api/v1/admin/admins` includes Supabase Auth identity provisioning via `ensureAdminSupabaseIdentity` (idempotent, duplicate-safe)
+- Admin account creation via `POST /api/v1/admin/admins` includes Supabase Auth identity provisioning via `ensureAdminSupabaseIdentity` for regular Admins (idempotent, duplicate-safe)
 - Secretary account creation via Admin or Doctor includes Supabase Auth identity provisioning via `ensureSecretarySupabaseIdentity` (idempotent, duplicate-safe)
-- Admin reconciliation endpoint `POST /api/v1/admin/admins/reconcile-supabase` provisions Supabase identities for existing Admin accounts (SUPERADMIN only)
+- Admin reconciliation endpoint `POST /api/v1/admin/admins/reconcile-supabase` provisions Supabase identities for existing regular Admin accounts (SUPERADMIN only)
 - Secretary reconciliation endpoint `POST /api/v1/admin/secretaries/reconcile-supabase` provisions Supabase identities for existing Secretary accounts (ADMIN or SUPERADMIN)
+- Admin seed script creates Admin accounts without immediate Supabase identity provisioning; identities are provisioned on-demand during API calls or via reconciliation endpoint
+- Admin deletion endpoint `DELETE /api/v1/admin/admins/:id` (SUPERADMIN only) preserves doctor review records by setting `reviewed_by = NULL` before deleting the admin account
 - PostgreSQL remains the single source of truth for all application account data (users, doctors, secretaries, patients)
 - Supabase Auth is used only for OTP delivery and verification, not for storing application accounts or credentials
 - Login OTP uses `shouldCreateUser: false` to prevent Supabase from creating application accounts

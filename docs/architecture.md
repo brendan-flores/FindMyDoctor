@@ -360,7 +360,8 @@ Secretaries created by Doctors must complete their profile before normal operati
 The system implements role-based login OTP with optional two-factor authentication:
 
 **OTP Requirement Rules:**
-- Admin/SuperAdmin: OTP is ALWAYS mandatory (no setting, no bypass) - enforced by backend role check
+- Admin: OTP is ALWAYS mandatory (no setting, no bypass) - enforced by backend role check
+- SuperAdmin: OTP is not required; SuperAdmins authenticate directly
 - Doctor: OTP is optional - required only if `doctors.two_factor_enabled = true`
 - Secretary: OTP is optional - required only if `secretaries.two_factor_enabled = true`
 
@@ -397,14 +398,15 @@ The system implements role-based login OTP with optional two-factor authenticati
 - Secretary 2FA toggle: `PUT /api/v1/secretaries/me/two-factor` (accepts `twoFactorEnabled: boolean`)
 - Web settings pages: `/doctor/settings` and `/secretary/settings` provide UI for toggling 2FA
 - Default state: 2FA is disabled for all Doctors and Secretaries (opt-in)
-- Admin/SuperAdmin: No setting exists - OTP is always mandatory
+- Admin: No setting exists - OTP is always mandatory
+- SuperAdmin: No setting exists - OTP is not required
 
 **Supabase Auth Identity Provisioning:**
-- Admin accounts are provisioned with Supabase Auth identity during creation via `ensureAdminSupabaseIdentity`
+- Regular Admin accounts are provisioned with Supabase Auth identity during creation via `ensureAdminSupabaseIdentity`
 - Secretary accounts are provisioned with Supabase Auth identity during creation via `ensureSecretarySupabaseIdentity`
 - Both functions are idempotent and duplicate-safe
 - Reconciliation endpoints exist for provisioning identities for existing accounts:
-  - `POST /api/v1/admin/admins/reconcile-supabase` (SUPERADMIN only)
+  - `POST /api/v1/admin/admins/reconcile-supabase` (SUPERADMIN only, for regular Admins)
   - `POST /api/v1/admin/secretaries/reconcile-supabase` (ADMIN or SUPERADMIN)
 - Supabase Auth is used only for OTP delivery and verification, not for storing application accounts
 - PostgreSQL remains the single source of truth for all application account data
