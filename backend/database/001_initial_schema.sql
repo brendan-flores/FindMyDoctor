@@ -66,8 +66,7 @@ CREATE TABLE doctors (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Secretaries table for secretary profiles
--- Secretaries are associated directly with doctors, not clinics
+-- Each Secretary belongs to exactly one Doctor; one Doctor may have multiple Secretaries.
 CREATE TABLE secretaries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,

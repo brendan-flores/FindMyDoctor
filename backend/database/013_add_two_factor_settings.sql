@@ -8,7 +8,7 @@ ALTER TABLE doctors ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT 
 -- Add two_factor_enabled to secretaries table
 ALTER TABLE secretaries ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT false;
 
--- Admin does NOT need this column - OTP is always mandatory via backend role check
+-- Admin does NOT need this column - regular Admin OTP is mandatory, while SuperAdmins bypass OTP
 -- Existing accounts default to 2FA OFF (opt-in)
 
 -- Migration complete
