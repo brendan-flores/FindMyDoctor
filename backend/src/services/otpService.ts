@@ -253,9 +253,9 @@ export async function verifyLoginOtp(email: string, token: string): Promise<{ ve
 }
 
 /**
- * Ensure Admin has Supabase Auth identity for mandatory OTP
+ * Ensure a regular Admin has a Supabase Auth identity for mandatory OTP
  *
- * This function is called when creating Admin accounts to ensure they have a
+ * This function is called when creating regular Admin accounts to ensure they have a
  * Supabase Auth user identity. This is required because login OTP uses
  * shouldCreateUser: false, which means the user must already exist in Supabase Auth.
  *

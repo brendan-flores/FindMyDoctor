@@ -140,8 +140,8 @@ export async function login(data: LoginData) {
   // Server-side OTP requirement decision
   let requiresOtp = false;
 
-  if (user.role === 'ADMIN' || user.role === 'SUPERADMIN') {
-    // OTP ALWAYS required for Admin - no setting, no bypass
+  if (user.role === 'ADMIN') {
+    // Regular Admins always require OTP; SuperAdmins authenticate directly.
     requiresOtp = true;
   } else if (user.role === 'DOCTOR') {
     // Check Doctor two_factor_enabled setting
