@@ -31,6 +31,29 @@ router.get('/me', authenticate, authorize('DOCTOR'), async (req: AuthRequest, re
   }
 });
 
+// List secretaries assigned to the authenticated doctor
+router.get('/secretaries', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await query(
+      `SELECT
+        s.id, s.doctor_id, s.first_name, s.middle_name, s.last_name, s.contact_number,
+        s.is_approved, s.created_at,
+        u.email, u.is_active, u.must_change_password
+       FROM doctors d
+       INNER JOIN secretaries s ON s.doctor_id = d.id
+       INNER JOIN users u ON u.id = s.user_id
+       WHERE d.user_id = $1 AND u.role = 'SECRETARY'
+       ORDER BY s.created_at DESC`,
+      [req.user!.id]
+    );
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    console.error('Failed to fetch Doctor secretaries:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch secretaries'));
+  }
+});
+
 // Get all doctors (public search)
 router.get('/', async (req: any, res: Response) => {
   try {

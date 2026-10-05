@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { query } from '../database/connection';
+import { getClient, query } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 import { sendApprovalEmail, sendRejectionEmail } from '../services/emailService';
@@ -524,6 +524,8 @@ router.patch('/admins/:id', authenticate, authorize('SUPERADMIN'), async (req: A
 
 // Delete admin account (SUPERADMIN only)
 router.delete('/admins/:id', authenticate, authorize('SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
   try {
     const { id } = req.params;
 
@@ -532,25 +534,36 @@ router.delete('/admins/:id', authenticate, authorize('SUPERADMIN'), async (req: 
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot delete your own account'));
     }
 
+    await client.query('BEGIN');
+
     // Verify the target is an ADMIN account (not SUPERADMIN)
-    const targetUser = await query(
-      'SELECT role FROM users WHERE id = $1',
+    const targetUser = await client.query(
+      'SELECT role FROM users WHERE id = $1 FOR UPDATE',
       [id]
     );
 
     if (targetUser.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Admin account not found'));
     }
 
     if (targetUser.rows[0].role !== 'ADMIN') {
+      await client.query('ROLLBACK');
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Can only delete ADMIN accounts'));
     }
 
-    await query('DELETE FROM users WHERE id = $1', [id]);
+    // Keep doctor review records while removing their optional admin reference.
+    await client.query('UPDATE doctors SET reviewed_by = NULL WHERE reviewed_by = $1', [id]);
+    await client.query('DELETE FROM users WHERE id = $1', [id]);
+    await client.query('COMMIT');
 
     res.json(success(null, 'Admin account deleted successfully'));
   } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Failed to delete admin account:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete admin account'));
+  } finally {
+    client.release();
   }
 });
 
