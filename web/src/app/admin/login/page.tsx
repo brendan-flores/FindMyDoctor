@@ -48,7 +48,7 @@ export default function AdminLogin() {
         if (authData.user.role === 'ADMIN' || authData.user.role === 'SUPERADMIN') {
           router.push('/admin/dashboard');
         } else {
-          setError('Access denied. Admin access required.');
+          setError('Invalid username or password.');
           // Clear credentials on role mismatch
           localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
@@ -70,7 +70,7 @@ export default function AdminLogin() {
     if (data.user.role === 'ADMIN' || data.user.role === 'SUPERADMIN') {
       router.push('/admin/dashboard');
     } else {
-      setError('Access denied. Admin access required.');
+      setError('Invalid username or password.');
       // Clear credentials on role mismatch
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');

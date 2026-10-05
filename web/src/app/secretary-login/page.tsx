@@ -47,14 +47,8 @@ export default function SecretaryLogin() {
           } else {
             router.push('/secretary/dashboard');
           }
-        } else if (authData.user.role === 'ADMIN') {
-          setError('Please use the Admin login portal at /admin/login');
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
-          apiClient.clearToken();
         } else {
-          setError('Access denied. Secretary access required.');
+          setError('Invalid username or password.');
           localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
@@ -77,14 +71,8 @@ export default function SecretaryLogin() {
       } else {
         router.push('/secretary/dashboard');
       }
-    } else if (data.user.role === 'ADMIN') {
-      setError('Please use the Admin login portal at /admin/login');
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-      apiClient.clearToken();
     } else {
-      setError('Access denied. Secretary access required.');
+      setError('Invalid username or password.');
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
