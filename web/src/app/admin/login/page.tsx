@@ -89,6 +89,10 @@ export default function AdminLogin() {
     setError('');
   };
 
+  const handleChallengeIdUpdate = (newChallengeId: string) => {
+    setChallengeId(newChallengeId);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F3F5F9] px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-[460px] flex flex-col items-center">
@@ -110,24 +114,28 @@ export default function AdminLogin() {
         </div>
 
         {/* Title Section */}
-        <div className="text-center mb-7 w-full">
-          <h1 className="text-[34px] font-black tracking-tight text-[#0D1829] mb-2 leading-tight">
-            Welcome back
-          </h1>
-          <p className="text-[15px] text-[#718096] font-normal leading-relaxed">
-            Please enter your administrator credentials to sign in.
-          </p>
-        </div>
+        {!showOtp && (
+          <>
+            <div className="text-center mb-7 w-full">
+              <h1 className="text-[34px] font-black tracking-tight text-[#0D1829] mb-2 leading-tight">
+                Welcome back
+              </h1>
+              <p className="text-[15px] text-[#718096] font-normal leading-relaxed">
+                Please enter your administrator credentials to sign in.
+              </p>
+            </div>
 
-        {/* Admin Role Badge */}
-        <div className="w-full bg-[#EAEFF5] p-1 rounded-full mb-7">
-          <div className="w-full bg-white rounded-full py-2.5 px-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center gap-2 text-center transition-all">
-            <svg className="w-4 h-4 text-[#1A62CD]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-            </svg>
-            <span className="text-[#1A62CD] font-bold text-[15px] tracking-wide">Administrator Access</span>
-          </div>
-        </div>
+            {/* Admin Role Badge */}
+            <div className="w-full bg-[#EAEFF5] p-1 rounded-full mb-7">
+              <div className="w-full bg-white rounded-full py-2.5 px-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center gap-2 text-center transition-all">
+                <svg className="w-4 h-4 text-[#1A62CD]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                </svg>
+                <span className="text-[#1A62CD] font-bold text-[15px] tracking-wide">Administrator Access</span>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Login Form */}
         {!showOtp ? (
@@ -240,6 +248,7 @@ export default function AdminLogin() {
             onVerifySuccess={handleOtpVerifySuccess}
             onVerifyError={handleOtpVerifyError}
             onCancel={handleOtpCancel}
+            onChallengeIdUpdate={handleChallengeIdUpdate}
           />
         )}
       </div>

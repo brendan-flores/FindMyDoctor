@@ -38,6 +38,10 @@ export interface ResendLoginOtpRequest {
   challengeId: string;
 }
 
+export interface ResendLoginOtpResponse {
+  challengeId: string;
+}
+
 export interface DoctorRegistrationRequest {
   email: string;
   password: string;
@@ -81,7 +85,7 @@ export const authApi = {
   },
 
   resendLoginOtp: async (payload: ResendLoginOtpRequest) => {
-    return apiClient.post('/auth/resend-login-otp', payload);
+    return apiClient.post<ResendLoginOtpResponse>('/auth/resend-login-otp', payload);
   },
 
   register: async (credentials: RegisterCredentials) => {

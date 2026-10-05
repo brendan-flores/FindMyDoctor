@@ -22,6 +22,7 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
     { id: 'appointments', label: 'Appointments', icon: 'calendar_month' },
     { id: 'schedule', label: 'Schedule', icon: 'schedule' },
     { id: 'patients', label: 'Patients', icon: 'people' },
+    { id: 'secretary', label: 'Secretary', icon: 'badge' },
     { id: 'prescriptions', label: 'Prescriptions', icon: 'medication' },
     { id: 'settings', label: 'Settings', icon: 'settings' },
   ];

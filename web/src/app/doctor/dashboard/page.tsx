@@ -167,16 +167,16 @@ export default function DoctorDashboard() {
             <span className="text-sm font-medium text-slate-700">View Appointments</span>
           </button>
           <button className="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors text-left">
+            <span className="material-symbols-outlined text-[20px] text-amber-600">schedule</span>
+            <span className="text-sm font-medium text-slate-700">Manage Schedule</span>
+          </button>
+          <button className="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors text-left">
             <span className="material-symbols-outlined text-[20px] text-blue-600">person_add</span>
             <span className="text-sm font-medium text-slate-700">Add Patient</span>
           </button>
           <button className="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors text-left">
             <span className="material-symbols-outlined text-[20px] text-purple-600">medication</span>
             <span className="text-sm font-medium text-slate-700">New Prescription</span>
-          </button>
-          <button className="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors text-left">
-            <span className="material-symbols-outlined text-[20px] text-amber-600">schedule</span>
-            <span className="text-sm font-medium text-slate-700">Manage Schedule</span>
           </button>
           <button
             onClick={() => setShowAddSecretaryModal(true)}

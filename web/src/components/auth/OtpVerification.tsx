@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { apiClient } from '@/lib/api/apiClient';
-import { authApi } from '@/lib/api/authApi';
+import { authApi, ResendLoginOtpResponse } from '@/lib/api/authApi';
 
 interface OtpVerificationProps {
   email: string;
@@ -10,6 +10,7 @@ interface OtpVerificationProps {
   onVerifySuccess: (data: any) => void;
   onVerifyError: (error: string) => void;
   onCancel?: () => void;
+  onChallengeIdUpdate?: (newChallengeId: string) => void;
 }
 
 interface AuthResponse {
@@ -20,13 +21,14 @@ interface AuthResponse {
 
 const OTP_PATTERN = /^\d{6}$/;
 
-export default function OtpVerification({ email, challengeId, onVerifySuccess, onVerifyError, onCancel }: OtpVerificationProps) {
+export default function OtpVerification({ email, challengeId, onVerifySuccess, onVerifyError, onCancel, onChallengeIdUpdate }: OtpVerificationProps) {
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [otpError, setOtpError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeOtpIndex, setActiveOtpIndex] = useState(0);
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [resendDisabled, setResendDisabled] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(60);
+  const [resendDisabled, setResendDisabled] = useState(true);
+  const [currentChallengeId, setCurrentChallengeId] = useState(challengeId);
 
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -36,10 +38,6 @@ export default function OtpVerification({ email, challengeId, onVerifySuccess, o
 
   // Resend cooldown timer
   useEffect(() => {
-    if (resendCooldown <= 0) {
-      return;
-    }
-
     const timer = setInterval(() => {
       setResendCooldown((previous) => {
         if (previous <= 1) {
@@ -51,7 +49,12 @@ export default function OtpVerification({ email, challengeId, onVerifySuccess, o
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [resendCooldown]);
+  }, []);
+
+  // Sync currentChallengeId with prop changes
+  useEffect(() => {
+    setCurrentChallengeId(challengeId);
+  }, [challengeId]);
 
   const validateOtp = (value: string[]): string => {
     const otpString = value.join('');
@@ -141,7 +144,7 @@ export default function OtpVerification({ email, challengeId, onVerifySuccess, o
 
     try {
       const response = await apiClient.post('/auth/verify-login-otp', {
-        challengeId,
+        challengeId: currentChallengeId,
         otp: getOtpValue(),
       });
 
@@ -175,9 +178,19 @@ export default function OtpVerification({ email, challengeId, onVerifySuccess, o
     setIsLoading(true);
 
     try {
-      const response = await authApi.resendLoginOtp({ challengeId });
+      const response = await authApi.resendLoginOtp({ challengeId: currentChallengeId });
 
       if (response.success) {
+        // Update the challenge ID with the new one from the response
+        const newChallengeId = (response.data as ResendLoginOtpResponse)?.challengeId;
+        if (newChallengeId) {
+          setCurrentChallengeId(newChallengeId);
+          // Notify parent component of the new challenge ID
+          if (onChallengeIdUpdate) {
+            onChallengeIdUpdate(newChallengeId);
+          }
+        }
+
         setResendCooldown(60);
         setResendDisabled(true);
         setOtp(['', '', '', '', '', '']);
