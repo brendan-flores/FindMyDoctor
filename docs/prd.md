@@ -209,9 +209,10 @@ Administrators can manage:
 - Users.
 - Doctors.
 - Secretaries.
-- Approval.
 - Approvals.
-- Basic appointment information.
+- Platform-level account and approval oversight.
+
+Administrators do not participate in clinic or consultation operations. They must not manage doctor working hours, availability, break periods, daily capacity, reservations, the operational queue, payment verification, or consultation records. Those responsibilities belong to doctors and authorized secretaries.
 
 ---
 
@@ -222,7 +223,7 @@ Administrators can manage:
 | Patient | Search, reserve, manage appointments, use queue, chat with secretary, use AI, access own records |
 | Doctor | Manage schedule/capacity, appointments, patient information, visits, prescriptions |
 | Secretary | Walk-ins, queue, patient chat, payment verification, daily operations |
-| Admin | Users, doctors, secretaries, approvals, platform oversight |
+| Admin | Users, doctors, secretaries, approvals, platform oversight; no clinic or consultation operations |
 
 ### Communication Permissions
 
@@ -869,9 +870,9 @@ Doctors who complete self-registration and email OTP verification are created wi
 
 ## FR-041 — Secretary Management
 
-Administrators shall be able to manage secretary accounts.
+Doctors shall be able to add Secretaries for their practice. Each Secretary must belong to exactly one Doctor, and a Doctor may have multiple Secretaries. The assignment is stored in `secretaries.doctor_id`, derived from the authenticated Doctor when inviting the Secretary, and retained through password change and profile completion.
 
-Administrators shall be able to manage secretary accounts.
+The Doctor's Secretary/Team page shall show only Secretaries assigned to that Doctor. Secretary setup updates the Secretary's account/profile without changing the Doctor assignment. Administrators may continue managing Secretary accounts through the existing administrative workflow.
 
 ---
 
@@ -1128,7 +1129,7 @@ Patient Views Professional Details
 - Secretary management.
 - Profile management.
 - Approvals.
-- Basic appointment monitoring.
+- Platform oversight only; no clinic or consultation operations.
 
 ### Admin Account Provisioning
 

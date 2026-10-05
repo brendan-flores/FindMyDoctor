@@ -335,6 +335,15 @@ Administrator-provisioned doctor and secretary accounts remain supported and now
 - All role verification uses backend-returned role, not frontend selector
 - Cross-role access is blocked and cleared credentials on mismatch
 
+### Doctor–Secretary Relationship
+
+- `secretaries.doctor_id` is a required foreign key to `doctors.id`; one Doctor may have multiple Secretaries, and each Secretary belongs to one Doctor.
+- `POST /api/v1/doctors/secretaries` derives `doctor_id` from the authenticated Doctor rather than client input.
+- `GET /api/v1/doctors/secretaries` is Doctor-only and filters by the Doctor associated with the authenticated user.
+- Secretary password changes and profile completion update only the authenticated Secretary account/profile and preserve its Doctor assignment.
+- PostgreSQL access is performed by the backend API (Supabase is used for OTP only), so Doctor-level data access is enforced by authenticated, Doctor-scoped backend queries rather than Supabase RLS.
+- Migration `015_enforce_secretary_doctor_relationship.sql` enforces the required foreign key and non-null assignment. It backfills only unambiguous assignments from persisted conversations and stops for manual resolution of remaining unassigned records.
+
 ### Backend Integration
 
 - Uses existing JWT-based authentication through `/api/v1/auth/login`
@@ -524,6 +533,8 @@ Secretaries
 
 Profile
 ```
+
+Administrators are limited to platform and account oversight. They do not manage clinic schedules, availability, break periods, daily capacity, reservations, queues, payment verification, or consultation records. Those operational workflows belong to doctors and authorized secretaries.
 
 ---
 

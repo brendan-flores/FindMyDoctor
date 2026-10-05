@@ -4,7 +4,7 @@
 
 The FindMyDoctor application uses Supabase Auth for OTP delivery across three different authentication flows:
 
-1. **Login OTP** - Used for Admin, Doctor, and Secretary login verification
+1. **Login OTP** - Used for regular Admin, Doctor, and Secretary login verification (SuperAdmins log in without OTP)
 2. **Doctor Signup OTP** - Used for doctor self-registration verification
 3. **Patient Signup OTP** - Used for patient registration verification
 
@@ -105,7 +105,7 @@ If the Supabase email template is not updated with the conditional logic, all OT
 
 After updating the Supabase email template:
 
-1. **Test Login OTP** - Trigger an Admin/Doctor/Secretary login and verify the email says "Login Verification Code"
+1. **Test Login OTP** - Trigger a regular Admin/Doctor/Secretary login and verify the email says "Login Verification Code"
 2. **Test Doctor Signup OTP** - Trigger a doctor signup and verify the email says "Doctor Registration"
 3. **Test Patient Signup OTP** - Trigger a patient signup and verify the email says "Patient Registration"
 4. **Verify OTP Code** - Confirm the 6-digit code is displayed via `{{ .Token }}` in all emails

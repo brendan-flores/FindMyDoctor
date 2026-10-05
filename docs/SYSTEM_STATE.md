@@ -8,6 +8,8 @@ Current System State (October 2026):
 - Patient registration uses email OTP verification via Supabase for account creation
 - Patient registration requires username (minimum 3 characters, alphanumeric + underscores only)
 - User login accepts either email or username for authentication
+- SuperAdmins log in directly without OTP; regular Admins always require login OTP
+- Each Secretary has a required `doctor_id` relationship to one Doctor; Doctors can list only their own Secretaries via the authenticated backend API
 - Supabase is used only for OTP email verification, not for storing application data
 - Backend API includes comprehensive endpoints for doctors, admin, OTP, appointments, queue, payments, etc.
 - Database schema includes approval status fields, pending doctor signups staging table, and pending patient signups staging table (with username)

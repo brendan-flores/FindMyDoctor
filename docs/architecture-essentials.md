@@ -55,6 +55,10 @@ SUPERADMIN
 
 Do not invent roles without changing the project requirements.
 
+### Clinic and Consultation Operations Boundary
+
+Clinic and consultation operations belong to doctors and authorized secretaries. `ADMIN` and `SUPERADMIN` roles are limited to platform, account, and approval oversight and must not receive permissions to manage working hours, availability, break periods, daily capacity, reservations, queues, payment verification, or consultation records.
+
 ---
 
 # 4. Communication Rules
@@ -816,6 +820,14 @@ Patient Can Login
 - `/secretary/*` routes - Allow only SECRETARY users
 - All role verification uses backend-returned role, not frontend selector
 - Cross-role access is blocked and credentials are cleared on mismatch
+
+### Doctor–Secretary Data Isolation
+
+- A Secretary's required `doctor_id` foreign key stores their permanent Doctor assignment.
+- Doctor-created Secretary records use the Doctor ID resolved from the authenticated Doctor account.
+- The Doctor Secretary list query filters by that authenticated user's Doctor profile; it must never return a global Secretary list to Doctors.
+- Secretary password/profile setup does not modify the stored Doctor assignment.
+- App data is accessed through the backend PostgreSQL connection, not directly through Supabase; enforce this access boundary in backend authorization and queries.
 
 ### Backend Integration
 
