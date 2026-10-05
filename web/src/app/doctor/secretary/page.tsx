@@ -3,8 +3,22 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api/apiClient';
 
+interface SecretarySummary {
+  id: string;
+  doctor_id: string;
+  email: string;
+  first_name: string | null;
+  middle_name: string | null;
+  last_name: string | null;
+  contact_number: string | null;
+  is_approved: boolean;
+  is_active: boolean;
+  must_change_password: boolean;
+  created_at: string;
+}
+
 export default function DoctorSecretary() {
-  const [secretaries, setSecretaries] = useState<any[]>([]);
+  const [secretaries, setSecretaries] = useState<SecretarySummary[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [secretaryForm, setSecretaryForm] = useState({
     email: '',
@@ -12,6 +26,7 @@ export default function DoctorSecretary() {
   });
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
+  const [listError, setListError] = useState('');
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
@@ -21,11 +36,16 @@ export default function DoctorSecretary() {
   const loadSecretaries = async () => {
     try {
       const response = await apiClient.get('/doctors/secretaries');
-      if (response.success && response.data) {
-        setSecretaries(Array.isArray(response.data) ? response.data : []);
+      if (!response.success || !Array.isArray(response.data)) {
+        setListError(response.error || 'Failed to load secretaries');
+        return;
       }
+
+      setSecretaries(response.data as SecretarySummary[]);
+      setListError('');
     } catch (err) {
-      console.error('Failed to load secretaries');
+      console.error('Failed to load secretaries:', err);
+      setListError('Failed to load secretaries');
     }
   };
 
@@ -54,7 +74,7 @@ export default function DoctorSecretary() {
       if (response.success) {
         setSuccess('Secretary created successfully');
         setSecretaryForm({ email: '', password: '' });
-        loadSecretaries();
+        await loadSecretaries();
         setTimeout(() => {
           setShowAddModal(false);
           setSuccess('');
@@ -96,7 +116,11 @@ export default function DoctorSecretary() {
         <div className="p-5 border-b border-slate-200">
           <h3 className="text-sm font-bold text-slate-900">Your Secretaries</h3>
         </div>
-        {secretaries.length === 0 ? (
+        {listError ? (
+          <div className="p-8 text-center text-red-700">
+            <p className="text-sm">{listError}</p>
+          </div>
+        ) : secretaries.length === 0 ? (
           <div className="p-8 text-center text-slate-500">
             <span className="material-symbols-outlined text-[48px] text-slate-300 mb-2">badge</span>
             <p className="text-sm">No secretaries added yet</p>
@@ -110,12 +134,16 @@ export default function DoctorSecretary() {
                     <span className="material-symbols-outlined text-[20px]">person</span>
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">{secretary.email}</div>
-                    <div className="text-xs text-slate-500">Secretary</div>
+                    <div className="text-sm font-semibold text-slate-900">
+                      {[secretary.first_name, secretary.middle_name, secretary.last_name].filter(Boolean).join(' ') || secretary.email}
+                    </div>
+                    <div className="text-xs text-slate-500">{secretary.email}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-emerald-600 font-medium">Active</span>
+                  <span className={`text-xs font-medium ${secretary.is_active ? 'text-emerald-600' : 'text-slate-500'}`}>
+                    {secretary.is_active ? 'Active' : 'Inactive'}
+                  </span>
                 </div>
               </div>
             ))}
