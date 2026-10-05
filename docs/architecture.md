@@ -228,13 +228,16 @@ web/
 │   │   │   ├── appointments/
 │   │   │   ├── schedule/
 │   │   │   ├── patients/
-│   │   │   └── prescriptions/
+│   │   │   ├── prescriptions/
+│   │   │   └── settings/      # Doctor settings (2FA toggle)
 │   │   └── secretary/         # Secretary dashboard namespace
 │   │       ├── dashboard/     # Secretary dashboard
 │   │       ├── queue/
 │   │       ├── walk-ins/
 │   │       ├── payments/
-│   │       └── conversations/
+│   │       ├── conversations/
+│   │       ├── profile/       # Secretary profile (view/edit)
+│   │       └── settings/      # Secretary settings (2FA toggle)
 │   ├── components/
 │   │   ├── layout/
 │   │   ├── ui/
@@ -326,6 +329,93 @@ After a doctor completes self-registration and email OTP verification:
 - The backend API includes endpoints for doctor approval: `PATCH /api/v1/admin/doctors/:id/approve` and `PATCH /api/v1/admin/doctors/:id/reject`.
 
 Administrator-provisioned doctor and secretary accounts remain supported and now hash passwords with bcrypt as well.
+
+### Secretary Account Creation by Doctors
+
+Doctors can create Secretary accounts through the Doctor Dashboard:
+
+- Doctors must have `approval_status = 'ACTIVE'` to create secretaries
+- Endpoint: `POST /api/v1/doctors/secretaries` (requires Doctor authentication)
+- Required fields: email, password
+- The Secretary account is automatically linked to the Doctor via `doctor_id` foreign key
+- Secretary accounts are created with `must_change_password = true` (forced password change on first login)
+- Secretary accounts are created with NULL `first_name` and `last_name` (to be completed by Secretary)
+- Secretary accounts are automatically approved (`is_approved = true`)
+- Secretary accounts are provisioned with Supabase Auth identity via `ensureSecretarySupabaseIdentity` (server-side, idempotent, duplicate-safe)
+- Duplicate email returns `409` conflict error
+- PostgreSQL is the single source of truth for Secretary account data. Supabase Auth is used only for OTP delivery if 2FA is enabled.
+
+### Secretary Profile Completion
+
+Secretaries created by Doctors must complete their profile before normal operation:
+
+- Secretary profile page at `/secretary/profile` allows viewing and editing profile information
+- Secretary must provide: first name, last name, contact number
+- Profile update endpoint: `PUT /api/v1/secretaries/me` (requires Secretary authentication)
+- Secretary cannot access normal dashboard features until profile is completed
+- Secretary must change password on first login (enforced by `must_change_password` flag)
+
+### Role-Based Login OTP and Two-Factor Authentication
+
+The system implements role-based login OTP with optional two-factor authentication:
+
+**OTP Requirement Rules:**
+- Admin/SuperAdmin: OTP is ALWAYS mandatory (no setting, no bypass) - enforced by backend role check
+- Doctor: OTP is optional - required only if `doctors.two_factor_enabled = true`
+- Secretary: OTP is optional - required only if `secretaries.two_factor_enabled = true`
+
+**Login OTP Flow:**
+1. User submits email and password to `POST /api/v1/auth/login`
+2. Backend validates credentials and checks role-specific OTP requirement
+3. If OTP is required:
+   - Backend creates server-side challenge in `login_otp_challenges` table
+   - Backend generates opaque challenge token (not a JWT)
+   - Backend sends 6-digit OTP via Supabase Auth to user's email
+   - Backend returns `{ requiresOtp: true, challengeId: <opaque token> }`
+4. User enters OTP and submits to `POST /api/v1/auth/verify-login-otp` with challengeId and OTP
+5. Backend verifies OTP with Supabase Auth
+6. If valid, backend consumes challenge (marks as used) and issues application JWT
+7. User is authenticated and redirected to role-specific dashboard
+
+**OTP Resend Flow:**
+- Endpoint: `POST /api/v1/auth/resend-login-otp` (accepts challengeId)
+- Server-side enforces 60-second cooldown between resends
+- When resending, backend invalidates all previous unused challenges for the user
+- New challenge is created and new OTP is sent
+- Returns new challengeId for the user to use
+
+**Server-Side Challenge State:**
+- `login_otp_challenges` table stores OTP challenge state in PostgreSQL
+- Challenge tokens are hashed before storage (SHA-256)
+- Challenges expire after 5 minutes
+- Challenges support up to 5 failed attempts
+- Challenges are marked as used after successful verification
+- Challenges are one-time use only (cannot be reused even if not expired)
+
+**Two-Factor Authentication Settings:**
+- Doctor 2FA toggle: `PUT /api/v1/doctors/me/two-factor` (accepts `twoFactorEnabled: boolean`)
+- Secretary 2FA toggle: `PUT /api/v1/secretaries/me/two-factor` (accepts `twoFactorEnabled: boolean`)
+- Web settings pages: `/doctor/settings` and `/secretary/settings` provide UI for toggling 2FA
+- Default state: 2FA is disabled for all Doctors and Secretaries (opt-in)
+- Admin/SuperAdmin: No setting exists - OTP is always mandatory
+
+**Supabase Auth Identity Provisioning:**
+- Admin accounts are provisioned with Supabase Auth identity during creation via `ensureAdminSupabaseIdentity`
+- Secretary accounts are provisioned with Supabase Auth identity during creation via `ensureSecretarySupabaseIdentity`
+- Both functions are idempotent and duplicate-safe
+- Reconciliation endpoints exist for provisioning identities for existing accounts:
+  - `POST /api/v1/admin/admins/reconcile-supabase` (SUPERADMIN only)
+  - `POST /api/v1/admin/secretaries/reconcile-supabase` (ADMIN or SUPERADMIN)
+- Supabase Auth is used only for OTP delivery and verification, not for storing application accounts
+- PostgreSQL remains the single source of truth for all application account data
+
+**Security Requirements:**
+- PostgreSQL is the single source of truth for application accounts (users, doctors, secretaries, patients)
+- Supabase Auth never stores application account data or credentials
+- Login OTP uses `shouldCreateUser: false` to prevent Supabase from creating application accounts
+- Challenge tokens are opaque and server-side hashed to prevent token guessing
+- OTP verification consumes the challenge atomically to prevent replay attacks
+- Backend enforces OTP requirement based on role, not frontend configuration
 
 ### Role-Based Route Protection
 
@@ -461,6 +551,10 @@ Patient Can Login
 - Database: `pending_patient_signups` table stages registration data
 - Migration: `008_patient_signup_otp_flow.sql` creates staging table
 
+**Database Migrations for Login OTP and 2FA:**
+- `013_add_two_factor_settings.sql` - Adds `two_factor_enabled` column to `doctors` and `secretaries` tables for optional 2FA
+- `014_add_login_otp_challenges.sql` - Creates `login_otp_challenges` table for server-side OTP challenge state with hashed challenge tokens
+
 **Mobile Implementation:**
 - Page: `otp_verification_page.dart` provides 6-digit OTP input interface
 - Page: `successful_registration_page.dart` displays registration success message
@@ -494,6 +588,8 @@ Patients
 Prescriptions
 
 Profile
+
+Settings
 ```
 
 ---
@@ -514,6 +610,8 @@ Walk-in Registration
 Payments
 
 Profile
+
+Settings
 ```
 
 The secretary is the primary operational user for daily queue and payment verification.
