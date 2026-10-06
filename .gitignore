@@ -85,3 +85,5 @@ coverage/
 .cache/
 
 logo/
+AGENTS.md
+docs/
