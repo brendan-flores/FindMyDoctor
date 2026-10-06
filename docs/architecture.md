@@ -276,21 +276,24 @@ FiDo Web
 **Admin Authentication:**
 - Dedicated login at `/admin/login`
 - Admin-only UI (no Doctor/Secretary selector)
-- Verifies backend-returned role is ADMIN
+- Sends the expected ADMIN role to the backend; the backend accepts ADMIN and the existing SUPERADMIN role for this portal and checks before OTP challenge creation or delivery
+- Doctor and Secretary accounts are rejected with a generic invalid-credentials/account-role error before OTP
 - Success → `/admin/dashboard`
 - Non-Admin login → Access denied
 
 **Doctor Authentication:**
 - Dedicated login at `/doctor-login`
 - Doctor-only UI (no role selector)
-- Verifies backend-returned role is DOCTOR
+- Sends the expected DOCTOR role to the backend; the backend verifies it before OTP challenge creation or delivery
+- Admin, SuperAdmin, and Secretary accounts are rejected with a generic invalid-credentials/account-role error before OTP
 - Success → `/doctor/dashboard`
 - Non-Doctor login → Access denied
 
 **Secretary Authentication:**
 - Dedicated login at `/secretary-login`
 - Secretary-only UI (no role selector)
-- Verifies backend-returned role is SECRETARY
+- Sends the expected SECRETARY role to the backend; the backend verifies it before OTP challenge creation or delivery
+- Admin, SuperAdmin, and Doctor accounts are rejected with a generic invalid-credentials/account-role error before OTP
 - Success → `/secretary/dashboard`
 - Non-Secretary login → Access denied
 

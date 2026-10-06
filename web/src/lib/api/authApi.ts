@@ -3,6 +3,7 @@ import { apiClient } from './apiClient';
 export interface LoginCredentials {
   email: string;
   password: string;
+  expectedRole: 'DOCTOR' | 'SECRETARY' | 'ADMIN';
 }
 
 export interface RegisterCredentials {

@@ -1207,21 +1207,24 @@ FiDo Web
 **Admin Authentication:**
 - Dedicated login at `/admin/login`
 - Admin-only UI with no Doctor/Secretary selector
-- Verifies backend-returned role is ADMIN
+- The backend verifies the account role matches the login page before issuing an OTP challenge or sending an OTP; an Admin-page login accepts ADMIN and the existing SUPERADMIN role
+- Doctor and Secretary accounts are rejected with a generic invalid-credentials/account-role error and do not proceed to OTP verification
 - Successful login redirects to `/admin/dashboard`
 - Non-Admin login attempts are denied
 
 **Doctor Authentication:**
 - Dedicated login at `/doctor-login`
 - Doctor-only UI with no role selector
-- Verifies backend-returned role is DOCTOR
+- The login request identifies the expected DOCTOR role, which the backend verifies before issuing an OTP challenge or sending an OTP
+- Admin, SuperAdmin, and Secretary accounts are rejected with a generic invalid-credentials/account-role error and do not proceed to OTP verification
 - Successful login redirects to `/doctor/dashboard`
 - Non-Doctor login attempts are denied
 
 **Secretary Authentication:**
 - Dedicated login at `/secretary-login`
 - Secretary-only UI with no role selector
-- Verifies backend-returned role is SECRETARY
+- The login request identifies the expected SECRETARY role, which the backend verifies before issuing an OTP challenge or sending an OTP
+- Admin, SuperAdmin, and Doctor accounts are rejected with a generic invalid-credentials/account-role error and do not proceed to OTP verification
 - Successful login redirects to `/secretary/dashboard`
 - Non-Secretary login attempts are denied
 

@@ -43,6 +43,7 @@ Current System State (October 2026):
 - Secretary settings page at `/secretary/settings` provides optional two-factor authentication toggle
 - Doctor settings page at `/doctor/settings` provides optional two-factor authentication toggle
 - Role-based login OTP/2FA is implemented with server-side challenge state in PostgreSQL
+- Doctor, Secretary, and Admin web login pages submit their expected role; the backend rejects cross-role login attempts before OTP challenge creation or delivery with `Invalid credentials or account role.` Admin login continues to accept SUPERADMIN accounts
 - Admin/SuperAdmin login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
 - Doctor login requires OTP only if `doctors.two_factor_enabled = true` (optional 2FA)
 - Secretary login requires OTP only if `secretaries.two_factor_enabled = true` (optional 2FA)

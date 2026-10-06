@@ -22,7 +22,7 @@ export default function AdminLogin() {
     setError('');
 
     try {
-      const response = await authApi.login({ email, password });
+      const response = await authApi.login({ email, password, expectedRole: 'ADMIN' });
 
       if (response.success && response.data) {
         // Check if OTP is required

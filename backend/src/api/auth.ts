@@ -97,15 +97,15 @@ router.post('/register/doctor', async (req: Request, res: Response) => {
 // Login
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, expectedRole } = req.body;
 
-    if (!email || !password) {
+    if (!email || !password || !['DOCTOR', 'SECRETARY', 'ADMIN'].includes(expectedRole)) {
       return res.status(400).json(
-        error(ErrorCodes.VALIDATION_ERROR, 'Email or username and password are required')
+        error(ErrorCodes.INVALID_CREDENTIALS, 'Invalid credentials or account role.')
       );
     }
 
-    const result = await login({ email, password });
+    const result = await login({ email, password, expectedRole });
 
     // If OTP is required, send OTP and return challenge
     if (result.requiresOtp) {

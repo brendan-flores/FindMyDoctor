@@ -17,6 +17,7 @@ export interface RegisterData {
 export interface LoginData {
   email: string;
   password: string;
+  expectedRole: 'DOCTOR' | 'SECRETARY' | 'ADMIN';
 }
 
 export interface DoctorRegistrationData {
@@ -88,7 +89,7 @@ export async function register(data: RegisterData) {
 }
 
 export async function login(data: LoginData) {
-  const { email, password } = data;
+  const { email, password, expectedRole } = data;
 
   // Find user by email or username
   const userResult = await query(
@@ -109,6 +110,17 @@ export async function login(data: LoginData) {
 
   if (!isValidPassword) {
     throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' };
+  }
+
+  const roleMatchesLoginPage = expectedRole === 'ADMIN'
+    ? user.role === 'ADMIN' || user.role === 'SUPERADMIN'
+    : user.role === expectedRole;
+
+  if (!roleMatchesLoginPage) {
+    throw {
+      code: ErrorCodes.INVALID_CREDENTIALS,
+      message: 'Invalid credentials or account role.',
+    };
   }
 
   // Check doctor approval status
