@@ -264,7 +264,7 @@ FiDo Web
 ├── Secretary
 │   └── `/secretary-login` → `/secretary/dashboard`
 └── Doctor Sign-Up (Self-Registration)
-    └── `/doctor-signup` → Basic form → Supabase email OTP → PostgreSQL Doctor account (PENDING + INCOMPLETE) → Profile completion → Submit for approval → PENDING / Awaiting Admin Review
+    └── `/doctor-signup` → Basic form → Supabase email OTP → PostgreSQL Doctor account (PENDING + INCOMPLETE) → `/doctor-profile` → Complete professional profile → Submit for approval → PENDING / Awaiting Admin Review
 ```
 
 ### Authentication Flow
@@ -311,30 +311,55 @@ The doctor sign-up page at `/doctor-signup` creates a doctor account through a t
 - Basic information (first_name, middle_name, last_name, contact_number) is stored in the doctors table.
 - Professional information fields (specialty, credentials, PRC license number, hospital/clinic, etc.) are NOT collected at this stage.
 - Registered doctors are created with `approval_status = 'PENDING'`, `is_approved = false`, and `profile_completion_status = 'INCOMPLETE'`, so they must complete their professional profile and wait for administrator approval before accessing the system.
-- The doctor sees a "Registration Submitted Successfully" message after OTP verification directing them to complete their professional profile.
-- Duplicate email returns `409`; a successful verification returns a success message and directs the doctor to complete their profile.
+- After successful OTP verification, the backend returns an access token which is stored in localStorage using the existing authentication mechanism.
+- The doctor is automatically redirected to `/doctor-profile` to complete their professional profile.
+- Duplicate email returns `409`; a successful verification returns an access token and redirects to profile completion.
 - PostgreSQL is the single source of truth for doctor accounts, credentials and profile data. Supabase stores no application account or profile data.
 
 ### Doctor Profile Completion
 
-After successful OTP verification, doctors must complete their professional profile:
+After successful OTP verification, doctors must complete their professional profile at `/doctor-profile`:
+
+- **Profile Page:** `/doctor-profile` allows doctors to complete their professional profile with 12 fields:
+  - Professional Photo (URL input - image upload to be implemented in future)
+  - Specialty (required for submission)
+  - Credentials (required for submission, multi-select)
+  - PRC License Number (required for submission, 7 digits)
+  - Hospital/Clinic (required for submission, searchable dropdown)
+  - Years of Experience
+  - Areas of Expertise (comma-separated)
+  - Short Biography
+  - Consultation Fee
+  - Consultation Type (In-Person, Online, Both)
+  - Languages Spoken (comma-separated)
+  - Available Schedule (using existing schedule APIs)
+
+- **Schedule Management:** The backend provides GET/POST/PUT/DELETE schedule APIs; the current profile UI uses GET/POST/DELETE:
+  - `GET /api/v1/doctors/me/schedules` - List current schedules
+  - `POST /api/v1/doctors/me/schedules` - Add new schedule
+  - `PUT /api/v1/doctors/me/schedules/:id` - Update existing schedule (backend provides, UI does not currently expose)
+  - `DELETE /api/v1/doctors/me/schedules/:id` - Delete schedule
 
 - **Profile Update Endpoint:** `PUT /api/v1/doctors/me/profile` (requires Doctor authentication)
   - Accepts professional profile fields: professional_photo_url, specialty, credentials, prc_license_number, practice_name, years_of_experience, areas_of_expertise, biography, consultation_fee, consultation_type, languages_spoken
   - Validates PRC license number format (7 digits) and uniqueness
   - Automatically updates `profile_completion_status` to 'COMPLETE' when all required fields are present
   - Allows partial updates (field-by-field or multiple fields at once)
+  - Supports draft saving without requiring all fields
 
 - **Profile Submission Endpoint:** `POST /api/v1/doctors/me/profile/submit` (requires Doctor authentication)
   - Validates required fields before submission: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic
   - Sets `profile_completion_status = 'SUBMITTED'` and `profile_submitted_at` to current timestamp
   - Keeps `approval_status = 'PENDING'` (does not approve the doctor)
   - Returns message directing doctor to wait for admin approval
+  - Shows a status banner indicating the profile is pending admin review
 
 - **Profile Completion Status Transitions:**
   - `INCOMPLETE` - Initial state after OTP verification, professional information not yet collected
   - `COMPLETE` - Required professional fields filled, ready for submission
   - `SUBMITTED` - Profile submitted for admin review, awaiting approval decision
+
+- **Professional Photo Limitation:** Currently accepts only URL input. File upload mechanism to be implemented in future update.
 
 ### Doctor Approval Workflow
 

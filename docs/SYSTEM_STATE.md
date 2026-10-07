@@ -10,6 +10,11 @@ Current System State (October 2026):
 - Doctor accounts are created with `profile_completion_status = 'INCOMPLETE'` after OTP verification
 - Doctor profile completion status transitions: INCOMPLETE → COMPLETE (when required fields filled) → SUBMITTED (when doctor submits for review)
 - Doctor approval workflow: PENDING → ACTIVE (approved) or REJECTED, with profile_completion_status tracked separately
+- Doctor signup flow on web: `/doctor-signup` (basic fields) → OTP verification → `/doctor-profile` (professional fields + schedule) → submit for approval
+- Web Doctor signup redirects to `/doctor-profile` after successful OTP verification, not to dashboard
+- Web Doctor profile page at `/doctor-profile` allows doctors to complete their professional profile with 12 fields: professional photo, specialty, credentials, PRC license, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule
+- Web Doctor profile page includes schedule management UI using existing schedule APIs (GET/POST/PUT/DELETE `/api/v1/doctors/me/schedules`)
+- Web Doctor profile page supports saving draft profiles and submitting for approval with validation
 - Patient registration uses email OTP verification via Supabase for account creation
 - Patient registration requires username (minimum 3 characters, alphanumeric + underscores only)
 - User login accepts either email or username for authentication
@@ -26,6 +31,7 @@ Current System State (October 2026):
 - Backend API endpoints for patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
 - Backend API endpoints for doctor profile: `PUT /api/v1/doctors/me/profile` (update profile), `POST /api/v1/doctors/me/profile/submit` (submit for approval)
+- Backend API endpoints for doctor schedules: `GET /api/v1/doctors/me/schedules`, `POST /api/v1/doctors/me/schedules`, `PUT /api/v1/doctors/me/schedules/:id`, `DELETE /api/v1/doctors/me/schedules/:id`
 - Doctor registration uses separate first name, middle name (optional), and last name fields instead of a single full name field
 - Backend doctor OTP API accepts only basic fields (`firstName`, `middleName`, `lastName`, `email`, `contactNumber`, `password`) in the signup payload
 - Backend doctors API returns all profile fields including `profile_completion_status` and `profile_submitted_at`

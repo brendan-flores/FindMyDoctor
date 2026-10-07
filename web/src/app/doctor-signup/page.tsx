@@ -1,22 +1,16 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { otpApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
-import { CEBU_FACILITIES } from '@/data/cebuFacilities';
-import { MEDICAL_SPECIALTIES } from '@/data/medicalSpecialties';
-import { MEDICAL_CREDENTIALS } from '@/data/medicalCredentials';
-import SearchableSelect from '@/components/ui/SearchableSelect';
-import SearchableMultiSelect from '@/components/ui/SearchableMultiSelect';
 
-type Step = 'signup' | 'otp' | 'success';
+type Step = 'signup' | 'otp';
 type FormStatus = 'idle' | 'loading';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_PATTERN = /^\d{6}$/;
-const PRC_LICENSE_PATTERN = /^\d{7}$/;
 
 export default function DoctorSignupOtp() {
   const router = useRouter();
@@ -45,11 +39,6 @@ export default function DoctorSignupOtp() {
     middleName: '',
     lastName: '',
     contactNumber: '',
-    specialty: '',
-    credentials: '',
-    prcLicenseNumber: '',
-    clinic: '',
-    roomNumber: '',
     password: '',
     confirmPassword: '',
   });
@@ -65,23 +54,6 @@ export default function DoctorSignupOtp() {
   const [hasSpecialChar, setHasSpecialChar] = useState(false);
 
   const [otpExpiresIn, setOtpExpiresIn] = useState(600);
-
-  // Cebu hospital and clinic options for dropdown with area sublabels
-  const cebuFacilityOptions = useMemo(() => {
-    return CEBU_FACILITIES.map((facility) => ({
-      value: facility.name,
-      label: facility.name,
-      sublabel: `${facility.type} • ${facility.area}`,
-      hasRoomNumber: facility.hasRoomNumber || false,
-    }));
-  }, []);
-
-  // Check if selected facility has room number requirement
-  const selectedFacility = useMemo(() => {
-    return CEBU_FACILITIES.find(f => f.name === formData.clinic);
-  }, [formData.clinic]);
-
-  const showRoomNumberField = selectedFacility?.hasRoomNumber === true;
 
   // Container ref for scroll handling
   const containerRef = useRef<HTMLDivElement>(null);
@@ -172,31 +144,6 @@ export default function DoctorSignupOtp() {
 
     if (!formData.contactNumber.trim()) {
       return 'Contact Number is required.';
-    }
-
-    if (!formData.specialty.trim()) {
-      return 'Specialty is required.';
-    }
-
-    if (!formData.credentials.trim()) {
-      return 'Credentials are required.';
-    }
-
-    if (!formData.prcLicenseNumber.trim()) {
-      return 'PRC License Number is required.';
-    }
-
-    if (!PRC_LICENSE_PATTERN.test(formData.prcLicenseNumber.trim())) {
-      return 'PRC License Number must be 7 digits.';
-    }
-
-    if (!formData.clinic.trim()) {
-      return 'Hospital/Clinic is required.';
-    }
-
-    // Validate room number if the selected facility requires it
-    if (showRoomNumberField && !formData.roomNumber.trim()) {
-      return 'Room/Clinic Number is required for this facility.';
     }
 
     if (!formData.password) {
@@ -361,11 +308,6 @@ export default function DoctorSignupOtp() {
         middleName: formData.middleName.trim(),
         lastName: formData.lastName.trim(),
         contactNumber: formData.contactNumber.trim(),
-        specialty: formData.specialty.trim(),
-        credentials: formData.credentials.trim(),
-        prcLicenseNumber: formData.prcLicenseNumber.trim(),
-        clinic: formData.clinic.trim(),
-        roomNumber: formData.roomNumber.trim(),
         password: formData.password,
         confirmPassword: formData.confirmPassword,
       });
@@ -459,11 +401,21 @@ export default function DoctorSignupOtp() {
 
       /*
        * The backend verified the OTP and created the doctor account in
-       * PostgreSQL with PENDING status. Doctor must wait for admin approval.
+       * PostgreSQL with PENDING status and INCOMPLETE profile completion.
+       * Store the access token and redirect to profile completion.
        */
 
-      setStep('success');
+      const authData = response.data;
+
+      // Store token in localStorage using existing authentication mechanism
+      localStorage.setItem('token', authData.accessToken);
+      localStorage.setItem('user', JSON.stringify(authData.user));
+      apiClient.setToken(authData.accessToken);
+
       setOtpStatus('idle');
+
+      // Redirect to doctor profile completion page
+      router.push('/doctor-profile');
     } catch (error) {
       console.error('OTP verification error:', error);
 
@@ -590,29 +542,6 @@ export default function DoctorSignupOtp() {
     </svg>
   );
 
-  const CheckIcon = () => (
-    <svg
-      className="h-8 w-8"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="9"
-        strokeWidth="1.8"
-      />
-
-      <path
-        d="M8 12l2.5 2.5L16 9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-
   const ArrowLeftIcon = () => (
     <svg
       className="h-5 w-5"
@@ -696,7 +625,7 @@ export default function DoctorSignupOtp() {
               </h1>
 
               <p className="text-[#64748B] mt-2 text-[15px]">
-                Complete all required information. A 6-digit verification
+                Enter your basic information. A 6-digit verification
                 code will be sent to your email.
               </p>
             </div>
@@ -846,146 +775,6 @@ export default function DoctorSignupOtp() {
                   className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
                 />
               </div>
-
-              {/* Specialty */}
-              <div className="mb-5">
-                <label
-                  htmlFor="specialty"
-                  className="block text-[15px] font-semibold text-[#334155] mb-2"
-                >
-                  Specialty
-                </label>
-
-                <SearchableSelect
-                  id="specialty"
-                  value={formData.specialty}
-                  onChange={(val) => {
-                    setFormData({
-                      ...formData,
-                      specialty: val,
-                    });
-                    setFormError('');
-                  }}
-                  options={MEDICAL_SPECIALTIES}
-                  placeholder="Search and select medical specialty..."
-                  noResultsText="No matching medical specialties found"
-                />
-              </div>
-
-              {/* Credentials */}
-              <div className="mb-5">
-                <label
-                  htmlFor="credentials"
-                  className="block text-[15px] font-semibold text-[#334155] mb-2"
-                >
-                  Credentials
-                </label>
-
-                <SearchableMultiSelect
-                  id="credentials"
-                  value={
-                    formData.credentials
-                      ? formData.credentials.split(',').map((c) => c.trim()).filter(Boolean)
-                      : []
-                  }
-                  onChange={(selectedList) => {
-                    setFormData({
-                      ...formData,
-                      credentials: selectedList.join(', '),
-                    });
-                    setFormError('');
-                  }}
-                  options={MEDICAL_CREDENTIALS}
-                  placeholder="Search & select credentials (e.g., MD, FPCP, FPSGS)..."
-                  noResultsText="No matching physician credentials found"
-                />
-              </div>
-
-              {/* PRC License Number */}
-              <div className="mb-5">
-                <label
-                  htmlFor="prcLicenseNumber"
-                  className="block text-[15px] font-semibold text-[#334155] mb-2"
-                >
-                  PRC License Number
-                </label>
-
-                <input
-                  id="prcLicenseNumber"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={7}
-                  value={formData.prcLicenseNumber}
-                  onChange={(event) => {
-                    // Allow only numeric input
-                    const numericValue = event.target.value.replace(/\D/g, '');
-                    setFormData({
-                      ...formData,
-                      prcLicenseNumber: numericValue,
-                    });
-
-                    setFormError('');
-                  }}
-                  placeholder="Enter your PRC license number"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
-                />
-              </div>
-
-              {/* Hospital/Clinic */}
-              <div className="mb-5">
-                <label
-                  htmlFor="clinic"
-                  className="block text-[15px] font-semibold text-[#334155] mb-2"
-                >
-                  Hospital/Clinic
-                </label>
-
-                <SearchableSelect
-                  id="clinic"
-                  value={formData.clinic}
-                  onChange={(val) => {
-                    setFormData({
-                      ...formData,
-                      clinic: val,
-                      roomNumber: '', // Reset room number when clinic changes
-                    });
-                    setFormError('');
-                  }}
-                  options={cebuFacilityOptions}
-                  placeholder="Search and select Cebu hospital or clinic..."
-                  noResultsText="No matching hospital or clinic found in Cebu"
-                />
-              </div>
-
-              {/* Room Number - Conditionally shown for facilities with room numbers */}
-              {showRoomNumberField && (
-                <div className="mb-5">
-                  <label
-                    htmlFor="roomNumber"
-                    className="block text-[15px] font-semibold text-[#334155] mb-2"
-                  >
-                    Room/Clinic Number
-                  </label>
-                  <input
-                    id="roomNumber"
-                    type="text"
-                    value={formData.roomNumber}
-                    onChange={(event) => {
-                      setFormData({
-                        ...formData,
-                        roomNumber: event.target.value,
-                      });
-                      setFormError('');
-                    }}
-                    placeholder="e.g., Room 406, Suite 302"
-                    className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Enter your specific room or suite number at this facility
-                  </p>
-                </div>
-              )}
 
               {/* Password */}
               <div className="mb-5">
@@ -1313,49 +1102,6 @@ export default function DoctorSignupOtp() {
         </div>
       </div>
     </div>
-    );
-  }
-
-  /*
-   * ============================================================
-   * SUCCESS STEP
-   * ============================================================
-   */
-
-  if (step === 'success') {
-    return (
-      <div className="min-h-screen bg-[#F3F5F9]">
-        <div className="px-4 py-8 overflow-y-auto" style={{ height: '100vh' }}>
-          <div className="w-full max-w-[460px] mx-auto text-center">
-            <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8">
-              <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckIcon />
-              </div>
-              <h1 className="text-2xl font-bold text-[#0F172A]">
-                Registration Submitted Successfully
-              </h1>
-              <p className="text-[#64748B] mt-2 text-[15px]">
-                Your email address has been successfully verified and your doctor registration has been submitted for review.
-              </p>
-              <p className="text-[#64748B] text-[15px] mt-2">
-                Our administrator will review your information and verify your account.
-              </p>
-              <p className="text-[#64748B] text-[15px] mt-2">
-                Please wait for an email confirming that your account has been approved. You cannot sign in until your account has been approved.
-              </p>
-              <div className="mt-8">
-                <button
-                  type="button"
-                  onClick={() => router.push('/doctor-login')}
-                  className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors"
-                >
-                  Back to Login
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     );
   }
 

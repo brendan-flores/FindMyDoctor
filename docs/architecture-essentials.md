@@ -685,7 +685,7 @@ FiDo Web
 ├── Secretary
 │   └── `/secretary-login` → `/secretary/dashboard`
 └── Doctor Sign-Up (Self-Registration)
-    └── `/doctor-signup` → Supabase email OTP → PostgreSQL account → `/doctor/dashboard`
+    └── `/doctor-signup` → Supabase email OTP → PostgreSQL account → `/doctor-profile` → Complete profile → Submit for approval
 ```
 
 ### Authentication Rules
@@ -733,8 +733,9 @@ The doctor sign-up page at `/doctor-signup` creates a doctor account:
 - Basic information (first_name, middle_name, last_name, contact_number) is stored in the doctors table.
 - Professional information fields (specialty, credentials, PRC license number, hospital/clinic, etc.) are NOT collected at this stage.
 - Registered doctors are created with `approval_status = 'PENDING'` and `profile_completion_status = 'INCOMPLETE'`, so they must complete their professional profile and wait for administrator approval before accessing the system.
-- The doctor sees a "Registration Submitted Successfully" message after OTP verification directing them to complete their professional profile.
-- Duplicate email returns `409`. A successful verification returns a success message and directs the doctor to complete their profile.
+- After successful OTP verification, the backend returns an access token which is stored in localStorage using the existing authentication mechanism.
+- The doctor is automatically redirected to `/doctor-profile` to complete their professional profile.
+- Duplicate email returns `409`. A successful verification returns an access token and redirects to profile completion.
 - PostgreSQL is the single source of truth for doctor accounts, credentials and profile data. Supabase never stores the doctor's application account - it only sends and verifies the email OTP.
 
 ### Doctor Profile Completion
