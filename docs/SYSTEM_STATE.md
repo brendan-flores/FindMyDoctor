@@ -64,3 +64,9 @@ Current System State (October 2026):
 - Supabase Auth is used only for OTP delivery and verification, not for storing application accounts or credentials
 - Login OTP uses `shouldCreateUser: false` to prevent Supabase from creating application accounts
 - Web application includes shared `OtpVerification` component for login OTP verification (6-digit input, auto-focus, paste support, resend timer)
+- Doctor schedule management feature allows doctors to create, view, edit, deactivate, and reactivate recurring weekly working hours
+- Backend API endpoints for doctor schedules: `GET /api/v1/doctors/:id/schedules` (public, active only), `GET /api/v1/doctors/me/schedules` (authenticated, supports includeInactive query param), `POST /api/v1/doctors/me/schedules` (create), `PUT /api/v1/doctors/me/schedules/:id` (update), `PATCH /api/v1/doctors/me/schedules/:id/deactivate` (soft delete), `PATCH /api/v1/doctors/me/schedules/:id/reactivate` (reactivate)
+- Doctor schedule validation enforces: start time < end time, no overlapping schedules on the same day, day of week between 0-6, doctors can only access their own schedules
+- Database migration `016_allow_multiple_schedules_per_day.sql` removes UNIQUE constraint on (doctor_id, day_of_week) to support multiple shift blocks per day (e.g., morning and afternoon shifts)
+- Doctor schedule deactivation uses soft delete (sets is_active = false) instead of permanent deletion
+- Web schedule page at `/doctor/schedule` provides full UI for managing working hours with KPI cards, weekly schedule display, and modals for add/edit/deactivate operations
