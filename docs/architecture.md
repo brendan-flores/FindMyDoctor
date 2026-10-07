@@ -559,6 +559,7 @@ Patient Can Login
 **Database Migrations for Login OTP and 2FA:**
 - `013_add_two_factor_settings.sql` - Adds `two_factor_enabled` column to `doctors` and `secretaries` tables for optional 2FA
 - `014_add_login_otp_challenges.sql` - Creates `login_otp_challenges` table for server-side OTP challenge state with hashed challenge tokens
+- `016_doctor_profile_fields.sql` - Adds extended doctor profile fields: contact_number, professional_photo_url, years_of_experience, areas_of_expertise (comma-separated text), consultation_type, languages_spoken (comma-separated text), profile_completion_status, profile_submitted_at
 
 **Mobile Implementation:**
 - Page: `otp_verification_page.dart` provides 6-digit OTP input interface

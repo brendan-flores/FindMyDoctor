@@ -50,6 +50,7 @@ Current System State (October 2026):
 - PostgreSQL `login_otp_challenges` table stores server-side OTP challenge state with hashed challenge tokens (migration 014_add_login_otp_challenges.sql)
 - PostgreSQL `doctors` and `secretaries` tables include `two_factor_enabled` column (migration 013_add_two_factor_settings.sql)
 - Migration `015_enforce_secretary_doctor_relationship.sql` enforces the required foreign key and non-null assignment for `secretaries.doctor_id`
+- Migration `016_doctor_profile_fields.sql` adds extended doctor profile fields: contact_number, professional_photo_url, years_of_experience, areas_of_expertise (comma-separated text), consultation_type, languages_spoken (comma-separated text), profile_completion_status, profile_submitted_at
 - Login OTP flow: user submits credentials → backend checks role-specific OTP requirement → if required, creates challenge → sends OTP via Supabase → returns opaque challenge token → user submits OTP → backend verifies with Supabase → consumes challenge → issues application JWT
 - Login OTP verification endpoint: `POST /api/v1/auth/verify-login-otp` (accepts challengeId and OTP)
 - Login OTP resend endpoint: `POST /api/v1/auth/resend-login-otp` (accepts challengeId, enforces 60-second cooldown, invalidates previous challenges)

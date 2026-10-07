@@ -665,6 +665,7 @@ login_otp_challenges (for login OTP challenge state)
 - `013_add_two_factor_settings.sql` - Adds `two_factor_enabled` column to `doctors` and `secretaries` tables
 - `014_add_login_otp_challenges.sql` - Creates `login_otp_challenges` table for server-side OTP challenge state
 - `015_enforce_secretary_doctor_relationship.sql` - Enforces required foreign key and non-null assignment for `secretaries.doctor_id`
+- `016_doctor_profile_fields.sql` - Adds extended doctor profile fields: contact_number, professional_photo_url, years_of_experience, areas_of_expertise (comma-separated text), consultation_type, languages_spoken (comma-separated text), profile_completion_status, profile_submitted_at
 
 ---
 
