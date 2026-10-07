@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
+import { calculateCapacity, calculateCapacityRange } from '../modules/capacity/capacityService';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
@@ -175,7 +176,7 @@ router.post('/me/schedules', authenticate, authorize('DOCTOR'), async (req: Auth
   try {
     await client.query('BEGIN');
 
-    const { dayOfWeek, startTime, endTime, consultationDurationMinutes } = req.body;
+    const { dayOfWeek, startTime, endTime, consultation_duration_minutes } = req.body;
 
     // Validation
     if (dayOfWeek === undefined || !startTime || !endTime) {
@@ -238,7 +239,7 @@ router.post('/me/schedules', authenticate, authorize('DOCTOR'), async (req: Auth
       `INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, consultation_duration_minutes, is_active)
        VALUES ($1, $2, $3, $4, $5, true)
        RETURNING *`,
-      [doctorId, dayOfWeek, startTime, endTime, consultationDurationMinutes || 30]
+      [doctorId, dayOfWeek, startTime, endTime, consultation_duration_minutes || 30]
     );
 
     await client.query('COMMIT');
@@ -261,7 +262,7 @@ router.put('/me/schedules/:id', authenticate, authorize('DOCTOR'), async (req: A
     await client.query('BEGIN');
 
     const { id } = req.params;
-    const { dayOfWeek, startTime, endTime, consultationDurationMinutes } = req.body;
+    const { dayOfWeek, startTime, endTime, consultation_duration_minutes } = req.body;
 
     // Get doctor_id from authenticated user
     const doctorResult = await client.query(
@@ -336,7 +337,7 @@ router.put('/me/schedules/:id', authenticate, authorize('DOCTOR'), async (req: A
        SET day_of_week = $1, start_time = $2, end_time = $3, consultation_duration_minutes = $4, updated_at = CURRENT_TIMESTAMP
        WHERE id = $5 AND doctor_id = $6
        RETURNING *`,
-      [dayOfWeek, startTime, endTime, consultationDurationMinutes || 30, id, doctorId]
+      [dayOfWeek, startTime, endTime, consultation_duration_minutes || 30, id, doctorId]
     );
 
     await client.query('COMMIT');
@@ -511,25 +512,203 @@ router.get('/:id/availability', async (req: any, res: Response) => {
   }
 });
 
+// ============================================
+// DOCTOR CAPACITY ENDPOINTS
+// ============================================
+
+// Get authenticated doctor's capacity - MUST be before /:id/capacity
+router.get('/me/capacity', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { date, startDate, endDate } = req.query;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    if (date) {
+      // Get capacity for a specific date
+      const capacity = await calculateCapacity(doctorId, String(date));
+      res.json(success(capacity));
+    } else if (startDate && endDate) {
+      // Get capacity for a date range
+      const capacityMap = await calculateCapacityRange(doctorId, String(startDate), String(endDate));
+      const capacityArray = Array.from(capacityMap.entries()).map(([date, capacity]) => ({
+        date,
+        ...capacity,
+      }));
+      res.json(success(capacityArray));
+    } else {
+      // Return error if no date or range provided
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date or date range (startDate and endDate) is required'));
+    }
+  } catch (err: any) {
+    console.error('Error fetching doctor capacity:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch capacity'));
+  }
+});
+
+// Update authenticated doctor's capacity - MUST be before /:id/capacity
+router.put('/me/capacity', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { date, configuredCapacity } = req.body;
+
+    if (!date || configuredCapacity === undefined) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date and configured capacity are required'));
+    }
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Calculate current capacity to get the calculated capacity
+    const currentCapacity = await calculateCapacity(doctorId, date);
+
+    // Validate configured capacity doesn't exceed calculated capacity
+    if (configuredCapacity !== null && configuredCapacity !== undefined && configuredCapacity > currentCapacity.calculated_capacity) {
+      return res.status(400).json(error(
+        ErrorCodes.VALIDATION_ERROR,
+        `Configured capacity cannot exceed calculated capacity of ${currentCapacity.calculated_capacity}`
+      ));
+    }
+
+    // Check if capacity exists
+    const existingResult = await query(
+      'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
+      [doctorId, date]
+    );
+
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Capacity record not found'));
+    }
+
+    const finalCapacity = configuredCapacity !== null && configuredCapacity !== undefined
+      ? Math.min(currentCapacity.calculated_capacity, configuredCapacity)
+      : currentCapacity.calculated_capacity;
+
+    await query(
+      `UPDATE daily_capacities
+       SET configured_capacity = $1, final_capacity = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE doctor_id = $3 AND date = $4`,
+      [configuredCapacity, finalCapacity, doctorId, date]
+    );
+
+    const updatedCapacity = await calculateCapacity(doctorId, date);
+    res.json(success(updatedCapacity, 'Capacity updated successfully'));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update capacity'));
+  }
+});
+
+// Set capacity for a specific date for authenticated doctor - MUST be before /:id/capacity/:date
+router.post('/me/capacity/:date', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { date } = req.params;
+    const { configuredCapacity } = req.body;
+
+    if (configuredCapacity === undefined) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Configured capacity is required'));
+    }
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Calculate capacity based on actual schedule, breaks, and exceptions
+    const calculated_capacityResult = await calculateCapacity(doctorId, date);
+
+    // Validate configured capacity doesn't exceed calculated capacity
+    if (configuredCapacity !== null && configuredCapacity !== undefined && configuredCapacity > calculated_capacityResult.calculated_capacity) {
+      return res.status(400).json(error(
+        ErrorCodes.VALIDATION_ERROR,
+        `Configured capacity cannot exceed calculated capacity of ${calculated_capacityResult.calculated_capacity}`
+      ));
+    }
+
+    const finalCapacity = configuredCapacity !== null && configuredCapacity !== undefined
+      ? Math.min(calculated_capacityResult.calculated_capacity, configuredCapacity)
+      : calculated_capacityResult.calculated_capacity;
+
+    // Check if capacity exists
+    const existingResult = await query(
+      'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
+      [doctorId, date]
+    );
+
+    if (existingResult.rows.length > 0) {
+      // Update existing
+      await query(
+        `UPDATE daily_capacities
+         SET configured_capacity = $1, final_capacity = $2, consultation_duration_minutes = $3, calculated_capacity = $4, updated_at = CURRENT_TIMESTAMP
+         WHERE doctor_id = $5 AND date = $6`,
+        [configuredCapacity, finalCapacity, calculated_capacityResult.consultation_duration_minutes, calculated_capacityResult.calculated_capacity, doctorId, date]
+      );
+    } else {
+      // Create new
+      await query(
+        `INSERT INTO daily_capacities (doctor_id, date, consultation_duration_minutes, calculated_capacity, configured_capacity, final_capacity)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [doctorId, date, calculated_capacityResult.consultation_duration_minutes, calculated_capacityResult.calculated_capacity, configuredCapacity, finalCapacity]
+      );
+    }
+
+    const updatedCapacity = await calculateCapacity(doctorId, date);
+    res.json(success(updatedCapacity, 'Capacity set successfully'));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to set capacity'));
+  }
+});
+
 // Get doctor capacity configuration
 router.get('/:id/capacity', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { date } = req.query;
+    const { date, startDate, endDate } = req.query;
 
-    let queryText = 'SELECT * FROM daily_capacities WHERE doctor_id = $1';
-    const params = [id];
-
-    if (date) {
-      queryText += ' AND date = $2';
-      params.push(String(date));
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid doctor ID'));
     }
 
-    queryText += ' ORDER BY date DESC LIMIT 30';
-
-    const result = await query(queryText, params);
-
-    res.json(success(result.rows));
+    if (date) {
+      // Get capacity for a specific date
+      const capacity = await calculateCapacity(id, String(date));
+      res.json(success(capacity));
+    } else if (startDate && endDate) {
+      // Get capacity for a date range
+      const capacityMap = await calculateCapacityRange(id, String(startDate), String(endDate));
+      const capacityArray = Array.from(capacityMap.entries()).map(([date, capacity]) => ({
+        date,
+        ...capacity,
+      }));
+      res.json(success(capacityArray));
+    } else {
+      // Return error if no date or range provided
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date or date range (startDate and endDate) is required'));
+    }
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch capacity'));
   }
@@ -541,8 +720,46 @@ router.put('/:id/capacity', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMI
     const { id } = req.params;
     const { date, configuredCapacity } = req.body;
 
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid doctor ID'));
+    }
+
     if (!date || configuredCapacity === undefined) {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date and configured capacity are required'));
+    }
+
+    // Ownership check for doctors
+    if (req.user!.role === 'DOCTOR') {
+      const doctorResult = await query(
+        'SELECT id FROM doctors WHERE user_id = $1',
+        [req.user!.id]
+      );
+      if (doctorResult.rows.length === 0 || doctorResult.rows[0].id !== id) {
+        return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only manage your own capacity'));
+      }
+    }
+
+    // Ownership check for secretaries
+    if (req.user!.role === 'SECRETARY') {
+      const secretaryResult = await query(
+        'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+        [req.user!.id]
+      );
+      if (secretaryResult.rows.length === 0 || secretaryResult.rows[0].doctor_id !== id) {
+        return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only manage capacity for doctors you are assigned to'));
+      }
+    }
+
+    // Calculate current capacity to get the calculated capacity
+    const currentCapacity = await calculateCapacity(id, date);
+
+    // Validate configured capacity doesn't exceed calculated capacity
+    if (configuredCapacity !== null && configuredCapacity !== undefined && configuredCapacity > currentCapacity.calculated_capacity) {
+      return res.status(400).json(error(
+        ErrorCodes.VALIDATION_ERROR,
+        `Configured capacity cannot exceed calculated capacity of ${currentCapacity.calculated_capacity}`
+      ));
     }
 
     // Check if capacity exists
@@ -555,8 +772,9 @@ router.put('/:id/capacity', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMI
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Capacity record not found'));
     }
 
-    const capacity = existingResult.rows[0];
-    const finalCapacity = Math.min(capacity.calculated_capacity, configuredCapacity);
+    const finalCapacity = configuredCapacity !== null && configuredCapacity !== undefined
+      ? Math.min(currentCapacity.calculated_capacity, configuredCapacity)
+      : currentCapacity.calculated_capacity;
 
     await query(
       `UPDATE daily_capacities
@@ -565,7 +783,8 @@ router.put('/:id/capacity', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMI
       [configuredCapacity, finalCapacity, id, date]
     );
 
-    res.json(success(null, 'Capacity updated successfully'));
+    const updatedCapacity = await calculateCapacity(id, date);
+    res.json(success(updatedCapacity, 'Capacity updated successfully'));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update capacity'));
   }
@@ -578,25 +797,51 @@ router.post('/:id/capacity/:date', authenticate, authorize('DOCTOR', 'SECRETARY'
     const { date } = req.params;
     const { configuredCapacity } = req.body;
 
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid doctor ID'));
+    }
+
     if (configuredCapacity === undefined) {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Configured capacity is required'));
     }
 
-    // Get doctor's consultation duration
-    const doctorResult = await query(
-      'SELECT consultation_duration_minutes FROM doctors WHERE id = $1',
-      [id]
-    );
-
-    if (doctorResult.rows.length === 0) {
-      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor not found'));
+    // Ownership check for doctors
+    if (req.user!.role === 'DOCTOR') {
+      const doctorResult = await query(
+        'SELECT id FROM doctors WHERE user_id = $1',
+        [req.user!.id]
+      );
+      if (doctorResult.rows.length === 0 || doctorResult.rows[0].id !== id) {
+        return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only manage your own capacity'));
+      }
     }
 
-    const doctor = doctorResult.rows[0];
+    // Ownership check for secretaries
+    if (req.user!.role === 'SECRETARY') {
+      const secretaryResult = await query(
+        'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+        [req.user!.id]
+      );
+      if (secretaryResult.rows.length === 0 || secretaryResult.rows[0].doctor_id !== id) {
+        return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only manage capacity for doctors you are assigned to'));
+      }
+    }
 
-    // Calculate capacity based on schedule (simplified for MVP)
-    const calculatedCapacity = 16; // Default: 8 hours / 30 min = 16 patients
-    const finalCapacity = Math.min(calculatedCapacity, configuredCapacity);
+    // Calculate capacity based on actual schedule, breaks, and exceptions
+    const calculated_capacityResult = await calculateCapacity(id, date);
+
+    // Validate configured capacity doesn't exceed calculated capacity
+    if (configuredCapacity !== null && configuredCapacity !== undefined && configuredCapacity > calculated_capacityResult.calculated_capacity) {
+      return res.status(400).json(error(
+        ErrorCodes.VALIDATION_ERROR,
+        `Configured capacity cannot exceed calculated capacity of ${calculated_capacityResult.calculated_capacity}`
+      ));
+    }
+
+    const finalCapacity = configuredCapacity !== null && configuredCapacity !== undefined
+      ? Math.min(calculated_capacityResult.calculated_capacity, configuredCapacity)
+      : calculated_capacityResult.calculated_capacity;
 
     // Check if capacity exists
     const existingResult = await query(
@@ -608,20 +853,21 @@ router.post('/:id/capacity/:date', authenticate, authorize('DOCTOR', 'SECRETARY'
       // Update existing
       await query(
         `UPDATE daily_capacities
-         SET configured_capacity = $1, final_capacity = $2, updated_at = CURRENT_TIMESTAMP
-         WHERE doctor_id = $3 AND date = $4`,
-        [configuredCapacity, finalCapacity, id, date]
+         SET configured_capacity = $1, final_capacity = $2, consultation_duration_minutes = $3, calculated_capacity = $4, updated_at = CURRENT_TIMESTAMP
+         WHERE doctor_id = $5 AND date = $6`,
+        [configuredCapacity, finalCapacity, calculated_capacityResult.consultation_duration_minutes, calculated_capacityResult.calculated_capacity, id, date]
       );
     } else {
       // Create new
       await query(
         `INSERT INTO daily_capacities (doctor_id, date, consultation_duration_minutes, calculated_capacity, configured_capacity, final_capacity)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [id, date, 30, calculatedCapacity, configuredCapacity, finalCapacity]
+        [id, date, calculated_capacityResult.consultation_duration_minutes, calculated_capacityResult.calculated_capacity, configuredCapacity, finalCapacity]
       );
     }
 
-    res.json(success(null, 'Capacity set successfully'));
+    const updatedCapacity = await calculateCapacity(id, date);
+    res.json(success(updatedCapacity, 'Capacity set successfully'));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to set capacity'));
   }
