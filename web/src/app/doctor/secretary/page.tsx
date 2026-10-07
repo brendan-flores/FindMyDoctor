@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api/apiClient';
+import Toast from '@/components/ui/Toast';
 
 interface SecretarySummary {
   id: string;
@@ -77,7 +78,6 @@ export default function DoctorSecretary() {
         await loadSecretaries();
         setTimeout(() => {
           setShowAddModal(false);
-          setSuccess('');
         }, 2000);
       } else {
         setError(response.error || 'Failed to create secretary');
@@ -157,14 +157,10 @@ export default function DoctorSecretary() {
             <h3 className="text-2xl font-bold text-slate-800 mb-6">Add Secretary</h3>
             <div className="space-y-4">
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                  {error}
-                </div>
+                <Toast message={error} type="error" onClose={() => setError('')} />
               )}
               {success && (
-                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm">
-                  {success}
-                </div>
+                <Toast message={success} type="success" onClose={() => setSuccess('')} />
               )}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Email</label>

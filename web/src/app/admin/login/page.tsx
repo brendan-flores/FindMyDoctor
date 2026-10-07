@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
 import OtpVerification from '@/components/auth/OtpVerification';
+import Toast from '@/components/ui/Toast';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -142,9 +143,7 @@ export default function AdminLogin() {
           <form onSubmit={handleSubmit} className="w-full space-y-5">
             {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                {error}
-              </div>
+              <Toast message={error} type="error" onClose={() => setError('')} />
             )}
 
             {/* Email Field */}

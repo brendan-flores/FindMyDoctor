@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
+import Toast from '@/components/ui/Toast';
 
 export default function SecretaryChangePassword() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -79,9 +80,7 @@ export default function SecretaryChangePassword() {
           </div>
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                {error}
-              </div>
+              <Toast message={error} type="error" onClose={() => setError('')} />
             )}
 
             <div className="space-y-2">

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
+import Toast from '@/components/ui/Toast';
 
 interface DoctorProfile {
   two_factor_enabled?: boolean;
@@ -65,7 +66,6 @@ export default function DoctorSettings() {
         const data = response.data as TwoFactorUpdateResponse;
         setTwoFactorEnabled(data.twoFactorEnabled);
         setSuccess('Two-factor authentication setting updated successfully');
-        setTimeout(() => setSuccess(''), 3000);
       } else {
         setError(response.error || 'Failed to update setting');
       }
@@ -94,17 +94,9 @@ export default function DoctorSettings() {
         <h1 className="text-2xl font-bold text-white">Settings</h1>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl">
-          {success}
-        </div>
-      )}
+      {/* Toast Notification */}
+      {success && <Toast message={success} type="success" onClose={() => setSuccess('')} />}
+      {error && <Toast message={error} type="error" onClose={() => setError('')} />}
 
       <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
         <h2 className="text-xl font-bold text-slate-800 mb-4">Security</h2>

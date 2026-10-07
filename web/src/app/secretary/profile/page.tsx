@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
+import Toast from '@/components/ui/Toast';
 
 interface SecretaryProfile {
   id: string;
@@ -188,17 +189,9 @@ export default function SecretaryProfile() {
         {/* Profile Content */}
         <div className="lg:col-span-3">
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-6">
-                {error}
-              </div>
-            )}
-
-            {success && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm mb-6">
-                {success}
-              </div>
-            )}
+            {/* Toast Notification */}
+            {success && <Toast message={success} type="success" onClose={() => setSuccess('')} />}
+            {error && <Toast message={error} type="error" onClose={() => setError('')} />}
 
             {isEditing ? (
               <form onSubmit={handleSave} className="space-y-6">
