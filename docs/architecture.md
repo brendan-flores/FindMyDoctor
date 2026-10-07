@@ -321,7 +321,7 @@ The doctor sign-up page at `/doctor-signup` creates a doctor account through a t
 After successful OTP verification, doctors must complete their professional profile at `/doctor-profile`:
 
 - **Profile Page:** `/doctor-profile` allows doctors to complete their professional profile with 12 fields:
-  - Professional Photo (URL input - image upload to be implemented in future)
+  - Professional Photo (PNG upload, max 4MB, client and server validation)
   - Specialty (required for submission)
   - Credentials (required for submission, multi-select)
   - PRC License Number (required for submission, 7 digits)
@@ -347,19 +347,38 @@ After successful OTP verification, doctors must complete their professional prof
   - Allows partial updates (field-by-field or multiple fields at once)
   - Supports draft saving without requiring all fields
 
+- **Professional Photo Upload Endpoint:** `POST /api/v1/doctors/me/photo` (requires Doctor authentication)
+  - Accepts PNG files only via multipart/form-data
+  - Validates file size: maximum 4MB
+  - Validates MIME type server-side: only image/png allowed
+  - Validates actual PNG file signature (magic number) after upload to prevent renamed non-PNG files
+  - Stores uploaded file in `./uploads` directory with unique filename
+  - Updates `professional_photo_url` field with relative path to uploaded file
+  - Returns the photo URL for client preview
+  - Cleans up uploaded file on error or if PNG validation fails
+
+- **Professional Photo Deletion Endpoint:** `DELETE /api/v1/doctors/me/photo` (requires Doctor authentication)
+  - Uses authenticated doctor's user ID to identify the doctor
+  - Clears the `professional_photo_url` field in the database
+  - Deletes the corresponding file from the uploads directory if it exists
+  - Uses path resolution to prevent directory traversal attacks
+  - Safely ignores missing files
+  - Returns success/error response in the project's standard format
+
 - **Profile Submission Endpoint:** `POST /api/v1/doctors/me/profile/submit` (requires Doctor authentication)
   - Validates required fields before submission: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic
   - Sets `profile_completion_status = 'SUBMITTED'` and `profile_submitted_at` to current timestamp
   - Keeps `approval_status = 'PENDING'` (does not approve the doctor)
   - Returns message directing doctor to wait for admin approval
-  - Shows a status banner indicating the profile is pending admin review
+  - Shows a confirmation modal with title "Profile Submitted for Review" after successful submission
+  - Modal directs doctor to wait for email notification and includes "Continue" button that redirects to `/doctor-login`
 
 - **Profile Completion Status Transitions:**
   - `INCOMPLETE` - Initial state after OTP verification, professional information not yet collected
   - `COMPLETE` - Required professional fields filled, ready for submission
   - `SUBMITTED` - Profile submitted for admin review, awaiting approval decision
 
-- **Professional Photo Limitation:** Currently accepts only URL input. File upload mechanism to be implemented in future update.
+- **Professional Photo Upload:** Supports PNG files up to 4MB. Files are stored in backend `./uploads` directory and served via `/uploads/<filename>` static route. Client-side validation ensures PNG format and 4MB limit before upload. Server-side validation confirms MIME type and file size. Photo preview is displayed after successful upload.
 
 ### Doctor Approval Workflow
 

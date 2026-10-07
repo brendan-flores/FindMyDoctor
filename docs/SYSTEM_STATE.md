@@ -19,13 +19,21 @@ Current System State (October 2026):
 - Admin approval endpoint `PATCH /api/v1/admin/doctors/:id/approve` explicitly rejects approving doctors with `approval_status = 'REJECTED'` (requires resubmission first)
 - Doctor signup flow on web: `/doctor-signup` (basic fields) → OTP verification → `/doctor-profile` (professional fields + schedule) → submit for approval
 - Web Doctor signup redirects to `/doctor-profile` after successful OTP verification, not to dashboard
-- Web Doctor profile page at `/doctor-profile` allows doctors to complete their professional profile with 12 fields: professional photo, specialty, credentials, PRC license, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule
+- Web Doctor profile page at `/doctor-profile` allows doctors to complete their professional profile with 12 fields: professional photo (PNG upload, max 4MB), specialty, credentials, PRC license, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule
 - Web Doctor profile page includes schedule management UI using existing schedule APIs (GET/POST/PUT/DELETE `/api/v1/doctors/me/schedules`)
+- Web Doctor profile page includes PNG photo upload with client-side validation (PNG only, max 4MB) and server-side validation via `POST /api/v1/doctors/me/photo` endpoint
+- Professional photo upload stores files in backend `./uploads` directory and serves them via `/uploads/<filename>` static route
+- Professional photo field `professional_photo_url` stores the relative path to the uploaded file
+- Web Doctor profile page includes photo preview after successful upload and ability to remove photo
 - Web Doctor profile page supports saving draft profiles and submitting for approval with validation
 - Web Doctor profile page explicitly handles REJECTED state: shows rejection banner with reason, allows profile editing, allows resubmission, does not lock form when `profile_completion_status === 'SUBMITTED'` if `approval_status === 'REJECTED'`
+- Web Doctor profile page shows submission confirmation modal after successful profile submission with exact text: "Profile Submitted for Review", directing doctor to wait for email notification, with "Continue" button redirecting to `/doctor-login`
 - Web Doctor login page routes authenticated Doctors based on approval_status: ACTIVE → `/doctor/dashboard`, REJECTED → `/doctor-profile`
 - Admin Doctor review interface at `/admin/doctors` displays two clearly separated sections: Basic Information (first name, middle name, last name, email, email verified, contact number) and Professional Information (professional photo, specialty, credentials, PRC license number, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule)
 - Admin Doctor review interface displays available schedules using existing `doctor_schedules` data via new endpoint `GET /api/v1/admin/doctors/:id/schedules`
+- Admin Doctor review interface displays uploaded professional photo if available
+- Admin Doctor review interface uses enhanced UI with color-coded sections, better typography, and improved readability
+- Admin Doctor rejection interface uses a dedicated modal with textarea for rejection reason instead of browser prompt
 - Admin Doctor approval endpoint `PATCH /api/v1/admin/doctors/:id/approve` validates critical information before approving: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic must all be present
 - Admin Doctor rejection endpoint `PATCH /api/v1/admin/doctors/:id/reject` requires a rejection reason (cannot be empty or null)
 - Rejected doctors have `approval_status = 'REJECTED'` and `rejection_reason` set; they can correct their profile and resubmit using the existing onboarding flow
@@ -47,12 +55,20 @@ Current System State (October 2026):
 - Patients table does not include phone field (removed in favor of username)
 - Backend API endpoints for patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
-- Backend API endpoints for doctor profile: `PUT /api/v1/doctors/me/profile` (update profile), `POST /api/v1/doctors/me/profile/submit` (submit for approval)
+- Backend API endpoints for doctor profile: `PUT /api/v1/doctors/me/profile` (update profile), `POST /api/v1/doctors/me/profile/submit` (submit for approval), `POST /api/v1/doctors/me/photo` (upload professional photo)
 - Backend API endpoints for doctor schedules: `GET /api/v1/doctors/me/schedules`, `POST /api/v1/doctors/me/schedules`, `PUT /api/v1/doctors/me/schedules/:id`, `DELETE /api/v1/doctors/me/schedules/:id`
 - Backend API endpoints for admin doctor review: `GET /api/v1/admin/doctors` (list all doctors with complete profile), `GET /api/v1/admin/doctors/:id` (get doctor details), `GET /api/v1/admin/doctors/:id/schedules` (get doctor schedules), `PATCH /api/v1/admin/doctors/:id/approve` (approve with validation), `PATCH /api/v1/admin/doctors/:id/reject` (reject with required reason)
 - Doctor registration uses separate first name, middle name (optional), and last name fields instead of a single full name field
 - Backend doctor OTP API accepts only basic fields (`firstName`, `middleName`, `lastName`, `email`, `contactNumber`, `password`) in the signup payload
 - Backend doctors API returns all profile fields including `profile_completion_status` and `profile_submitted_at`
+- Backend photo upload uses multer with disk storage, PNG-only file filter, and 4MB size limit
+- Backend serves uploaded photos via static file serving at `/uploads` route
+- Backend validates PNG files by checking the actual PNG magic number signature (0x89 50 4E 47 0D 0A 1A 0A) after upload
+- Backend deletes uploaded files if PNG validation fails or if errors occur during upload
+- Backend provides DELETE /api/v1/doctors/me/photo endpoint for authenticated doctors to delete their professional photo
+- Photo deletion clears the database field and deletes the corresponding file from the uploads directory
+- Photo deletion uses path resolution to prevent directory traversal attacks
+- Frontend resolves relative photo URLs against the configured backend API origin
 - Web application provides role-specific dashboards for Doctor, Secretary, and Admin users
 - Mobile application includes OTP verification page for patient registration with full backend integration
 - Mobile application authentication persists across hot restarts using SharedPreferences for token storage

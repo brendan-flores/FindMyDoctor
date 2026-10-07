@@ -19,8 +19,12 @@ export default function DoctorProfile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
 
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
   const [formData, setFormData] = useState({
@@ -38,6 +42,7 @@ export default function DoctorProfile() {
   });
 
   const [showPassword, setShowPassword] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   // Schedule management state
   const [schedules, setSchedules] = useState<any[]>([]);
@@ -109,6 +114,9 @@ export default function DoctorProfile() {
           consultation_type: response.data.consultation_type || '',
           languages_spoken: response.data.languages_spoken || '',
         });
+        if (response.data.professional_photo_url) {
+          setPhotoPreview(response.data.professional_photo_url);
+        }
       } else {
         setError(response.error || 'Failed to load profile');
       }
@@ -169,6 +177,99 @@ export default function DoctorProfile() {
     } catch (err) {
       console.error('Delete schedule error:', err);
       setError('An error occurred while deleting schedule');
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    console.log('File selected:', file.name, file.type, file.size);
+
+    // Client-side validation
+    if (file.type !== 'image/png') {
+      setError('Only PNG files are allowed');
+      return;
+    }
+
+    if (file.size > 4 * 1024 * 1024) {
+      setError('File size exceeds 4MB limit');
+      return;
+    }
+
+    // Show immediate preview before upload
+    const previewUrl = URL.createObjectURL(file);
+    console.log('Preview URL created:', previewUrl);
+    setPhotoPreview(previewUrl);
+
+    setIsUploadingPhoto(true);
+    setError('');
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/doctor-login');
+        return;
+      }
+
+      const uploadFormData = new FormData();
+      uploadFormData.append('photo', file);
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/doctors/me/photo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: uploadFormData,
+      });
+
+      const data = await response.json();
+      console.log('Upload response:', data);
+
+      if (response.ok && data.success) {
+        // Keep the blob URL as preview (it always works)
+        // Only update the form data with the server URL
+        setFormData({ ...formData, professional_photo_url: data.data.photoUrl });
+        console.log('Photo uploaded, keeping blob preview:', previewUrl);
+        setSuccessMessage('Photo uploaded successfully');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        // Clean up the temporary preview URL on error
+        URL.revokeObjectURL(previewUrl);
+        setPhotoPreview(null);
+        setError(data.error?.message || 'Failed to upload photo');
+      }
+    } catch (err) {
+      console.error('Photo upload error:', err);
+      // Clean up the temporary preview URL on error
+      URL.revokeObjectURL(previewUrl);
+      setPhotoPreview(null);
+      setError('An error occurred while uploading your photo');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    setIsDeletingPhoto(true);
+    setError('');
+
+    try {
+      const response = await doctorApi.deletePhoto();
+
+      if (response.success) {
+        setPhotoPreview(null);
+        setFormData({ ...formData, professional_photo_url: '' });
+        setSuccessMessage('Photo deleted successfully');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setError(response.error || 'Failed to delete photo');
+      }
+    } catch (err) {
+      console.error('Photo deletion error:', err);
+      setError('An error occurred while deleting your photo');
+    } finally {
+      setIsDeletingPhoto(false);
     }
   };
 
@@ -253,12 +354,10 @@ export default function DoctorProfile() {
       const response = await doctorApi.submitProfile();
 
       if (response.success) {
-        setSuccessMessage(isRejected
-          ? 'Profile resubmitted successfully. Your application is now pending admin review.'
-          : 'Profile submitted successfully. Please wait for admin approval.'
-        );
         // Reload profile to get updated status
         await loadProfile();
+        // Show confirmation modal
+        setShowSubmissionModal(true);
       } else {
         setError(response.error || 'Failed to submit profile');
       }
@@ -268,6 +367,11 @@ export default function DoctorProfile() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleModalContinue = () => {
+    setShowSubmissionModal(false);
+    router.push('/doctor-login');
   };
 
   if (isLoading) {
@@ -383,21 +487,60 @@ export default function DoctorProfile() {
               {/* Professional Photo */}
               <div>
                 <label className="block text-[15px] font-semibold text-[#334155] mb-2">
-                  Professional Photo URL
+                  Professional Photo
                 </label>
-                <input
-                  type="url"
-                  value={formData.professional_photo_url}
-                  onChange={(e) => {
-                    setFormData({ ...formData, professional_photo_url: e.target.value });
-                    setError('');
-                  }}
-                  placeholder="https://example.com/photo.jpg"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Enter a URL to your professional photo. Image upload will be available in a future update.
-                </p>
+                <div className="space-y-3">
+                  {photoPreview ? (
+                    <div className="relative inline-block">
+                      <button
+                        type="button"
+                        onClick={() => setShowPhotoModal(true)}
+                        className="cursor-pointer hover:opacity-90 transition-opacity"
+                      >
+                        <img
+                          src={photoPreview.startsWith('http') || photoPreview.startsWith('blob:')
+                            ? photoPreview
+                            : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:3000'}${photoPreview}`}
+                          alt="Professional Photo Preview"
+                          className="w-32 h-32 rounded-xl object-cover border-2 border-[#E2E8F0]"
+                          onError={(e) => {
+                            console.error('Image failed to load:', photoPreview);
+                            console.error('Error event:', e);
+                          }}
+                          onLoad={() => {
+                            console.log('Image loaded successfully:', photoPreview);
+                          }}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePhotoDelete}
+                        disabled={isDeletingPhoto || !canEdit}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isDeletingPhoto ? '...' : '×'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center w-32 h-32 rounded-xl border-2 border-dashed border-[#E2E8F0] bg-gray-50">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/png"
+                      onChange={handlePhotoUpload}
+                      disabled={isUploadingPhoto || !canEdit}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#1A62CD] file:text-white hover:file:bg-[#0D3B75] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      PNG only, maximum 4MB
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Specialty */}
@@ -615,11 +758,11 @@ export default function DoctorProfile() {
                       <select
                         value={scheduleForm.day_of_week}
                         onChange={(e) => setScheduleForm({ ...scheduleForm, day_of_week: e.target.value })}
-                        className="block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]/20"
+                        className="block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm text-gray-900 focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]/20"
                       >
-                        <option value="">Select day</option>
+                        <option value="" className="text-gray-500">Select day</option>
                         {dayOptions.map((day) => (
-                          <option key={day.value} value={day.value}>{day.label}</option>
+                          <option key={day.value} value={day.value} className="text-gray-900">{day.label}</option>
                         ))}
                       </select>
                     </div>
@@ -630,7 +773,7 @@ export default function DoctorProfile() {
                           type="time"
                           value={scheduleForm.start_time}
                           onChange={(e) => setScheduleForm({ ...scheduleForm, start_time: e.target.value })}
-                          className="block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]/20"
+                          className="block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm text-gray-900 focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]/20"
                         />
                       </div>
                       <div>
@@ -639,7 +782,7 @@ export default function DoctorProfile() {
                           type="time"
                           value={scheduleForm.end_time}
                           onChange={(e) => setScheduleForm({ ...scheduleForm, end_time: e.target.value })}
-                          className="block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]/20"
+                          className="block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm text-gray-900 focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]/20"
                         />
                       </div>
                     </div>
@@ -714,6 +857,61 @@ export default function DoctorProfile() {
 
         </div>
       </div>
+
+      {/* Submission Confirmation Modal */}
+      {showSubmissionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8 max-w-md w-full">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-[#0F172A] mb-3">
+                Profile Submitted for Review
+              </h2>
+              <p className="text-[#64748B] text-[15px] leading-relaxed mb-6">
+                Your professional profile has been submitted successfully
+                and is now awaiting administrator approval.
+                <br /><br />
+                Please wait for an email notification once your account
+                has been reviewed and approved.
+              </p>
+              <button
+                onClick={handleModalContinue}
+                className="w-full py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#1A62CD] hover:bg-[#0D3B75] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1A62CD] transition-colors duration-150"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Modal */}
+      {showPhotoModal && photoPreview && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowPhotoModal(false)}>
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <button
+              onClick={() => setShowPhotoModal(false)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img
+              src={photoPreview.startsWith('http') || photoPreview.startsWith('blob:')
+                ? photoPreview
+                : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:3000'}${photoPreview}`}
+              alt="Professional Photo"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

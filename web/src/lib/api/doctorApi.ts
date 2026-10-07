@@ -79,4 +79,9 @@ export const doctorApi = {
   deleteSchedule: async (id: string): Promise<{ success: boolean; error?: string }> => {
     return apiClient.delete<{ success: boolean }>(`/doctors/me/schedules/${id}`);
   },
+
+  // Delete professional photo
+  deletePhoto: async (): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.delete<{ success: boolean }>('/doctors/me/photo');
+  },
 };

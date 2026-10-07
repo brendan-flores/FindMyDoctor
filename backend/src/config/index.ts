@@ -42,8 +42,8 @@ export const config = {
   // File Upload
   upload: {
     dir: process.env.UPLOAD_DIR || './uploads',
-    maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '5242880'), // 5MB
-    allowedTypes: (process.env.ALLOWED_FILE_TYPES || 'image/jpeg,image/png,application/pdf').split(','),
+    maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '4194304'), // 4MB
+    allowedTypes: (process.env.ALLOWED_FILE_TYPES || 'image/png').split(','),
   },
 
   // Rate Limiting

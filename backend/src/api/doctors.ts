@@ -3,8 +3,46 @@ import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { config } from '../config';
 
 const router = Router();
+
+// Configure multer for photo upload
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = config.upload.dir;
+    // Create upload directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename: doctor_photo_<timestamp>_<random>.png
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `doctor_photo_${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+// File filter - only PNG allowed
+const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  if (file.mimetype === 'image/png') {
+    cb(null, true);
+  } else {
+    cb(new Error('Only PNG files are allowed'));
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 4 * 1024 * 1024, // 4MB
+  }
+});
 
 // Get current doctor (authenticated)
 router.get('/me', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
@@ -647,6 +685,113 @@ router.put('/me/two-factor', authenticate, authorize('DOCTOR'), async (req: Auth
   } catch (err: any) {
     console.error('Doctor 2FA setting update error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update two-factor setting'));
+  }
+});
+
+// Upload doctor professional photo
+router.post('/me/photo', authenticate, authorize('DOCTOR'), upload.single('photo'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    if (!req.file) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'No file uploaded'));
+    }
+
+    // Verify actual PNG file signature (magic number)
+    // PNG signature: 89 50 4E 47 0D 0A 1A 0A
+    const fileBuffer = fs.readFileSync(req.file.path);
+    const pngSignature = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+
+    if (fileBuffer.length < 8 || !fileBuffer.subarray(0, 8).equals(pngSignature)) {
+      // Delete the file if it's not a valid PNG
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Only PNG files are allowed'));
+    }
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      // Clean up uploaded file if doctor not found
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Store the file path in the database
+    const photoUrl = `/uploads/${req.file.filename}`;
+
+    const result = await query(
+      `UPDATE doctors
+       SET professional_photo_url = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $2
+       RETURNING professional_photo_url`,
+      [photoUrl, userId]
+    );
+
+    res.json(success({
+      photoUrl: result.rows[0].professional_photo_url
+    }, 'Photo uploaded successfully'));
+  } catch (err: any) {
+    console.error('Photo upload error:', err);
+
+    // Clean up uploaded file if error occurred
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to upload photo'));
+  }
+});
+
+// Delete doctor professional photo
+router.delete('/me/photo', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get current photo URL
+    const doctorResult = await query(
+      'SELECT professional_photo_url FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const currentPhotoUrl = doctorResult.rows[0].professional_photo_url;
+
+    // Clear database field
+    await query(
+      'UPDATE doctors SET professional_photo_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1',
+      [userId]
+    );
+
+    // Delete file if it exists and is a managed local file
+    if (currentPhotoUrl && currentPhotoUrl.startsWith('/uploads/')) {
+      const filename = currentPhotoUrl.split('/').pop();
+      if (filename) {
+        const filePath = path.join(config.upload.dir, filename);
+        // Verify the file is within the upload directory to prevent path traversal
+        const resolvedUploadDir = path.resolve(config.upload.dir);
+        const resolvedFilePath = path.resolve(filePath);
+
+        if (resolvedFilePath.startsWith(resolvedUploadDir) && fs.existsSync(resolvedFilePath)) {
+          fs.unlinkSync(resolvedFilePath);
+        }
+      }
+    }
+
+    res.json(success(null, 'Photo deleted successfully'));
+  } catch (err: any) {
+    console.error('Photo deletion error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete photo'));
   }
 });
 
