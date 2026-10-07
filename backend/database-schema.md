@@ -324,6 +324,8 @@ CREATE TABLE doctor_break_periods (
 #### daily_capacities
 Daily capacity calculations and overrides.
 
+**Migration:** `018_add_daily_capacities.sql` (applied)
+
 ```sql
 CREATE TABLE daily_capacities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

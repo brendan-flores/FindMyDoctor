@@ -13,6 +13,7 @@
     "migrate:doctor-signup-otp": "tsx src/database/applyDoctorSignupOtp.ts",
     "migrate:secretary-doctor-relationship": "tsx src/database/applySecretaryDoctorRelationship.ts",
     "migrate:break-periods": "tsx src/database/applyBreakPeriods.ts",
+    "migrate:daily-capacities": "tsx src/database/applyDailyCapacities.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",
