@@ -49,10 +49,9 @@ export default function SecretaryChangePassword() {
 
       if (response.success) {
         // Clear authentication session
-        localStorage.removeItem('token');
+        apiClient.clearToken();
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        apiClient.clearToken();
 
         // Show success modal
         setShowSuccessModal(true);

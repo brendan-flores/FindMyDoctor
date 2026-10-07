@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { apiClient } from '@/lib/api/apiClient';
 
 interface SecretarySidebarProps {
   userName?: string;
@@ -21,6 +22,7 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
     { id: 'dashboard', label: 'Dashboard', icon: 'grid_view' },
     { id: 'queue', label: 'Daily Queue', icon: 'people' },
     { id: 'walk-ins', label: 'Walk-ins', icon: 'person_add' },
+    { id: 'capacity', label: 'Capacity', icon: 'analytics' },
     { id: 'conversations', label: 'Conversations', icon: 'chat' },
     { id: 'payments', label: 'Payments', icon: 'payments' },
     { id: 'profile', label: 'Profile', icon: 'account_circle' },
@@ -37,7 +39,7 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    apiClient.clearToken();
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     router.push('/secretary-login');

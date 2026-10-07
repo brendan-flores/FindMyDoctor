@@ -32,10 +32,9 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
       // Verify backend-returned role is SECRETARY
       if (user.role !== 'SECRETARY') {
         // Cross-role access denied, redirect to appropriate login
-        localStorage.removeItem('token');
+        apiClient.clearToken();
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        apiClient.clearToken();
         router.push('/secretary-login');
         return;
       }

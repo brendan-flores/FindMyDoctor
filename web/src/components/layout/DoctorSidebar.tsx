@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { apiClient } from '@/lib/api/apiClient';
 
 interface DoctorSidebarProps {
   userName?: string;
@@ -37,7 +38,7 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    apiClient.clearToken();
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     router.push('/doctor-login');

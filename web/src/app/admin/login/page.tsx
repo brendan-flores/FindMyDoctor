@@ -37,13 +37,10 @@ export default function AdminLogin() {
         // Type guard: this is now AuthResponse (not LoginOtpRequiredResponse)
         const authData = response.data as { user: any; accessToken: string; refreshToken: string };
 
-        // Store token in localStorage
-        localStorage.setItem('token', authData.accessToken);
+        // Set token in API client (automatically stores in localStorage)
+        apiClient.setToken(authData.accessToken);
         localStorage.setItem('refreshToken', authData.refreshToken);
         localStorage.setItem('user', JSON.stringify(authData.user));
-
-        // Set token in API client
-        apiClient.setToken(authData.accessToken);
 
         // Verify backend-returned role is ADMIN or SUPERADMIN
         if (authData.user.role === 'ADMIN' || authData.user.role === 'SUPERADMIN') {
@@ -51,7 +48,6 @@ export default function AdminLogin() {
         } else {
           setError('Invalid username or password.');
           // Clear credentials on role mismatch
-          localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
           apiClient.clearToken();
@@ -69,11 +65,13 @@ export default function AdminLogin() {
   const handleOtpVerifySuccess = (data: any) => {
     // Verify backend-returned role is ADMIN or SUPERADMIN
     if (data.user.role === 'ADMIN' || data.user.role === 'SUPERADMIN') {
+      apiClient.setToken(data.accessToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
+      localStorage.setItem('user', JSON.stringify(data.user));
       router.push('/admin/dashboard');
     } else {
       setError('Invalid username or password.');
       // Clear credentials on role mismatch
-      localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       apiClient.clearToken();

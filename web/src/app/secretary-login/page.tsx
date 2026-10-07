@@ -37,10 +37,9 @@ export default function SecretaryLogin() {
         // Type guard: this is now AuthResponse (not LoginOtpRequiredResponse)
         const authData = response.data as { user: any; accessToken: string; refreshToken: string };
 
-        localStorage.setItem('token', authData.accessToken);
+        apiClient.setToken(authData.accessToken);
         localStorage.setItem('refreshToken', authData.refreshToken);
         localStorage.setItem('user', JSON.stringify(authData.user));
-        apiClient.setToken(authData.accessToken);
 
         if (authData.user.role === 'SECRETARY') {
           if (authData.user.mustChangePassword === true) {
@@ -50,7 +49,6 @@ export default function SecretaryLogin() {
           }
         } else {
           setError('Invalid username or password.');
-          localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
           apiClient.clearToken();
@@ -67,6 +65,9 @@ export default function SecretaryLogin() {
 
   const handleOtpVerifySuccess = (data: any) => {
     if (data.user.role === 'SECRETARY') {
+      apiClient.setToken(data.accessToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
+      localStorage.setItem('user', JSON.stringify(data.user));
       if (data.user.mustChangePassword === true) {
         router.push('/secretary/change-password');
       } else {
@@ -74,7 +75,6 @@ export default function SecretaryLogin() {
       }
     } else {
       setError('Invalid username or password.');
-      localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       apiClient.clearToken();
