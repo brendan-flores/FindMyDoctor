@@ -117,19 +117,353 @@ router.get('/:id', async (req: any, res: Response) => {
   }
 });
 
-// Get doctor schedules
+// Get authenticated doctor's schedules (with active/inactive filter) - MUST be before /:id/schedules
+router.get('/me/schedules', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+    const { includeInactive } = req.query;
+
+    let queryText = 'SELECT * FROM doctor_schedules WHERE doctor_id = $1';
+    const params = [doctorId];
+
+    if (includeInactive !== 'true') {
+      queryText += ' AND is_active = true';
+    }
+
+    queryText += ' ORDER BY day_of_week, start_time';
+
+    const result = await query(queryText, params);
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor schedules'));
+  }
+});
+
+// Get doctor schedules (public - for doctor profile display)
 router.get('/:id/schedules', async (req: any, res: Response) => {
   try {
     const { id } = req.params;
 
     const result = await query(
-      'SELECT * FROM doctor_schedules WHERE doctor_id = $1 AND is_active = true ORDER BY day_of_week',
+      'SELECT * FROM doctor_schedules WHERE doctor_id = $1 AND is_active = true ORDER BY day_of_week, start_time',
       [id]
     );
 
     res.json(success(result.rows));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor schedules'));
+  }
+});
+
+// Create schedule for authenticated doctor
+router.post('/me/schedules', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { dayOfWeek, startTime, endTime, consultationDurationMinutes } = req.body;
+
+    // Validation
+    if (dayOfWeek === undefined || !startTime || !endTime) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'dayOfWeek, startTime, and endTime are required'));
+    }
+
+    if (dayOfWeek < 0 || dayOfWeek > 6) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'dayOfWeek must be between 0 (Sunday) and 6 (Saturday)'));
+    }
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await client.query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Validate time format and convert to TIME
+    const startTimeDate = new Date(`2000-01-01T${startTime}`);
+    const endTimeDate = new Date(`2000-01-01T${endTime}`);
+
+    if (isNaN(startTimeDate.getTime()) || isNaN(endTimeDate.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid time format. Use HH:MM format'));
+    }
+
+    // Validate start time < end time
+    if (startTimeDate >= endTimeDate) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start time must be before end time'));
+    }
+
+    // Check for overlapping schedules on the same day
+    const overlapResult = await client.query(
+      `SELECT * FROM doctor_schedules
+       WHERE doctor_id = $1 AND day_of_week = $2 AND is_active = true
+       AND (
+         (start_time < $3 AND end_time > $3) OR
+         (start_time < $4 AND end_time > $4) OR
+         (start_time >= $3 AND end_time <= $4)
+       )`,
+      [doctorId, dayOfWeek, startTime, endTime]
+    );
+
+    if (overlapResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Schedule overlaps with an existing schedule'));
+    }
+
+    // Create schedule
+    const result = await client.query(
+      `INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, consultation_duration_minutes, is_active)
+       VALUES ($1, $2, $3, $4, $5, true)
+       RETURNING *`,
+      [doctorId, dayOfWeek, startTime, endTime, consultationDurationMinutes || 30]
+    );
+
+    await client.query('COMMIT');
+
+    res.status(201).json(success(result.rows[0], 'Schedule created successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Schedule creation error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create schedule'));
+  } finally {
+    client.release();
+  }
+});
+
+// Update schedule for authenticated doctor
+router.put('/me/schedules/:id', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const { dayOfWeek, startTime, endTime, consultationDurationMinutes } = req.body;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await client.query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Verify the schedule belongs to the authenticated doctor
+    const scheduleResult = await client.query(
+      'SELECT * FROM doctor_schedules WHERE id = $1 AND doctor_id = $2',
+      [id, doctorId]
+    );
+
+    if (scheduleResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Schedule not found or access denied'));
+    }
+
+    // Validation
+    if (dayOfWeek === undefined || !startTime || !endTime) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'dayOfWeek, startTime, and endTime are required'));
+    }
+
+    if (dayOfWeek < 0 || dayOfWeek > 6) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'dayOfWeek must be between 0 (Sunday) and 6 (Saturday)'));
+    }
+
+    // Validate time format
+    const startTimeDate = new Date(`2000-01-01T${startTime}`);
+    const endTimeDate = new Date(`2000-01-01T${endTime}`);
+
+    if (isNaN(startTimeDate.getTime()) || isNaN(endTimeDate.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid time format. Use HH:MM format'));
+    }
+
+    // Validate start time < end time
+    if (startTimeDate >= endTimeDate) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start time must be before end time'));
+    }
+
+    // Check for overlapping schedules on the same day (excluding current schedule)
+    const overlapResult = await client.query(
+      `SELECT * FROM doctor_schedules
+       WHERE doctor_id = $1 AND day_of_week = $2 AND is_active = true AND id != $3
+       AND (
+         (start_time < $4 AND end_time > $4) OR
+         (start_time < $5 AND end_time > $5) OR
+         (start_time >= $4 AND end_time <= $5)
+       )`,
+      [doctorId, dayOfWeek, id, startTime, endTime]
+    );
+
+    if (overlapResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Schedule overlaps with an existing schedule'));
+    }
+
+    // Update schedule
+    const result = await client.query(
+      `UPDATE doctor_schedules
+       SET day_of_week = $1, start_time = $2, end_time = $3, consultation_duration_minutes = $4, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5 AND doctor_id = $6
+       RETURNING *`,
+      [dayOfWeek, startTime, endTime, consultationDurationMinutes || 30, id, doctorId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json(success(result.rows[0], 'Schedule updated successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Schedule update error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update schedule'));
+  } finally {
+    client.release();
+  }
+});
+
+// Deactivate schedule for authenticated doctor (soft delete)
+router.patch('/me/schedules/:id/deactivate', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Verify the schedule belongs to the authenticated doctor
+    const scheduleResult = await query(
+      'SELECT * FROM doctor_schedules WHERE id = $1 AND doctor_id = $2',
+      [id, doctorId]
+    );
+
+    if (scheduleResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Schedule not found or access denied'));
+    }
+
+    // Deactivate schedule
+    const result = await query(
+      `UPDATE doctor_schedules
+       SET is_active = false, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND doctor_id = $2
+       RETURNING *`,
+      [id, doctorId]
+    );
+
+    res.json(success(result.rows[0], 'Schedule deactivated successfully'));
+  } catch (err: any) {
+    console.error('Schedule deactivation error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to deactivate schedule'));
+  }
+});
+
+// Reactivate schedule for authenticated doctor
+router.patch('/me/schedules/:id/reactivate', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await client.query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Verify the schedule belongs to the authenticated doctor
+    const scheduleResult = await client.query(
+      'SELECT * FROM doctor_schedules WHERE id = $1 AND doctor_id = $2',
+      [id, doctorId]
+    );
+
+    if (scheduleResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Schedule not found or access denied'));
+    }
+
+    const schedule = scheduleResult.rows[0];
+
+    // Check for overlapping schedules on the same day (since we're reactivating)
+    const overlapResult = await client.query(
+      `SELECT * FROM doctor_schedules
+       WHERE doctor_id = $1 AND day_of_week = $2 AND is_active = true AND id != $3
+       AND (
+         (start_time < $4 AND end_time > $4) OR
+         (start_time < $5 AND end_time > $5) OR
+         (start_time >= $4 AND end_time <= $5)
+       )`,
+      [doctorId, schedule.day_of_week, id, schedule.start_time, schedule.end_time]
+    );
+
+    if (overlapResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Cannot reactivate: schedule overlaps with an existing active schedule'));
+    }
+
+    // Reactivate schedule
+    const result = await client.query(
+      `UPDATE doctor_schedules
+       SET is_active = true, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND doctor_id = $2
+       RETURNING *`,
+      [id, doctorId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json(success(result.rows[0], 'Schedule reactivated successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Schedule reactivation error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to reactivate schedule'));
+  } finally {
+    client.release();
   }
 });
 
@@ -329,7 +663,7 @@ router.post('/secretaries', authenticate, authorize('DOCTOR'), async (req: AuthR
 
     if (existingUser.rows.length > 0) {
       await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.EMAIL_ALREADY_EXISTS, 'Email already registered'));
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Email already registered'));
     }
 
     // Hash password
@@ -371,7 +705,7 @@ router.post('/secretaries', authenticate, authorize('DOCTOR'), async (req: AuthR
 
     // Handle unique constraint violation (race condition)
     if (err.code === '23505') {
-      return res.status(409).json(error(ErrorCodes.EMAIL_ALREADY_EXISTS, 'Email already registered'));
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Email already registered'));
     }
 
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create secretary'));
