@@ -88,57 +88,55 @@ export default function DoctorSettings() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F3F5F9]">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
-          <p className="text-slate-600 mt-2">Manage your account settings and preferences</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 shadow-lg">
+        <h1 className="text-2xl font-bold text-white">Settings</h1>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
+          {error}
         </div>
+      )}
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6">
-            {error}
-          </div>
-        )}
+      {success && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl">
+          {success}
+        </div>
+      )}
 
-        {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-6">
-            {success}
-          </div>
-        )}
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+        <h2 className="text-xl font-bold text-slate-800 mb-4">Security</h2>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">Security</h2>
-          
-          <div className="flex items-center justify-between py-4 border-b border-slate-200">
-            <div>
-              <h3 className="font-semibold text-slate-900">Two-Factor Authentication</h3>
-              <p className="text-sm text-slate-600 mt-1">
-                Require a verification code every time you sign in
-              </p>
-            </div>
-            <button
-              onClick={handleToggle2FA}
-              disabled={isSaving}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                twoFactorEnabled ? 'bg-[#1A62CD]' : 'bg-slate-300'
-              } ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          <div className="mt-4 p-4 bg-slate-50 rounded-xl">
-            <p className="text-sm text-slate-600">
-              {twoFactorEnabled
-                ? 'Two-factor authentication is enabled. You will be required to enter a verification code sent to your email each time you sign in.'
-                : 'Two-factor authentication is disabled. You can enable it to add an extra layer of security to your account.'}
+        <div className="flex items-center justify-between py-4 border-b border-slate-100">
+          <div>
+            <h3 className="font-semibold text-slate-800">Two-Factor Authentication</h3>
+            <p className="text-sm text-slate-600 mt-1">
+              Require a verification code every time you sign in
             </p>
           </div>
+          <button
+            onClick={handleToggle2FA}
+            disabled={isSaving}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              twoFactorEnabled ? 'bg-gradient-to-r from-blue-500 to-blue-600' : 'bg-slate-300'
+            } ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        <div className="mt-4 p-4 bg-slate-50 rounded-xl">
+          <p className="text-sm text-slate-600">
+            {twoFactorEnabled
+              ? 'Two-factor authentication is enabled. You will be required to enter a verification code sent to your email each time you sign in.'
+              : 'Two-factor authentication is disabled. You can enable it to add an extra layer of security to your account.'}
+          </p>
         </div>
       </div>
     </div>
