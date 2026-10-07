@@ -15,7 +15,10 @@ router.get('/me', authenticate, authorize('DOCTOR'), async (req: AuthRequest, re
       `SELECT
         d.id, d.user_id, d.first_name, d.middle_name, d.last_name, d.specialty, d.credentials,
         d.prc_license_number, d.practice_name, d.practice_phone, d.practice_email, d.room_number,
-        d.two_factor_enabled, d.is_approved, d.approval_status
+        d.contact_number, d.professional_photo_url, d.years_of_experience, d.areas_of_expertise,
+        d.biography, d.consultation_fee, d.consultation_type, d.languages_spoken,
+        d.two_factor_enabled, d.is_approved, d.approval_status, d.profile_completion_status,
+        d.profile_submitted_at
        FROM doctors d
        WHERE d.user_id = $1`,
       [userId]
@@ -117,7 +120,233 @@ router.get('/:id', async (req: any, res: Response) => {
   }
 });
 
-// Get doctor schedules
+// Get current doctor's schedules
+router.get('/me/schedules', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Get schedules
+    const result = await query(
+      'SELECT * FROM doctor_schedules WHERE doctor_id = $1 ORDER BY day_of_week',
+      [doctorId]
+    );
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    console.error('Failed to fetch doctor schedules:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch schedules'));
+  }
+});
+
+// Create schedule for current doctor
+router.post('/me/schedules', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { day_of_week, start_time, end_time, consultation_duration_minutes, is_active } = req.body;
+
+    // Validation
+    if (day_of_week === undefined || start_time === undefined || end_time === undefined) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'day_of_week, start_time, and end_time are required'));
+    }
+
+    if (day_of_week < 0 || day_of_week > 6) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'day_of_week must be between 0 and 6'));
+    }
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Check if schedule already exists for this day
+    const existingSchedule = await query(
+      'SELECT id FROM doctor_schedules WHERE doctor_id = $1 AND day_of_week = $2',
+      [doctorId, day_of_week]
+    );
+
+    if (existingSchedule.rows.length > 0) {
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Schedule already exists for this day'));
+    }
+
+    // Create schedule
+    const result = await query(
+      `INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, consultation_duration_minutes, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        doctorId,
+        day_of_week,
+        start_time,
+        end_time,
+        consultation_duration_minutes || 30,
+        is_active !== undefined ? is_active : true
+      ]
+    );
+
+    res.status(201).json(success(result.rows[0], 'Schedule created successfully'));
+  } catch (err: any) {
+    console.error('Failed to create schedule:', err);
+
+    // Handle unique constraint violation
+    if (err.code === '23505') {
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Schedule already exists for this day'));
+    }
+
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create schedule'));
+  }
+});
+
+// Update schedule for current doctor
+router.put('/me/schedules/:id', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { id } = req.params;
+    const { day_of_week, start_time, end_time, consultation_duration_minutes, is_active } = req.body;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Verify schedule belongs to this doctor
+    const scheduleResult = await query(
+      'SELECT * FROM doctor_schedules WHERE id = $1 AND doctor_id = $2',
+      [id, doctorId]
+    );
+
+    if (scheduleResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Schedule not found'));
+    }
+
+    // Validate day_of_week if provided
+    if (day_of_week !== undefined && (day_of_week < 0 || day_of_week > 6)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'day_of_week must be between 0 and 6'));
+    }
+
+    // Build dynamic update query
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramCount = 0;
+
+    if (day_of_week !== undefined) {
+      paramCount++;
+      updates.push(`day_of_week = $${paramCount}`);
+      values.push(day_of_week);
+    }
+    if (start_time !== undefined) {
+      paramCount++;
+      updates.push(`start_time = $${paramCount}`);
+      values.push(start_time);
+    }
+    if (end_time !== undefined) {
+      paramCount++;
+      updates.push(`end_time = $${paramCount}`);
+      values.push(end_time);
+    }
+    if (consultation_duration_minutes !== undefined) {
+      paramCount++;
+      updates.push(`consultation_duration_minutes = $${paramCount}`);
+      values.push(consultation_duration_minutes);
+    }
+    if (is_active !== undefined) {
+      paramCount++;
+      updates.push(`is_active = $${paramCount}`);
+      values.push(is_active);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'No fields to update'));
+    }
+
+    // Add schedule_id and doctor_id parameters
+    paramCount++;
+    values.push(id);
+    paramCount++;
+    values.push(doctorId);
+
+    const result = await query(
+      `UPDATE doctor_schedules
+       SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $${paramCount - 1} AND doctor_id = $${paramCount}
+       RETURNING *`,
+      values
+    );
+
+    res.json(success(result.rows[0], 'Schedule updated successfully'));
+  } catch (err: any) {
+    console.error('Failed to update schedule:', err);
+
+    // Handle unique constraint violation
+    if (err.code === '23505') {
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Schedule already exists for this day'));
+    }
+
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update schedule'));
+  }
+});
+
+// Delete schedule for current doctor
+router.delete('/me/schedules/:id', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { id } = req.params;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Verify schedule belongs to this doctor and delete
+    const result = await query(
+      'DELETE FROM doctor_schedules WHERE id = $1 AND doctor_id = $2 RETURNING *',
+      [id, doctorId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Schedule not found'));
+    }
+
+    res.json(success(null, 'Schedule deleted successfully'));
+  } catch (err: any) {
+    console.error('Failed to delete schedule:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete schedule'));
+  }
+});
+
+// Get doctor schedules (public endpoint)
 router.get('/:id/schedules', async (req: any, res: Response) => {
   try {
     const { id } = req.params;
@@ -408,6 +637,282 @@ router.put('/me/two-factor', authenticate, authorize('DOCTOR'), async (req: Auth
   } catch (err: any) {
     console.error('Doctor 2FA setting update error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update two-factor setting'));
+  }
+});
+
+// Update Doctor professional profile
+router.put('/me/profile', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const {
+      professional_photo_url,
+      specialty,
+      credentials,
+      prc_license_number,
+      practice_name,
+      years_of_experience,
+      areas_of_expertise,
+      biography,
+      consultation_fee,
+      consultation_type,
+      languages_spoken,
+    } = req.body;
+
+    // Validate PRC license number format if provided
+    const PRC_LICENSE_PATTERN = /^\d{7}$/;
+    if (prc_license_number && !PRC_LICENSE_PATTERN.test(prc_license_number)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'PRC license number must be 7 digits'));
+    }
+
+    // Check if PRC license number is already taken by another doctor
+    if (prc_license_number) {
+      const existingLicense = await query(
+        'SELECT id FROM doctors WHERE prc_license_number = $1 AND user_id <> $2',
+        [prc_license_number, userId]
+      );
+
+      if (existingLicense.rows.length > 0) {
+        return res.status(409).json(error(ErrorCodes.CONFLICT, 'PRC license number is already registered'));
+      }
+    }
+
+    // Build dynamic update query
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramCount = 0;
+
+    if (professional_photo_url !== undefined) {
+      paramCount++;
+      updates.push(`professional_photo_url = $${paramCount}`);
+      values.push(professional_photo_url);
+    }
+    if (specialty !== undefined) {
+      paramCount++;
+      updates.push(`specialty = $${paramCount}`);
+      values.push(specialty);
+    }
+    if (credentials !== undefined) {
+      paramCount++;
+      updates.push(`credentials = $${paramCount}`);
+      values.push(credentials);
+    }
+    if (prc_license_number !== undefined) {
+      paramCount++;
+      updates.push(`prc_license_number = $${paramCount}`);
+      values.push(prc_license_number);
+    }
+    if (practice_name !== undefined) {
+      paramCount++;
+      updates.push(`practice_name = $${paramCount}`);
+      values.push(practice_name);
+    }
+    if (years_of_experience !== undefined) {
+      paramCount++;
+      updates.push(`years_of_experience = $${paramCount}`);
+      values.push(years_of_experience);
+    }
+    if (areas_of_expertise !== undefined) {
+      paramCount++;
+      updates.push(`areas_of_expertise = $${paramCount}`);
+      values.push(areas_of_expertise);
+    }
+    if (biography !== undefined) {
+      paramCount++;
+      updates.push(`biography = $${paramCount}`);
+      values.push(biography);
+    }
+    if (consultation_fee !== undefined) {
+      paramCount++;
+      updates.push(`consultation_fee = $${paramCount}`);
+      values.push(consultation_fee);
+    }
+    if (consultation_type !== undefined) {
+      paramCount++;
+      updates.push(`consultation_type = $${paramCount}`);
+      values.push(consultation_type);
+    }
+    if (languages_spoken !== undefined) {
+      paramCount++;
+      updates.push(`languages_spoken = $${paramCount}`);
+      values.push(languages_spoken);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'No fields to update'));
+    }
+
+    // Add user_id parameter
+    paramCount++;
+    values.push(userId);
+
+    const result = await query(
+      `UPDATE doctors
+       SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $${paramCount}
+       RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    // Determine profile completion status based on required fields
+    const doctor = result.rows[0];
+
+    // Get user email verification status for profile completion check
+    const userResult = await query(
+      `SELECT email_verified FROM users WHERE id = $1`,
+      [userId]
+    );
+
+    const user = userResult.rows[0];
+
+    const hasRequiredFields =
+      doctor.first_name &&
+      doctor.last_name &&
+      doctor.contact_number &&
+      doctor.specialty &&
+      doctor.credentials &&
+      doctor.prc_license_number &&
+      doctor.practice_name;
+
+    const hasVerifiedEmail = user.email_verified === true;
+
+    if (hasRequiredFields && hasVerifiedEmail && doctor.profile_completion_status === 'INCOMPLETE') {
+      await query(
+        `UPDATE doctors
+         SET profile_completion_status = 'COMPLETE'
+         WHERE user_id = $1`,
+        [userId]
+      );
+      doctor.profile_completion_status = 'COMPLETE';
+    }
+
+    res.json(success(doctor, 'Profile updated successfully'));
+  } catch (err: any) {
+    console.error('Doctor profile update error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update profile'));
+  }
+});
+
+// Submit Doctor profile for approval
+router.post('/me/profile/submit', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const userId = req.user!.id;
+
+    // Get current doctor profile
+    const doctorResult = await client.query(
+      `SELECT * FROM doctors WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctor = doctorResult.rows[0];
+
+    // Validate approval status - only allow submission for PENDING or REJECTED doctors
+    // ACTIVE doctors should not be able to submit onboarding applications again
+    if (doctor.approval_status === 'ACTIVE') {
+      await client.query('ROLLBACK');
+      return res.status(409).json(
+        error(
+          ErrorCodes.CONFLICT,
+          'Your account is already approved. You cannot submit an onboarding application again.'
+        )
+      );
+    }
+
+    // Get user email verification status
+    const userResult = await client.query(
+      `SELECT email, email_verified FROM users WHERE id = $1`,
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'User not found'));
+    }
+
+    const user = userResult.rows[0];
+
+    // Validate required fields before submission
+    const requiredFields = [
+      { field: 'first_name', value: doctor.first_name, name: 'First Name' },
+      { field: 'last_name', value: doctor.last_name, name: 'Last Name' },
+      { field: 'contact_number', value: doctor.contact_number, name: 'Contact Number' },
+      { field: 'specialty', value: doctor.specialty, name: 'Specialty' },
+      { field: 'credentials', value: doctor.credentials, name: 'Credentials' },
+      { field: 'prc_license_number', value: doctor.prc_license_number, name: 'PRC License Number' },
+      { field: 'practice_name', value: doctor.practice_name, name: 'Hospital/Clinic' },
+    ];
+
+    const missingFields = requiredFields.filter(f => {
+      if (f.value === null || f.value === undefined) {
+        return true;
+      }
+      if (typeof f.value === 'string' && f.value.trim() === '') {
+        return true;
+      }
+      return false;
+    });
+
+    if (missingFields.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(
+        error(
+          ErrorCodes.VALIDATION_ERROR,
+          `Missing required fields: ${missingFields.map(f => f.name).join(', ')}`
+        )
+      );
+    }
+
+    // Validate email verification status
+    if (!user.email_verified || user.email_verified !== true) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(
+        error(
+          ErrorCodes.VALIDATION_ERROR,
+          'Email must be verified before submitting profile for approval'
+        )
+      );
+    }
+
+    // Update profile completion status to SUBMITTED
+    const result = await client.query(
+      `UPDATE doctors
+       SET profile_completion_status = 'SUBMITTED',
+           profile_submitted_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1
+       RETURNING *`,
+      [userId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json(success(
+      result.rows[0],
+      'Profile submitted for administrator approval. You will be notified once your account is approved.'
+    ));
+  } catch (err: any) {
+    if (client) {
+      await client.query('ROLLBACK').catch(() => {});
+    }
+
+    console.error('Doctor profile submission error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to submit profile'));
+  } finally {
+    if (client) {
+      client.release();
+    }
   }
 });
 

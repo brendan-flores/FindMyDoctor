@@ -264,7 +264,7 @@ FiDo Web
 ├── Secretary
 │   └── `/secretary-login` → `/secretary/dashboard`
 └── Doctor Sign-Up (Self-Registration)
-    └── `/doctor-signup` → Supabase email OTP → PostgreSQL account → `/doctor/dashboard`
+    └── `/doctor-signup` → Basic form → Supabase email OTP → PostgreSQL Doctor account (PENDING + INCOMPLETE) → Profile completion → Submit for approval → PENDING / Awaiting Admin Review
 ```
 
 ### Authentication Flow
@@ -299,28 +299,50 @@ FiDo Web
 
 ### Doctor Sign-Up (Self-Registration)
 
-The doctor sign-up page at `/doctor-signup` creates a doctor account:
+The doctor sign-up page at `/doctor-signup` creates a doctor account through a two-step flow:
 
 - Linked from the Doctor login page at `/doctor-login`.
-- Groups the form into Doctor Information (Full Name, Specialty via searchable dropdown, Credentials via searchable multi-select dropdown, PRC License Number, Hospital/Clinic via searchable dropdown of Cebu facilities), Contact Information, and Account Security sections.
-- Submits the completed form to `POST /api/v1/auth/otp/send` (public, no token required).
-- The backend validates the payload (required fields, email format, password length, password/confirm-password match, 7-digit PRC license number, first and last name), then stages the sign-up - including the bcrypt-hashed password - in the `pending_doctor_signups` table added by migration `006_doctor_signup_otp_flow.sql`. No account is created at this step.
+- **Step 1 - Basic Registration:** Collects only basic information (first name, middle name optional, last name, email, contact number, password, confirm password).
+- Submits the basic form to `POST /api/v1/auth/otp/send` (public, no token required).
+- The backend validates the payload (required fields, email format, password length, password/confirm-password match, first and last name), then stages the sign-up - including the bcrypt-hashed password - in the `pending_doctor_signups` table added by migration `006_doctor_signup_otp_flow.sql` (modified by migration `017_modify_pending_doctor_signup_for_basic_flow.sql`). No account is created at this step.
 - Supabase is then used only to email the 6-digit OTP to the doctor's address.
-- The doctor enters the OTP and the page calls `POST /api/v1/auth/otp/verify`. Only after Supabase confirms the OTP does the backend create the `users` (`role = DOCTOR`, `email_verified = true`) and `doctors` records inside a single transaction on one pooled client, rolling back on any failure and then clearing the staged row.
+- **Step 2 - OTP Verification:** The doctor enters the OTP and the page calls `POST /api/v1/auth/otp/verify`. Only after Supabase confirms the OTP does the backend create the `users` record (`role = DOCTOR`, `email_verified = true`) and the `doctors` record with `profile_completion_status = 'INCOMPLETE'` inside a single transaction on one pooled client, rolling back on any failure and then clearing the staged row.
 - The password is hashed with bcrypt and `must_change_password` is false because the doctor chooses their own password.
-- Field mapping: `fullName` is split into `first_name` and `last_name`, `clinic` (Hospital/Clinic selection) maps to `practice_name`, `contactNumber` maps to `practice_phone`, and `email` is also stored as `practice_email`.
-- The PRC license number is stored in `doctors.prc_license_number` and is enforced unique by a partial unique index.
-- `practice_address` and the practice coordinates default to empty/zero, so a doctor can register before supplying a practice location.
-- Registered doctors are created with `approval_status = 'PENDING'` and `is_approved = false`, so they must wait for administrator approval before accessing the system.
-- The doctor sees a "Registration Submitted Successfully" message after OTP verification and cannot log in until an administrator approves the account.
-- Duplicate email or PRC license number returns `409`; a successful verification returns a success message and directs the doctor to wait for admin approval.
+- Basic information (first_name, middle_name, last_name, contact_number) is stored in the doctors table.
+- Professional information fields (specialty, credentials, PRC license number, hospital/clinic, etc.) are NOT collected at this stage.
+- Registered doctors are created with `approval_status = 'PENDING'`, `is_approved = false`, and `profile_completion_status = 'INCOMPLETE'`, so they must complete their professional profile and wait for administrator approval before accessing the system.
+- The doctor sees a "Registration Submitted Successfully" message after OTP verification directing them to complete their professional profile.
+- Duplicate email returns `409`; a successful verification returns a success message and directs the doctor to complete their profile.
 - PostgreSQL is the single source of truth for doctor accounts, credentials and profile data. Supabase stores no application account or profile data.
+
+### Doctor Profile Completion
+
+After successful OTP verification, doctors must complete their professional profile:
+
+- **Profile Update Endpoint:** `PUT /api/v1/doctors/me/profile` (requires Doctor authentication)
+  - Accepts professional profile fields: professional_photo_url, specialty, credentials, prc_license_number, practice_name, years_of_experience, areas_of_expertise, biography, consultation_fee, consultation_type, languages_spoken
+  - Validates PRC license number format (7 digits) and uniqueness
+  - Automatically updates `profile_completion_status` to 'COMPLETE' when all required fields are present
+  - Allows partial updates (field-by-field or multiple fields at once)
+
+- **Profile Submission Endpoint:** `POST /api/v1/doctors/me/profile/submit` (requires Doctor authentication)
+  - Validates required fields before submission: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic
+  - Sets `profile_completion_status = 'SUBMITTED'` and `profile_submitted_at` to current timestamp
+  - Keeps `approval_status = 'PENDING'` (does not approve the doctor)
+  - Returns message directing doctor to wait for admin approval
+
+- **Profile Completion Status Transitions:**
+  - `INCOMPLETE` - Initial state after OTP verification, professional information not yet collected
+  - `COMPLETE` - Required professional fields filled, ready for submission
+  - `SUBMITTED` - Profile submitted for admin review, awaiting approval decision
 
 ### Doctor Approval Workflow
 
-After a doctor completes self-registration and email OTP verification:
+After a doctor completes self-registration, email OTP verification, and profile submission:
 
-- The doctor account is created with `approval_status = 'PENDING'` and `is_approved = false`.
+- The doctor account is created with `approval_status = 'PENDING'`, `is_approved = false`, and `profile_completion_status = 'INCOMPLETE'`.
+- The doctor must complete their professional profile and submit it for review.
+- After profile submission, `profile_completion_status` becomes 'SUBMITTED' but `approval_status` remains 'PENDING'.
 - The doctor cannot log in or access the Doctor Dashboard while in PENDING status.
 - Administrators can view pending doctors through the Admin Doctors page at `/admin/doctors`.
 - Administrators can review complete doctor information and either:

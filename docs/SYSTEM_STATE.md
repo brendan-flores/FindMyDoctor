@@ -4,7 +4,12 @@ This document contains the current system state for the FindMyDoctor project. It
 
 Current System State (October 2026):
 - Doctor self-registration creates accounts with `approval_status = 'PENDING'` requiring admin approval
-- Three-state doctor approval workflow: PENDING → ACTIVE (approved) or REJECTED
+- Doctor self-registration now uses a two-step flow: basic registration → OTP verification → profile completion → submission for approval
+- Basic Doctor registration requires only: first_name, middle_name (optional), last_name, email, contact_number, password
+- Professional information (specialty, credentials, PRC license number, hospital/clinic, etc.) is collected after OTP verification in the profile completion step
+- Doctor accounts are created with `profile_completion_status = 'INCOMPLETE'` after OTP verification
+- Doctor profile completion status transitions: INCOMPLETE → COMPLETE (when required fields filled) → SUBMITTED (when doctor submits for review)
+- Doctor approval workflow: PENDING → ACTIVE (approved) or REJECTED, with profile_completion_status tracked separately
 - Patient registration uses email OTP verification via Supabase for account creation
 - Patient registration requires username (minimum 3 characters, alphanumeric + underscores only)
 - User login accepts either email or username for authentication
@@ -12,25 +17,28 @@ Current System State (October 2026):
 - Each Secretary has a required `doctor_id` relationship to one Doctor; Doctors can list only their own Secretaries via the authenticated backend API
 - Supabase is used only for OTP email verification, not for storing application data
 - Backend API includes comprehensive endpoints for doctors, admin, OTP, appointments, queue, payments, etc.
-- Database schema includes approval status fields, pending doctor signups staging table, and pending patient signups staging table (with username)
+- Database schema includes approval status fields, pending doctor signups staging table (basic fields only), and pending patient signups staging table (with username)
 - Database schema includes `middle_name` field in `doctors` and `pending_doctor_signups` tables (migration 010_add_middle_name.sql)
+- Database schema includes extended doctor profile fields (migration 016_doctor_profile_fields.sql): contact_number, professional_photo_url, years_of_experience, areas_of_expertise (comma-separated text), consultation_type, languages_spoken (comma-separated text), profile_completion_status, profile_submitted_at
+- Migration `017_modify_pending_doctor_signup_for_basic_flow.sql` adds contact_number field to pending_doctor_signups for basic registration flow (professional fields remain in table for compatibility)
 - Users table includes username field (unique) for patient identification
 - Patients table does not include phone field (removed in favor of username)
 - Backend API endpoints for patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
+- Backend API endpoints for doctor profile: `PUT /api/v1/doctors/me/profile` (update profile), `POST /api/v1/doctors/me/profile/submit` (submit for approval)
 - Doctor registration uses separate first name, middle name (optional), and last name fields instead of a single full name field
-- Backend doctor OTP API accepts `firstName`, `middleName`, and `lastName` in the signup payload
-- Backend doctors API returns `middle_name` field in doctor records and includes it in search functionality
+- Backend doctor OTP API accepts only basic fields (`firstName`, `middleName`, `lastName`, `email`, `contactNumber`, `password`) in the signup payload
+- Backend doctors API returns all profile fields including `profile_completion_status` and `profile_submitted_at`
 - Web application provides role-specific dashboards for Doctor, Secretary, and Admin users
 - Mobile application includes OTP verification page for patient registration with full backend integration
 - Mobile application authentication persists across hot restarts using SharedPreferences for token storage
 - Mobile Doctors page displays real doctor records from database through backend API (no hardcoded data)
 - Mobile Doctors page dynamically derives specialties and hospitals from actual registered doctors
 - Mobile Doctors page shows hospital cards with hospital name, address, and doctor count derived from database
-- Doctor self-registration form at `/doctor-signup` features searchable dropdowns/autocompletes for Hospital/Clinic (legitimate Cebu outpatient clinics, consultation centers, primary care polyclinics, and medical arts buildings), Specialty (recognized Philippine medical specialties), and Credentials (searchable multi-select for recognized suffixes such as MD, FPCP, FPSGS, etc.) with partial-name filtering and keyboard navigation
-- Doctor self-registration form includes optional room number field for facilities with room/suite numbers
+- Doctor self-registration form at `/doctor-signup` now collects only basic information initially
+- Doctor profile completion form (post-OTP) collects professional information: specialty, credentials, PRC license number, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, professional photo
 - Doctor self-registration form includes password visibility toggle and real-time password strength requirements (8+ chars, uppercase, lowercase, number, special character)
-- Doctor self-registration form enforces 7-digit numeric PRC license number with maximum length enforcement
+- Doctor profile submission validates required fields: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic
 - Doctors can create Secretary accounts via `POST /api/v1/doctors/secretaries` (requires Doctor authentication and ACTIVE approval status)
 - Doctors can list their assigned Secretaries via `GET /api/v1/doctors/secretaries` (requires Doctor authentication)
 - Secretary accounts created by Doctors have `must_change_password = true` and NULL first_name/last_name (to be completed by Secretary)
@@ -50,7 +58,6 @@ Current System State (October 2026):
 - PostgreSQL `login_otp_challenges` table stores server-side OTP challenge state with hashed challenge tokens (migration 014_add_login_otp_challenges.sql)
 - PostgreSQL `doctors` and `secretaries` tables include `two_factor_enabled` column (migration 013_add_two_factor_settings.sql)
 - Migration `015_enforce_secretary_doctor_relationship.sql` enforces the required foreign key and non-null assignment for `secretaries.doctor_id`
-- Migration `016_doctor_profile_fields.sql` adds extended doctor profile fields: contact_number, professional_photo_url, years_of_experience, areas_of_expertise (comma-separated text), consultation_type, languages_spoken (comma-separated text), profile_completion_status, profile_submitted_at
 - Login OTP flow: user submits credentials → backend checks role-specific OTP requirement → if required, creates challenge → sends OTP via Supabase → returns opaque challenge token → user submits OTP → backend verifies with Supabase → consumes challenge → issues application JWT
 - Login OTP verification endpoint: `POST /api/v1/auth/verify-login-otp` (accepts challengeId and OTP)
 - Login OTP resend endpoint: `POST /api/v1/auth/resend-login-otp` (accepts challengeId, enforces 60-second cooldown, invalidates previous challenges)
