@@ -69,7 +69,17 @@ interface BreakPeriodFormData {
   reason: string;
 }
 
-type TabType = 'working-hours' | 'exceptions' | 'breaks';
+interface DoctorCapacity {
+  date: string;
+  calculated_capacity: number;
+  configured_capacity: number | null;
+  final_capacity: number;
+  registered_count: number;
+  remaining_capacity: number;
+  consultation_duration_minutes: number;
+}
+
+type TabType = 'working-hours' | 'exceptions' | 'breaks' | 'capacity';
 
 export default function DoctorSchedule() {
   const [activeTab, setActiveTab] = useState<TabType>('working-hours');
@@ -80,8 +90,8 @@ export default function DoctorSchedule() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<DoctorSchedule | null>(null);
-  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
-  const [deactivatingSchedule, setDeactivatingSchedule] = useState<DoctorSchedule | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingSchedule, setDeletingSchedule] = useState<DoctorSchedule | null>(null);
   const [formData, setFormData] = useState<ScheduleFormData>({
     dayOfWeek: 1,
     startTime: '08:00',
@@ -123,16 +133,18 @@ export default function DoctorSchedule() {
   const [showBreakDayPicker, setShowBreakDayPicker] = useState(false);
   const [showBreakEditDayPicker, setShowBreakEditDayPicker] = useState(false);
 
+  // Capacity states
+  const [capacityData, setCapacityData] = useState<DoctorCapacity | null>(null);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [configuredCapacity, setConfiguredCapacity] = useState<number | ''>('');
+  const [showCapacityDatePicker, setShowCapacityDatePicker] = useState(false);
+  const [capacityLoading, setCapacityLoading] = useState(false);
+
   // Date picker states
   const [showExceptionStartDatePicker, setShowExceptionStartDatePicker] = useState(false);
   const [showExceptionEditStartDatePicker, setShowExceptionEditStartDatePicker] = useState(false);
 
   useEffect(() => {
-    // Load token from localStorage
-    const token = localStorage.getItem('token');
-    if (token) {
-      apiClient.setToken(token);
-    }
     fetchSchedules();
     fetchUnavailability();
     fetchBreakPeriods();
@@ -160,6 +172,7 @@ export default function DoctorSchedule() {
     setShowBreakEditDayPicker(false);
     setShowExceptionStartDatePicker(false);
     setShowExceptionEditStartDatePicker(false);
+    setShowCapacityDatePicker(false);
   };
 
   const fetchSchedules = async () => {
@@ -252,33 +265,20 @@ export default function DoctorSchedule() {
     }
   };
 
-  const handleDeactivate = async () => {
-    if (!deactivatingSchedule) return;
+  const handleDeleteSchedule = async () => {
+    if (!deletingSchedule) return;
 
     setError(null);
     setSuccess(null);
 
-    const response = await apiClient.patch<DoctorSchedule>(`/doctors/me/schedules/${deactivatingSchedule.id}/deactivate`, {});
+    const response = await apiClient.delete<DoctorSchedule>(`/doctors/me/schedules/${deletingSchedule.id}`);
     if (response.success && response.data) {
-      setSuccess('Schedule deactivated successfully');
-      setShowDeactivateModal(false);
-      setDeactivatingSchedule(null);
+      setSuccess('Schedule deleted successfully');
+      setShowDeleteModal(false);
+      setDeletingSchedule(null);
       fetchSchedules();
     } else {
-      setError(response.error || 'Failed to deactivate schedule');
-    }
-  };
-
-  const handleReactivate = async (schedule: DoctorSchedule) => {
-    setError(null);
-    setSuccess(null);
-
-    const response = await apiClient.patch<DoctorSchedule>(`/doctors/me/schedules/${schedule.id}/reactivate`, {});
-    if (response.success && response.data) {
-      setSuccess('Schedule reactivated successfully');
-      fetchSchedules();
-    } else {
-      setError(response.error || 'Failed to reactivate schedule');
+      setError(response.error || 'Failed to delete schedule');
     }
   };
 
@@ -293,9 +293,9 @@ export default function DoctorSchedule() {
     setShowEditModal(true);
   };
 
-  const openDeactivateModal = (schedule: DoctorSchedule) => {
-    setDeactivatingSchedule(schedule);
-    setShowDeactivateModal(true);
+  const openDeleteModal = (schedule: DoctorSchedule) => {
+    setDeletingSchedule(schedule);
+    setShowDeleteModal(true);
   };
 
   // Exception handlers
@@ -479,6 +479,64 @@ export default function DoctorSchedule() {
   const openBreakDeleteModal = (breakPeriod: DoctorBreakPeriod) => {
     setDeletingBreak(breakPeriod);
     setShowBreakDeleteModal(true);
+  };
+
+  // Capacity handlers
+  const fetchCapacity = async (date: string) => {
+    if (!date) return;
+    
+    setCapacityLoading(true);
+    setError(null);
+    
+    const response = await apiClient.get<DoctorCapacity>(`/doctors/me/capacity?date=${date}`);
+    if (response.success && response.data) {
+      setCapacityData(response.data);
+      setConfiguredCapacity(response.data.configured_capacity ?? '');
+    } else {
+      setError(response.error || 'Failed to fetch capacity data');
+      setCapacityData(null);
+    }
+    setCapacityLoading(false);
+  };
+
+  const handleDateChange = (date: string) => {
+    setSelectedDate(date);
+    if (date) {
+      fetchCapacity(date);
+    } else {
+      setCapacityData(null);
+      setConfiguredCapacity('');
+    }
+  };
+
+  const handleConfiguredCapacityChange = (value: string) => {
+    const numValue = value === '' ? '' : parseInt(value);
+    if (numValue === '' || (capacityData && numValue <= capacityData.calculated_capacity)) {
+      setConfiguredCapacity(numValue);
+    }
+  };
+
+  const handleSaveCapacity = async () => {
+    if (!selectedDate) return;
+
+    setCapacityLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    const payload = {
+      date: selectedDate,
+      configuredCapacity: configuredCapacity === '' ? null : configuredCapacity,
+    };
+
+    const response = await apiClient.post<DoctorCapacity>(`/doctors/me/capacity/${selectedDate}`, payload);
+    if (response.success && response.data) {
+      setSuccess('Capacity updated successfully');
+      setCapacityData(response.data);
+      setConfiguredCapacity(response.data.configured_capacity ?? '');
+    } else {
+      setError(response.error || 'Failed to update capacity');
+    }
+    setCapacityLoading(false);
   };
 
   const formatTime = (time: string) => {
@@ -749,6 +807,19 @@ export default function DoctorSchedule() {
               </span>
             </span>
           </button>
+          <button
+            onClick={() => setActiveTab('capacity')}
+            className={`flex-1 px-6 py-4 font-semibold text-sm transition-all ${
+              activeTab === 'capacity'
+                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <span className="flex items-center justify-center gap-2">
+              <span className="material-symbols-outlined text-[20px]">analytics</span>
+              Capacity
+            </span>
+          </button>
         </div>
       </div>
 
@@ -851,45 +922,22 @@ export default function DoctorSchedule() {
                             </div>
 
                             <div className="flex items-center gap-2 mt-3 sm:mt-0">
-                              {schedule.is_active ? (
-                                <>
-                                  <button
-                                    onClick={() => openEditModal(schedule)}
-                                    className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold flex items-center gap-2 transition-all transform hover:scale-105"
-                                    title="Edit"
-                                  >
-                                    <span className="material-symbols-outlined text-[18px]">edit</span>
-                                    <span>Edit</span>
-                                  </button>
-                                  <button
-                                    onClick={() => openDeactivateModal(schedule)}
-                                    className="h-10 px-4 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105"
-                                    title="Deactivate"
-                                  >
-                                    <span className="material-symbols-outlined text-[18px]">pause_circle</span>
-                                    <span>Deactivate</span>
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => handleReactivate(schedule)}
-                                    className="h-10 px-4 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105"
-                                    title="Reactivate"
-                                  >
-                                    <span className="material-symbols-outlined text-[18px]">play_circle</span>
-                                    <span>Reactivate</span>
-                                  </button>
-                                  <button
-                                    onClick={() => openEditModal(schedule)}
-                                    className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold flex items-center gap-2 transition-all transform hover:scale-105"
-                                    title="Edit"
-                                  >
-                                    <span className="material-symbols-outlined text-[18px]">edit</span>
-                                    <span>Edit</span>
-                                  </button>
-                                </>
-                              )}
+                              <button
+                                onClick={() => openEditModal(schedule)}
+                                className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold flex items-center gap-2 transition-all transform hover:scale-105"
+                                title="Edit"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">edit</span>
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                onClick={() => openDeleteModal(schedule)}
+                                className="h-10 px-4 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105"
+                                title="Delete"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                                <span>Delete</span>
+                              </button>
                             </div>
                           </div>
                         );
@@ -1090,6 +1138,162 @@ export default function DoctorSchedule() {
                 </div>
               );
             })
+          )}
+        </div>
+      </div>
+      )}
+
+      {/* Capacity Tab */}
+      {activeTab === 'capacity' && (
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
+        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+          <h2 className="text-xl font-bold text-slate-800">Daily Capacity Management</h2>
+          <p className="text-sm text-slate-500 mt-1">View and manage your daily consultation capacity</p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Consultation Duration */}
+          <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shadow-md">
+              <span className="material-symbols-outlined text-[24px]">schedule</span>
+            </div>
+            <div className="flex-1">
+              <div className="text-sm text-slate-500 font-medium">Consultation Duration</div>
+              <div className="text-2xl font-bold text-slate-800">30 minutes</div>
+            </div>
+            <div className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm font-semibold">
+              Fixed
+            </div>
+          </div>
+
+          {/* Date Picker */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Select Date</label>
+            <DatePicker
+              value={selectedDate}
+              onChange={handleDateChange}
+              showPicker={showCapacityDatePicker}
+              setShowPicker={setShowCapacityDatePicker}
+            />
+          </div>
+
+          {/* Capacity Details */}
+          {capacityData && (
+            <div className="space-y-4">
+              {/* 5-Metric Responsive Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                {/* Calculated Capacity */}
+                <div className="p-3.5 bg-gradient-to-br from-emerald-50/80 to-teal-50/50 rounded-xl border border-emerald-100/80 shadow-sm">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                      <span className="material-symbols-outlined text-[16px]">calculate</span>
+                    </div>
+                    <div className="text-xs text-slate-600 font-semibold truncate">Calculated</div>
+                  </div>
+                  <div className="text-2xl font-bold text-slate-800">{capacityData.calculated_capacity}</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5 truncate">From working hours</div>
+                </div>
+
+                {/* Configured Capacity */}
+                <div className="p-3.5 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 rounded-xl border border-blue-100/80 shadow-sm">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                      <span className="material-symbols-outlined text-[16px]">tune</span>
+                    </div>
+                    <div className="text-xs text-slate-600 font-semibold truncate">Configured</div>
+                  </div>
+                  <div className="text-2xl font-bold text-slate-800">
+                    {capacityData.configured_capacity ?? 'Not set'}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5 truncate">Optional limit</div>
+                </div>
+
+                {/* Final Capacity */}
+                <div className="p-3.5 bg-gradient-to-br from-purple-50/80 to-violet-50/50 rounded-xl border border-purple-100/80 shadow-sm">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                      <span className="material-symbols-outlined text-[16px]">verified</span>
+                    </div>
+                    <div className="text-xs text-slate-600 font-semibold truncate">Final Limit</div>
+                  </div>
+                  <div className="text-2xl font-bold text-slate-800">{capacityData.final_capacity}</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5 truncate">Enforced limit</div>
+                </div>
+
+                {/* Registered Count */}
+                <div className="p-3.5 bg-gradient-to-br from-amber-50/80 to-orange-50/50 rounded-xl border border-amber-100/80 shadow-sm">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                      <span className="material-symbols-outlined text-[16px]">event_available</span>
+                    </div>
+                    <div className="text-xs text-slate-600 font-semibold truncate">Registered</div>
+                  </div>
+                  <div className="text-2xl font-bold text-slate-800">{capacityData.registered_count}</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5 truncate">Booked reservations</div>
+                </div>
+
+                {/* Remaining Capacity */}
+                <div className={`p-3.5 rounded-xl border shadow-sm ${
+                  capacityData.remaining_capacity > 0
+                    ? 'bg-gradient-to-br from-emerald-50/80 to-green-50/50 border-emerald-200/80'
+                    : 'bg-gradient-to-br from-rose-50/80 to-red-50/50 border-rose-200/80'
+                }`}>
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className={`w-8 h-8 rounded-lg text-white flex items-center justify-center shadow-xs shrink-0 ${
+                      capacityData.remaining_capacity > 0
+                        ? 'bg-gradient-to-br from-emerald-500 to-green-600'
+                        : 'bg-gradient-to-br from-rose-500 to-red-600'
+                    }`}>
+                      <span className="material-symbols-outlined text-[16px]">hourglass_empty</span>
+                    </div>
+                    <div className="text-xs text-slate-600 font-semibold truncate">Remaining</div>
+                  </div>
+                  <div className={`text-2xl font-bold ${
+                    capacityData.remaining_capacity > 0 ? 'text-slate-800' : 'text-red-600'
+                  }`}>
+                    {capacityData.remaining_capacity}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5 truncate">Available slots</div>
+                </div>
+              </div>
+
+              {/* Configured Capacity Input Panel */}
+              <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200/80 max-w-xl">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Set Configured Capacity (Optional)
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    value={configuredCapacity}
+                    onChange={(e) => handleConfiguredCapacityChange(e.target.value)}
+                    className="w-44 px-3.5 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-semibold text-slate-800 bg-white shadow-sm hover:border-slate-400 transition-all"
+                    min="0"
+                    max={capacityData.calculated_capacity}
+                    placeholder={`Max: ${capacityData.calculated_capacity}`}
+                  />
+                  <button
+                    onClick={handleSaveCapacity}
+                    disabled={capacityLoading}
+                    className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all transform hover:scale-102 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">save</span>
+                    <span>{capacityLoading ? 'Saving...' : 'Save'}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  Leave empty to use calculated capacity ({capacityData.calculated_capacity})
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!capacityData && selectedDate && capacityLoading && (
+            <div className="p-8 text-center text-slate-500">Loading capacity data...</div>
+          )}
+
+          {!capacityData && !selectedDate && (
+            <div className="p-8 text-center text-slate-500">Select a date to view capacity information</div>
           )}
         </div>
       </div>
@@ -1408,29 +1612,29 @@ export default function DoctorSchedule() {
         </div>
       )}
 
-      {/* Deactivate Confirmation Modal */}
-      {showDeactivateModal && deactivatingSchedule && (
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deletingSchedule && (
         <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
-            <h3 className="text-2xl font-bold text-slate-800 mb-3">Deactivate Schedule</h3>
+            <h3 className="text-2xl font-bold text-slate-800 mb-3">Delete Schedule</h3>
             <p className="text-slate-600 mb-8 text-base">
-              Are you sure you want to deactivate this schedule? It will no longer be available for patient bookings.
+              Are you sure you want to delete this schedule? It will be permanently removed.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  setShowDeactivateModal(false);
-                  setDeactivatingSchedule(null);
+                  setShowDeleteModal(false);
+                  setDeletingSchedule(null);
                 }}
                 className="flex-1 px-6 py-3 border-2 border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 hover:border-slate-300 font-semibold transition-all"
               >
                 Cancel
               </button>
               <button
-                onClick={handleDeactivate}
+                onClick={handleDeleteSchedule}
                 className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
               >
-                Deactivate
+                Delete
               </button>
             </div>
           </div>
