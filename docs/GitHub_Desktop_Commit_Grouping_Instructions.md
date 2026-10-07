@@ -40,13 +40,13 @@ These instructions are intended for **GitHub Desktop / the GitHub app**, where f
 
 8. All commit titles MUST follow this exact format:
 
-   `[Flores][type] title`
+   `[Balberona][type] title`
 
    Examples:
-   - `[Flores][feat] add admin dashboard`
-   - `[Flores][fix] resolve appointment status update`
-   - `[Flores][refactor] reorganize doctor API routes`
-   - `[Flores][docs] update database documentation`
+   - `[Balberona][feat] add admin dashboard`
+   - `[Balberona][fix] resolve appointment status update`
+   - `[Balberona][refactor] reorganize doctor API routes`
+   - `[Balberona][docs] update database documentation`
 
 9. Use an appropriate commit type:
    - `feat` — new functionality
