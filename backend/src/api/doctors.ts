@@ -351,8 +351,8 @@ router.put('/me/schedules/:id', authenticate, authorize('DOCTOR'), async (req: A
   }
 });
 
-// Deactivate schedule for authenticated doctor (soft delete)
-router.patch('/me/schedules/:id/deactivate', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+// Delete schedule for authenticated doctor
+router.delete('/me/schedules/:id', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -378,19 +378,16 @@ router.patch('/me/schedules/:id/deactivate', authenticate, authorize('DOCTOR'), 
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Schedule not found or access denied'));
     }
 
-    // Deactivate schedule
+    // Delete schedule
     const result = await query(
-      `UPDATE doctor_schedules
-       SET is_active = false, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 AND doctor_id = $2
-       RETURNING *`,
+      `DELETE FROM doctor_schedules WHERE id = $1 AND doctor_id = $2 RETURNING *`,
       [id, doctorId]
     );
 
-    res.json(success(result.rows[0], 'Schedule deactivated successfully'));
+    res.json(success(result.rows[0], 'Schedule deleted successfully'));
   } catch (err: any) {
-    console.error('Schedule deactivation error:', err);
-    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to deactivate schedule'));
+    console.error('Schedule deletion error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete schedule'));
   }
 });
 
@@ -477,13 +474,22 @@ router.get('/:id/availability', async (req: any, res: Response) => {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start date and end date are required'));
     }
 
-    // Get unavailability periods
+    // Get active unavailability periods (exceptions)
     const unavailabilityResult = await query(
       `SELECT * FROM doctor_unavailability
-       WHERE doctor_id = $1
+       WHERE doctor_id = $1 AND is_active = true
        AND (start_date <= $2 AND end_date >= $3)
        ORDER BY start_date`,
       [id, endDate, startDate]
+    );
+
+    // Get active break periods for the date range
+    const breakPeriodsResult = await query(
+      `SELECT * FROM doctor_break_periods
+       WHERE doctor_id = $1 AND is_active = true
+       AND break_date >= $2 AND break_date <= $3
+       ORDER BY break_date, start_time`,
+      [id, startDate, endDate]
     );
 
     // Get daily capacities
@@ -497,6 +503,7 @@ router.get('/:id/availability', async (req: any, res: Response) => {
 
     res.json(success({
       unavailability: unavailabilityResult.rows,
+      breakPeriods: breakPeriodsResult.rows,
       capacities: capacityResult.rows,
     }));
   } catch (err: any) {
@@ -742,6 +749,575 @@ router.put('/me/two-factor', authenticate, authorize('DOCTOR'), async (req: Auth
   } catch (err: any) {
     console.error('Doctor 2FA setting update error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update two-factor setting'));
+  }
+});
+
+// ============================================
+// DOCTOR UNAVAILABILITY (EXCEPTIONS) ENDPOINTS
+// ============================================
+
+// Get authenticated doctor's unavailability periods (exceptions)
+router.get('/me/unavailability', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+    const { includeInactive } = req.query;
+
+    let queryText = 'SELECT * FROM doctor_unavailability WHERE doctor_id = $1';
+    const params = [doctorId];
+
+    if (includeInactive !== 'true') {
+      queryText += ' AND is_active = true';
+    }
+
+    queryText += ' ORDER BY start_date';
+
+    const result = await query(queryText, params);
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor unavailability periods'));
+  }
+});
+
+// Create unavailability period (exception) for authenticated doctor
+router.post('/me/unavailability', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { startDate, endDate, reason } = req.body;
+
+    // Validation
+    if (!startDate || !endDate) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'startDate and endDate are required'));
+    }
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await client.query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Validate date format
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+
+    if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid date format'));
+    }
+
+    // Validate start date <= end date
+    if (startDateObj > endDateObj) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start date must be before or equal to end date'));
+    }
+
+    // Create unavailability period
+    const result = await client.query(
+      `INSERT INTO doctor_unavailability (doctor_id, start_date, end_date, reason, is_active)
+       VALUES ($1, $2, $3, $4, true)
+       RETURNING *`,
+      [doctorId, startDate, endDate, reason || null]
+    );
+
+    await client.query('COMMIT');
+
+    res.status(201).json(success(result.rows[0], 'Unavailability period created successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Unavailability creation error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create unavailability period'));
+  } finally {
+    client.release();
+  }
+});
+
+// Update unavailability period for authenticated doctor
+router.put('/me/unavailability/:id', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const { startDate, endDate, reason } = req.body;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await client.query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Verify the unavailability period belongs to the authenticated doctor
+    const unavailabilityResult = await client.query(
+      'SELECT * FROM doctor_unavailability WHERE id = $1 AND doctor_id = $2',
+      [id, doctorId]
+    );
+
+    if (unavailabilityResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Unavailability period not found or access denied'));
+    }
+
+    // Validation
+    if (!startDate || !endDate) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'startDate and endDate are required'));
+    }
+
+    // Validate date format
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+
+    if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid date format'));
+    }
+
+    // Validate start date <= end date
+    if (startDateObj > endDateObj) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start date must be before or equal to end date'));
+    }
+
+    // Update unavailability period
+    const result = await client.query(
+      `UPDATE doctor_unavailability
+       SET start_date = $1, end_date = $2, reason = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 AND doctor_id = $5
+       RETURNING *`,
+      [startDate, endDate, reason || null, id, doctorId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json(success(result.rows[0], 'Unavailability period updated successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Unavailability update error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update unavailability period'));
+  } finally {
+    client.release();
+  }
+});
+
+// Delete unavailability period
+router.delete('/me/unavailability/:id', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await client.query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Verify the unavailability period belongs to the authenticated doctor and delete it
+    const result = await client.query(
+      `DELETE FROM doctor_unavailability WHERE id = $1 AND doctor_id = $2 RETURNING *`,
+      [id, doctorId]
+    );
+
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Unavailability period not found or access denied'));
+    }
+
+    await client.query('COMMIT');
+
+    res.json(success(result.rows[0], 'Unavailability period deleted successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Unavailability deletion error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete unavailability period'));
+  } finally {
+    client.release();
+  }
+});
+
+// ============================================
+// DOCTOR BREAK PERIODS ENDPOINTS
+// ============================================
+
+// Get authenticated doctor's break periods
+router.get('/me/break-periods', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+    const { includeInactive, startDate, endDate } = req.query;
+
+    let queryText = 'SELECT * FROM doctor_break_periods WHERE doctor_id = $1';
+    const params = [doctorId];
+
+    if (includeInactive !== 'true') {
+      queryText += ' AND is_active = true';
+    }
+
+    if (startDate) {
+      queryText += ' AND break_date >= $2';
+      params.push(String(startDate));
+    }
+
+    if (endDate) {
+      const paramIndex = params.length + 1;
+      queryText += ` AND break_date <= $${paramIndex}`;
+      params.push(String(endDate));
+    }
+
+    queryText += ' ORDER BY break_date, start_time';
+
+    const result = await query(queryText, params);
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor break periods'));
+  }
+});
+
+// Create break period for authenticated doctor
+router.post('/me/break-periods', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { breakDate, startTime, endTime, reason } = req.body;
+
+    // Validation
+    if (!breakDate || !startTime || !endTime) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'breakDate, startTime, and endTime are required'));
+    }
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await client.query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Validate date format
+    const breakDateObj = new Date(breakDate);
+    if (isNaN(breakDateObj.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid break date format'));
+    }
+
+    // Validate time format
+    const startTimeDate = new Date(`2000-01-01T${startTime}`);
+    const endTimeDate = new Date(`2000-01-01T${endTime}`);
+
+    if (isNaN(startTimeDate.getTime()) || isNaN(endTimeDate.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid time format. Use HH:MM format'));
+    }
+
+    // Validate start time < end time
+    if (startTimeDate >= endTimeDate) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start time must be before end time'));
+    }
+
+    // Get day of week for the break date
+    const dayOfWeek = breakDateObj.getDay();
+
+    // Get working hours for this day
+    const scheduleResult = await client.query(
+      `SELECT start_time, end_time FROM doctor_schedules
+       WHERE doctor_id = $1 AND day_of_week = $2 AND is_active = true`,
+      [doctorId, dayOfWeek]
+    );
+
+    if (scheduleResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'No working hours defined for this date'));
+    }
+
+    // Validate break falls completely within at least one working hour block
+    let breakWithinWorkingHours = false;
+    for (const schedule of scheduleResult.rows) {
+      const scheduleStart = new Date(`2000-01-01T${schedule.start_time}`);
+      const scheduleEnd = new Date(`2000-01-01T${schedule.end_time}`);
+
+      if (startTimeDate >= scheduleStart && endTimeDate <= scheduleEnd) {
+        breakWithinWorkingHours = true;
+        break;
+      }
+    }
+
+    if (!breakWithinWorkingHours) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Break period must fall completely within working hours'));
+    }
+
+    // Check for overlapping break periods on the same date
+    const overlapResult = await client.query(
+      `SELECT * FROM doctor_break_periods
+       WHERE doctor_id = $1 AND break_date = $2 AND is_active = true
+       AND (
+         (start_time < $3 AND end_time > $3) OR
+         (start_time < $4 AND end_time > $4) OR
+         (start_time >= $3 AND end_time <= $4)
+       )`,
+      [doctorId, breakDate, startTime, endTime]
+    );
+
+    if (overlapResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Break period overlaps with an existing break'));
+    }
+
+    // Create break period
+    const result = await client.query(
+      `INSERT INTO doctor_break_periods (doctor_id, break_date, start_time, end_time, reason, is_active)
+       VALUES ($1, $2, $3, $4, $5, true)
+       RETURNING *`,
+      [doctorId, breakDate, startTime, endTime, reason || null]
+    );
+
+    await client.query('COMMIT');
+
+    res.status(201).json(success(result.rows[0], 'Break period created successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Break period creation error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create break period'));
+  } finally {
+    client.release();
+  }
+});
+
+// Update break period for authenticated doctor
+router.put('/me/break-periods/:id', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const { breakDate, startTime, endTime, reason } = req.body;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await client.query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Verify the break period belongs to the authenticated doctor
+    const breakResult = await client.query(
+      'SELECT * FROM doctor_break_periods WHERE id = $1 AND doctor_id = $2',
+      [id, doctorId]
+    );
+
+    if (breakResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Break period not found or access denied'));
+    }
+
+    // Validation
+    if (!breakDate || !startTime || !endTime) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'breakDate, startTime, and endTime are required'));
+    }
+
+    // Validate date format
+    const breakDateObj = new Date(breakDate);
+    if (isNaN(breakDateObj.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid break date format'));
+    }
+
+    // Validate time format
+    const startTimeDate = new Date(`2000-01-01T${startTime}`);
+    const endTimeDate = new Date(`2000-01-01T${endTime}`);
+
+    if (isNaN(startTimeDate.getTime()) || isNaN(endTimeDate.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid time format. Use HH:MM format'));
+    }
+
+    // Validate start time < end time
+    if (startTimeDate >= endTimeDate) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start time must be before end time'));
+    }
+
+    // Get day of week for the break date
+    const dayOfWeek = breakDateObj.getDay();
+
+    // Get working hours for this day
+    const scheduleResult = await client.query(
+      `SELECT start_time, end_time FROM doctor_schedules
+       WHERE doctor_id = $1 AND day_of_week = $2 AND is_active = true`,
+      [doctorId, dayOfWeek]
+    );
+
+    if (scheduleResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'No working hours defined for this date'));
+    }
+
+    // Validate break falls completely within at least one working hour block
+    let breakWithinWorkingHours = false;
+    for (const schedule of scheduleResult.rows) {
+      const scheduleStart = new Date(`2000-01-01T${schedule.start_time}`);
+      const scheduleEnd = new Date(`2000-01-01T${schedule.end_time}`);
+
+      if (startTimeDate >= scheduleStart && endTimeDate <= scheduleEnd) {
+        breakWithinWorkingHours = true;
+        break;
+      }
+    }
+
+    if (!breakWithinWorkingHours) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Break period must fall completely within working hours'));
+    }
+
+    // Check for overlapping break periods on the same date (excluding current break)
+    const overlapResult = await client.query(
+      `SELECT * FROM doctor_break_periods
+       WHERE doctor_id = $1 AND break_date = $2 AND is_active = true AND id != $3
+       AND (
+         (start_time < $4 AND end_time > $4) OR
+         (start_time < $5 AND end_time > $5) OR
+         (start_time >= $4 AND end_time <= $5)
+       )`,
+      [doctorId, breakDate, id, startTime, endTime]
+    );
+
+    if (overlapResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Break period overlaps with an existing break'));
+    }
+
+    // Update break period
+    const result = await client.query(
+      `UPDATE doctor_break_periods
+       SET break_date = $1, start_time = $2, end_time = $3, reason = $4, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5 AND doctor_id = $6
+       RETURNING *`,
+      [breakDate, startTime, endTime, reason || null, id, doctorId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json(success(result.rows[0], 'Break period updated successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Break period update error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update break period'));
+  } finally {
+    client.release();
+  }
+});
+
+// Delete break period
+router.delete('/me/break-periods/:id', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await client.query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Verify the break period belongs to the authenticated doctor and delete it
+    const result = await client.query(
+      `DELETE FROM doctor_break_periods WHERE id = $1 AND doctor_id = $2 RETURNING *`,
+      [id, doctorId]
+    );
+
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Break period not found or access denied'));
+    }
+
+    await client.query('COMMIT');
+
+    res.json(success(result.rows[0], 'Break period deleted successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Break period deletion error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete break period'));
+  } finally {
+    client.release();
   }
 });
 
