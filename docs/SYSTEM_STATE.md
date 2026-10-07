@@ -70,3 +70,14 @@ Current System State (October 2026):
 - Database migration `016_allow_multiple_schedules_per_day.sql` removes UNIQUE constraint on (doctor_id, day_of_week) to support multiple shift blocks per day (e.g., morning and afternoon shifts)
 - Doctor schedule deactivation uses soft delete (sets is_active = false) instead of permanent deletion
 - Web schedule page at `/doctor/schedule` provides full UI for managing working hours with KPI cards, weekly schedule display, and modals for add/edit/deactivate operations
+- Database migration `017_add_doctor_break_periods.sql` adds `doctor_break_periods` table for break period management and adds `is_active` and `updated_at` columns to `doctor_unavailability` table for soft delete support
+- Backend API endpoints for doctor unavailability (exceptions): `GET /api/v1/doctors/me/unavailability` (authenticated, supports includeInactive query param), `POST /api/v1/doctors/me/unavailability` (create), `PUT /api/v1/doctors/me/unavailability/:id` (update), `PATCH /api/v1/doctors/me/unavailability/:id/deactivate` (soft delete), `PATCH /api/v1/doctors/me/unavailability/:id/reactivate` (reactivate)
+- Backend API endpoints for doctor break periods: `GET /api/v1/doctors/me/break-periods` (authenticated, supports includeInactive, startDate, endDate query params), `POST /api/v1/doctors/me/break-periods` (create), `PUT /api/v1/doctors/me/break-periods/:id` (update), `PATCH /api/v1/doctors/me/break-periods/:id/deactivate` (soft delete), `PATCH /api/v1/doctors/me/break-periods/:id/reactivate` (reactivate)
+- Doctor unavailability validation enforces: start date <= end date, valid date format, doctors can only access their own exceptions
+- Doctor break period validation enforces: start time < end time, valid time format, break must fall completely within working hours for the specific date, no overlapping breaks on the same date, doctors can only access their own breaks
+- Extended `GET /api/v1/doctors/:id/availability` endpoint to include active unavailability periods (exceptions) and active break periods in the response
+- Web schedule page at `/doctor/schedule` now includes tabbed interface with three tabs: Working Hours, Exceptions, and Break Periods
+- Web schedule page allows doctors to add, view, edit, deactivate, and reactivate date-specific exceptions (doctor leave, clinic closure, full-day unavailability)
+- Web schedule page allows doctors to add, view, edit, deactivate, and reactivate break periods within working hours (e.g., lunch breaks)
+- Inactive exceptions and break periods are visually distinguished and can be reactivated
+- Active exceptions remove availability for the affected date range; active break periods remove availability for the affected time periods on specific dates
