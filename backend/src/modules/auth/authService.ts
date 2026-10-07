@@ -140,12 +140,8 @@ export async function login(data: LoginData) {
         };
       }
 
-      if (approvalStatus === 'REJECTED') {
-        throw {
-          code: ErrorCodes.DOCTOR_REJECTED,
-          message: 'Your doctor account has not been approved and you cannot sign in'
-        };
-      }
+      // REJECTED doctors are allowed to authenticate to correct and resubmit their profile
+      // They will be routed to /doctor-profile based on their approval_status
     }
   }
 

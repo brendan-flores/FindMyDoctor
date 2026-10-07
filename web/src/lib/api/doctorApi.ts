@@ -18,6 +18,8 @@ export interface DoctorProfile {
   languages_spoken?: string | null;
   profile_completion_status?: 'INCOMPLETE' | 'COMPLETE' | 'SUBMITTED';
   profile_submitted_at?: string | null;
+  approval_status?: 'PENDING' | 'REJECTED' | 'ACTIVE';
+  rejection_reason?: string | null;
 }
 
 export interface UpdateProfileRequest {

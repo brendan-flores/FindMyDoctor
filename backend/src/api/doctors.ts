@@ -18,7 +18,7 @@ router.get('/me', authenticate, authorize('DOCTOR'), async (req: AuthRequest, re
         d.contact_number, d.professional_photo_url, d.years_of_experience, d.areas_of_expertise,
         d.biography, d.consultation_fee, d.consultation_type, d.languages_spoken,
         d.two_factor_enabled, d.is_approved, d.approval_status, d.profile_completion_status,
-        d.profile_submitted_at
+        d.profile_submitted_at, d.rejection_reason
        FROM doctors d
        WHERE d.user_id = $1`,
       [userId]
@@ -68,7 +68,9 @@ router.get('/', async (req: any, res: Response) => {
         d.biography, d.consultation_fee, d.is_approved, d.approval_status,
         d.practice_name, d.practice_address, d.practice_latitude, d.practice_longitude,
         d.practice_phone, d.practice_email, d.practice_description,
-        d.operating_hours_start, d.operating_hours_end
+        d.operating_hours_start, d.operating_hours_end,
+        d.professional_photo_url, d.years_of_experience, d.areas_of_expertise,
+        d.consultation_type, d.languages_spoken
       FROM doctors d
       WHERE d.approval_status = 'ACTIVE'
     `;
@@ -91,22 +93,29 @@ router.get('/', async (req: any, res: Response) => {
 
     const result = await query(queryText, params);
 
+    // Privacy: PRC license number, contact_number, and email are not selected from the database
     res.json(success(result.rows));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctors'));
   }
 });
 
-// Get doctor by ID
+// Get doctor by ID (public endpoint - privacy-aware)
 router.get('/:id', async (req: any, res: Response) => {
   try {
     const { id } = req.params;
 
     const result = await query(
       `SELECT
-        d.*
+        d.id, d.first_name, d.middle_name, d.last_name, d.specialty, d.credentials,
+        d.biography, d.consultation_fee, d.is_approved, d.approval_status,
+        d.practice_name, d.practice_address, d.practice_latitude, d.practice_longitude,
+        d.practice_phone, d.practice_email, d.practice_description,
+        d.operating_hours_start, d.operating_hours_end,
+        d.professional_photo_url, d.years_of_experience, d.areas_of_expertise,
+        d.consultation_type, d.languages_spoken
        FROM doctors d
-       WHERE d.id = $1`,
+       WHERE d.id = $1 AND d.approval_status = 'ACTIVE'`,
       [id]
     );
 
@@ -114,6 +123,7 @@ router.get('/:id', async (req: any, res: Response) => {
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor not found'));
     }
 
+    // Privacy: PRC license number, contact_number, and email are not selected from the database
     res.json(success(result.rows[0]));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor'));
@@ -885,12 +895,18 @@ router.post('/me/profile/submit', authenticate, authorize('DOCTOR'), async (req:
       );
     }
 
+    // If the doctor was REJECTED, restore them to PENDING status on resubmission
+    // This allows rejected doctors to correct their profile and resubmit for review
+    const wasRejected = doctor.approval_status === 'REJECTED';
+
     // Update profile completion status to SUBMITTED
+    // If resubmitting from REJECTED, also restore approval_status to PENDING and clear rejection_reason
     const result = await client.query(
       `UPDATE doctors
        SET profile_completion_status = 'SUBMITTED',
            profile_submitted_at = CURRENT_TIMESTAMP,
            updated_at = CURRENT_TIMESTAMP
+           ${wasRejected ? ', approval_status = \'PENDING\', rejection_reason = NULL' : ''}
        WHERE user_id = $1
        RETURNING *`,
       [userId]

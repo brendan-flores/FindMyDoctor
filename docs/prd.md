@@ -726,6 +726,24 @@ Patients shall be able to search for doctors.
 
 The system shall display doctor information.
 
+## FR-005-A — Doctor Rejection and Resubmission
+
+The system shall support a doctor rejection and resubmission workflow:
+
+1. Administrators shall be able to reject doctor applications with a required rejection reason.
+2. Rejected doctors shall have `approval_status = 'REJECTED'` and a stored `rejection_reason`.
+3. Rejected doctors shall be able to authenticate to the system specifically to correct and resubmit their application.
+4. Rejected doctors shall not be able to access the Doctor Dashboard or appear in public doctor search while in REJECTED status.
+5. Rejected doctors shall be able to view their rejection reason through the doctor profile endpoint.
+6. Rejected doctors shall be able to edit their professional profile fields and schedule.
+7. Rejected doctors shall be able to resubmit their profile for review.
+8. On successful resubmission, the doctor's `approval_status` shall be restored to 'PENDING' and `rejection_reason` shall be cleared.
+9. Administrators shall not be able to directly approve a REJECTED doctor; the doctor must resubmit first.
+10. The doctor profile page shall display a rejection banner with the reason when in REJECTED status.
+11. The doctor profile page shall allow editing and resubmission when in REJECTED status, even if `profile_completion_status === 'SUBMITTED'`.
+12. The doctor login page shall route authenticated doctors based on approval_status: ACTIVE → dashboard, REJECTED → profile page.
+13. PENDING doctors shall not be able to log in while awaiting administrator approval.
+
 ## FR-006 — Availability
 
 The system shall display available consultation schedules.

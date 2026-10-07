@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
+import { doctorApi } from '@/lib/api/doctorApi';
 import OtpVerification from '@/components/auth/OtpVerification';
 
 export default function DoctorLogin() {
@@ -42,7 +43,7 @@ export default function DoctorLogin() {
         apiClient.setToken(authData.accessToken);
 
         if (authData.user.role === 'DOCTOR') {
-          router.push('/doctor/dashboard');
+          await routeBasedOnApprovalStatus();
         } else {
           setError('Invalid username or password.');
           localStorage.removeItem('token');
@@ -60,9 +61,9 @@ export default function DoctorLogin() {
     }
   };
 
-  const handleOtpVerifySuccess = (data: any) => {
+  const handleOtpVerifySuccess = async (data: any) => {
     if (data.user.role === 'DOCTOR') {
-      router.push('/doctor/dashboard');
+      await routeBasedOnApprovalStatus();
     } else {
       setError('Invalid username or password.');
       localStorage.removeItem('token');
@@ -84,6 +85,49 @@ export default function DoctorLogin() {
 
   const handleChallengeIdUpdate = (newChallengeId: string) => {
     setChallengeId(newChallengeId);
+  };
+
+  const routeBasedOnApprovalStatus = async () => {
+    try {
+      const response = await doctorApi.getProfile();
+
+      if (response.success && response.data) {
+        const approvalStatus = response.data.approval_status;
+
+        if (approvalStatus === 'ACTIVE') {
+          router.push('/doctor/dashboard');
+        } else if (approvalStatus === 'REJECTED') {
+          router.push('/doctor-profile');
+        } else if (approvalStatus === 'PENDING') {
+          // PENDING should not normally reach here since backend blocks login
+          // Handle defensively
+          setError('Your account is awaiting administrator approval');
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          apiClient.clearToken();
+        } else {
+          setError('Invalid account status');
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          apiClient.clearToken();
+        }
+      } else {
+        setError('Failed to fetch profile');
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        apiClient.clearToken();
+      }
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+      setError('An error occurred while fetching your profile');
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      apiClient.clearToken();
+    }
   };
 
   return (

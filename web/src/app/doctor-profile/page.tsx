@@ -253,7 +253,10 @@ export default function DoctorProfile() {
       const response = await doctorApi.submitProfile();
 
       if (response.success) {
-        setSuccessMessage('Profile submitted successfully. Please wait for admin approval.');
+        setSuccessMessage(isRejected
+          ? 'Profile resubmitted successfully. Your application is now pending admin review.'
+          : 'Profile submitted successfully. Please wait for admin approval.'
+        );
         // Reload profile to get updated status
         await loadProfile();
       } else {
@@ -280,6 +283,12 @@ export default function DoctorProfile() {
 
   const isProfileComplete = profile?.profile_completion_status === 'COMPLETE' || profile?.profile_completion_status === 'SUBMITTED';
   const isProfileSubmitted = profile?.profile_completion_status === 'SUBMITTED';
+  const isRejected = profile?.approval_status === 'REJECTED';
+  const isPending = profile?.approval_status === 'PENDING';
+
+  // When REJECTED, allow editing even if profile_completion_status is SUBMITTED
+  const canEdit = !isProfileSubmitted || isRejected;
+  const canSubmit = !isProfileSubmitted || isRejected;
 
   return (
     <div className="min-h-screen bg-[#F3F5F9]">
@@ -325,7 +334,24 @@ export default function DoctorProfile() {
             </div>
 
             {/* Status Banner */}
-            {isProfileSubmitted && (
+            {isRejected && (
+              <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-red-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-semibold text-red-900">Profile Rejected</p>
+                    {profile?.rejection_reason && (
+                      <p className="text-sm text-red-700 mt-1">Reason: {profile.rejection_reason}</p>
+                    )}
+                    <p className="text-sm text-red-700 mt-1">Please correct your profile information and resubmit for approval.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isProfileSubmitted && !isRejected && (
               <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
                 <div className="flex items-start gap-3">
                   <svg className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -574,7 +600,7 @@ export default function DoctorProfile() {
                   <button
                     type="button"
                     onClick={() => setShowScheduleForm(!showScheduleForm)}
-                    disabled={isProfileSubmitted}
+                    disabled={!canEdit}
                     className="text-sm font-semibold text-[#1967D2] hover:text-[#0D3B75] disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
                   >
                     {showScheduleForm ? 'Cancel' : '+ Add Schedule'}
@@ -642,7 +668,7 @@ export default function DoctorProfile() {
                         <button
                           type="button"
                           onClick={() => handleDeleteSchedule(schedule.id)}
-                          disabled={isProfileSubmitted}
+                          disabled={!canEdit}
                           className="text-red-600 hover:text-red-800 disabled:text-gray-400 disabled:cursor-not-allowed text-sm font-medium"
                         >
                           Remove
@@ -660,13 +686,13 @@ export default function DoctorProfile() {
                 <button
                   type="button"
                   onClick={handleSave}
-                  disabled={isSaving || isProfileSubmitted}
+                  disabled={isSaving || !canEdit}
                   className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#1A62CD] hover:bg-[#0D3B75] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1A62CD] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? 'Saving...' : 'Save Profile'}
                 </button>
 
-                {!isProfileSubmitted && (
+                {canSubmit && (
                   <button
                     type="button"
                     onClick={handleSubmit}

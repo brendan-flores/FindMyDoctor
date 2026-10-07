@@ -13,18 +13,29 @@ export interface Doctor {
   email: string;
   emailVerified: boolean;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
+  contactNumber?: string | null;
   specialty: string;
-  credentials?: string;
+  credentials?: string | null;
   prcLicenseNumber: string;
+  practiceName?: string | null;
+  practiceAddress?: string | null;
+  practicePhone?: string | null;
+  practiceEmail?: string | null;
+  professionalPhotoUrl?: string | null;
+  yearsOfExperience?: number | null;
+  areasOfExpertise?: string | null;
+  biography?: string | null;
+  consultationFee?: number | null;
+  consultationType?: string | null;
+  languagesSpoken?: string | null;
   isApproved: boolean;
   approvalStatus?: 'PENDING' | 'ACTIVE' | 'REJECTED';
-  practiceName?: string;
-  practiceAddress?: string;
+  profileCompletionStatus?: 'INCOMPLETE' | 'COMPLETE' | 'SUBMITTED';
+  profileSubmittedAt?: string | null;
   practiceLatitude?: number;
   practiceLongitude?: number;
-  practicePhone?: string;
-  practiceEmail?: string;
   practiceDescription?: string;
   operatingHoursStart?: string;
   operatingHoursEnd?: string;
@@ -42,6 +53,16 @@ export interface Secretary {
   lastName: string;
   doctorId: string;
   isApproved: boolean;
+}
+
+export interface DoctorSchedule {
+  id: string;
+  doctorId: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  consultationDurationMinutes: number;
+  isActive: boolean;
 }
 
 export const adminApi = {
@@ -85,6 +106,10 @@ export const adminApi = {
 
   rejectDoctor: async (doctorId: string, reason: string) => {
     return apiClient.patch(`/admin/doctors/${doctorId}/reject`, { reason });
+  },
+
+  getDoctorSchedules: async (doctorId: string) => {
+    return apiClient.get<DoctorSchedule[]>(`/admin/doctors/${doctorId}/schedules`);
   },
 
   // Secretary Management

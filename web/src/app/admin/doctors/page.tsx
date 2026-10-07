@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { adminApi, Doctor } from '@/lib/api/adminApi';
+import { adminApi, Doctor, DoctorSchedule } from '@/lib/api/adminApi';
 
 export default function DoctorManagement() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -12,6 +12,8 @@ export default function DoctorManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [doctorSchedules, setDoctorSchedules] = useState<DoctorSchedule[]>([]);
+  const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
 
   useEffect(() => {
     loadDoctors();
@@ -36,12 +38,13 @@ export default function DoctorManagement() {
     if (!confirm('Are you sure you want to approve this doctor account? Once confirmed, the doctor will be authorized to sign in and access the Doctor Dashboard.')) {
       return;
     }
-    
+
     try {
       const response = await adminApi.approveDoctor(doctorId);
       if (response.success) {
         loadDoctors();
         setShowDetailModal(false);
+        setDoctorSchedules([]);
       }
     } catch (error) {
       console.error('Failed to approve doctor:', error);
@@ -54,6 +57,19 @@ export default function DoctorManagement() {
       if (response.success && response.data) {
         setSelectedDoctor(response.data);
         setShowDetailModal(true);
+
+        // Load doctor schedules
+        setIsLoadingSchedules(true);
+        try {
+          const schedulesResponse = await adminApi.getDoctorSchedules(doctorId);
+          if (schedulesResponse.success && schedulesResponse.data) {
+            setDoctorSchedules(schedulesResponse.data);
+          }
+        } catch (scheduleError) {
+          console.error('Failed to fetch doctor schedules:', scheduleError);
+        } finally {
+          setIsLoadingSchedules(false);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch doctor details:', error);
@@ -61,17 +77,23 @@ export default function DoctorManagement() {
   };
 
   const handleRejectDoctor = async (doctorId: string) => {
-    const reason = prompt('Reason for rejection (optional):');
-    
+    const reason = prompt('Reason for rejection (required):');
+
+    if (!reason || reason.trim() === '') {
+      alert('Rejection reason is required. Please provide a reason for rejecting this doctor.');
+      return;
+    }
+
     if (!confirm('Are you sure you want to reject this doctor registration? The doctor will not be authorized to sign in.')) {
       return;
     }
-    
+
     try {
-      const response = await adminApi.rejectDoctor(doctorId, reason || '');
+      const response = await adminApi.rejectDoctor(doctorId, reason);
       if (response.success) {
         loadDoctors();
         setShowDetailModal(false);
+        setDoctorSchedules([]);
       }
     } catch (error) {
       console.error('Failed to reject doctor:', error);
@@ -338,61 +360,161 @@ export default function DoctorManagement() {
       {/* Doctor Detail Modal */}
       {showDetailModal && selectedDoctor && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-slate-200">
-              <h2 className="text-lg font-bold text-slate-900">Doctor Details</h2>
+              <h2 className="text-lg font-bold text-slate-900">Doctor Review</h2>
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-500">Name</label>
-                <p className="text-sm text-slate-900">{selectedDoctor.firstName} {selectedDoctor.lastName}</p>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500">Email</label>
-                <p className="text-sm text-slate-900">{selectedDoctor.email}</p>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500">Email Verified</label>
-                <p className="text-sm text-slate-900">{selectedDoctor.emailVerified ? 'Yes' : 'No'}</p>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500">Specialty</label>
-                <p className="text-sm text-slate-900">{selectedDoctor.specialty}</p>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500">Credentials</label>
-                <p className="text-sm text-slate-900">{selectedDoctor.credentials || 'N/A'}</p>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500">PRC License Number</label>
-                <p className="text-sm text-slate-900">{selectedDoctor.prcLicenseNumber}</p>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500">Practice Name</label>
-                <p className="text-sm text-slate-900">{selectedDoctor.practiceName || 'N/A'}</p>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500">Practice Address</label>
-                <p className="text-sm text-slate-900">{selectedDoctor.practiceAddress || 'N/A'}</p>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500">Practice Phone</label>
-                <p className="text-sm text-slate-900">{selectedDoctor.practicePhone || 'N/A'}</p>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500">Status</label>
-                <p className="text-sm text-slate-900">{selectedDoctor.approvalStatus}</p>
-              </div>
-              {selectedDoctor.rejectionReason && (
-                <div>
-                  <label className="text-xs font-semibold text-slate-500">Rejection Reason</label>
-                  <p className="text-sm text-slate-900">{selectedDoctor.rejectionReason}</p>
+            <div className="p-6 space-y-6">
+
+              {/* Basic Information Section */}
+              <div className="bg-slate-50 rounded-lg p-4">
+                <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px]">person</span>
+                  Basic Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500">First Name</label>
+                    <p className="text-sm text-slate-900">{selectedDoctor.firstName || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500">Middle Name</label>
+                    <p className="text-sm text-slate-900">{selectedDoctor.middleName || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500">Last Name</label>
+                    <p className="text-sm text-slate-900">{selectedDoctor.lastName || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500">Email Address</label>
+                    <p className="text-sm text-slate-900">{selectedDoctor.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500">Email Verified</label>
+                    <p className="text-sm text-slate-900">{selectedDoctor.emailVerified ? 'Yes' : 'No'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500">Contact Number</label>
+                    <p className="text-sm text-slate-900">{selectedDoctor.contactNumber || 'N/A'}</p>
+                  </div>
                 </div>
-              )}
+              </div>
+
+              {/* Professional Information Section */}
+              <div className="bg-slate-50 rounded-lg p-4">
+                <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px]">medical_services</span>
+                  Professional Information
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500">Professional Photo</label>
+                    {selectedDoctor.professionalPhotoUrl ? (
+                      <img src={selectedDoctor.professionalPhotoUrl} alt="Professional Photo" className="w-24 h-24 rounded-lg object-cover mt-1" />
+                    ) : (
+                      <p className="text-sm text-slate-400 mt-1">No photo provided</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500">Specialty</label>
+                      <p className="text-sm text-slate-900">{selectedDoctor.specialty || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500">Credentials</label>
+                      <p className="text-sm text-slate-900">{selectedDoctor.credentials || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500">PRC License Number</label>
+                      <p className="text-sm text-slate-900">{selectedDoctor.prcLicenseNumber || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500">Hospital/Clinic</label>
+                      <p className="text-sm text-slate-900">{selectedDoctor.practiceName || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500">Years of Experience</label>
+                      <p className="text-sm text-slate-900">{selectedDoctor.yearsOfExperience || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500">Consultation Fee</label>
+                      <p className="text-sm text-slate-900">{selectedDoctor.consultationFee ? `₱${selectedDoctor.consultationFee}` : 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500">Consultation Type</label>
+                      <p className="text-sm text-slate-900">{selectedDoctor.consultationType || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500">Languages Spoken</label>
+                      <p className="text-sm text-slate-900">{selectedDoctor.languagesSpoken || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500">Areas of Expertise</label>
+                    <p className="text-sm text-slate-900">{selectedDoctor.areasOfExpertise || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500">Short Biography</label>
+                    <p className="text-sm text-slate-900">{selectedDoctor.biography || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Available Schedule Section */}
+              <div className="bg-slate-50 rounded-lg p-4">
+                <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px]">schedule</span>
+                  Available Schedule
+                </h3>
+                {isLoadingSchedules ? (
+                  <p className="text-sm text-slate-500">Loading schedules...</p>
+                ) : doctorSchedules.length > 0 ? (
+                  <div className="space-y-2">
+                    {doctorSchedules.map((schedule) => (
+                      <div key={schedule.id} className="bg-white rounded p-2 text-sm">
+                        <span className="font-medium">{['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][schedule.dayOfWeek]}</span>
+                        <span className="text-slate-600 ml-2">
+                          {schedule.startTime?.substring(0, 5)} - {schedule.endTime?.substring(0, 5)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">No schedules configured</p>
+                )}
+              </div>
+
+              {/* Status Section */}
+              <div className="bg-slate-50 rounded-lg p-4">
+                <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px]">info</span>
+                  Account Status
+                </h3>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500">Approval Status</label>
+                    <p className="text-sm text-slate-900">{selectedDoctor.approvalStatus}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500">Profile Completion Status</label>
+                    <p className="text-sm text-slate-900">{selectedDoctor.profileCompletionStatus || 'N/A'}</p>
+                  </div>
+                  {selectedDoctor.rejectionReason && (
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500">Rejection Reason</label>
+                      <p className="text-sm text-slate-900">{selectedDoctor.rejectionReason}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
             </div>
             <div className="p-6 border-t border-slate-200 flex justify-between gap-3">
               <button
-                onClick={() => setShowDetailModal(false)}
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setDoctorSchedules([]);
+                }}
                 className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
               >
                 Close
@@ -409,7 +531,7 @@ export default function DoctorManagement() {
                     onClick={() => handleApproveDoctor(selectedDoctor.id)}
                     className="px-4 py-2 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
                   >
-                    Confirm Doctor
+                    Approve
                   </button>
                 </div>
               )}

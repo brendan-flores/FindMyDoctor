@@ -10,11 +10,28 @@ Current System State (October 2026):
 - Doctor accounts are created with `profile_completion_status = 'INCOMPLETE'` after OTP verification
 - Doctor profile completion status transitions: INCOMPLETE → COMPLETE (when required fields filled) → SUBMITTED (when doctor submits for review)
 - Doctor approval workflow: PENDING → ACTIVE (approved) or REJECTED, with profile_completion_status tracked separately
+- Doctor rejection and resubmission workflow: PENDING → REJECTED (with rejection_reason) → Doctor logs in → corrects profile → resubmits → PENDING → Admin approves → ACTIVE
+- PENDING Doctors cannot log in while awaiting administrator approval
+- REJECTED Doctors may authenticate specifically to correct and resubmit their application (they are not active/patient-visible)
+- REJECTED Doctors can view their rejection reason via `GET /api/v1/doctors/me` (returns `approval_status` and `rejection_reason`)
+- REJECTED Doctors can edit their profile and resubmit via `POST /api/v1/doctors/me/profile/submit`, which restores `approval_status` to `PENDING` and clears `rejection_reason`
+- REJECTED Doctors are routed to `/doctor-profile` after login to view rejection reason and correct their profile
+- Admin approval endpoint `PATCH /api/v1/admin/doctors/:id/approve` explicitly rejects approving doctors with `approval_status = 'REJECTED'` (requires resubmission first)
 - Doctor signup flow on web: `/doctor-signup` (basic fields) → OTP verification → `/doctor-profile` (professional fields + schedule) → submit for approval
 - Web Doctor signup redirects to `/doctor-profile` after successful OTP verification, not to dashboard
 - Web Doctor profile page at `/doctor-profile` allows doctors to complete their professional profile with 12 fields: professional photo, specialty, credentials, PRC license, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule
 - Web Doctor profile page includes schedule management UI using existing schedule APIs (GET/POST/PUT/DELETE `/api/v1/doctors/me/schedules`)
 - Web Doctor profile page supports saving draft profiles and submitting for approval with validation
+- Web Doctor profile page explicitly handles REJECTED state: shows rejection banner with reason, allows profile editing, allows resubmission, does not lock form when `profile_completion_status === 'SUBMITTED'` if `approval_status === 'REJECTED'`
+- Web Doctor login page routes authenticated Doctors based on approval_status: ACTIVE → `/doctor/dashboard`, REJECTED → `/doctor-profile`
+- Admin Doctor review interface at `/admin/doctors` displays two clearly separated sections: Basic Information (first name, middle name, last name, email, email verified, contact number) and Professional Information (professional photo, specialty, credentials, PRC license number, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule)
+- Admin Doctor review interface displays available schedules using existing `doctor_schedules` data via new endpoint `GET /api/v1/admin/doctors/:id/schedules`
+- Admin Doctor approval endpoint `PATCH /api/v1/admin/doctors/:id/approve` validates critical information before approving: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic must all be present
+- Admin Doctor rejection endpoint `PATCH /api/v1/admin/doctors/:id/reject` requires a rejection reason (cannot be empty or null)
+- Rejected doctors have `approval_status = 'REJECTED'` and `rejection_reason` set; they can correct their profile and resubmit using the existing onboarding flow
+- Patient-facing doctor search endpoint `GET /api/v1/doctors` does not expose PRC license number, personal contact number, or email address
+- Patient-facing doctor by ID endpoint `GET /api/v1/doctors/:id` does not expose PRC license number, personal contact number, or email address
+- Backend Admin API endpoints `GET /api/v1/admin/doctors` and `GET /api/v1/admin/doctors/:id` return complete doctor profile fields including all professional information, middle name, contact number, profile completion status, and submission timestamp
 - Patient registration uses email OTP verification via Supabase for account creation
 - Patient registration requires username (minimum 3 characters, alphanumeric + underscores only)
 - User login accepts either email or username for authentication
@@ -32,6 +49,7 @@ Current System State (October 2026):
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
 - Backend API endpoints for doctor profile: `PUT /api/v1/doctors/me/profile` (update profile), `POST /api/v1/doctors/me/profile/submit` (submit for approval)
 - Backend API endpoints for doctor schedules: `GET /api/v1/doctors/me/schedules`, `POST /api/v1/doctors/me/schedules`, `PUT /api/v1/doctors/me/schedules/:id`, `DELETE /api/v1/doctors/me/schedules/:id`
+- Backend API endpoints for admin doctor review: `GET /api/v1/admin/doctors` (list all doctors with complete profile), `GET /api/v1/admin/doctors/:id` (get doctor details), `GET /api/v1/admin/doctors/:id/schedules` (get doctor schedules), `PATCH /api/v1/admin/doctors/:id/approve` (approve with validation), `PATCH /api/v1/admin/doctors/:id/reject` (reject with required reason)
 - Doctor registration uses separate first name, middle name (optional), and last name fields instead of a single full name field
 - Backend doctor OTP API accepts only basic fields (`firstName`, `middleName`, `lastName`, `email`, `contactNumber`, `password`) in the signup payload
 - Backend doctors API returns all profile fields including `profile_completion_status` and `profile_submitted_at`

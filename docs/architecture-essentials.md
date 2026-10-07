@@ -765,11 +765,40 @@ After a doctor completes self-registration, email OTP verification, and profile 
 - Administrators can view pending doctors through the Admin Doctors page at `/admin/doctors`.
 - Administrators can review complete doctor information and either:
   - Approve the doctor: Sets `approval_status = 'ACTIVE'` and `is_approved = true`, allowing the doctor to log in and access the Doctor Dashboard.
-  - Reject the doctor: Sets `approval_status = 'REJECTED'` and `is_approved = false`, permanently blocking login access.
+  - Reject the doctor: Sets `approval_status = 'REJECTED'` and `is_approved = false`, and sets `rejection_reason` with the admin's explanation.
 - Only users with `role = ADMIN` can approve or reject doctor accounts.
 - The public doctor search (`GET /api/v1/doctors`) only returns doctors with `approval_status = 'ACTIVE'`.
-- Login attempts by PENDING or REJECTED doctors are blocked with appropriate error messages.
+- Login attempts by PENDING doctors are blocked with appropriate error messages.
 - The backend API includes endpoints for doctor approval: `PATCH /api/v1/admin/doctors/:id/approve` and `PATCH /api/v1/admin/doctors/:id/reject`.
+
+### Doctor Rejection and Resubmission Workflow
+
+When a doctor is rejected:
+
+- The doctor's `approval_status` is set to 'REJECTED' and `rejection_reason` contains the admin's explanation.
+- REJECTED doctors may authenticate specifically to correct and resubmit their application (they are not active/patient-visible).
+- The rejected doctor can log in and is routed to `/doctor-profile` to view the rejection reason and correct their profile.
+- The doctor can view their rejection reason via `GET /api/v1/doctors/me` which returns `approval_status` and `rejection_reason`.
+- The rejected doctor can edit their professional profile fields and schedule via the existing profile update and schedule management endpoints.
+- The rejected doctor can resubmit their profile via `POST /api/v1/doctors/me/profile/submit`.
+- On successful resubmission:
+  - `approval_status` is restored to 'PENDING'
+  - `is_approved` remains false
+  - `profile_completion_status` is set to 'SUBMITTED'
+  - `profile_submitted_at` is updated to current timestamp
+  - `rejection_reason` is cleared
+- After resubmission, the doctor must wait for admin approval again.
+- Admins cannot directly approve a REJECTED doctor; the doctor must resubmit first (which restores PENDING status).
+- The admin approval endpoint `PATCH /api/v1/admin/doctors/:id/approve` explicitly rejects approving doctors with `approval_status = 'REJECTED'`.
+- The web Doctor profile page at `/doctor-profile` handles the REJECTED state by:
+  - Displaying a rejection banner with the rejection reason
+  - Allowing profile editing even when `profile_completion_status === 'SUBMITTED'`
+  - Allowing resubmission with a success message indicating the application is pending admin review
+  - Reloading the profile after successful resubmission to reflect the updated status
+- The web Doctor login page routes authenticated Doctors based on approval_status:
+  - ACTIVE → `/doctor/dashboard`
+  - REJECTED → `/doctor-profile`
+  - PENDING → blocked by backend (should not reach frontend login routing)
 
 `POST /api/v1/auth/register/doctor` remains available for Administrator-provisioned doctor accounts, but the self-registration page no longer uses it.
 
