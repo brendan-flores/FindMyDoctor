@@ -1,0 +1,1195 @@
+<!DOCTYPE html><html lang="en" style="width: 1280px; min-height: 100vh; position: relative;"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><title>FiDo - Working Hours Management</title><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-tertiary-container": "#81eddf", "secondary-fixed": "#d6e3ff", "on-secondary-fixed": "#001b3d", "tertiary": "#00524b", "on-tertiary-fixed-variant": "#005049", "on-background": "#0b1c30", "surface": "#f8f9ff", "on-surface": "#0b1c30", "on-secondary-container": "#345383", "surface-container-lowest": "#ffffff", "on-primary-container": "#ccdbff", "on-primary-fixed": "#001a40", "surface-dim": "#cbdbf5", "on-tertiary": "#ffffff", "primary-container": "#1b5eb8", "inverse-on-surface": "#eaf1ff", "on-primary": "#ffffff", "inverse-primary": "#acc7ff", "surface-container-highest": "#d3e4fe", "on-secondary-fixed-variant": "#274777", "surface-container-low": "#eff4ff", "tertiary-container": "#006c63", "primary-fixed": "#d7e2ff", "on-primary-fixed-variant": "#004591", "error-container": "#ffdad6", "inverse-surface": "#213145", "on-secondary": "#ffffff", "on-error": "#ffffff", "error": "#ba1a1a", "secondary-container": "#a9c7ff", "outline": "#727783", "on-tertiary-fixed": "#00201d", "tertiary-fixed-dim": "#6bd8cb", "surface-variant": "#d3e4fe", "background": "#f8f9ff", "secondary": "#405f90", "outline-variant": "#c2c6d4", "surface-tint": "#185cb6", "on-error-container": "#93000a", "tertiary-fixed": "#89f5e7", "primary-fixed-dim": "#acc7ff", "surface-container-high": "#dce9ff", "secondary-fixed-dim": "#a9c7ff", "surface-container": "#e5eeff", "primary": "#004694", "surface-bright": "#f8f9ff", "on-surface-variant": "#424752" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "space-3xl": "2.5rem", "gutter-desktop": "1.5rem", "space-lg": "1.25rem", "space-sm": "0.5rem", "gutter-mobile": "1rem", "space-base": "1rem", "space-2xl": "2rem", "sidebar-collapsed-width": "72px", "space-md": "0.75rem", "space-xs": "0.25rem", "profile-bar-height": "80px", "space-xl": "1.5rem", "sidebar-width": "260px", "space-2xs": "0.125rem" }, "fontFamily": { "headline-lg-mobile": [ "Inter" ], "headline-md": [ "Inter" ], "headline-xl": [ "Inter" ], "label-sm": [ "Inter" ], "body-lg": [ "Inter" ], "body-sm": [ "Inter" ], "body-md": [ "Inter" ], "label-lg": [ "Inter" ], "headline-xl-mobile": [ "Inter" ], "code-sm": [ "JetBrains Mono" ], "headline-lg": [ "Inter" ], "label-md": [ "Inter" ] }, "fontSize": { "headline-lg-mobile": [ "20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" } ], "headline-md": [ "18px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600" } ], "headline-xl": [ "32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" } ], "label-sm": [ "11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "500" } ], "body-lg": [ "16px", { "lineHeight": "24px", "fontWeight": "400" } ], "body-sm": [ "13px", { "lineHeight": "18px", "fontWeight": "400" } ], "body-md": [ "14px", { "lineHeight": "20px", "fontWeight": "400" } ], "label-lg": [ "14px", { "lineHeight": "20px", "fontWeight": "600" } ], "headline-xl-mobile": [ "26px", { "lineHeight": "34px", "letterSpacing": "-0.015em", "fontWeight": "700" } ], "code-sm": [ "12px", { "lineHeight": "16px", "fontWeight": "500" } ], "headline-lg": [ "24px", { "lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "600" } ], "label-md": [ "12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" } ] } } } };</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen">
+<!-- Persistent Left Sidebar Navigation -->
+<aside class="fixed left-0 top-0 h-screen w-sidebar-width bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between overflow-y-auto">
+  <div class="flex flex-col">
+    <!-- Brand Logo Area -->
+    <div class="px-space-xl pt-space-xl pb-space-lg">
+      <div class="flex items-center gap-space-sm">
+        <div class="h-9 w-9 rounded-lg bg-primary flex items-center justify-center text-on-primary shadow-sm">
+          <span class="material-symbols-outlined text-[20px]">local_hospital</span>
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-1">
+            <span class="font-headline-md text-headline-md text-primary leading-none tracking-tight font-bold">FiDo</span>
+            <span class="font-label-sm text-[10px] text-tertiary bg-tertiary-fixed/30 px-1.5 py-0.5 rounded-full font-semibold">CLINIC</span>
+          </div>
+          <span class="font-label-sm text-[10px] text-secondary font-semibold uppercase tracking-wider mt-1 leading-none">+ FIND A DOCTOR</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Doctor Profile Bar -->
+    <div class="mx-space-base mb-space-base p-space-md rounded-xl bg-surface-container-low">
+      <div class="flex items-center gap-space-md">
+        <div class="relative flex-shrink-0">
+          <div class="w-11 h-11 rounded-full bg-primary flex items-center justify-center ring-2 ring-surface-container-lowest">
+            <span class="material-symbols-outlined text-on-primary text-[22px]">person</span>
+          </div>
+          <span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-tertiary-container ring-2 ring-surface-container-lowest"></span>
+        </div>
+        <div class="flex flex-col min-w-0">
+          <span class="font-label-lg text-label-lg text-on-surface truncate font-semibold">Dr. Alexander Mercer</span>
+          <div class="flex items-center gap-space-xs mt-space-2xs">
+            <span class="px-space-sm py-space-2xs rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label-sm text-label-sm">MD Cardio</span>
+            <span class="font-label-sm text-label-sm text-tertiary-container font-medium">Active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Items -->
+    <nav class="flex flex-col gap-space-2xs px-space-base">
+      <a class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="dashboard" href="#">
+        <span class="material-symbols-outlined text-[20px]">dashboard</span>
+        <span class="">Dashboard</span>
+      </a>
+      <a class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="appointments" href="#">
+        <span class="material-symbols-outlined text-[20px]">calendar_month</span>
+        <span class="">Appointments</span>
+      </a>
+      <a class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="todays-queue" href="#">
+        <span class="material-symbols-outlined text-[20px]">group</span>
+        <span class="">Today's Queue</span>
+      </a>
+      <!-- Active Working Hours / Schedule Route -->
+      <a aria-current="page" class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl font-label-lg text-label-lg bg-primary-container text-on-primary shadow-sm transition-all" data-path="schedule" href="#">
+        <span class="material-symbols-outlined text-[20px] text-on-primary">schedule</span>
+        <span class="">Schedule</span>
+      </a>
+      <a class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="patient-records" href="#">
+        <span class="material-symbols-outlined text-[20px]">folder_shared</span>
+        <span class="">Patient Records</span>
+      </a>
+      <a class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="consultation-history" href="#">
+        <span class="material-symbols-outlined text-[20px]">history</span>
+        <span class="">Consultation History</span>
+      </a>
+      <a class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="prescriptions" href="#">
+        <span class="material-symbols-outlined text-[20px]">prescriptions</span>
+        <span class="">Prescriptions</span>
+      </a>
+      <a class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="settings" href="#">
+        <span class="material-symbols-outlined text-[20px]">settings</span>
+        <span class="">Settings</span>
+      </a>
+    </nav>
+  </div>
+
+  <!-- Switch Role Footer Button -->
+  <div class="p-space-base">
+    <div class="p-space-sm border-t border-surface-container-low">
+      <button class="w-full flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl font-medium text-xs text-on-primary bg-primary hover:bg-primary-container transition-all shadow-sm whitespace-nowrap" onclick="showToast('Session status: Dr. Alexander Mercer (Room 304)', 'info')" type="button">
+        <span class="material-symbols-outlined text-[16px] shrink-0">logout</span>
+        <span class="whitespace-nowrap leading-none">Switch to Secretary / Logout</span>
+      </button>
+    </div>
+  </div>
+</aside>
+
+<!-- Main Wrapper -->
+<div class="pl-sidebar-width">
+  <!-- Top Persistent Header Bar -->
+  <header class="fixed top-0 left-sidebar-width right-0 h-profile-bar-height bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-space-xl">
+    <div class="flex items-center gap-space-lg">
+      <div class="flex items-center gap-space-sm">
+        <span class="px-space-md py-space-xs rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label-sm text-label-sm uppercase tracking-wide font-semibold">Doctor Portal</span>
+      </div>
+      <div class="hidden lg:flex items-center gap-space-xs text-on-surface-variant font-label-md text-label-md">
+        <span class="material-symbols-outlined text-[18px] text-primary">location_on</span>
+        <span class="">Central Medical Clinic • Room 304</span>
+      </div>
+      <div class="hidden xl:flex items-center gap-space-xs text-secondary font-label-md text-label-md bg-surface-container-low px-space-md py-space-xs rounded-lg">
+        <span class="material-symbols-outlined text-[18px]">schedule</span>
+        <span class="">Tuesday, October 24 | Shift: 08:00 AM - 04:00 PM</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-space-lg">
+      <button class="relative p-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all flex items-center justify-center" onclick="showToast('No new notifications', 'info')" type="button">
+        <span class="material-symbols-outlined text-[24px]">notifications</span>
+        <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-error ring-2 ring-surface-container-lowest"></span>
+      </button>
+      <button class="h-10 px-space-lg rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md flex items-center gap-space-sm shadow-sm transition-all" onclick="showToast('Calling Next Patient to Room 304...', 'success')" type="button">
+        <span class="material-symbols-outlined text-[18px]">notifications_active</span>
+        <span class="">Call Next Patient</span>
+      </button>
+      <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+        <span class="material-symbols-outlined text-on-primary text-[18px]">person</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Page Body -->
+  <main class="relative pt-profile-bar-height w-full bg-surface min-h-screen px-space-xl pb-space-3xl">
+    <div class="flex flex-col w-full max-w-[1280px] mx-auto pt-space-base">
+      
+      <!-- Breadcrumb & Top Page Header -->
+      <div class="flex flex-col gap-space-xs pb-space-lg border-b border-surface-container-low mb-space-xl">
+        <div class="flex items-center gap-space-xs text-outline font-label-sm text-label-sm">
+          <span class="">Doctor Portal</span>
+          <span class="text-outline">/</span>
+          <span class="text-primary font-semibold">Working Hours</span>
+        </div>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md mt-space-2xs">
+          <div>
+            <h1 class="font-headline-xl text-headline-xl text-on-surface tracking-tight font-bold">Working Hours</h1>
+            <p class="font-body-md text-body-md text-on-surface-variant mt-1">
+              Configure and manage your recurring weekly consultation working hours, shift windows, and active clinic availability.
+            </p>
+          </div>
+          <!-- Primary CTA: + Add Working Hours -->
+          <div class="flex items-center gap-space-sm flex-shrink-0">
+            <button class="h-10 px-space-lg rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md font-semibold flex items-center gap-space-xs shadow-sm transition-all" id="btn-open-add-modal" onclick="openAddModal()" type="button">
+              <span class="material-symbols-outlined text-[18px]">add_circle</span>
+              <span class="">+ Add Working Hours</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick KPI & Status Strip -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-base mb-space-xl">
+        <div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-surface-container-low flex items-center gap-space-md">
+          <div class="w-11 h-11 rounded-xl bg-primary-fixed text-primary flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-[24px]">calendar_view_week</span>
+          </div>
+          <div class="flex flex-col min-w-0">
+            <span class="font-label-sm text-label-sm text-secondary uppercase font-semibold">Active Weekly Days</span>
+            <span class="font-headline-lg text-headline-lg text-on-surface font-bold leading-tight" id="kpi-active-days">4 Days Active</span>
+            <span class="font-label-sm text-label-sm text-tertiary-container font-medium mt-0.5">Mon, Tue, Wed, Thu, Fri</span>
+          </div>
+        </div>
+        <div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-surface-container-low flex items-center gap-space-md">
+          <div class="w-11 h-11 rounded-xl bg-tertiary-fixed text-on-tertiary-fixed-variant flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-[24px]">timelapse</span>
+          </div>
+          <div class="flex flex-col min-w-0">
+            <span class="font-label-sm text-label-sm text-secondary uppercase font-semibold">Weekly Operating Hours</span>
+            <span class="font-headline-lg text-headline-lg text-on-surface font-bold leading-tight" id="kpi-weekly-hours">28.0 Hours</span>
+            <span class="font-label-sm text-label-sm text-tertiary font-medium mt-0.5">Standard Clinic Schedule</span>
+          </div>
+        </div>
+        <div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-surface-container-low flex items-center gap-space-md">
+          <div class="w-11 h-11 rounded-xl bg-secondary-fixed text-secondary flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-[24px]">verified</span>
+          </div>
+          <div class="flex flex-col min-w-0">
+            <span class="font-label-sm text-label-sm text-secondary uppercase font-semibold">Active Shift Blocks</span>
+            <span class="font-headline-lg text-headline-lg text-on-surface font-bold leading-tight" id="kpi-active-shifts">6 Active Shifts</span>
+            <span class="font-label-sm text-label-sm text-secondary font-medium mt-0.5">1 Inactive Schedule</span>
+          </div>
+        </div>
+        <div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-surface-container-low flex items-center gap-space-md">
+          <div class="w-11 h-11 rounded-xl bg-surface-container-high text-primary flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-[24px]">domain</span>
+          </div>
+          <div class="flex flex-col min-w-0">
+            <span class="font-label-sm text-label-sm text-secondary uppercase font-semibold">Assigned Practice Room</span>
+            <span class="font-headline-lg text-headline-lg text-on-surface font-bold leading-tight">Room 304</span>
+            <span class="font-label-sm text-label-sm text-outline font-medium mt-0.5">Central Medical Clinic</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Weekly Schedule Days Section -->
+      <div class="bg-surface-container-lowest rounded-xl border border-surface-container-low shadow-sm flex flex-col p-space-xl">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-space-lg border-b border-surface-container-low mb-space-lg">
+          <div class="flex items-center gap-space-sm">
+            <h2 class="font-headline-md text-headline-md text-on-surface font-bold">Weekly Schedule (Monday – Sunday)</h2>
+            <span class="px-space-sm py-0.5 rounded-full bg-surface-container-high text-primary font-label-sm text-label-sm font-semibold">Recurring Weekly</span>
+          </div>
+          <div class="flex items-center gap-space-sm text-outline font-body-sm text-body-sm">
+            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span> Active</span>
+            <span class="inline-flex items-center gap-1.5 ml-2"><span class="w-2.5 h-2.5 rounded-full bg-outline-variant"></span> Inactive</span>
+          </div>
+        </div>
+
+        <!-- Weekly Days Accordion / Container List -->
+        <div class="flex flex-col gap-space-base" id="weekly-days-container"><div class="rounded-xl border transition-all bg-surface-container-lowest border-surface-container-low shadow-xs p-space-lg"><div class="flex flex-col sm:flex-row sm:items-center justify-between pb-space-sm gap-space-xs border-b border-surface-container-low">
+          <div class="flex items-center gap-space-sm">
+            <span class="font-headline-md text-headline-md font-bold text-on-surface">Monday</span>
+            <span class="px-space-sm py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm font-semibold flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active Day
+                    </span>
+          </div>
+          <div class="flex items-center gap-space-xs">
+            <button class="h-8 px-space-md rounded-lg text-primary hover:bg-surface-container-low font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openAddModalForDay('Monday')" type="button">
+              <span class="material-symbols-outlined text-[16px]">add</span>
+              <span class="">Add Shift</span>
+            </button>
+          </div>
+        </div><div class="flex flex-col gap-space-sm pt-space-md"><div class="flex flex-col sm:flex-row sm:items-center justify-between p-space-md rounded-xl transition-all bg-surface-container-low/70 border border-surface-container-high hover:border-primary/40">
+              <div class="flex items-center gap-space-md min-w-0">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center font-code-sm bg-primary-fixed text-primary">
+                  <span class="material-symbols-outlined text-[18px]">wb_sunny</span>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex items-center gap-space-sm flex-wrap">
+                    <span class="font-code-sm text-code-sm font-bold text-on-surface">
+                      8:00 AM – 12:00 PM
+                    </span>
+                    <span class="font-body-sm text-body-sm text-secondary">(4h)</span>
+                    <span class="inline-flex items-center gap-1 px-space-sm py-0.5 rounded-full bg-tertiary-fixed/40 text-tertiary font-label-sm text-label-sm font-semibold">
+                          <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active
+                        </span>
+                  </div>
+                  <span class="font-body-sm text-body-sm text-outline mt-0.5">Recurring weekly shift window • Room 304</span>
+                </div>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-space-xs mt-space-sm sm:mt-0 self-end sm:self-center">
+                <button class="h-8 px-space-md rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openEditModal('sch-1')" title="Edit this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">edit</span>
+                      <span class="">Edit</span>
+                    </button>
+                    <button class="h-8 px-space-md rounded-lg text-error hover:bg-error-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openDeactivateModal('sch-1')" title="Deactivate this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">pause_circle</span>
+                      <span class="">Deactivate</span>
+                    </button>
+              </div>
+            </div><div class="flex flex-col sm:flex-row sm:items-center justify-between p-space-md rounded-xl transition-all bg-surface-container-low/70 border border-surface-container-high hover:border-primary/40">
+              <div class="flex items-center gap-space-md min-w-0">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center font-code-sm bg-primary-fixed text-primary">
+                  <span class="material-symbols-outlined text-[18px]">wb_sunny</span>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex items-center gap-space-sm flex-wrap">
+                    <span class="font-code-sm text-code-sm font-bold text-on-surface">
+                      1:00 PM – 5:00 PM
+                    </span>
+                    <span class="font-body-sm text-body-sm text-secondary">(4h)</span>
+                    <span class="inline-flex items-center gap-1 px-space-sm py-0.5 rounded-full bg-tertiary-fixed/40 text-tertiary font-label-sm text-label-sm font-semibold">
+                          <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active
+                        </span>
+                  </div>
+                  <span class="font-body-sm text-body-sm text-outline mt-0.5">Recurring weekly shift window • Room 304</span>
+                </div>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-space-xs mt-space-sm sm:mt-0 self-end sm:self-center">
+                <button class="h-8 px-space-md rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openEditModal('sch-2')" title="Edit this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">edit</span>
+                      <span class="">Edit</span>
+                    </button>
+                    <button class="h-8 px-space-md rounded-lg text-error hover:bg-error-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openDeactivateModal('sch-2')" title="Deactivate this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">pause_circle</span>
+                      <span class="">Deactivate</span>
+                    </button>
+              </div>
+            </div></div></div><div class="rounded-xl border transition-all bg-surface-container-lowest border-surface-container-low shadow-xs p-space-lg"><div class="flex flex-col sm:flex-row sm:items-center justify-between pb-space-sm gap-space-xs border-b border-surface-container-low">
+          <div class="flex items-center gap-space-sm">
+            <span class="font-headline-md text-headline-md font-bold text-on-surface">Tuesday</span>
+            <span class="px-space-sm py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm font-semibold flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active Day
+                    </span>
+          </div>
+          <div class="flex items-center gap-space-xs">
+            <button class="h-8 px-space-md rounded-lg text-primary hover:bg-surface-container-low font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openAddModalForDay('Tuesday')" type="button">
+              <span class="material-symbols-outlined text-[16px]">add</span>
+              <span class="">Add Shift</span>
+            </button>
+          </div>
+        </div><div class="flex flex-col gap-space-sm pt-space-md"><div class="flex flex-col sm:flex-row sm:items-center justify-between p-space-md rounded-xl transition-all bg-surface-container-low/70 border border-surface-container-high hover:border-primary/40">
+              <div class="flex items-center gap-space-md min-w-0">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center font-code-sm bg-primary-fixed text-primary">
+                  <span class="material-symbols-outlined text-[18px]">wb_sunny</span>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex items-center gap-space-sm flex-wrap">
+                    <span class="font-code-sm text-code-sm font-bold text-on-surface">
+                      8:30 AM – 4:30 PM
+                    </span>
+                    <span class="font-body-sm text-body-sm text-secondary">(8h)</span>
+                    <span class="inline-flex items-center gap-1 px-space-sm py-0.5 rounded-full bg-tertiary-fixed/40 text-tertiary font-label-sm text-label-sm font-semibold">
+                          <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active
+                        </span>
+                  </div>
+                  <span class="font-body-sm text-body-sm text-outline mt-0.5">Recurring weekly shift window • Room 304</span>
+                </div>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-space-xs mt-space-sm sm:mt-0 self-end sm:self-center">
+                <button class="h-8 px-space-md rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openEditModal('sch-3')" title="Edit this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">edit</span>
+                      <span class="">Edit</span>
+                    </button>
+                    <button class="h-8 px-space-md rounded-lg text-error hover:bg-error-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openDeactivateModal('sch-3')" title="Deactivate this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">pause_circle</span>
+                      <span class="">Deactivate</span>
+                    </button>
+              </div>
+            </div></div></div><div class="rounded-xl border transition-all bg-surface-container-lowest border-surface-container-low shadow-xs p-space-lg"><div class="flex flex-col sm:flex-row sm:items-center justify-between pb-space-sm gap-space-xs border-b border-surface-container-low">
+          <div class="flex items-center gap-space-sm">
+            <span class="font-headline-md text-headline-md font-bold text-on-surface">Wednesday</span>
+            <span class="px-space-sm py-0.5 rounded-full bg-surface-container-high text-outline font-label-sm text-label-sm font-semibold">
+                      All Shifts Inactive
+                    </span>
+          </div>
+          <div class="flex items-center gap-space-xs">
+            <button class="h-8 px-space-md rounded-lg text-primary hover:bg-surface-container-low font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openAddModalForDay('Wednesday')" type="button">
+              <span class="material-symbols-outlined text-[16px]">add</span>
+              <span class="">Add Shift</span>
+            </button>
+          </div>
+        </div><div class="flex flex-col gap-space-sm pt-space-md"><div class="flex flex-col sm:flex-row sm:items-center justify-between p-space-md rounded-xl transition-all bg-surface-container-low/30 border border-dashed border-outline-variant/40 opacity-70">
+              <div class="flex items-center gap-space-md min-w-0">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center font-code-sm bg-surface-container text-outline">
+                  <span class="material-symbols-outlined text-[18px]">nightlight</span>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex items-center gap-space-sm flex-wrap">
+                    <span class="font-code-sm text-code-sm font-bold text-outline line-through">
+                      9:00 AM – 3:00 PM
+                    </span>
+                    <span class="font-body-sm text-body-sm text-secondary">(6h)</span>
+                    <span class="inline-flex items-center gap-1 px-space-sm py-0.5 rounded-full bg-surface-container text-outline font-label-sm text-label-sm font-medium">
+                          <span class="w-1.5 h-1.5 rounded-full bg-outline"></span> Inactive
+                        </span>
+                  </div>
+                  <span class="font-body-sm text-body-sm text-outline mt-0.5">Recurring weekly shift window • Room 304</span>
+                </div>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-space-xs mt-space-sm sm:mt-0 self-end sm:self-center">
+                <button class="h-8 px-space-md rounded-lg text-primary hover:bg-primary-fixed/40 font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="reactivateSchedule('sch-4')" title="Reactivate this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">play_circle</span>
+                      <span class="">Reactivate</span>
+                    </button>
+                    <button class="h-8 px-space-md rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openEditModal('sch-4')" title="Edit this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">edit</span>
+                      <span class="">Edit</span>
+                    </button>
+              </div>
+            </div></div></div><div class="rounded-xl border transition-all bg-surface-container-lowest border-surface-container-low shadow-xs p-space-lg"><div class="flex flex-col sm:flex-row sm:items-center justify-between pb-space-sm gap-space-xs border-b border-surface-container-low">
+          <div class="flex items-center gap-space-sm">
+            <span class="font-headline-md text-headline-md font-bold text-on-surface">Thursday</span>
+            <span class="px-space-sm py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm font-semibold flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active Day
+                    </span>
+          </div>
+          <div class="flex items-center gap-space-xs">
+            <button class="h-8 px-space-md rounded-lg text-primary hover:bg-surface-container-low font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openAddModalForDay('Thursday')" type="button">
+              <span class="material-symbols-outlined text-[16px]">add</span>
+              <span class="">Add Shift</span>
+            </button>
+          </div>
+        </div><div class="flex flex-col gap-space-sm pt-space-md"><div class="flex flex-col sm:flex-row sm:items-center justify-between p-space-md rounded-xl transition-all bg-surface-container-low/70 border border-surface-container-high hover:border-primary/40">
+              <div class="flex items-center gap-space-md min-w-0">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center font-code-sm bg-primary-fixed text-primary">
+                  <span class="material-symbols-outlined text-[18px]">wb_sunny</span>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex items-center gap-space-sm flex-wrap">
+                    <span class="font-code-sm text-code-sm font-bold text-on-surface">
+                      8:00 AM – 2:00 PM
+                    </span>
+                    <span class="font-body-sm text-body-sm text-secondary">(6h)</span>
+                    <span class="inline-flex items-center gap-1 px-space-sm py-0.5 rounded-full bg-tertiary-fixed/40 text-tertiary font-label-sm text-label-sm font-semibold">
+                          <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active
+                        </span>
+                  </div>
+                  <span class="font-body-sm text-body-sm text-outline mt-0.5">Recurring weekly shift window • Room 304</span>
+                </div>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-space-xs mt-space-sm sm:mt-0 self-end sm:self-center">
+                <button class="h-8 px-space-md rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openEditModal('sch-5')" title="Edit this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">edit</span>
+                      <span class="">Edit</span>
+                    </button>
+                    <button class="h-8 px-space-md rounded-lg text-error hover:bg-error-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openDeactivateModal('sch-5')" title="Deactivate this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">pause_circle</span>
+                      <span class="">Deactivate</span>
+                    </button>
+              </div>
+            </div></div></div><div class="rounded-xl border transition-all bg-surface-container-lowest border-surface-container-low shadow-xs p-space-lg"><div class="flex flex-col sm:flex-row sm:items-center justify-between pb-space-sm gap-space-xs border-b border-surface-container-low">
+          <div class="flex items-center gap-space-sm">
+            <span class="font-headline-md text-headline-md font-bold text-on-surface">Friday</span>
+            <span class="px-space-sm py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm font-semibold flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active Day
+                    </span>
+          </div>
+          <div class="flex items-center gap-space-xs">
+            <button class="h-8 px-space-md rounded-lg text-primary hover:bg-surface-container-low font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openAddModalForDay('Friday')" type="button">
+              <span class="material-symbols-outlined text-[16px]">add</span>
+              <span class="">Add Shift</span>
+            </button>
+          </div>
+        </div><div class="flex flex-col gap-space-sm pt-space-md"><div class="flex flex-col sm:flex-row sm:items-center justify-between p-space-md rounded-xl transition-all bg-surface-container-low/70 border border-surface-container-high hover:border-primary/40">
+              <div class="flex items-center gap-space-md min-w-0">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center font-code-sm bg-primary-fixed text-primary">
+                  <span class="material-symbols-outlined text-[18px]">wb_sunny</span>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex items-center gap-space-sm flex-wrap">
+                    <span class="font-code-sm text-code-sm font-bold text-on-surface">
+                      9:00 AM – 12:00 PM
+                    </span>
+                    <span class="font-body-sm text-body-sm text-secondary">(3h)</span>
+                    <span class="inline-flex items-center gap-1 px-space-sm py-0.5 rounded-full bg-tertiary-fixed/40 text-tertiary font-label-sm text-label-sm font-semibold">
+                          <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active
+                        </span>
+                  </div>
+                  <span class="font-body-sm text-body-sm text-outline mt-0.5">Recurring weekly shift window • Room 304</span>
+                </div>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-space-xs mt-space-sm sm:mt-0 self-end sm:self-center">
+                <button class="h-8 px-space-md rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openEditModal('sch-6')" title="Edit this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">edit</span>
+                      <span class="">Edit</span>
+                    </button>
+                    <button class="h-8 px-space-md rounded-lg text-error hover:bg-error-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openDeactivateModal('sch-6')" title="Deactivate this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">pause_circle</span>
+                      <span class="">Deactivate</span>
+                    </button>
+              </div>
+            </div><div class="flex flex-col sm:flex-row sm:items-center justify-between p-space-md rounded-xl transition-all bg-surface-container-low/70 border border-surface-container-high hover:border-primary/40">
+              <div class="flex items-center gap-space-md min-w-0">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center font-code-sm bg-primary-fixed text-primary">
+                  <span class="material-symbols-outlined text-[18px]">wb_sunny</span>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex items-center gap-space-sm flex-wrap">
+                    <span class="font-code-sm text-code-sm font-bold text-on-surface">
+                      1:00 PM – 4:00 PM
+                    </span>
+                    <span class="font-body-sm text-body-sm text-secondary">(3h)</span>
+                    <span class="inline-flex items-center gap-1 px-space-sm py-0.5 rounded-full bg-tertiary-fixed/40 text-tertiary font-label-sm text-label-sm font-semibold">
+                          <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active
+                        </span>
+                  </div>
+                  <span class="font-body-sm text-body-sm text-outline mt-0.5">Recurring weekly shift window • Room 304</span>
+                </div>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-space-xs mt-space-sm sm:mt-0 self-end sm:self-center">
+                <button class="h-8 px-space-md rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openEditModal('sch-7')" title="Edit this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">edit</span>
+                      <span class="">Edit</span>
+                    </button>
+                    <button class="h-8 px-space-md rounded-lg text-error hover:bg-error-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openDeactivateModal('sch-7')" title="Deactivate this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">pause_circle</span>
+                      <span class="">Deactivate</span>
+                    </button>
+              </div>
+            </div></div></div><div class="rounded-xl border transition-all bg-surface-container-lowest border-surface-container-low shadow-xs p-space-lg"><div class="flex flex-col sm:flex-row sm:items-center justify-between pb-space-sm gap-space-xs border-b border-surface-container-low">
+          <div class="flex items-center gap-space-sm">
+            <span class="font-headline-md text-headline-md font-bold text-on-surface">Saturday</span>
+            <span class="px-space-sm py-0.5 rounded-full bg-surface-container-high text-outline font-label-sm text-label-sm font-semibold">
+                      All Shifts Inactive
+                    </span>
+          </div>
+          <div class="flex items-center gap-space-xs">
+            <button class="h-8 px-space-md rounded-lg text-primary hover:bg-surface-container-low font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openAddModalForDay('Saturday')" type="button">
+              <span class="material-symbols-outlined text-[16px]">add</span>
+              <span class="">Add Shift</span>
+            </button>
+          </div>
+        </div><div class="flex flex-col gap-space-sm pt-space-md"><div class="flex flex-col sm:flex-row sm:items-center justify-between p-space-md rounded-xl transition-all bg-surface-container-low/30 border border-dashed border-outline-variant/40 opacity-70">
+              <div class="flex items-center gap-space-md min-w-0">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center font-code-sm bg-surface-container text-outline">
+                  <span class="material-symbols-outlined text-[18px]">nightlight</span>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex items-center gap-space-sm flex-wrap">
+                    <span class="font-code-sm text-code-sm font-bold text-outline line-through">
+                      9:00 AM – 1:00 PM
+                    </span>
+                    <span class="font-body-sm text-body-sm text-secondary">(4h)</span>
+                    <span class="inline-flex items-center gap-1 px-space-sm py-0.5 rounded-full bg-surface-container text-outline font-label-sm text-label-sm font-medium">
+                          <span class="w-1.5 h-1.5 rounded-full bg-outline"></span> Inactive
+                        </span>
+                  </div>
+                  <span class="font-body-sm text-body-sm text-outline mt-0.5">Recurring weekly shift window • Room 304</span>
+                </div>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-space-xs mt-space-sm sm:mt-0 self-end sm:self-center">
+                <button class="h-8 px-space-md rounded-lg text-primary hover:bg-primary-fixed/40 font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="reactivateSchedule('sch-8')" title="Reactivate this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">play_circle</span>
+                      <span class="">Reactivate</span>
+                    </button>
+                    <button class="h-8 px-space-md rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openEditModal('sch-8')" title="Edit this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">edit</span>
+                      <span class="">Edit</span>
+                    </button>
+              </div>
+            </div></div></div><div class="rounded-xl border transition-all bg-surface-container-low/30 border-surface-container-low p-space-md opacity-85"><div class="flex flex-col sm:flex-row sm:items-center justify-between pb-space-sm gap-space-xs border-b border-surface-container-low">
+          <div class="flex items-center gap-space-sm">
+            <span class="font-headline-md text-headline-md font-bold text-on-surface text-outline">Sunday</span>
+            <span class="px-space-sm py-0.5 rounded-full bg-surface-container text-outline font-label-sm text-label-sm font-medium">Off Duty / No Shifts</span>
+          </div>
+          <div class="flex items-center gap-space-xs">
+            <button class="h-8 px-space-md rounded-lg text-primary hover:bg-surface-container-low font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openAddModalForDay('Sunday')" type="button">
+              <span class="material-symbols-outlined text-[16px]">add</span>
+              <span class="">Add Shift</span>
+            </button>
+          </div>
+        </div><div class="flex flex-col gap-space-sm pt-space-md">
+            <div class="py-space-sm px-space-md rounded-lg bg-surface-container-low/50 text-outline text-xs flex items-center justify-between">
+              <span class="">No recurring hours scheduled for Sunday.</span>
+              <button class="text-primary hover:underline font-semibold" onclick="openAddModalForDay('Sunday')">+ Configure Hours</button>
+            </div>
+          </div></div></div>
+
+        <!-- Empty State Container (Hidden when schedules exist) -->
+        <div class="hidden flex-col items-center justify-center py-space-3xl px-space-xl text-center bg-surface-container-low/40 rounded-xl border border-dashed border-outline-variant/60 my-space-lg" id="empty-state-container">
+          <div class="w-16 h-16 rounded-2xl bg-surface-container-high text-primary flex items-center justify-center mb-space-md shadow-sm">
+            <span class="material-symbols-outlined text-[36px]">event_busy</span>
+          </div>
+          <h3 class="font-headline-md text-headline-md font-bold text-on-surface">No Working Hours Configured</h3>
+          <p class="font-body-md text-body-md text-on-surface-variant max-w-md mt-1 mb-space-lg">
+            You currently have no recurring weekly working hours set up. Patients and receptionists cannot book appointments until you activate your availability.
+          </p>
+          <button class="h-10 px-space-xl rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md font-semibold flex items-center gap-space-xs shadow-sm transition-all" onclick="openAddModal()" type="button">
+            <span class="material-symbols-outlined text-[20px]">add_circle</span>
+            <span class="">+ Add Working Hours</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Backend Context & Integration Info Note -->
+      <div class="mt-space-xl p-space-md rounded-xl bg-surface-container-low/70 border border-surface-container-high/60 flex items-start gap-space-md text-on-surface-variant">
+        <span class="material-symbols-outlined text-[20px] text-primary flex-shrink-0 mt-0.5">info</span>
+        <div class="flex flex-col text-xs leading-relaxed">
+          <span class="font-semibold text-on-surface">FindMyDoctor Schedule Engine Synchronization</span>
+          <p class="text-on-surface-variant mt-0.5">
+            Schedules are tied to physician ID <code class="font-code-sm font-semibold bg-surface-container px-1 py-0.5 rounded text-primary">DOC-MERCER-304</code> and synchronized with <code class="font-code-sm bg-surface-container px-1 py-0.5 rounded">/api/v1/doctors/:id/schedules</code>. Changes automatically reflect in patient booking portals, break interval controls, and reception desk triage queues.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- ================= MODAL: ADD / EDIT WORKING HOURS ================= -->
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 backdrop-blur-xs hidden p-space-base transition-opacity duration-200" id="modal-schedule">
+  <div class="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-space-xl shadow-2xl flex flex-col gap-space-lg transform transition-all scale-95 opacity-0 duration-200" id="modal-schedule-card">
+    <!-- Modal Header -->
+    <div class="flex items-start justify-between pb-space-sm border-b border-surface-container-low">
+      <div class="flex items-center gap-space-md">
+        <div class="w-10 h-10 rounded-xl bg-primary-fixed text-primary flex items-center justify-center flex-shrink-0" id="modal-icon-badge">
+          <span class="material-symbols-outlined text-[22px]">schedule</span>
+        </div>
+        <div class="flex flex-col">
+          <h3 class="font-headline-md text-headline-md font-bold text-on-surface" id="modal-title">Add Working Hours</h3>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Configure recurring weekly availability window</p>
+        </div>
+      </div>
+      <button class="text-outline hover:text-on-surface p-space-xs rounded-lg transition-colors" onclick="closeScheduleModal()" title="Close" type="button">
+        <span class="material-symbols-outlined text-[20px]">close</span>
+      </button>
+    </div>
+
+    <!-- Modal Form -->
+    <form class="flex flex-col gap-space-md" id="schedule-form" onsubmit="handleFormSubmit(event)">
+      <input id="form-schedule-id" type="hidden" value="">
+
+      <!-- Error / Validation Banner -->
+      <div class="hidden p-space-md rounded-xl bg-error-container text-on-error-container flex items-start gap-space-sm text-xs leading-normal animate-shake" id="modal-error-banner">
+        <span class="material-symbols-outlined text-[18px] text-error flex-shrink-0 mt-0.5" id="modal-error-icon">error</span>
+        <div class="flex flex-col">
+          <span class="font-bold text-error uppercase tracking-wider text-[11px]" id="modal-error-title">Validation Error</span>
+          <span class="text-on-error-container mt-0.5" id="modal-error-msg">End time must be later than start time.</span>
+        </div>
+      </div>
+
+      <!-- Field 1: Day of the Week -->
+      <div class="flex flex-col gap-space-2xs">
+        <label class="font-label-md text-label-md text-on-surface font-semibold flex items-center justify-between" for="form-day">
+          <span class="">Day of the Week <span class="text-error">*</span></span>
+          <span class="font-label-sm text-label-sm text-outline font-normal">Recurring Weekly</span>
+        </label>
+        <div class="relative">
+          <select class="w-full h-11 px-space-md pr-space-xl rounded-xl bg-surface-container-low text-on-surface font-body-md text-body-md border border-outline-variant/30 focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary appearance-none cursor-pointer transition-all" id="form-day" required="">
+            <option disabled="" value="">Select a day of the week</option>
+            <option selected="" value="Monday">Monday</option>
+            <option value="Tuesday">Tuesday</option>
+            <option value="Wednesday">Wednesday</option>
+            <option value="Thursday">Thursday</option>
+            <option value="Friday">Friday</option>
+            <option value="Saturday">Saturday</option>
+            <option value="Sunday">Sunday</option>
+          </select>
+          <span class="material-symbols-outlined absolute right-3 top-3 text-[20px] text-outline pointer-events-none">expand_more</span>
+        </div>
+      </div>
+
+      <!-- Field 2: Start & End Time Inputs -->
+      <div class="grid grid-cols-2 gap-space-md">
+        <div class="flex flex-col gap-space-2xs">
+          <label class="font-label-md text-label-md text-on-surface font-semibold" for="form-start-time">
+            Start Time <span class="text-error">*</span>
+          </label>
+          <div class="relative">
+            <input class="w-full h-11 px-space-md rounded-xl bg-surface-container-low text-on-surface font-code-sm text-code-sm border border-outline-variant/30 focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary transition-all" id="form-start-time" required="" type="time" value="08:00">
+          </div>
+        </div>
+        <div class="flex flex-col gap-space-2xs">
+          <label class="font-label-md text-label-md text-on-surface font-semibold" for="form-end-time">
+            End Time <span class="text-error">*</span>
+          </label>
+          <div class="relative">
+            <input class="w-full h-11 px-space-md rounded-xl bg-surface-container-low text-on-surface font-code-sm text-code-sm border border-outline-variant/30 focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary transition-all" id="form-end-time" required="" type="time" value="12:00">
+          </div>
+        </div>
+      </div>
+
+      <!-- Time Format Helper & Live Calculation -->
+      <div class="p-space-sm rounded-lg bg-surface-container-low flex items-center justify-between text-xs text-secondary">
+        <span class="flex items-center gap-1 font-medium">
+          <span class="material-symbols-outlined text-[16px] text-primary">schedule</span>
+          <span id="shift-duration-label" class="">Shift duration: 4 hrs 00 mins</span>
+        </span>
+        <span class="text-outline">Room 304 Cardiology</span>
+      </div>
+
+      <!-- Modal Action Buttons -->
+      <div class="flex items-center justify-end gap-space-sm pt-space-xs border-t border-surface-container-low">
+        <button class="h-10 px-space-lg rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md font-semibold transition-colors" onclick="closeScheduleModal()" type="button">
+          Cancel
+        </button>
+        <button class="h-10 px-space-xl rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md font-semibold flex items-center gap-space-xs shadow-sm transition-all" id="modal-save-btn" type="submit">
+          <span class="material-symbols-outlined text-[18px]">save</span>
+          <span id="modal-save-text" class="">Save Schedule</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= MODAL: DEACTIVATE CONFIRMATION DIALOG ================= -->
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 backdrop-blur-xs hidden p-space-base transition-opacity duration-200" id="modal-deactivate">
+  <div class="bg-surface-container-lowest rounded-2xl max-w-md w-full p-space-xl shadow-2xl flex flex-col gap-space-lg transform transition-all scale-95 opacity-0 duration-200" id="modal-deactivate-card">
+    <div class="flex items-start justify-between">
+      <div class="flex items-center gap-space-md">
+        <div class="w-11 h-11 rounded-xl bg-error-container text-on-error-container flex items-center justify-center flex-shrink-0">
+          <span class="material-symbols-outlined text-[24px]">pause_circle</span>
+        </div>
+        <div class="flex flex-col">
+          <h3 class="font-headline-md text-headline-md font-bold text-on-surface">Deactivate working hours?</h3>
+          <span class="font-body-sm text-body-sm text-outline" id="deactivate-target-summary">Monday • 8:00 AM - 12:00 PM</span>
+        </div>
+      </div>
+      <button class="text-outline hover:text-on-surface p-space-xs rounded-lg transition-colors" onclick="closeDeactivateModal()" title="Close" type="button">
+        <span class="material-symbols-outlined text-[20px]">close</span>
+      </button>
+    </div>
+
+    <div class="bg-surface-container-low p-space-md rounded-xl text-on-surface-variant font-body-sm text-body-sm leading-relaxed border border-surface-container-high/60">
+      <p class="">
+        The schedule will become <strong class="text-on-surface font-semibold">inactive</strong> rather than being permanently deleted.
+      </p>
+      <p class="mt-2 text-outline">
+        Patients will no longer be able to book visits during this period, but you can reactivate or edit this schedule at any time.
+      </p>
+    </div>
+
+    <input id="deactivate-target-id" type="hidden" value="">
+
+    <div class="flex items-center justify-end gap-space-sm pt-space-xs">
+      <button class="h-10 px-space-lg rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md font-semibold transition-colors" onclick="closeDeactivateModal()" type="button">
+        Cancel
+      </button>
+      <button class="h-10 px-space-xl rounded-xl bg-error hover:bg-on-error-container text-on-error font-label-md text-label-md font-semibold flex items-center gap-space-xs shadow-sm transition-all" onclick="confirmDeactivateSchedule()" type="button">
+        <span class="material-symbols-outlined text-[18px]">pause_circle</span>
+        <span class="">Deactivate</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= TOAST NOTIFICATION ================= -->
+<div class="fixed bottom-6 right-6 z-50 bg-inverse-surface text-inverse-on-surface px-space-lg py-space-md rounded-xl shadow-xl flex items-center gap-space-md transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none" id="schedule-toast">
+  <span class="material-symbols-outlined text-[22px] text-tertiary-fixed" id="toast-icon">check_circle</span>
+  <div class="flex flex-col">
+    <span class="font-label-md text-label-md font-semibold" id="toast-title">Schedule Updated</span>
+    <span class="font-body-sm text-body-sm text-inverse-on-surface/80" id="toast-msg">Working hours saved successfully.</span>
+  </div>
+</div>
+
+<!-- Interactive Client Application Logic -->
+<script>
+  (function() {
+    // Standard Day Order
+    const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    // In-memory Data Store mimicking /api/v1/doctors/:id/schedules
+    let schedules = [
+      { id: 'sch-1', day: 'Monday', start: '08:00', end: '12:00', status: 'Active' },
+      { id: 'sch-2', day: 'Monday', start: '13:00', end: '17:00', status: 'Active' },
+      { id: 'sch-3', day: 'Tuesday', start: '08:30', end: '16:30', status: 'Active' },
+      { id: 'sch-4', day: 'Wednesday', start: '09:00', end: '15:00', status: 'Inactive' },
+      { id: 'sch-5', day: 'Thursday', start: '08:00', end: '14:00', status: 'Active' },
+      { id: 'sch-6', day: 'Friday', start: '09:00', end: '12:00', status: 'Active' },
+      { id: 'sch-7', day: 'Friday', start: '13:00', end: '16:00', status: 'Active' },
+      { id: 'sch-8', day: 'Saturday', start: '09:00', end: '13:00', status: 'Inactive' }
+    ];
+
+    // Helper: format 24h to 12h AM/PM
+    function formatTime(timeStr) {
+      if (!timeStr) return '';
+      const [hStr, mStr] = timeStr.split(':');
+      let h = parseInt(hStr, 10);
+      const m = mStr || '00';
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      h = h ? h : 12;
+      return `${h}:${m} ${ampm}`;
+    }
+
+    // Helper: calculate total minutes
+    function toMinutes(timeStr) {
+      const [h, m] = timeStr.split(':').map(Number);
+      return h * 60 + m;
+    }
+
+    // Live Duration Update in Modal
+    function updateDurationPreview() {
+      const start = document.getElementById('form-start-time').value;
+      const end = document.getElementById('form-end-time').value;
+      const label = document.getElementById('shift-duration-label');
+      if (start && end) {
+        const diff = toMinutes(end) - toMinutes(start);
+        if (diff > 0) {
+          const hrs = Math.floor(diff / 60);
+          const mins = diff % 60;
+          label.textContent = `Shift duration: ${hrs}h ${mins > 0 ? mins + 'm' : '00m'}`;
+        } else {
+          label.textContent = `Shift duration: Invalid time window`;
+        }
+      }
+    }
+
+    document.getElementById('form-start-time').addEventListener('input', updateDurationPreview);
+    document.getElementById('form-end-time').addEventListener('input', updateDurationPreview);
+
+    // Toast Notification helper
+    let toastTimer;
+    window.showToast = function(message, type = 'success', title = 'Working Hours') {
+      const toast = document.getElementById('schedule-toast');
+      const toastMsg = document.getElementById('toast-msg');
+      const toastTitle = document.getElementById('toast-title');
+      const toastIcon = document.getElementById('toast-icon');
+
+      toastTitle.textContent = title;
+      toastMsg.textContent = message;
+
+      if (type === 'error') {
+        toastIcon.textContent = 'error';
+        toastIcon.className = 'material-symbols-outlined text-[22px] text-error';
+      } else if (type === 'info') {
+        toastIcon.textContent = 'info';
+        toastIcon.className = 'material-symbols-outlined text-[22px] text-secondary';
+      } else {
+        toastIcon.textContent = 'check_circle';
+        toastIcon.className = 'material-symbols-outlined text-[22px] text-tertiary-fixed';
+      }
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3500);
+    };
+
+    // Render Weekly Schedules
+    function renderWeeklySchedule() {
+      const container = document.getElementById('weekly-days-container');
+      const emptyState = document.getElementById('empty-state-container');
+      container.innerHTML = '';
+
+      if (schedules.length === 0) {
+        emptyState.classList.remove('hidden');
+        emptyState.classList.add('flex');
+        updateKPIs();
+        return;
+      } else {
+        emptyState.classList.add('hidden');
+        emptyState.classList.remove('flex');
+      }
+
+      DAYS.forEach(day => {
+        const daySchedules = schedules.filter(s => s.day === day);
+        const dayHasActive = daySchedules.some(s => s.status === 'Active');
+
+        // Card Container per Day
+        const dayCard = document.createElement('div');
+        dayCard.className = `rounded-xl border transition-all ${
+          daySchedules.length === 0
+            ? 'bg-surface-container-low/30 border-surface-container-low p-space-md opacity-85'
+            : 'bg-surface-container-lowest border-surface-container-low shadow-xs p-space-lg'
+        }`;
+
+        // Header for the Day
+        const header = document.createElement('div');
+        header.className = 'flex flex-col sm:flex-row sm:items-center justify-between pb-space-sm gap-space-xs border-b border-surface-container-low';
+        
+        header.innerHTML = `
+          <div class="flex items-center gap-space-sm">
+            <span class="font-headline-md text-headline-md font-bold text-on-surface ${daySchedules.length === 0 ? 'text-outline' : ''}">${day}</span>
+            ${daySchedules.length > 0 
+              ? (dayHasActive 
+                  ? `<span class="px-space-sm py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm font-semibold flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active Day
+                    </span>`
+                  : `<span class="px-space-sm py-0.5 rounded-full bg-surface-container-high text-outline font-label-sm text-label-sm font-semibold">
+                      All Shifts Inactive
+                    </span>`
+                )
+              : `<span class="px-space-sm py-0.5 rounded-full bg-surface-container text-outline font-label-sm text-label-sm font-medium">Off Duty / No Shifts</span>`
+            }
+          </div>
+          <div class="flex items-center gap-space-xs">
+            <button class="h-8 px-space-md rounded-lg text-primary hover:bg-surface-container-low font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openAddModalForDay('${day}')" type="button">
+              <span class="material-symbols-outlined text-[16px]">add</span>
+              <span>Add Shift</span>
+            </button>
+          </div>
+        `;
+        dayCard.appendChild(header);
+
+        // Schedule Shift Rows List
+        const listContainer = document.createElement('div');
+        listContainer.className = 'flex flex-col gap-space-sm pt-space-md';
+
+        if (daySchedules.length === 0) {
+          listContainer.innerHTML = `
+            <div class="py-space-sm px-space-md rounded-lg bg-surface-container-low/50 text-outline text-xs flex items-center justify-between">
+              <span>No recurring hours scheduled for ${day}.</span>
+              <button class="text-primary hover:underline font-semibold" onclick="openAddModalForDay('${day}')">+ Configure Hours</button>
+            </div>
+          `;
+        } else {
+          daySchedules.forEach(item => {
+            const isActive = item.status === 'Active';
+            const row = document.createElement('div');
+            row.className = `flex flex-col sm:flex-row sm:items-center justify-between p-space-md rounded-xl transition-all ${
+              isActive 
+                ? 'bg-surface-container-low/70 border border-surface-container-high hover:border-primary/40' 
+                : 'bg-surface-container-low/30 border border-dashed border-outline-variant/40 opacity-70'
+            }`;
+
+            row.innerHTML = `
+              <div class="flex items-center gap-space-md min-w-0">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center font-code-sm ${
+                  isActive ? 'bg-primary-fixed text-primary' : 'bg-surface-container text-outline'
+                }">
+                  <span class="material-symbols-outlined text-[18px]">${isActive ? 'wb_sunny' : 'nightlight'}</span>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex items-center gap-space-sm flex-wrap">
+                    <span class="font-code-sm text-code-sm font-bold ${isActive ? 'text-on-surface' : 'text-outline line-through'}">
+                      ${formatTime(item.start)} – ${formatTime(item.end)}
+                    </span>
+                    <span class="font-body-sm text-body-sm text-secondary">(${calculateDuration(item.start, item.end)})</span>
+                    ${isActive 
+                      ? `<span class="inline-flex items-center gap-1 px-space-sm py-0.5 rounded-full bg-tertiary-fixed/40 text-tertiary font-label-sm text-label-sm font-semibold">
+                          <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active
+                        </span>`
+                      : `<span class="inline-flex items-center gap-1 px-space-sm py-0.5 rounded-full bg-surface-container text-outline font-label-sm text-label-sm font-medium">
+                          <span class="w-1.5 h-1.5 rounded-full bg-outline"></span> Inactive
+                        </span>`
+                    }
+                  </div>
+                  <span class="font-body-sm text-body-sm text-outline mt-0.5">Recurring weekly shift window • Room 304</span>
+                </div>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-space-xs mt-space-sm sm:mt-0 self-end sm:self-center">
+                ${isActive 
+                  ? `<button class="h-8 px-space-md rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openEditModal('${item.id}')" title="Edit this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">edit</span>
+                      <span>Edit</span>
+                    </button>
+                    <button class="h-8 px-space-md rounded-lg text-error hover:bg-error-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openDeactivateModal('${item.id}')" title="Deactivate this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">pause_circle</span>
+                      <span>Deactivate</span>
+                    </button>`
+                  : `<button class="h-8 px-space-md rounded-lg text-primary hover:bg-primary-fixed/40 font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="reactivateSchedule('${item.id}')" title="Reactivate this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">play_circle</span>
+                      <span>Reactivate</span>
+                    </button>
+                    <button class="h-8 px-space-md rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm font-semibold flex items-center gap-1 transition-colors" onclick="openEditModal('${item.id}')" title="Edit this schedule" type="button">
+                      <span class="material-symbols-outlined text-[16px]">edit</span>
+                      <span>Edit</span>
+                    </button>`
+                }
+              </div>
+            `;
+            listContainer.appendChild(row);
+          });
+        }
+        dayCard.appendChild(listContainer);
+        container.appendChild(dayCard);
+      });
+
+      updateKPIs();
+    }
+
+    function calculateDuration(start, end) {
+      const diff = toMinutes(end) - toMinutes(start);
+      if (diff <= 0) return '0 hrs';
+      const h = Math.floor(diff / 60);
+      const m = diff % 60;
+      return `${h}h${m > 0 ? ' ' + m + 'm' : ''}`;
+    }
+
+    function updateKPIs() {
+      const activeList = schedules.filter(s => s.status === 'Active');
+      const activeDays = new Set(activeList.map(s => s.day)).size;
+      let totalMins = 0;
+      activeList.forEach(s => {
+        totalMins += Math.max(0, toMinutes(s.end) - toMinutes(s.start));
+      });
+      const totalHrs = (totalMins / 60).toFixed(1);
+
+      const kpiDays = document.getElementById('kpi-active-days');
+      const kpiHours = document.getElementById('kpi-weekly-hours');
+      const kpiShifts = document.getElementById('kpi-active-shifts');
+
+      if (kpiDays) kpiDays.textContent = `${activeDays} Day${activeDays === 1 ? '' : 's'} Active`;
+      if (kpiHours) kpiHours.textContent = `${totalHrs} Hours`;
+      if (kpiShifts) kpiShifts.textContent = `${activeList.length} Active Shift${activeList.length === 1 ? '' : 's'}`;
+    }
+
+    // Modal Control Functions
+    const modalSchedule = document.getElementById('modal-schedule');
+    const modalScheduleCard = document.getElementById('modal-schedule-card');
+    const modalDeactivate = document.getElementById('modal-deactivate');
+    const modalDeactivateCard = document.getElementById('modal-deactivate-card');
+    const modalErrorBanner = document.getElementById('modal-error-banner');
+    const modalErrorMsg = document.getElementById('modal-error-msg');
+    const modalErrorTitle = document.getElementById('modal-error-title');
+
+    function showModal(modal, card) {
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        card.classList.remove('scale-95', 'opacity-0');
+        card.classList.add('scale-100', 'opacity-100');
+      }, 10);
+    }
+
+    function hideModal(modal, card) {
+      card.classList.remove('scale-100', 'opacity-100');
+      card.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 200);
+    }
+
+    window.openAddModal = function() {
+      clearFormErrors();
+      document.getElementById('schedule-form').reset();
+      document.getElementById('form-schedule-id').value = '';
+      document.getElementById('form-day').value = 'Monday';
+      document.getElementById('form-start-time').value = '08:00';
+      document.getElementById('form-end-time').value = '12:00';
+      document.getElementById('modal-title').textContent = 'Add Working Hours';
+      document.getElementById('modal-save-text').textContent = 'Save Schedule';
+      document.getElementById('modal-icon-badge').innerHTML = '<span class="material-symbols-outlined text-[22px]">add_circle</span>';
+      updateDurationPreview();
+      showModal(modalSchedule, modalScheduleCard);
+    };
+
+    window.openAddModalForDay = function(dayName) {
+      openAddModal();
+      document.getElementById('form-day').value = dayName;
+    };
+
+    window.openEditModal = function(id) {
+      clearFormErrors();
+      const sched = schedules.find(s => s.id === id);
+      if (!sched) return;
+      document.getElementById('form-schedule-id').value = sched.id;
+      document.getElementById('form-day').value = sched.day;
+      document.getElementById('form-start-time').value = sched.start;
+      document.getElementById('form-end-time').value = sched.end;
+      document.getElementById('modal-title').textContent = 'Edit Working Hours';
+      document.getElementById('modal-save-text').textContent = 'Update Schedule';
+      document.getElementById('modal-icon-badge').innerHTML = '<span class="material-symbols-outlined text-[22px]">edit</span>';
+      updateDurationPreview();
+      showModal(modalSchedule, modalScheduleCard);
+    };
+
+    window.closeScheduleModal = function() {
+      hideModal(modalSchedule, modalScheduleCard);
+    };
+
+    window.openDeactivateModal = function(id) {
+      const sched = schedules.find(s => s.id === id);
+      if (!sched) return;
+      document.getElementById('deactivate-target-id').value = sched.id;
+      document.getElementById('deactivate-target-summary').textContent = `${sched.day} • ${formatTime(sched.start)} - ${formatTime(sched.end)}`;
+      showModal(modalDeactivate, modalDeactivateCard);
+    };
+
+    window.closeDeactivateModal = function() {
+      hideModal(modalDeactivate, modalDeactivateCard);
+    };
+
+    window.confirmDeactivateSchedule = function() {
+      const id = document.getElementById('deactivate-target-id').value;
+      const target = schedules.find(s => s.id === id);
+      if (target) {
+        target.status = 'Inactive';
+        renderWeeklySchedule();
+        closeDeactivateModal();
+        showToast(`${target.day} shift (${formatTime(target.start)} - ${formatTime(target.end)}) is now inactive.`, 'info', 'Shift Deactivated');
+      }
+    };
+
+    window.reactivateSchedule = function(id) {
+      const target = schedules.find(s => s.id === id);
+      if (!target) return;
+
+      // Check if reactivating would conflict with existing active schedules
+      const conflict = checkTimeConflict(target.day, target.start, target.end, target.id);
+      if (conflict) {
+        showToast(`Cannot reactivate: ${conflict}`, 'error', 'Conflict Error');
+        return;
+      }
+
+      target.status = 'Active';
+      renderWeeklySchedule();
+      showToast(`${target.day} shift (${formatTime(target.start)} - ${formatTime(target.end)}) is now active.`, 'success', 'Shift Reactivated');
+    };
+
+    function clearFormErrors() {
+      modalErrorBanner.classList.add('hidden');
+      modalErrorMsg.textContent = '';
+    }
+
+    function showFormError(title, msg) {
+      modalErrorTitle.textContent = title;
+      modalErrorMsg.textContent = msg;
+      modalErrorBanner.classList.remove('hidden');
+    }
+
+    // Strict Validation Engine (Matches backend rules)
+    function checkTimeConflict(day, start, end, excludeId = null) {
+      const newStartMin = toMinutes(start);
+      const newEndMin = toMinutes(end);
+
+      // Rule 1: End time must be later than start time
+      if (newEndMin <= newStartMin) {
+        return 'End time must be later than start time.';
+      }
+
+      // Check against existing schedules on the same day
+      const sameDaySchedules = schedules.filter(s => s.day === day && s.id !== excludeId && s.status === 'Active');
+
+      for (let s of sameDaySchedules) {
+        const existStart = toMinutes(s.start);
+        const existEnd = toMinutes(s.end);
+
+        // Rule 2: Duplicate schedule (exact match)
+        if (existStart === newStartMin && existEnd === newEndMin) {
+          return 'This working-hour schedule already exists.';
+        }
+
+        // Rule 3: Overlapping schedule period
+        // Periods overlap if: (StartA < EndB) and (EndA > StartB)
+        if (newStartMin < existEnd && newEndMin > existStart) {
+          return `This working-hour period overlaps with an existing schedule on ${day} (${formatTime(s.start)} - ${formatTime(s.end)}).`;
+        }
+      }
+
+      return null;
+    }
+
+    window.handleFormSubmit = function(e) {
+      e.preventDefault();
+      clearFormErrors();
+
+      const id = document.getElementById('form-schedule-id').value;
+      const day = document.getElementById('form-day').value;
+      const start = document.getElementById('form-start-time').value;
+      const end = document.getElementById('form-end-time').value;
+
+      // Missing values check
+      if (!day) {
+        showFormError('Missing Information', 'Please select a day of the week.');
+        return;
+      }
+      if (!start) {
+        showFormError('Missing Information', 'Please enter a valid shift start time.');
+        return;
+      }
+      if (!end) {
+        showFormError('Missing Information', 'Please enter a valid shift end time.');
+        return;
+      }
+
+      // Conflict / Validation check
+      const conflictError = checkTimeConflict(day, start, end, id || null);
+      if (conflictError) {
+        if (conflictError.includes('later than start time')) {
+          showFormError('Invalid Time', conflictError);
+        } else if (conflictError.includes('already exists')) {
+          showFormError('Duplicate Schedule', conflictError);
+        } else {
+          showFormError('Overlapping Schedule', conflictError);
+        }
+        return;
+      }
+
+      // If editing existing
+      if (id) {
+        const target = schedules.find(s => s.id === id);
+        if (target) {
+          target.day = day;
+          target.start = start;
+          target.end = end;
+          // Keep existing active status
+          renderWeeklySchedule();
+          closeScheduleModal();
+          showToast(`Updated working hours for ${day}: ${formatTime(start)} - ${formatTime(end)}`, 'success', 'Schedule Updated');
+        }
+      } else {
+        // Create new
+        const newId = 'sch-' + Date.now();
+        schedules.push({
+          id: newId,
+          day: day,
+          start: start,
+          end: end,
+          status: 'Active'
+        });
+        renderWeeklySchedule();
+        closeScheduleModal();
+        showToast(`Added working hours for ${day}: ${formatTime(start)} - ${formatTime(end)}`, 'success', 'Schedule Created');
+      }
+    };
+
+    // Close on backdrop click
+    modalSchedule.addEventListener('click', (e) => {
+      if (e.target === modalSchedule) closeScheduleModal();
+    });
+    modalDeactivate.addEventListener('click', (e) => {
+      if (e.target === modalDeactivate) closeDeactivateModal();
+    });
+
+    // Initialize layout on load
+    document.addEventListener('DOMContentLoaded', () => {
+      renderWeeklySchedule();
+    });
+    renderWeeklySchedule();
+  })();
+</script>
+
+
+</body></html>

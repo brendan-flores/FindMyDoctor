@@ -264,7 +264,7 @@ CREATE TABLE doctor_schedules (
 - Foundation for capacity calculations
 
 #### doctor_unavailability
-Specific dates/times when doctor is unavailable.
+Specific dates/times when doctor is unavailable (date-specific exceptions).
 
 ```sql
 CREATE TABLE doctor_unavailability (
@@ -273,23 +273,63 @@ CREATE TABLE doctor_unavailability (
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
     end_date TIMESTAMP WITH TIME ZONE NOT NULL,
     reason TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
 **Why this table is necessary**:
-- Handles exceptions to regular schedule (vacations, conferences)
+- Handles exceptions to regular schedule (vacations, conferences, clinic closure)
 - Prevents booking during unavailable periods
 - Supports complex availability patterns
+- Soft delete via is_active allows reactivation without data loss
+
+**Key design decisions**:
+- is_active: Soft delete flag for exception deactivation/reactivation
+- updated_at: Tracks when exceptions are modified
+
+#### doctor_break_periods
+Break periods within a doctor's working hours for specific dates.
+
+```sql
+CREATE TABLE doctor_break_periods (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    doctor_id UUID NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+    break_date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    reason TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT valid_break_time CHECK (start_time < end_time),
+    CONSTRAINT unique_break_per_doctor_date_time UNIQUE (doctor_id, break_date, start_time, end_time)
+);
+```
+
+**Why this table is necessary**:
+- Handles break periods within working hours (lunch breaks, meetings)
+- Removes availability for specific time ranges on specific dates
+- Distinguishes breaks from full-day unavailability
+- Supports complex availability patterns
+
+**Key design decisions**:
+- break_date: DATE type for specific day breaks (not recurring)
+- valid_break_time CHECK constraint: Ensures start_time < end_time
+- unique_break_per_doctor_date_time: Prevents duplicate breaks on same date/time
+- is_active: Soft delete flag for break deactivation/reactivation
+- Indexes on (doctor_id, break_date) and (doctor_id, is_active) for efficient querying
 
 #### daily_capacities
 Daily capacity calculations and overrides.
+
+**Migration:** `018_add_daily_capacities.sql` (applied)
 
 ```sql
 CREATE TABLE daily_capacities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     doctor_id UUID NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-    clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     consultation_duration_minutes INTEGER DEFAULT 30,
     calculated_capacity INTEGER NOT NULL,

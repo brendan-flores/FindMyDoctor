@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiClient } from '@/lib/api/apiClient';
 
 interface SecretaryHeaderProps {
   userName?: string;
@@ -65,7 +66,7 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
 
   const handleSignOut = () => {
     setIsDropdownOpen(false);
-    localStorage.removeItem('token');
+    apiClient.clearToken();
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     router.push('/secretary-login');

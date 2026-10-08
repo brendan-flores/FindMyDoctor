@@ -924,11 +924,7 @@ export default function DoctorSignupOtp() {
 
               {/* Error */}
               {(formError || emailError) && (
-                <div className="mb-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
-                  <p className="text-red-600 text-[14px]">
-                    {formError || emailError}
-                  </p>
-                </div>
+                <Toast message={formError || emailError} type="error" onClose={() => { setFormError(''); setEmailError(''); }} />
               )}
 
               {/* Submit */}
@@ -1050,9 +1046,7 @@ export default function DoctorSignupOtp() {
                 </div>
 
                 {otpError && (
-                  <p className="text-red-500 text-[14px] mt-3 text-center">
-                    {otpError}
-                  </p>
+                  <Toast message={otpError} type="error" onClose={() => setOtpError('')} />
                 )}
 
               </div>

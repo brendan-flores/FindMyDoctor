@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { apiClient } from '@/lib/api/apiClient';
 
 interface AdminSidebarProps {
   userName?: string;
@@ -39,7 +40,7 @@ export default function AdminSidebar({ userName = 'Eleanor Vance', userRole = 'S
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    apiClient.clearToken();
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     router.push('/admin/login');

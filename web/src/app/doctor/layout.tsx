@@ -31,10 +31,9 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
       // Verify backend-returned role is DOCTOR
       if (user.role !== 'DOCTOR') {
         // Cross-role access denied, redirect to appropriate login
-        localStorage.removeItem('token');
+        apiClient.clearToken();
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        apiClient.clearToken();
         router.push('/doctor-login');
         return;
       }

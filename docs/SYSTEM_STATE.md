@@ -74,7 +74,11 @@ Current System State (October 2026):
 - Web application provides role-specific dashboards for Doctor, Secretary, and Admin users
 - Mobile application includes OTP verification page for patient registration with full backend integration
 - Mobile application authentication persists across hot restarts using SharedPreferences for token storage
-- Mobile Doctors page displays real doctor records from database through backend API (no hardcoded data)
+- Web application authentication persists across page refreshes (Ctrl+R) via apiClient automatic localStorage token management
+- Web apiClient automatically loads token from localStorage on initialization and saves/clears it on setToken/clearToken operations
+- Web application uses toast notifications (auto-dismiss after 2 seconds with close button) for success/error messages instead of inline banners
+- Toast component at web/src/components/ui/Toast.tsx provides consistent notification UI across all pages
+- Web Doctors page displays real doctor records from database through backend API (no hardcoded data)
 - Mobile Doctors page dynamically derives specialties and hospitals from actual registered doctors
 - Mobile Doctors page shows hospital cards with hospital name, address, and doctor count derived from database
 - Doctor self-registration form at `/doctor-signup` now collects only basic information initially
@@ -114,3 +118,35 @@ Current System State (October 2026):
 - Supabase Auth is used only for OTP delivery and verification, not for storing application accounts or credentials
 - Login OTP uses `shouldCreateUser: false` to prevent Supabase from creating application accounts
 - Web application includes shared `OtpVerification` component for login OTP verification (6-digit input, auto-focus, paste support, resend timer)
+- Doctor schedule management feature allows doctors to create, view, edit, deactivate, and reactivate recurring weekly working hours
+- Backend API endpoints for doctor schedules: `GET /api/v1/doctors/:id/schedules` (public, active only), `GET /api/v1/doctors/me/schedules` (authenticated, supports includeInactive query param), `POST /api/v1/doctors/me/schedules` (create), `PUT /api/v1/doctors/me/schedules/:id` (update), `PATCH /api/v1/doctors/me/schedules/:id/deactivate` (soft delete), `PATCH /api/v1/doctors/me/schedules/:id/reactivate` (reactivate)
+- Doctor schedule validation enforces: start time < end time, no overlapping schedules on the same day, day of week between 0-6, doctors can only access their own schedules
+- Database migration `016_allow_multiple_schedules_per_day.sql` removes UNIQUE constraint on (doctor_id, day_of_week) to support multiple shift blocks per day (e.g., morning and afternoon shifts)
+- Doctor schedule operations use permanent deletion via DELETE endpoint (no soft delete/reactivate)
+- Web schedule page at `/doctor/schedule` provides full UI for managing working hours with KPI cards, weekly schedule display, and modals for add/edit/deactivate operations
+- Database migration `017_add_doctor_break_periods.sql` adds `doctor_break_periods` table for break period management and adds `is_active` and `updated_at` columns to `doctor_unavailability` table for soft delete support
+- Database migration `018_add_daily_capacities.sql` adds `daily_capacities` table for storing calculated and configured daily capacity values
+- Backend API endpoints for doctor unavailability (exceptions): `GET /api/v1/doctors/me/unavailability` (authenticated, supports includeInactive query param), `POST /api/v1/doctors/me/unavailability` (create), `PUT /api/v1/doctors/me/unavailability/:id` (update), `DELETE /api/v1/doctors/me/unavailability/:id` (permanent delete)
+- Backend API endpoints for doctor break periods: `GET /api/v1/doctors/me/break-periods` (authenticated, supports includeInactive, startDate, endDate query params), `POST /api/v1/doctors/me/break-periods` (create), `PUT /api/v1/doctors/me/break-periods/:id` (update), `DELETE /api/v1/doctors/me/break-periods/:id` (permanent delete)
+- Doctor unavailability validation enforces: start date <= end date, valid date format, doctors can only access their own exceptions
+- Doctor break period validation enforces: start time < end time, valid time format, break must fall completely within working hours for the specific date, no overlapping breaks on the same date, doctors can only access their own breaks
+- Extended `GET /api/v1/doctors/:id/availability` endpoint to include active unavailability periods (exceptions) and active break periods in the response
+- Web schedule page at `/doctor/schedule` now includes tabbed interface with four tabs: Working Hours, Exceptions, Break Periods, and Capacity
+- Web schedule page allows doctors to add, view, edit, and permanently delete date-specific exceptions (doctor leave, clinic closure, full-day unavailability)
+- Web schedule page allows doctors to add, view, edit, and permanently delete break periods within working hours (e.g., lunch breaks)
+- Past exception and break dates are automatically filtered out from the displayed lists
+- Duplicate exception dates are prevented via disabled date picker options
+- Active exceptions remove availability for the affected date range; active break periods remove availability for the affected time periods on specific dates
+- Capacity calculation service uses centralized 30-minute consultation duration to calculate maximum appointment slots based on available working time after excluding breaks and schedule exceptions
+- Capacity system provides: Calculated Capacity (maximum slots based on available time), Configured Capacity (lower limit set by doctor/secretary), Final Capacity (actual allowed appointments), Remaining Capacity (final capacity minus existing reservations)
+- Backend capacity endpoints updated to use real calculation: GET /api/v1/doctors/:id/capacity (supports date or date range query params), PUT /api/v1/doctors/:id/capacity (with ownership validation and capacity limit enforcement), POST /api/v1/doctors/:id/capacity/:date (with real calculation and validation)
+- Backend adds authenticated doctor capacity endpoints: GET /api/v1/doctors/me/capacity, PUT /api/v1/doctors/me/capacity, POST /api/v1/doctors/me/capacity/:date (registered before parameterized /:id/capacity routes to prevent route shadowing, and returning updated capacity objects on save)
+- Backend adds secretary capacity endpoints: GET /api/v1/secretaries/managed-doctors/capacity, PUT /api/v1/secretaries/managed-doctors/capacity, POST /api/v1/secretaries/managed-doctors/capacity/:date
+- Backend enforces ownership validation: doctors can only manage their own capacity, secretaries can only manage capacity for doctors they are assigned to
+- Backend validates configured capacity cannot exceed calculated capacity on both frontend and backend
+- Capacity calculation accounts for: working hours for the day of week, break periods on the specific date, full-day exceptions (unavailability) for the specific date
+- When a date has a full-day exception, calculated capacity is 0; when no working hours exist for the day, calculated capacity is 0
+- Capacity calculation service at backend/src/modules/capacity/capacityService.ts handles time range merging, break period subtraction, and minute-based slot calculation
+- Web doctor schedule page at /doctor/schedule and web secretary capacity page at /secretary/capacity feature a unified 5-metric responsive grid (Calculated, Configured, Final Limit, Registered, Remaining) with fixed-width input controls
+- Web secretary capacity page at /secretary/capacity allows secretaries to manage capacity for their assigned doctor with the exact same UI as the doctor schedule page
+- Secretary sidebar includes "Capacity" navigation item linking to /secretary/capacity

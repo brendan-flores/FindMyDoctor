@@ -41,10 +41,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       // Verify backend-returned role is ADMIN or SUPERADMIN
       if (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
         // Cross-role access denied, redirect to admin login
-        localStorage.removeItem('token');
+        apiClient.clearToken();
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        apiClient.clearToken();
         router.push('/admin/login');
         return;
       }

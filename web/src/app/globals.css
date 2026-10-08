@@ -65,3 +65,39 @@ body {
     text-wrap: balance;
   }
 }
+
+/* Modern time picker styling */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+/* Color scheme for time picker dropdown */
+input[type="time"]::-webkit-datetime-edit {
+  color: slate-700;
+}
+
+input[type="time"]::-webkit-datetime-edit-fields-wrapper {
+  background: linear-gradient(to bottom, #f8fafc, #ffffff);
+  border-radius: 8px;
+}
+
+input[type="time"]::-webkit-datetime-edit-text {
+  color: #334155;
+  font-weight: 500;
+}
+
+input[type="time"]::-webkit-datetime-edit-hour-field,
+input[type="time"]::-webkit-datetime-edit-minute-field {
+  background: linear-gradient(to bottom, #f1f5f9, #ffffff);
+  border-radius: 6px;
+  padding: 2px 4px;
+  margin: 0 2px;
+  border: 1px solid #e2e8f0;
+}
+
+input[type="time"]::-webkit-datetime-edit-hour-field:focus,
+input[type="time"]::-webkit-datetime-edit-minute-field:focus {
+  background: #dbeafe;
+  border-color: #3b82f6;
+  outline: none;
+}

@@ -27,12 +27,25 @@ function normalizeApiResponse<T>(payload: any): ApiResponse<T> {
 class ApiClient {
   private token: string | null = null;
 
+  constructor() {
+    // Load token from localStorage on initialization
+    if (typeof window !== 'undefined') {
+      this.token = localStorage.getItem('token');
+    }
+  }
+
   setToken(token: string) {
     this.token = token;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('token', token);
+    }
   }
 
   clearToken() {
     this.token = null;
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+    }
   }
 
   private getHeaders(): HeadersInit {
@@ -54,6 +67,14 @@ class ApiClient {
         headers: this.getHeaders(),
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          error: `Server error (${response.status}): ${errorText}`,
+        };
+      }
+
       const data = await response.json();
       return normalizeApiResponse<T>(data);
     } catch (error) {
@@ -72,6 +93,14 @@ class ApiClient {
         body: JSON.stringify(body),
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          error: `Server error (${response.status}): ${errorText}`,
+        };
+      }
+
       const data = await response.json();
       return normalizeApiResponse<T>(data);
     } catch (error) {
@@ -89,6 +118,14 @@ class ApiClient {
         headers: this.getHeaders(),
         body: JSON.stringify(body),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          error: `Server error (${response.status}): ${errorText}`,
+        };
+      }
 
       const data = await response.json();
       return normalizeApiResponse<T>(data);

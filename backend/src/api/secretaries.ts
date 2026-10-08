@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { query } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
+import { calculateCapacity, calculateCapacityRange } from '../modules/capacity/capacityService';
 
 const router = Router();
 
@@ -142,6 +143,180 @@ router.put('/me/two-factor', authenticate, authorize('SECRETARY'), async (req: A
   } catch (err: any) {
     console.error('Secretary 2FA setting update error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update two-factor setting'));
+  }
+});
+
+// Get managed doctor's capacity
+router.get('/managed-doctors/capacity', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { date, startDate, endDate } = req.query;
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+
+    if (date) {
+      // Get capacity for a specific date
+      const capacity = await calculateCapacity(doctorId, String(date));
+      res.json(success(capacity));
+    } else if (startDate && endDate) {
+      // Get capacity for a date range
+      const capacityMap = await calculateCapacityRange(doctorId, String(startDate), String(endDate));
+      const capacityArray = Array.from(capacityMap.entries()).map(([date, capacity]) => ({
+        date,
+        ...capacity,
+      }));
+      res.json(success(capacityArray));
+    } else {
+      // Return error if no date or range provided
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date or date range (startDate and endDate) is required'));
+    }
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch capacity'));
+  }
+});
+
+// Update managed doctor's capacity
+router.put('/managed-doctors/capacity', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { date, configuredCapacity } = req.body;
+
+    if (!date || configuredCapacity === undefined) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date and configured capacity are required'));
+    }
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+
+    // Calculate current capacity to get the calculated capacity
+    const currentCapacity = await calculateCapacity(doctorId, date);
+
+    // Validate configured capacity doesn't exceed calculated capacity
+    if (configuredCapacity > currentCapacity.calculated_capacity) {
+      return res.status(400).json(error(
+        ErrorCodes.VALIDATION_ERROR,
+        `Configured capacity cannot exceed calculated capacity of ${currentCapacity.calculated_capacity}`
+      ));
+    }
+
+    // Check if capacity exists
+    const existingResult = await query(
+      'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
+      [doctorId, date]
+    );
+
+    if (configuredCapacity !== null && configuredCapacity !== undefined && configuredCapacity > currentCapacity.calculated_capacity) {
+      return res.status(400).json(error(
+        ErrorCodes.VALIDATION_ERROR,
+        `Configured capacity cannot exceed calculated capacity of ${currentCapacity.calculated_capacity}`
+      ));
+    }
+
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Capacity record not found'));
+    }
+
+    const finalCapacity = configuredCapacity !== null && configuredCapacity !== undefined
+      ? Math.min(currentCapacity.calculated_capacity, configuredCapacity)
+      : currentCapacity.calculated_capacity;
+
+    await query(
+      `UPDATE daily_capacities
+       SET configured_capacity = $1, final_capacity = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE doctor_id = $3 AND date = $4`,
+      [configuredCapacity, finalCapacity, doctorId, date]
+    );
+
+    // Fetch the updated capacity to return
+    const updatedCapacity = await calculateCapacity(doctorId, date);
+    res.json(success(updatedCapacity, 'Capacity updated successfully'));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update capacity'));
+  }
+});
+
+// Set capacity for a specific date for managed doctor
+router.post('/managed-doctors/capacity/:date', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { date } = req.params;
+    const { configuredCapacity } = req.body;
+
+    if (configuredCapacity === undefined) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Configured capacity is required'));
+    }
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+
+    // Calculate capacity based on actual schedule, breaks, and exceptions
+    const calculated_capacityResult = await calculateCapacity(doctorId, date);
+
+    // Validate configured capacity doesn't exceed calculated capacity
+    if (configuredCapacity !== null && configuredCapacity !== undefined && configuredCapacity > calculated_capacityResult.calculated_capacity) {
+      return res.status(400).json(error(
+        ErrorCodes.VALIDATION_ERROR,
+        `Configured capacity cannot exceed calculated capacity of ${calculated_capacityResult.calculated_capacity}`
+      ));
+    }
+
+    const finalCapacity = configuredCapacity !== null && configuredCapacity !== undefined
+      ? Math.min(calculated_capacityResult.calculated_capacity, configuredCapacity)
+      : calculated_capacityResult.calculated_capacity;
+
+    // Check if capacity exists
+    const existingResult = await query(
+      'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
+      [doctorId, date]
+    );
+
+    if (existingResult.rows.length > 0) {
+      // Update existing
+      await query(
+        `UPDATE daily_capacities
+         SET configured_capacity = $1, final_capacity = $2, consultation_duration_minutes = $3, calculated_capacity = $4, updated_at = CURRENT_TIMESTAMP
+         WHERE doctor_id = $5 AND date = $6`,
+        [configuredCapacity, finalCapacity, calculated_capacityResult.consultation_duration_minutes, calculated_capacityResult.calculated_capacity, doctorId, date]
+      );
+    } else {
+      // Create new
+      await query(
+        `INSERT INTO daily_capacities (doctor_id, date, consultation_duration_minutes, calculated_capacity, configured_capacity, final_capacity)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [doctorId, date, calculated_capacityResult.consultation_duration_minutes, calculated_capacityResult.calculated_capacity, configuredCapacity, finalCapacity]
+      );
+    }
+
+    // Fetch the updated capacity to return
+    const updatedCapacity = await calculateCapacity(doctorId, date);
+    res.json(success(updatedCapacity, 'Capacity set successfully'));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to set capacity'));
   }
 });
 

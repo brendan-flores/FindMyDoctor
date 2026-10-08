@@ -2,15 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { apiClient } from '@/lib/api/apiClient';
 
 export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
 
-    if (token && userStr) {
+    if (userStr) {
       const user = JSON.parse(userStr);
       // Redirect authenticated users to their correct dashboard
       if (user.role === 'ADMIN' || user.role === 'SUPERADMIN') {
@@ -21,7 +21,7 @@ export default function Home() {
         router.push('/secretary/dashboard');
       } else {
         // Unknown role, clear credentials and redirect to doctor login
-        localStorage.removeItem('token');
+        apiClient.clearToken();
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         router.push('/doctor-login');
