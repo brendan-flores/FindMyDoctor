@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation';
 
 import { otpApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
+import { CEBU_FACILITIES } from '@/data/cebuFacilities';
+import { MEDICAL_SPECIALTIES } from '@/data/medicalSpecialties';
+import { MEDICAL_CREDENTIALS } from '@/data/medicalCredentials';
+import SearchableSelect from '@/components/ui/SearchableSelect';
+import SearchableMultiSelect from '@/components/ui/SearchableMultiSelect';
+import Toast from '@/components/ui/Toast';
 
 type Step = 'signup' | 'otp';
 type FormStatus = 'idle' | 'loading';

@@ -134,7 +134,11 @@ export default function DoctorProfile() {
           languages_spoken: response.data.languages_spoken || '',
         });
         if (response.data.professional_photo_url) {
-          setPhotoPreview(response.data.professional_photo_url);
+          setPhotoPreview(
+            response.data.professional_photo_url.startsWith('http')
+              ? response.data.professional_photo_url
+              : `http://localhost:3000${response.data.professional_photo_url}`
+          );
         }
       } else {
         setError(response.error || 'Failed to load profile');
@@ -256,7 +260,8 @@ export default function DoctorProfile() {
         // Clean up the temporary preview URL on error
         URL.revokeObjectURL(previewUrl);
         setPhotoPreview(null);
-        setError(data.error?.message || 'Failed to upload photo');
+        console.error('Upload error details:', data);
+        setError(data.error?.message || data.error || 'Failed to upload photo. Please try again.');
       }
     } catch (err) {
       console.error('Photo upload error:', err);
@@ -504,7 +509,7 @@ export default function DoctorProfile() {
                         <img
                           src={photoPreview.startsWith('http') || photoPreview.startsWith('blob:')
                             ? photoPreview
-                            : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:3000'}${photoPreview}`}
+                            : `http://localhost:3000${photoPreview}`}
                           alt="Professional Photo Preview"
                           className="w-32 h-32 rounded-xl object-cover border-2 border-[#E2E8F0]"
                           onError={(e) => {
@@ -541,7 +546,7 @@ export default function DoctorProfile() {
                       className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#1A62CD] file:text-white hover:file:bg-[#0D3B75] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                      PNG only, maximum 4MB
+                      JPEG, PNG, GIF, WebP, BMP (max 4MB)
                     </p>
                   </div>
                 </div>
@@ -882,7 +887,7 @@ export default function DoctorProfile() {
             <img
               src={photoPreview.startsWith('http') || photoPreview.startsWith('blob:')
                 ? photoPreview
-                : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:3000'}${photoPreview}`}
+                : `http://localhost:3000${photoPreview}`}
               alt="Professional Photo"
               className="max-w-full max-h-[90vh] object-contain rounded-lg"
               onClick={(e) => e.stopPropagation()}
