@@ -240,6 +240,10 @@ router.post('/verify', async (req: Request, res: Response) => {
 
     const user = userResult.rows[0];
 
+    // Ensure Supabase Auth identity for OTP delivery (login flow)
+    const { ensureDoctorSupabaseIdentity } = await import('../services/otpService');
+    await ensureDoctorSupabaseIdentity(email);
+
     // Doctor profile - basic information only, profile_completion_status = 'INCOMPLETE'
     // Professional information will be collected in the profile completion step
     const doctorResult = await client.query(

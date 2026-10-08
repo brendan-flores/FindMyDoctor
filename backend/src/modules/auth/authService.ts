@@ -305,6 +305,9 @@ export async function registerDoctor(data: DoctorRegistrationData) {
 
     const user = userResult.rows[0];
 
+    // Ensure Supabase Auth identity for OTP delivery
+    await otpService.ensureDoctorSupabaseIdentity(email);
+
     // Create the doctor profile (auto-approved)
     const doctorResult = await client.query(
       `INSERT INTO doctors (

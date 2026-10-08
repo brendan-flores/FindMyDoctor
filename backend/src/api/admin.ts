@@ -122,6 +122,10 @@ router.post('/doctors', authenticate, authorize('ADMIN'), async (req: AuthReques
 
     const userId = userResult.rows[0].id;
 
+    // Ensure Supabase Auth identity for OTP delivery
+    const { ensureDoctorSupabaseIdentity } = await import('../services/otpService');
+    await ensureDoctorSupabaseIdentity(email);
+
     // Create doctor profile with practice information
     const doctorResult = await query(
       `INSERT INTO doctors (user_id, first_name, last_name, specialty, credentials, biography, consultation_fee, prc_license_number, practice_name, practice_address, practice_latitude, practice_longitude, practice_phone, practice_email, practice_description, operating_hours_start, operating_hours_end, is_approved)

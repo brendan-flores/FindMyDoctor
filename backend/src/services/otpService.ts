@@ -275,7 +275,7 @@ export async function ensureAdminSupabaseIdentity(email: string): Promise<{ succ
 
     // Check if user already exists in Supabase Auth
     // Use pagination with high perPage to ensure we don't miss existing users
-    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+    const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({
       page: 1,
       perPage: 1000
     });
@@ -285,7 +285,8 @@ export async function ensureAdminSupabaseIdentity(email: string): Promise<{ succ
       throw { code: ErrorCodes.SERVER_ERROR, message: 'Failed to check Supabase users' };
     }
 
-    const existingUser = users?.find(user => user.email === email);
+    const users = data?.users || [];
+    const existingUser = users.find((user: any) => user.email === email);
 
     if (existingUser) {
       console.log('Supabase Auth user already exists for:', email);
@@ -344,7 +345,7 @@ export async function ensureSecretarySupabaseIdentity(email: string): Promise<{ 
 
     // Check if user already exists in Supabase Auth
     // Use pagination with high perPage to ensure we don't miss existing users
-    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+    const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({
       page: 1,
       perPage: 1000
     });
@@ -354,7 +355,8 @@ export async function ensureSecretarySupabaseIdentity(email: string): Promise<{ 
       throw { code: ErrorCodes.SERVER_ERROR, message: 'Failed to check Supabase users' };
     }
 
-    const existingUser = users?.find(user => user.email === email);
+    const users = data?.users || [];
+    const existingUser = users.find((user: any) => user.email === email);
 
     if (existingUser) {
       console.log('Supabase Auth user already exists for:', email);
@@ -383,6 +385,76 @@ export async function ensureSecretarySupabaseIdentity(email: string): Promise<{ 
     }
 
     console.log('Supabase Auth identity created for Secretary:', email);
+    return { success: true, message: 'Supabase identity created successfully' };
+  } catch (err: any) {
+    console.error('Error ensuring Supabase identity:', err);
+    throw err;
+  }
+}
+
+/**
+ * Ensure Doctor has Supabase Auth identity for mandatory OTP
+ *
+ * This function is called when creating Doctor accounts to ensure they have a
+ * Supabase Auth user identity. This is required because login OTP uses
+ * shouldCreateUser: false, which means the user must already exist in Supabase Auth.
+ *
+ * This function is idempotent - it will not create duplicate identities.
+ *
+ * IMPORTANT: This is server-side only. We create a Supabase Auth user but we do NOT
+ * set a password in Supabase Auth. The PostgreSQL users table remains the source of
+ * truth for authentication. Supabase Auth is used only for OTP delivery.
+ */
+export async function ensureDoctorSupabaseIdentity(email: string): Promise<{ success: boolean; message: string }> {
+  try {
+    if (!supabaseAdmin) {
+      throw { code: ErrorCodes.SERVER_ERROR, message: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to backend/.env.' };
+    }
+
+    console.log('Ensuring Supabase Auth identity for Doctor:', email);
+
+    // Check if user already exists in Supabase Auth
+    // Use pagination with high perPage to ensure we don't miss existing users
+    const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000
+    });
+
+    if (listError) {
+      console.error('Supabase Auth listUsers error:', listError);
+      throw { code: ErrorCodes.SERVER_ERROR, message: 'Failed to check Supabase users' };
+    }
+
+    const users = data?.users || [];
+    const existingUser = users.find((user: any) => user.email === email);
+
+    if (existingUser) {
+      console.log('Supabase Auth user already exists for:', email);
+      return { success: true, message: 'Supabase identity already exists' };
+    }
+
+    // Create Supabase Auth user without password (passwordless OTP only)
+    // We use admin.createUser to create the user without sending an email
+    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      email_confirm: true, // Auto-confirm email so OTP can be sent immediately
+      user_metadata: {
+        role: 'DOCTOR',
+        created_via: 'admin_provisioning'
+      }
+    });
+
+    if (createError) {
+      console.error('Supabase Auth createUser error:', createError);
+      // If error is "duplicate key" or similar, user already exists (race condition)
+      if (createError.message?.includes('duplicate') || createError.message?.includes('already exists')) {
+        console.log('Supabase Auth user already exists (race condition):', email);
+        return { success: true, message: 'Supabase identity already exists' };
+      }
+      throw { code: ErrorCodes.SERVER_ERROR, message: createError.message || 'Failed to create Supabase identity' };
+    }
+
+    console.log('Supabase Auth identity created for Doctor:', email);
     return { success: true, message: 'Supabase identity created successfully' };
   } catch (err: any) {
     console.error('Error ensuring Supabase identity:', err);
