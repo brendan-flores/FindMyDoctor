@@ -28,12 +28,20 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter - only PNG allowed
+// File filter - accept common image types
 const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  if (file.mimetype === 'image/png') {
+  const allowedMimeTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/bmp',
+  ];
+  if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Only PNG files are allowed'));
+    cb(new Error('Only image files (JPEG, PNG, GIF, WebP, BMP) are allowed'));
   }
 };
 
@@ -1049,6 +1057,10 @@ router.put('/me/two-factor', authenticate, authorize('DOCTOR'), async (req: Auth
   }
 });
 
+// ============================================
+// DOCTOR PHOTO ENDPOINTS
+// ============================================
+
 // Upload doctor professional photo
 router.post('/me/photo', authenticate, authorize('DOCTOR'), upload.single('photo'), async (req: AuthRequest, res: Response) => {
   try {
@@ -1057,26 +1069,6 @@ router.post('/me/photo', authenticate, authorize('DOCTOR'), upload.single('photo
     if (!req.file) {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'No file uploaded'));
     }
-
-    // Verify actual PNG file signature (magic number)
-    // PNG signature: 89 50 4E 47 0D 0A 1A 0A
-    const fileBuffer = fs.readFileSync(req.file.path);
-    const pngSignature = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-
-    if (fileBuffer.length < 8 || !fileBuffer.subarray(0, 8).equals(pngSignature)) {
-      // Delete the file if it's not a valid PNG
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Only PNG files are allowed'));
-    }
-
-// ============================================
-// DOCTOR UNAVAILABILITY (EXCEPTIONS) ENDPOINTS
-// ============================================
-
-// Get authenticated doctor's unavailability periods (exceptions)
-router.get('/me/unavailability', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
 
     // Get doctor_id from authenticated user
     const doctorResult = await query(
@@ -1092,28 +1084,233 @@ router.get('/me/unavailability', authenticate, authorize('DOCTOR'), async (req: 
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
     }
 
-    const doctorId = doctorResult.rows[0].id;
-    const { includeInactive } = req.query;
+    // Store the file path in the database
+    const photoUrl = `/uploads/${req.file.filename}`;
 
-    let queryText = 'SELECT * FROM doctor_unavailability WHERE doctor_id = $1';
-    const params = [doctorId];
+    const result = await query(
+      `UPDATE doctors
+       SET professional_photo_url = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $2
+       RETURNING professional_photo_url`,
+      [photoUrl, userId]
+    );
 
-    if (includeInactive !== 'true') {
-      queryText += ' AND is_active = true';
+    res.json(success({
+      photoUrl: result.rows[0].professional_photo_url
+    }, 'Photo uploaded successfully'));
+  } catch (err: any) {
+    console.error('Photo upload error:', err);
+
+    // Clean up uploaded file if error occurred
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
     }
 
-    queryText += ' ORDER BY start_date';
-
-    const result = await query(queryText, params);
-
-    res.json(success(result.rows));
-  } catch (err: any) {
-    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor unavailability periods'));
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to upload photo'));
   }
 });
 
-// Create unavailability period (exception) for authenticated doctor
-router.post('/me/unavailability', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+// Delete doctor professional photo
+router.delete('/me/photo', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get current photo URL
+    const doctorResult = await query(
+      'SELECT professional_photo_url FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const currentPhotoUrl = doctorResult.rows[0].professional_photo_url;
+
+    // Clear database field
+    await query(
+      'UPDATE doctors SET professional_photo_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1',
+      [userId]
+    );
+
+    // Delete file if it exists and is a managed local file
+    if (currentPhotoUrl && currentPhotoUrl.startsWith('/uploads/')) {
+      const filename = currentPhotoUrl.split('/').pop();
+      if (filename) {
+        const filePath = path.join(config.upload.dir, filename);
+        // Verify the file is within the upload directory to prevent path traversal
+        const resolvedUploadDir = path.resolve(config.upload.dir);
+        const resolvedFilePath = path.resolve(filePath);
+
+        if (resolvedFilePath.startsWith(resolvedUploadDir) && fs.existsSync(resolvedFilePath)) {
+          fs.unlinkSync(resolvedFilePath);
+        }
+      }
+    }
+
+    res.json(success(null, 'Photo deleted successfully'));
+  } catch (err: any) {
+    console.error('Photo deletion error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete photo'));
+  }
+});
+
+// ============================================
+// DOCTOR PROFILE ENDPOINTS
+// ============================================
+
+// Update Doctor professional profile
+router.put('/me/profile', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const {
+      professional_photo_url,
+      specialty,
+      credentials,
+      prc_license_number,
+      practice_name,
+      years_of_experience,
+      areas_of_expertise,
+      biography,
+      consultation_fee,
+      languages_spoken,
+    } = req.body;
+
+    // Validate PRC license number format if provided
+    const PRC_LICENSE_PATTERN = /^\d{7}$/;
+    if (prc_license_number && !PRC_LICENSE_PATTERN.test(prc_license_number)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'PRC license number must be 7 digits'));
+    }
+
+    // Check if PRC license number is already taken by another doctor
+    if (prc_license_number) {
+      const existingLicense = await query(
+        'SELECT id FROM doctors WHERE prc_license_number = $1 AND user_id <> $2',
+        [prc_license_number, userId]
+      );
+
+      if (existingLicense.rows.length > 0) {
+        return res.status(409).json(error(ErrorCodes.CONFLICT, 'PRC license number is already registered'));
+      }
+    }
+
+    // Build dynamic update query
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramCount = 0;
+
+    if (professional_photo_url !== undefined) {
+      paramCount++;
+      updates.push(`professional_photo_url = $${paramCount}`);
+      values.push(professional_photo_url);
+    }
+    if (specialty !== undefined) {
+      paramCount++;
+      updates.push(`specialty = $${paramCount}`);
+      values.push(specialty);
+    }
+    if (credentials !== undefined) {
+      paramCount++;
+      updates.push(`credentials = $${paramCount}`);
+      values.push(credentials);
+    }
+    if (prc_license_number !== undefined) {
+      paramCount++;
+      updates.push(`prc_license_number = $${paramCount}`);
+      values.push(prc_license_number);
+    }
+    if (practice_name !== undefined) {
+      paramCount++;
+      updates.push(`practice_name = $${paramCount}`);
+      values.push(practice_name);
+    }
+    if (years_of_experience !== undefined) {
+      paramCount++;
+      updates.push(`years_of_experience = $${paramCount}`);
+      values.push(years_of_experience);
+    }
+    if (areas_of_expertise !== undefined) {
+      paramCount++;
+      updates.push(`areas_of_expertise = $${paramCount}`);
+      values.push(areas_of_expertise);
+    }
+    if (biography !== undefined) {
+      paramCount++;
+      updates.push(`biography = $${paramCount}`);
+      values.push(biography);
+    }
+    if (consultation_fee !== undefined) {
+      paramCount++;
+      updates.push(`consultation_fee = $${paramCount}`);
+      values.push(consultation_fee);
+    }
+    if (languages_spoken !== undefined) {
+      paramCount++;
+      updates.push(`languages_spoken = $${paramCount}`);
+      values.push(languages_spoken);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'No fields to update'));
+    }
+
+    // Add user_id parameter
+    paramCount++;
+    values.push(userId);
+
+    const result = await query(
+      `UPDATE doctors
+       SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $${paramCount}
+       RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    // Determine profile completion status based on required fields
+    const doctor = result.rows[0];
+
+    // Get user email verification status for profile completion check
+    const userResult = await query(
+      `SELECT email_verified FROM users WHERE id = $1`,
+      [userId]
+    );
+
+    const user = userResult.rows[0];
+
+    const hasRequiredFields =
+      doctor.first_name &&
+      doctor.last_name &&
+      doctor.contact_number &&
+      doctor.specialty &&
+      doctor.credentials &&
+      doctor.prc_license_number &&
+      doctor.practice_name;
+
+    const hasVerifiedEmail = user.email_verified === true;
+
+    if (hasRequiredFields && hasVerifiedEmail && doctor.profile_completion_status === 'INCOMPLETE') {
+      await query(
+        `UPDATE doctors
+         SET profile_completion_status = 'COMPLETE'
+         WHERE user_id = $1`,
+        [userId]
+      );
+      doctor.profile_completion_status = 'COMPLETE';
+    }
+
+    res.json(success(doctor, 'Profile updated successfully'));
+  } catch (err: any) {
+    console.error('Doctor profile update error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update profile'));
+  }
+});
+
+// Submit Doctor profile for approval
+router.post('/me/profile/submit', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
   const client = await getClient();
 
   try {
@@ -1125,18 +1322,6 @@ router.post('/me/unavailability', authenticate, authorize('DOCTOR'), async (req:
     const doctorResult = await client.query(
       `SELECT * FROM doctors WHERE user_id = $1`,
       [userId]
-    const { startDate, endDate, reason } = req.body;
-
-    // Validation
-    if (!startDate || !endDate) {
-      await client.query('ROLLBACK');
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'startDate and endDate are required'));
-    }
-
-    // Get doctor_id from authenticated user
-    const doctorResult = await client.query(
-      'SELECT id FROM doctors WHERE user_id = $1',
-      [req.user!.id]
     );
 
     if (doctorResult.rows.length === 0) {
@@ -1228,6 +1413,93 @@ router.post('/me/unavailability', authenticate, authorize('DOCTOR'), async (req:
        WHERE user_id = $1
        RETURNING *`,
       [userId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json(success(
+      result.rows[0],
+      'Profile submitted for administrator approval. You will be notified once your account is approved.'
+    ));
+  } catch (err: any) {
+    if (client) {
+      await client.query('ROLLBACK').catch(() => {});
+    }
+
+    console.error('Doctor profile submission error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to submit profile'));
+  } finally {
+    if (client) {
+      client.release();
+    }
+  }
+});
+
+// ============================================
+// DOCTOR UNAVAILABILITY (EXCEPTIONS) ENDPOINTS
+// ============================================
+
+// Get authenticated doctor's unavailability periods (exceptions)
+router.get('/me/unavailability', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+    const { includeInactive } = req.query;
+
+    let queryText = 'SELECT * FROM doctor_unavailability WHERE doctor_id = $1';
+    const params = [doctorId];
+
+    if (includeInactive !== 'true') {
+      queryText += ' AND is_active = true';
+    }
+
+    queryText += ' ORDER BY start_date';
+
+    const result = await query(queryText, params);
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor unavailability periods'));
+  }
+});
+
+// Create unavailability period (exception) for authenticated doctor
+router.post('/me/unavailability', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { startDate, endDate, reason } = req.body;
+
+    // Validation
+    if (!startDate || !endDate) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'startDate and endDate are required'));
+    }
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await client.query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
     const doctorId = doctorResult.rows[0].id;
 
     // Validate date format
