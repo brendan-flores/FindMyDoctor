@@ -140,41 +140,18 @@ export async function login(data: LoginData) {
         };
       }
 
-      if (approvalStatus === 'REJECTED') {
-        throw {
-          code: ErrorCodes.DOCTOR_REJECTED,
-          message: 'Your doctor account has not been approved and you cannot sign in'
-        };
-      }
+      // REJECTED doctors are allowed to authenticate to correct and resubmit their profile
+      // They will be routed to /doctor-profile based on their approval_status
     }
   }
 
   // Server-side OTP requirement decision
+  // All Admin, Secretary, and Doctor accounts require mandatory OTP for login
   let requiresOtp = false;
 
-  if (user.role === 'ADMIN') {
-    // Regular Admins always require OTP; SuperAdmins authenticate directly.
+  if (user.role === 'ADMIN' || user.role === 'DOCTOR' || user.role === 'SECRETARY') {
+    // All these roles require mandatory OTP for login
     requiresOtp = true;
-  } else if (user.role === 'DOCTOR') {
-    // Check Doctor two_factor_enabled setting
-    const doctorResult = await query(
-      'SELECT two_factor_enabled FROM doctors WHERE user_id = $1',
-      [user.id]
-    );
-
-    if (doctorResult.rows.length > 0 && doctorResult.rows[0].two_factor_enabled === true) {
-      requiresOtp = true;
-    }
-  } else if (user.role === 'SECRETARY') {
-    // Check Secretary two_factor_enabled setting
-    const secretaryResult = await query(
-      'SELECT two_factor_enabled FROM secretaries WHERE user_id = $1',
-      [user.id]
-    );
-
-    if (secretaryResult.rows.length > 0 && secretaryResult.rows[0].two_factor_enabled === true) {
-      requiresOtp = true;
-    }
   }
 
   // If OTP is required, create challenge and return opaque token

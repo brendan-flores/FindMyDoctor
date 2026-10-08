@@ -4,33 +4,83 @@ This document contains the current system state for the FindMyDoctor project. It
 
 Current System State (October 2026):
 - Doctor self-registration creates accounts with `approval_status = 'PENDING'` requiring admin approval
-- Three-state doctor approval workflow: PENDING → ACTIVE (approved) or REJECTED
+- Doctor self-registration now uses a two-step flow: basic registration → OTP verification → profile completion → submission for approval
+- Basic Doctor registration requires only: first_name, middle_name (optional), last_name, email, contact_number, password
+- Professional information (specialty, credentials, PRC license number, hospital/clinic, etc.) is collected after OTP verification in the profile completion step
+- Doctor accounts are created with `profile_completion_status = 'INCOMPLETE'` after OTP verification
+- Doctor profile completion status transitions: INCOMPLETE → COMPLETE (when required fields filled) → SUBMITTED (when doctor submits for review)
+- Doctor approval workflow: PENDING → ACTIVE (approved) or REJECTED, with profile_completion_status tracked separately
+- Doctor rejection and resubmission workflow: PENDING → REJECTED (with rejection_reason) → Doctor logs in → corrects profile → resubmits → PENDING → Admin approves → ACTIVE
+- PENDING Doctors cannot log in while awaiting administrator approval
+- REJECTED Doctors may authenticate specifically to correct and resubmit their application (they are not active/patient-visible)
+- REJECTED Doctors can view their rejection reason via `GET /api/v1/doctors/me` (returns `approval_status` and `rejection_reason`)
+- REJECTED Doctors can edit their profile and resubmit via `POST /api/v1/doctors/me/profile/submit`, which restores `approval_status` to `PENDING` and clears `rejection_reason`
+- REJECTED Doctors are routed to `/doctor-profile` after login to view rejection reason and correct their profile
+- Admin approval endpoint `PATCH /api/v1/admin/doctors/:id/approve` explicitly rejects approving doctors with `approval_status = 'REJECTED'` (requires resubmission first)
+- Doctor signup flow on web: `/doctor-signup` (basic fields) → OTP verification → `/doctor-profile` (professional fields + schedule) → submit for approval
+- Web Doctor signup redirects to `/doctor-profile` after successful OTP verification, not to dashboard
+- Web Doctor profile page at `/doctor-profile` allows doctors to complete their professional profile with 12 fields: professional photo (PNG upload, max 4MB), specialty, credentials, PRC license, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule
+- Web Doctor profile page includes schedule management UI using existing schedule APIs (GET/POST/PUT/DELETE `/api/v1/doctors/me/schedules`)
+- Web Doctor profile page includes PNG photo upload with client-side validation (PNG only, max 4MB) and server-side validation via `POST /api/v1/doctors/me/photo` endpoint
+- Professional photo upload stores files in backend `./uploads` directory and serves them via `/uploads/<filename>` static route
+- Professional photo field `professional_photo_url` stores the relative path to the uploaded file
+- Web Doctor profile page includes photo preview after successful upload and ability to remove photo
+- Web Doctor profile page supports saving draft profiles and submitting for approval with validation
+- Web Doctor profile page explicitly handles REJECTED state: shows rejection banner with reason, allows profile editing, allows resubmission, does not lock form when `profile_completion_status === 'SUBMITTED'` if `approval_status === 'REJECTED'`
+- Web Doctor profile page shows submission confirmation modal after successful profile submission with exact text: "Profile Submitted for Review", directing doctor to wait for email notification, with "Continue" button redirecting to `/doctor-login`
+- Web Doctor login page routes authenticated Doctors based on approval_status: ACTIVE → `/doctor/dashboard`, REJECTED → `/doctor-profile`
+- Admin Doctor review interface at `/admin/doctors` displays two clearly separated sections: Basic Information (first name, middle name, last name, email, email verified, contact number) and Professional Information (professional photo, specialty, credentials, PRC license number, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule)
+- Admin Doctor review interface displays available schedules using existing `doctor_schedules` data via new endpoint `GET /api/v1/admin/doctors/:id/schedules`
+- Admin Doctor review interface displays uploaded professional photo if available
+- Admin Doctor review interface uses enhanced UI with color-coded sections, better typography, and improved readability
+- Admin Doctor rejection interface uses a dedicated modal with textarea for rejection reason instead of browser prompt
+- Admin Doctor approval endpoint `PATCH /api/v1/admin/doctors/:id/approve` validates critical information before approving: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic must all be present
+- Admin Doctor rejection endpoint `PATCH /api/v1/admin/doctors/:id/reject` requires a rejection reason (cannot be empty or null)
+- Rejected doctors have `approval_status = 'REJECTED'` and `rejection_reason` set; they can correct their profile and resubmit using the existing onboarding flow
+- Patient-facing doctor search endpoint `GET /api/v1/doctors` does not expose PRC license number, personal contact number, or email address
+- Patient-facing doctor by ID endpoint `GET /api/v1/doctors/:id` does not expose PRC license number, personal contact number, or email address
+- Backend Admin API endpoints `GET /api/v1/admin/doctors` and `GET /api/v1/admin/doctors/:id` return complete doctor profile fields including all professional information, middle name, contact number, profile completion status, and submission timestamp
 - Patient registration uses email OTP verification via Supabase for account creation
 - Patient registration requires username (minimum 3 characters, alphanumeric + underscores only)
 - User login accepts either email or username for authentication
 - SuperAdmins log in directly without OTP; regular Admins always require login OTP (no setting, no bypass)
+- All Doctor accounts require mandatory login OTP (no setting, no bypass)
+- All Secretary accounts require mandatory login OTP (no setting, no bypass)
 - Each Secretary has a required `doctor_id` relationship to one Doctor; Doctors can list only their own Secretaries via the authenticated backend API
 - Supabase is used only for OTP email verification, not for storing application data
 - Backend API includes comprehensive endpoints for doctors, admin, OTP, appointments, queue, payments, etc.
-- Database schema includes approval status fields, pending doctor signups staging table, and pending patient signups staging table (with username)
+- Database schema includes approval status fields, pending doctor signups staging table (basic fields only), and pending patient signups staging table (with username)
 - Database schema includes `middle_name` field in `doctors` and `pending_doctor_signups` tables (migration 010_add_middle_name.sql)
+- Database schema includes extended doctor profile fields (migration 016_doctor_profile_fields.sql): contact_number, professional_photo_url, years_of_experience, areas_of_expertise (comma-separated text), consultation_type, languages_spoken (comma-separated text), profile_completion_status, profile_submitted_at
+- Migration `017_modify_pending_doctor_signup_for_basic_flow.sql` adds contact_number field to pending_doctor_signups for basic registration flow (professional fields remain in table for compatibility)
 - Users table includes username field (unique) for patient identification
 - Patients table does not include phone field (removed in favor of username)
 - Backend API endpoints for patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
+- Backend API endpoints for doctor profile: `PUT /api/v1/doctors/me/profile` (update profile), `POST /api/v1/doctors/me/profile/submit` (submit for approval), `POST /api/v1/doctors/me/photo` (upload professional photo)
+- Backend API endpoints for doctor schedules: `GET /api/v1/doctors/me/schedules`, `POST /api/v1/doctors/me/schedules`, `PUT /api/v1/doctors/me/schedules/:id`, `DELETE /api/v1/doctors/me/schedules/:id`
+- Backend API endpoints for admin doctor review: `GET /api/v1/admin/doctors` (list all doctors with complete profile), `GET /api/v1/admin/doctors/:id` (get doctor details), `GET /api/v1/admin/doctors/:id/schedules` (get doctor schedules), `PATCH /api/v1/admin/doctors/:id/approve` (approve with validation), `PATCH /api/v1/admin/doctors/:id/reject` (reject with required reason)
 - Doctor registration uses separate first name, middle name (optional), and last name fields instead of a single full name field
-- Backend doctor OTP API accepts `firstName`, `middleName`, and `lastName` in the signup payload
-- Backend doctors API returns `middle_name` field in doctor records and includes it in search functionality
+- Backend doctor OTP API accepts only basic fields (`firstName`, `middleName`, `lastName`, `email`, `contactNumber`, `password`) in the signup payload
+- Backend doctors API returns all profile fields including `profile_completion_status` and `profile_submitted_at`
+- Backend photo upload uses multer with disk storage, PNG-only file filter, and 4MB size limit
+- Backend serves uploaded photos via static file serving at `/uploads` route
+- Backend validates PNG files by checking the actual PNG magic number signature (0x89 50 4E 47 0D 0A 1A 0A) after upload
+- Backend deletes uploaded files if PNG validation fails or if errors occur during upload
+- Backend provides DELETE /api/v1/doctors/me/photo endpoint for authenticated doctors to delete their professional photo
+- Photo deletion clears the database field and deletes the corresponding file from the uploads directory
+- Photo deletion uses path resolution to prevent directory traversal attacks
+- Frontend resolves relative photo URLs against the configured backend API origin
 - Web application provides role-specific dashboards for Doctor, Secretary, and Admin users
 - Mobile application includes OTP verification page for patient registration with full backend integration
 - Mobile application authentication persists across hot restarts using SharedPreferences for token storage
 - Mobile Doctors page displays real doctor records from database through backend API (no hardcoded data)
 - Mobile Doctors page dynamically derives specialties and hospitals from actual registered doctors
 - Mobile Doctors page shows hospital cards with hospital name, address, and doctor count derived from database
-- Doctor self-registration form at `/doctor-signup` features searchable dropdowns/autocompletes for Hospital/Clinic (legitimate Cebu outpatient clinics, consultation centers, primary care polyclinics, and medical arts buildings), Specialty (recognized Philippine medical specialties), and Credentials (searchable multi-select for recognized suffixes such as MD, FPCP, FPSGS, etc.) with partial-name filtering and keyboard navigation
-- Doctor self-registration form includes optional room number field for facilities with room/suite numbers
+- Doctor self-registration form at `/doctor-signup` now collects only basic information initially
+- Doctor profile completion form (post-OTP) collects professional information: specialty, credentials, PRC license number, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, professional photo
 - Doctor self-registration form includes password visibility toggle and real-time password strength requirements (8+ chars, uppercase, lowercase, number, special character)
-- Doctor self-registration form enforces 7-digit numeric PRC license number with maximum length enforcement
+- Doctor profile submission validates required fields: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic
 - Doctors can create Secretary accounts via `POST /api/v1/doctors/secretaries` (requires Doctor authentication and ACTIVE approval status)
 - Doctors can list their assigned Secretaries via `GET /api/v1/doctors/secretaries` (requires Doctor authentication)
 - Secretary accounts created by Doctors have `must_change_password = true` and NULL first_name/last_name (to be completed by Secretary)
@@ -40,13 +90,13 @@ Current System State (October 2026):
 - Secretary must complete profile information (first name, last name, contact number) via `PUT /api/v1/secretaries/me`
 - Secretary must change password on first login (enforced by `must_change_password` flag)
 - Secretary profile page at `/secretary/profile` allows viewing and editing profile information
-- Secretary settings page at `/secretary/settings` provides optional two-factor authentication toggle
-- Doctor settings page at `/doctor/settings` provides optional two-factor authentication toggle
+- Secretary settings page at `/secretary/settings` provides optional two-factor authentication toggle (deprecated - OTP is now mandatory)
+- Doctor settings page at `/doctor/settings` provides optional two-factor authentication toggle (deprecated - OTP is now mandatory)
 - Role-based login OTP/2FA is implemented with server-side challenge state in PostgreSQL
 - Doctor, Secretary, and Admin web login pages submit their expected role; the backend rejects cross-role login attempts before OTP challenge creation or delivery with `Invalid credentials or account role.` Admin login continues to accept SUPERADMIN accounts
 - Admin/SuperAdmin login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
-- Doctor login requires OTP only if `doctors.two_factor_enabled = true` (optional 2FA)
-- Secretary login requires OTP only if `secretaries.two_factor_enabled = true` (optional 2FA)
+- Doctor login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
+- Secretary login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
 - PostgreSQL `login_otp_challenges` table stores server-side OTP challenge state with hashed challenge tokens (migration 014_add_login_otp_challenges.sql)
 - PostgreSQL `doctors` and `secretaries` tables include `two_factor_enabled` column (migration 013_add_two_factor_settings.sql)
 - Migration `015_enforce_secretary_doctor_relationship.sql` enforces the required foreign key and non-null assignment for `secretaries.doctor_id`

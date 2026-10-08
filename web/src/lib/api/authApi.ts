@@ -118,11 +118,6 @@ export interface SendOtpRequest {
   middleName?: string;
   lastName: string;
   contactNumber: string;
-  specialty: string;
-  credentials: string;
-  prcLicenseNumber: string;
-  clinic: string;
-  roomNumber?: string;
   password: string;
   confirmPassword: string;
 }
@@ -160,7 +155,6 @@ export interface VerifyOtpData {
     is_approved: boolean;
   };
   accessToken: string;
-  refreshToken: string;
 }
 
 export interface VerifyOtpResponse {

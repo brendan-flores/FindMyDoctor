@@ -1,9 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
+import { doctorApi } from '@/lib/api/doctorApi';
 
 export default function DoctorDashboard() {
+  const router = useRouter();
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [stats, setStats] = useState({
     totalAppointments: 0,
     todayAppointments: 0,
@@ -22,15 +26,69 @@ export default function DoctorDashboard() {
   const [secretarySuccess, setSecretarySuccess] = useState('');
 
   useEffect(() => {
-    // Load dashboard data from backend
-    // This would be replaced with actual API calls
-    setStats({
-      totalAppointments: 15,
-      todayAppointments: 5,
-      totalPatients: 42,
-      activePrescriptions: 8,
-    });
-  }, []);
+    const checkApprovalStatus = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        apiClient.clearToken();
+        router.push('/doctor-login');
+        return;
+      }
+
+      apiClient.setToken(token);
+
+      try {
+        const response = await doctorApi.getProfile();
+
+        if (response.success && response.data) {
+          const approvalStatus = response.data.approval_status;
+
+          if (approvalStatus === 'ACTIVE') {
+            setIsLoadingAuth(false);
+            // Load dashboard data from backend
+            setStats({
+              totalAppointments: 15,
+              todayAppointments: 5,
+              totalPatients: 42,
+              activePrescriptions: 8,
+            });
+          } else if (approvalStatus === 'REJECTED') {
+            router.push('/doctor-profile');
+          } else if (approvalStatus === 'PENDING') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            apiClient.clearToken();
+            router.push('/doctor-login');
+          } else {
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            apiClient.clearToken();
+            router.push('/doctor-login');
+          }
+        } else {
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          apiClient.clearToken();
+          router.push('/doctor-login');
+        }
+      } catch (err) {
+        console.error('Error checking approval status:', err);
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        apiClient.clearToken();
+        router.push('/doctor-login');
+      }
+    };
+
+    checkApprovalStatus();
+  }, [router]);
 
   const handleAddSecretary = async () => {
     // Basic validation
@@ -71,6 +129,17 @@ export default function DoctorDashboard() {
       setIsCreatingSecretary(false);
     }
   };
+
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen bg-[#F3F5F9] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1A62CD] mx-auto"></div>
+          <p className="mt-4 text-[#64748B]">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

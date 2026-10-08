@@ -726,6 +726,24 @@ Patients shall be able to search for doctors.
 
 The system shall display doctor information.
 
+## FR-005-A — Doctor Rejection and Resubmission
+
+The system shall support a doctor rejection and resubmission workflow:
+
+1. Administrators shall be able to reject doctor applications with a required rejection reason.
+2. Rejected doctors shall have `approval_status = 'REJECTED'` and a stored `rejection_reason`.
+3. Rejected doctors shall be able to authenticate to the system specifically to correct and resubmit their application.
+4. Rejected doctors shall not be able to access the Doctor Dashboard or appear in public doctor search while in REJECTED status.
+5. Rejected doctors shall be able to view their rejection reason through the doctor profile endpoint.
+6. Rejected doctors shall be able to edit their professional profile fields and schedule.
+7. Rejected doctors shall be able to resubmit their profile for review.
+8. On successful resubmission, the doctor's `approval_status` shall be restored to 'PENDING' and `rejection_reason` shall be cleared.
+9. Administrators shall not be able to directly approve a REJECTED doctor; the doctor must resubmit first.
+10. The doctor profile page shall display a rejection banner with the reason when in REJECTED status.
+11. The doctor profile page shall allow editing and resubmission when in REJECTED status, even if `profile_completion_status === 'SUBMITTED'`.
+12. The doctor login page shall route authenticated doctors based on approval_status: ACTIVE → dashboard, REJECTED → profile page.
+13. PENDING doctors shall not be able to log in while awaiting administrator approval.
+
 ## FR-006 — Availability
 
 The system shall display available consultation schedules.
@@ -866,7 +884,7 @@ The system shall provide relevant application notifications.
 
 Administrators shall be able to approve/reject doctors.
 
-Doctors who complete self-registration and email OTP verification are created with `approval_status = 'PENDING'` and `is_approved = false`, and must wait for administrator approval before accessing the system. Administrators can view pending doctors through the Admin Doctors page, review complete doctor information, and either approve (setting `approval_status = 'ACTIVE'` and `is_approved = true`) or reject (setting `approval_status = 'REJECTED'` and `is_approved = false`) the registration. Only ACTIVE doctors can log in and access the Doctor Dashboard.
+Doctors who complete self-registration, email OTP verification, and profile submission are created with `approval_status = 'PENDING'`, `is_approved = false`, and `profile_completion_status = 'SUBMITTED'`, and must wait for administrator approval before accessing the system. Administrators can view pending doctors through the Admin Doctors page, review complete doctor information, and either approve (setting `approval_status = 'ACTIVE'` and `is_approved = true`) or reject (setting `approval_status = 'REJECTED'` and `is_approved = false`) the registration. Only ACTIVE doctors can log in and access the Doctor Dashboard.
 
 ## FR-041 — Secretary Management
 
@@ -1195,7 +1213,7 @@ FiDo Web
 ├── Secretary
 │   └── `/secretary-login` → `/secretary/dashboard`
 └── Doctor Sign-Up (Self-Registration)
-    └── `/doctor-signup` → Supabase email OTP → PostgreSQL account → `/doctor/dashboard`
+    └── `/doctor-signup` → Basic Registration → Supabase email OTP → PostgreSQL Doctor account (PENDING + INCOMPLETE) → Profile Completion → Submit for Approval → PENDING / Awaiting Admin Review
 ```
 
 ### Authentication Behavior
@@ -1230,21 +1248,65 @@ FiDo Web
 
 ### Doctor Sign-Up (Self-Registration)
 
-The doctor sign-up page at `/doctor-signup` allows a doctor to create an account without an Administrator:
+The doctor sign-up page at `/doctor-signup` allows a doctor to create an account without an Administrator through a two-step flow:
 
 - Reachable from the Doctor login page at `/doctor-login` through the "Create an Account" link.
-- Collects doctor information (full name, specialty via searchable dropdown of recognized Philippine medical specialties, credentials via searchable multi-select dropdown of recognized physician credentials/suffixes, PRC license number, and Hospital/Clinic via searchable dropdown of legitimate Cebu hospitals and clinics), contact information (email, contact number), and account security fields (password, confirm password). All dropdowns support typing, partial-name filtering, and keyboard navigation.
+- **Step 1 - Basic Registration:** Collects only basic information (first name, middle name optional, last name, email, contact number, password, confirm password).
 - Submits to `POST /api/v1/auth/otp/send`, which validates the payload and stages the sign-up - including the bcrypt-hashed password - in the `pending_doctor_signups` table. No account is created at this step.
 - Supabase is used only to email the 6-digit OTP to the doctor's address.
-- `POST /api/v1/auth/otp/verify` verifies the OTP with Supabase and, only when verification succeeds, creates the `users` record (`role = DOCTOR`, `email_verified = true`) and the `doctors` profile in a single PostgreSQL transaction.
+- **Step 2 - OTP Verification:** `POST /api/v1/auth/otp/verify` verifies the OTP with Supabase and, only when verification succeeds, creates the `users` record (`role = DOCTOR`, `email_verified = true`) and the `doctors` profile with `profile_completion_status = 'INCOMPLETE'` in a single PostgreSQL transaction.
 - PostgreSQL is the single source of truth for doctor accounts, credentials and profile data; Supabase stores no application account or profile data.
 - Passwords are hashed with bcrypt before storage and are never stored or logged in plaintext.
+- Email address must be unique; duplicates are rejected.
+- Self-registered doctors are created with `approval_status = 'PENDING'`, `is_approved = false`, and `profile_completion_status = 'INCOMPLETE'`, requiring profile completion and administrator approval before they can access the system.
+- The doctor sees a "Registration Submitted Successfully" message after OTP verification directing them to complete their professional profile.
+- A successful verification returns a success message and directs the doctor to complete their profile.
+
+### Doctor Profile Completion
+
+After successful OTP verification, doctors must complete their professional profile:
+
+- **Profile Update Endpoint:** `PUT /api/v1/doctors/me/profile` (requires Doctor authentication)
+  - Accepts professional profile fields: professional_photo_url, specialty, credentials, prc_license_number, practice_name, years_of_experience, areas_of_expertise, biography, consultation_fee, consultation_type, languages_spoken
+  - Validates PRC license number format (7 digits) and uniqueness
+  - Automatically updates `profile_completion_status` to 'COMPLETE' when all required fields are present
+  - Allows partial updates (field-by-field or multiple fields at once)
+
+- **Profile Submission Endpoint:** `POST /api/v1/doctors/me/profile/submit` (requires Doctor authentication)
+  - Validates required fields before submission: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic
+  - Sets `profile_completion_status = 'SUBMITTED'` and `profile_submitted_at` to current timestamp
+  - Keeps `approval_status = 'PENDING'` (does not approve the doctor)
+  - Returns message directing doctor to wait for admin approval
+
 - The PRC license number is stored on the doctor profile and may only be registered once.
-- Email address and PRC license number must be unique; duplicates are rejected.
-- Self-registered doctors are created with `approval_status = 'PENDING'` and `is_approved = false`, requiring administrator approval before they can access the system.
-- The doctor sees a "Registration Submitted Successfully" message after OTP verification and cannot log in until an administrator approves the account.
 - PRC license numbers are recorded but are not verified against a PRC registry; PRC verification remains out of scope.
-- A successful verification returns a success message and directs the doctor to wait for admin approval.
+
+### Doctor Available Schedule Management
+
+Doctors can manage their available schedules through authenticated endpoints that reuse the existing `doctor_schedules` table infrastructure:
+
+- **GET /api/v1/doctors/me/schedules** (requires Doctor authentication)
+  - Retrieves the authenticated doctor's schedule configurations
+  - Returns all schedule records for the doctor
+
+- **POST /api/v1/doctors/me/schedules** (requires Doctor authentication)
+  - Creates a new schedule configuration for the authenticated doctor
+  - Accepts: day_of_week (0-6), start_time, end_time, consultation_duration_minutes, is_active
+  - Validates day_of_week range and prevents duplicate schedules for the same day
+  - Returns the created schedule record
+
+- **PUT /api/v1/doctors/me/schedules/:id** (requires Doctor authentication)
+  - Updates an existing schedule configuration
+  - Accepts partial updates to schedule fields
+  - Verifies ownership - only allows updates to schedules belonging to the authenticated doctor
+  - Returns the updated schedule record
+
+- **DELETE /api/v1/doctors/me/schedules/:id** (requires Doctor authentication)
+  - Deletes a schedule configuration
+  - Verifies ownership - only allows deletion of schedules belonging to the authenticated doctor
+  - Returns success confirmation
+
+This reuses the existing `doctor_schedules` table and does not create a new schedule representation. The schedule infrastructure supports both doctor self-management and administrative configuration.
 
 Administrator-provisioned doctor accounts remain available for accounts created on a doctor's behalf.
 

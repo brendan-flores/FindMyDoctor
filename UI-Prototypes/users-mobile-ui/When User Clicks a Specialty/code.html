@@ -1,0 +1,320 @@
+<!DOCTYPE html><html lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_tab" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-error-container": "#93000a", "on-secondary-fixed": "#131b2e", "tertiary-fixed-dim": "#4fdbc8", "on-secondary": "#ffffff", "on-primary-fixed": "#001e2f", "secondary-fixed-dim": "#bec6e0", "error": "#ba1a1a", "surface-container-low": "#eff4ff", "secondary": "#565e74", "surface-container-high": "#dce9ff", "inverse-on-surface": "#eaf1ff", "on-primary-container": "#003751", "inverse-primary": "#89ceff", "primary": "#006591", "tertiary": "#006b5f", "outline": "#6e7881", "surface-dim": "#cbdbf5", "on-primary": "#ffffff", "surface-container-lowest": "#ffffff", "primary-fixed": "#c9e6ff", "surface": "#f8f9ff", "on-surface-variant": "#3e4850", "surface-tint": "#006591", "on-tertiary-fixed-variant": "#005048", "tertiary-container": "#00ae9d", "surface-variant": "#d3e4fe", "surface-bright": "#f8f9ff", "on-surface": "#0b1c30", "primary-fixed-dim": "#89ceff", "inverse-surface": "#213145", "on-background": "#0b1c30", "on-error": "#ffffff", "on-tertiary": "#ffffff", "on-secondary-container": "#5c647a", "secondary-container": "#dae2fd", "surface-container": "#e5eeff", "on-secondary-fixed-variant": "#3f465c", "on-tertiary-fixed": "#00201c", "background": "#f8f9ff", "error-container": "#ffdad6", "tertiary-fixed": "#71f8e4", "surface-container-highest": "#d3e4fe", "on-tertiary-container": "#003a33", "secondary-fixed": "#dae2fd", "primary-container": "#0ea5e9", "on-primary-fixed-variant": "#004c6e", "outline-variant": "#bec8d2" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "gutter-sm": "0.5rem", "gutter-3xl": "2rem", "gutter-lg": "1rem", "gutter-xl": "1.25rem", "gutter-xs": "0.25rem", "touch-target": "3rem", "gutter-2xl": "1.5rem", "gutter-md": "0.75rem", "safe-margin": "1rem" }, "fontFamily": { "label-md": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"], "body-lg-medium": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "body-md-medium": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"], "queue-num": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"] }, "fontSize": { "label-md": ["13px", { "lineHeight": "16px", "fontWeight": "600" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "headline-md": ["22px", { "lineHeight": "28px", "fontWeight": "700" }], "body-lg-medium": ["16px", { "lineHeight": "24px", "fontWeight": "500" }], "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "700" }], "body-md-medium": ["14px", { "lineHeight": "20px", "fontWeight": "500" }], "headline-lg": ["28px", { "lineHeight": "36px", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "queue-num": ["32px", { "lineHeight": "36px", "fontWeight": "800" }], "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }] } } } };</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-safe-margin flex items-center justify-between gap-gutter-sm"><div class="flex items-center gap-gutter-xs"><button aria-label="Go back" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high/40 transition-colors" onclick="history.back()" type="button"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><h1 class="font-headline-sm text-headline-sm text-on-surface truncate max-w-[200px]">Doctors</h1></div><div class="flex items-center gap-gutter-xs"><button aria-label="Search or filter" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high/40 transition-colors" type="button"><span class="material-symbols-outlined text-[24px]">filter_list</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0" style="background-color: rgb(0, 82, 204);"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full pt-16 pb-24 min-h-screen bg-surface" style="--brand-primary: #0052cc;"><div class="flex flex-col w-full">
+<!-- Search & Filter Controls -->
+<section class="px-safe-margin pt-gutter-md pb-gutter-sm flex flex-col gap-gutter-sm">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[20px] text-outline">search</span>
+<input class="w-full h-12 pl-11 pr-11 bg-surface-container-lowest rounded-xl font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none shadow-sm transition-shadow focus:shadow-md" placeholder="Search pediatricians, clinics..." type="search">
+<button aria-label="Filter results" class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+</button>
+</div>
+<!-- Active Specialty Counter & Quick Switch -->
+<div class="flex items-center justify-between pt-gutter-xs">
+<div class="flex items-center gap-gutter-xs">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-fixed font-label-md text-label-md">
+<span class="material-symbols-outlined text-[16px] text-primary">child_care</span>
+          Pediatrics
+        </span>
+<span class="font-body-md text-body-md text-on-surface-variant">18 Available</span>
+</div>
+<button class="flex items-center gap-0.5 font-label-md text-label-md text-primary hover:underline" type="button">
+<span class="">Change</span>
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</button>
+</div>
+<!-- Quick Horizontal Filter Chips -->
+<div class="flex items-center gap-gutter-xs overflow-x-auto pb-1 pt-1 -mx-safe-margin px-safe-margin no-scrollbar">
+<button class="filter-chip active flex-shrink-0 px-3.5 py-1.5 rounded-full font-label-md text-label-md bg-primary text-on-primary shadow-sm transition-all" type="button" style="background-color: rgb(0, 82, 204);">
+        All
+      </button>
+<button class="filter-chip flex-shrink-0 px-3.5 py-1.5 rounded-full font-label-md text-label-md bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container shadow-sm transition-all flex items-center gap-1" type="button">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+        Available Today
+      </button>
+<button class="filter-chip flex-shrink-0 px-3.5 py-1.5 rounded-full font-label-md text-label-md bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container shadow-sm transition-all" type="button">
+        St. Luke's
+      </button>
+<button class="filter-chip flex-shrink-0 px-3.5 py-1.5 rounded-full font-label-md text-label-md bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container shadow-sm transition-all" type="button">
+        Medical City
+      </button>
+<button class="filter-chip flex-shrink-0 px-3.5 py-1.5 rounded-full font-label-md text-label-md bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container shadow-sm transition-all flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+        Top Rated
+      </button>
+</div>
+</section>
+<!-- Single Column Doctors List -->
+<section class="px-safe-margin py-gutter-sm flex flex-col gap-gutter-md">
+<!-- Doctor Card 1 -->
+<article class="bg-surface-container-lowest rounded-2xl p-4 shadow-sm flex flex-col gap-3.5 hover:shadow-md transition-shadow">
+<div class="flex items-start gap-3.5">
+<div class="relative flex-shrink-0">
+<img class="w-16 h-16 rounded-xl object-cover" data-alt="Warm and reassuring portrait of Dr. Maria Elena Santos, a Filipina female pediatrician in clean clinical white coat with stethoscope, soft warm natural clinic background light, caring approachable smile, high quality portrait photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBTX16lBXDb_WxytW5C_VFIlvmgeUrDwSiK7NG8rwUAWF-lPBTCcruCuK7589QyRm-6mpPpphSt7xMUwWs7kTRxBiMFog468zcN6VcSfRPvbZtbBfO_Zj7P3PUwPrITzDOndUMpGY-8LXZUvBgz3ZyKL6O8r6Cjkkj7-EaV1xhZOX1zvXjGenSeZHho9LIeV70sOODJjfCyDD4p6GEf9eMexxCZIHaaBI7jnZEyNENJF2E9Ngpx_prCtQ">
+<span class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-tertiary-container rounded-full shadow-sm ring-2 ring-surface-container-lowest" title="Online now"></span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between gap-1">
+<h2 class="font-headline-sm text-headline-sm text-on-surface truncate">Dr. Maria Elena Santos, MD</h2>
+<button aria-label="Bookmark doctor" class="text-outline hover:text-primary transition-colors flex-shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+</div>
+<p class="font-body-md-medium text-body-md-medium text-primary">General Pediatrics</p>
+<div class="flex items-center gap-1 text-on-surface-variant pt-0.5">
+<span class="material-symbols-outlined text-[15px] text-outline flex-shrink-0">apartment</span>
+<span class="font-body-md text-body-md text-on-surface-variant truncate">St. Luke's Medical Center • BGC</span>
+</div>
+</div>
+</div>
+<!-- Metadata Badges -->
+<div class="flex flex-wrap items-center gap-2 pt-0.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-label-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+          4.9 <span class="text-on-surface-variant font-normal">(182 reviews)</span>
+</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-on-primary-container font-label-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-primary">payments</span>
+          ₱1,000 / consult
+        </span>
+</div>
+<!-- Availability Banner -->
+<div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low text-on-secondary-fixed">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-tertiary"></span>
+</span>
+<span class="font-label-md text-label-md text-tertiary flex-1">Available Today, 2:30 PM</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Slot 4 of 6 left</span>
+</div>
+<!-- Bottom Action Buttons -->
+<div class="grid grid-cols-2 gap-2.5 pt-1">
+<button class="w-full h-11 flex items-center justify-center rounded-xl bg-surface-container text-primary font-body-md-medium text-body-md-medium hover:bg-surface-container-high active:scale-[0.98] transition-all" type="button" style="color: rgb(0, 82, 204);">
+          View Profile
+        </button>
+<button class="w-full h-11 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-on-primary font-body-md-medium text-body-md-medium shadow-sm hover:opacity-95 active:scale-[0.98] transition-all" type="button" style="background-color: rgb(0, 82, 204);">
+<span class="">Book Appointment</span>
+</button>
+</div>
+</article>
+<!-- Doctor Card 2 -->
+<article class="bg-surface-container-lowest rounded-2xl p-4 shadow-sm flex flex-col gap-3.5 hover:shadow-md transition-shadow">
+<div class="flex items-start gap-3.5">
+<div class="relative flex-shrink-0">
+<img class="w-16 h-16 rounded-xl object-cover" data-alt="Professional studio portrait of Dr. Rafael Cruz, a friendly Filipino male developmental pediatrician in his late 30s wearing modern glasses and teal scrubs with hospital lanyard, warm clinic environment, natural lighting, trustworthy demeanor." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfTVYwv9eS0vFijRcvZoEGjJWYyB-Uu04_BC3BxQOxLvIbZciCEYGg8EgRZj5y6rdNpSM3hUdCe3DEdZuqjCoDuwy_snENORt4HVdWBzLEa7CmNv5fz7kFoR89oZYGGW3HU3qNBFKboUOhepHTuq7UgyETwoT0afEGEaGRcbIfS4-i4cThRhZhDB6IGgWCGIt6cCLYr9W5d6Yr3ZgDX_KfOcaWtNKvBS7EgJkd7OJJWy6XCi9lZlwzBQ">
+<span class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-tertiary-container rounded-full shadow-sm ring-2 ring-surface-container-lowest" title="Online now"></span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between gap-1">
+<h2 class="font-headline-sm text-headline-sm text-on-surface truncate">Dr. Rafael Cruz, MD</h2>
+<button aria-label="Bookmark doctor" class="text-outline hover:text-primary transition-colors flex-shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+</div>
+<p class="font-body-md-medium text-body-md-medium text-primary">Developmental Pediatrics</p>
+<div class="flex items-center gap-1 text-on-surface-variant pt-0.5">
+<span class="material-symbols-outlined text-[15px] text-outline flex-shrink-0">apartment</span>
+<span class="font-body-md text-body-md text-on-surface-variant truncate">The Medical City • Ortigas</span>
+</div>
+</div>
+</div>
+<!-- Metadata Badges -->
+<div class="flex flex-wrap items-center gap-2 pt-0.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-label-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+          4.95 <span class="text-on-surface-variant font-normal">(230 reviews)</span>
+</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-on-primary-container font-label-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-primary">payments</span>
+          ₱1,200 / consult
+        </span>
+</div>
+<!-- Availability Banner -->
+<div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low text-on-secondary-fixed">
+<span class="material-symbols-outlined text-[16px] text-primary">event_available</span>
+<span class="font-label-md text-label-md text-primary flex-1">Next: Tomorrow, 9:00 AM</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Online &amp; Clinic</span>
+</div>
+<!-- Bottom Action Buttons -->
+<div class="grid grid-cols-2 gap-2.5 pt-1">
+<button class="w-full h-11 flex items-center justify-center rounded-xl bg-surface-container text-primary font-body-md-medium text-body-md-medium hover:bg-surface-container-high active:scale-[0.98] transition-all" type="button" style="color: rgb(0, 82, 204);">
+          View Profile
+        </button>
+<button class="w-full h-11 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-on-primary font-body-md-medium text-body-md-medium shadow-sm hover:opacity-95 active:scale-[0.98] transition-all" type="button" style="background-color: rgb(0, 82, 204);">
+<span class="">Book Appointment</span>
+</button>
+</div>
+</article>
+<!-- Doctor Card 3 -->
+<article class="bg-surface-container-lowest rounded-2xl p-4 shadow-sm flex flex-col gap-3.5 hover:shadow-md transition-shadow">
+<div class="flex items-start gap-3.5">
+<div class="relative flex-shrink-0">
+<img class="w-16 h-16 rounded-xl object-cover" data-alt="Portrait of senior female pediatrician Dr. Carmen Bautista, MD, Filipina physician with silver-streaked hair styled neatly, wearing white medical coat with stethoscope and subtle pearl earrings, warm grandfatherly warmth, high definition clinical portrait." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAR7hNWzDaxuNKbTpXpMgKzhg6wuojUr4RPsp9s2s2aJ8SSz4-RFiNvv4K6DVnbG9EvbJT9PriSq2JS7NA4RzdCfzyP6rYozoU18HPoBI2I7yAyg93qYjjQeaRrUa67IVONvq-e5rAVbMY40pvhLenbcSnLDsTjAa8YI-fU4LokMA74KtJeEnUKuSCHIBadtHv2286FKdIpzV_7tj5054Mn2Mk1uo95LdyQjUWaH8RJDMF5CtMBpCwEaQ">
+<span class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-tertiary-container rounded-full shadow-sm ring-2 ring-surface-container-lowest" title="Online now"></span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between gap-1">
+<h2 class="font-headline-sm text-headline-sm text-on-surface truncate">Dr. Carmen Bautista, MD</h2>
+<button aria-label="Bookmark doctor" class="text-primary hover:text-primary transition-colors flex-shrink-0" type="button" style="color: rgb(0, 82, 204);">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">bookmark</span>
+</button>
+</div>
+<p class="font-body-md-medium text-body-md-medium text-primary">Pediatric Pulmonology</p>
+<div class="flex items-center gap-1 text-on-surface-variant pt-0.5">
+<span class="material-symbols-outlined text-[15px] text-outline flex-shrink-0">apartment</span>
+<span class="font-body-md text-body-md text-on-surface-variant truncate">St. Luke's Medical Center • Quezon City</span>
+</div>
+</div>
+</div>
+<!-- Metadata Badges -->
+<div class="flex flex-wrap items-center gap-2 pt-0.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-label-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+          4.88 <span class="text-on-surface-variant font-normal">(310 reviews)</span>
+</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-on-primary-container font-label-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-primary">payments</span>
+          ₱1,100 / consult
+        </span>
+</div>
+<!-- Availability Banner -->
+<div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low text-on-secondary-fixed">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-tertiary"></span>
+</span>
+<span class="font-label-md text-label-md text-tertiary flex-1">Available Today, 4:00 PM</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Only 2 slots left</span>
+</div>
+<!-- Bottom Action Buttons -->
+<div class="grid grid-cols-2 gap-2.5 pt-1">
+<button class="w-full h-11 flex items-center justify-center rounded-xl bg-surface-container text-primary font-body-md-medium text-body-md-medium hover:bg-surface-container-high active:scale-[0.98] transition-all" type="button" style="color: rgb(0, 82, 204);">
+          View Profile
+        </button>
+<button class="w-full h-11 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-on-primary font-body-md-medium text-body-md-medium shadow-sm hover:opacity-95 active:scale-[0.98] transition-all" type="button" style="background-color: rgb(0, 82, 204);">
+<span class="">Book Appointment</span>
+</button>
+</div>
+</article>
+<!-- Doctor Card 4 -->
+<article class="bg-surface-container-lowest rounded-2xl p-4 shadow-sm flex flex-col gap-3.5 hover:shadow-md transition-shadow">
+<div class="flex items-start gap-3.5">
+<div class="relative flex-shrink-0">
+<img class="w-16 h-16 rounded-xl object-cover" data-alt="Modern high key portrait of Dr. Joshua Mendoza, a skilled Filipino pediatric cardiologist in his 40s in navy medical scrubs with pediatric badge, friendly gentle expression, modern clinical setting with soft depth of field." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdzr7wRoG_7GnV6rSV0I6OwIdHQL7gXtC_7rrP2oM4RJ8oid7cwoRaEK0WkaiaC5OGb192TdcyYcSgN1B7XumPCLvl5K80X_RoXcBo9sx5pi9iXCFSWHIte82UgwfL7un7EEw_HfrXJkPZVqDFWk8kzbR5j13Tv6_uXHt2Zi5wNbGRTB21IGRVaajwAFsjjGV6Z4lRDkWUADMheI0uqdZqrvIs7CIlK8iFFpuyqNTJ3ZddRmstgkUlzQ">
+<span class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-outline rounded-full shadow-sm ring-2 ring-surface-container-lowest" title="In Consultation"></span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between gap-1">
+<h2 class="font-headline-sm text-headline-sm text-on-surface truncate">Dr. Joshua Mendoza, MD</h2>
+<button aria-label="Bookmark doctor" class="text-outline hover:text-primary transition-colors flex-shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+</div>
+<p class="font-body-md-medium text-body-md-medium text-primary">Pediatric Cardiology</p>
+<div class="flex items-center gap-1 text-on-surface-variant pt-0.5">
+<span class="material-symbols-outlined text-[15px] text-outline flex-shrink-0">apartment</span>
+<span class="font-body-md text-body-md text-on-surface-variant truncate">Philippine Heart Center • Quezon City</span>
+</div>
+</div>
+</div>
+<!-- Metadata Badges -->
+<div class="flex flex-wrap items-center gap-2 pt-0.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-label-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+          4.97 <span class="text-on-surface-variant font-normal">(98 reviews)</span>
+</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-on-primary-container font-label-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-primary">payments</span>
+          ₱1,500 / consult
+        </span>
+</div>
+<!-- Availability Banner -->
+<div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low text-on-secondary-fixed">
+<span class="material-symbols-outlined text-[16px] text-secondary">schedule</span>
+<span class="font-label-md text-label-md text-on-surface-variant flex-1">Next: Thursday, 10:00 AM</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">In clinic</span>
+</div>
+<!-- Bottom Action Buttons -->
+<div class="grid grid-cols-2 gap-2.5 pt-1">
+<button class="w-full h-11 flex items-center justify-center rounded-xl bg-surface-container text-primary font-body-md-medium text-body-md-medium hover:bg-surface-container-high active:scale-[0.98] transition-all" type="button" style="color: rgb(0, 82, 204);">
+          View Profile
+        </button>
+<button class="w-full h-11 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-on-primary font-body-md-medium text-body-md-medium shadow-sm hover:opacity-95 active:scale-[0.98] transition-all" type="button" style="background-color: rgb(0, 82, 204);">
+<span class="">Book Appointment</span>
+</button>
+</div>
+</article>
+<!-- Doctor Card 5 -->
+<article class="bg-surface-container-lowest rounded-2xl p-4 shadow-sm flex flex-col gap-3.5 hover:shadow-md transition-shadow">
+<div class="flex items-start gap-3.5">
+<div class="relative flex-shrink-0">
+<img class="w-16 h-16 rounded-xl object-cover" data-alt="Warm environmental portrait of Dr. Alyssa Tan-Lim, MD, a compassionate female Filipino pediatrician in clean bright clinical room, holding a colorful pediatric examination tool, smiling gently, warm lighting and soothing atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDLIDFwGhIpxVWK-F4kcKkltCYbn1BHChB2Ni6buxMYynAtaGjVxhxh7fv7-lc4Rb-OE4R3tqny1EZEqbuIjDNxRBiltUXZFPQA88QjgXAEPvdVSVxkEFQFF6IXSnLAi-FAJBey-iZ0WCt8IBBYTkbilWJGRhHeFMke2hRb60ed23YAkyF29I1wxrift7BcUe62NdMfnqaU8cxc_ToBvv6INSOMMGIJi6pehp5IdWsk-2RRkA0NNURGnw">
+<span class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-tertiary-container rounded-full shadow-sm ring-2 ring-surface-container-lowest" title="Online now"></span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between gap-1">
+<h2 class="font-headline-sm text-headline-sm text-on-surface truncate">Dr. Alyssa Tan-Lim, MD</h2>
+<button aria-label="Bookmark doctor" class="text-outline hover:text-primary transition-colors flex-shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+</div>
+<p class="font-body-md-medium text-body-md-medium text-primary">Pediatric Allergy &amp; Immunology</p>
+<div class="flex items-center gap-1 text-on-surface-variant pt-0.5">
+<span class="material-symbols-outlined text-[15px] text-outline flex-shrink-0">apartment</span>
+<span class="font-body-md text-body-md text-on-surface-variant truncate">Makati Medical Center • Makati</span>
+</div>
+</div>
+</div>
+<!-- Metadata Badges -->
+<div class="flex flex-wrap items-center gap-2 pt-0.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-label-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+          4.92 <span class="text-on-surface-variant font-normal">(146 reviews)</span>
+</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-on-primary-container font-label-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-primary">payments</span>
+          ₱1,200 / consult
+        </span>
+</div>
+<!-- Availability Banner -->
+<div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low text-on-secondary-fixed">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-tertiary"></span>
+</span>
+<span class="font-label-md text-label-md text-tertiary flex-1">Available Today, 5:15 PM</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Slot 1 of 4 left</span>
+</div>
+<!-- Bottom Action Buttons -->
+<div class="grid grid-cols-2 gap-2.5 pt-1">
+<button class="w-full h-11 flex items-center justify-center rounded-xl bg-surface-container text-primary font-body-md-medium text-body-md-medium hover:bg-surface-container-high active:scale-[0.98] transition-all" type="button" style="color: rgb(0, 82, 204);">
+          View Profile
+        </button>
+<button class="w-full h-11 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-on-primary font-body-md-medium text-body-md-medium shadow-sm hover:opacity-95 active:scale-[0.98] transition-all" type="button" style="background-color: rgb(0, 82, 204);">
+<span class="">Book Appointment</span>
+</button>
+</div>
+</article>
+</section>
+<!-- Helpful Care Note / Delighter Banner -->
+<section class="px-safe-margin pt-gutter-sm pb-gutter-2xl"></section>
+</div>
+<script>
+  (function() {
+    const chips = document.querySelectorAll('.filter-chip');
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        chips.forEach(c => {
+          c.classList.remove('bg-primary', 'text-on-primary', 'active');
+          c.classList.add('bg-surface-container-lowest', 'text-on-surface-variant');
+        });
+        chip.classList.remove('bg-surface-container-lowest', 'text-on-surface-variant');
+        chip.classList.add('bg-primary', 'text-on-primary', 'active');
+      });
+    });
+  })();
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-4px_16px_rgba(15,23,42,0.06)]" data-active-classes="text-primary font-bold"></nav>
+
+
+
+</body></html>

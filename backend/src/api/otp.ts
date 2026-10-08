@@ -4,6 +4,7 @@ import { success, error, ErrorCodes } from '../utils/response';
 import { query, getClient } from '../database/connection';
 import bcrypt from 'bcryptjs';
 import { config } from '../config';
+import { generateAccessToken } from '../modules/auth/authService';
 
 /*
  * Doctor sign-up OTP flow
@@ -22,7 +23,6 @@ import { config } from '../config';
 const router = Router();
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PRC_LICENSE_PATTERN = /^\d{7}$/;
 const OTP_PATTERN = /^\d{6}$/;
 
 // How long a staged sign-up stays valid while the doctor enters the OTP
@@ -35,17 +35,12 @@ interface ValidatedDoctorSignup {
   middleName: string | null;
   lastName: string;
   contactNumber: string;
-  specialty: string;
-  credentials: string | null;
-  prcLicenseNumber: string;
-  clinic: string;
-  roomNumber: string | null;
 }
 
 /**
  * Validates the doctor sign-up payload before any OTP is sent.
- * These are the same rules enforced by the PostgreSQL registration service
- * (backend/src/modules/auth/authService.ts).
+ * New flow: Only basic information is required initially.
+ * Professional information will be collected in the profile completion step.
  */
 function validateDoctorSignupPayload(body: any): ValidatedDoctorSignup {
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
@@ -53,23 +48,15 @@ function validateDoctorSignupPayload(body: any): ValidatedDoctorSignup {
   const middleName = typeof body?.middleName === 'string' ? body.middleName.trim() : '';
   const lastName = typeof body?.lastName === 'string' ? body.lastName.trim() : '';
   const contactNumber = typeof body?.contactNumber === 'string' ? body.contactNumber.trim() : '';
-  const specialty = typeof body?.specialty === 'string' ? body.specialty.trim() : '';
-  const credentials = typeof body?.credentials === 'string' ? body.credentials.trim() : '';
-  const prcLicenseNumber = typeof body?.prcLicenseNumber === 'string' ? body.prcLicenseNumber.trim() : '';
-  const clinic = typeof body?.clinic === 'string' ? body.clinic.trim() : '';
-  const roomNumber = typeof body?.roomNumber === 'string' ? body.roomNumber.trim() : '';
   const password = typeof body?.password === 'string' ? body.password : '';
   const confirmPassword = typeof body?.confirmPassword === 'string' ? body.confirmPassword : '';
 
+  // Basic registration fields only
   if (
     !email ||
     !firstName ||
     !lastName ||
     !contactNumber ||
-    !specialty ||
-    !credentials ||
-    !prcLicenseNumber ||
-    !clinic ||
     !password ||
     !confirmPassword
   ) {
@@ -101,10 +88,6 @@ function validateDoctorSignupPayload(body: any): ValidatedDoctorSignup {
     throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Passwords do not match' };
   }
 
-  if (!PRC_LICENSE_PATTERN.test(prcLicenseNumber)) {
-    throw { code: ErrorCodes.VALIDATION_ERROR, message: 'PRC license number must be 7 digits' };
-  }
-
   return {
     email,
     password,
@@ -112,11 +95,6 @@ function validateDoctorSignupPayload(body: any): ValidatedDoctorSignup {
     middleName: middleName || null,
     lastName,
     contactNumber,
-    specialty,
-    credentials: credentials || null,
-    prcLicenseNumber,
-    clinic,
-    roomNumber: roomNumber || null,
   };
 }
 
@@ -127,33 +105,13 @@ function validateDoctorSignupPayload(body: any): ValidatedDoctorSignup {
 router.post('/send', async (req: Request, res: Response) => {
   try {
     const payload = validateDoctorSignupPayload(req.body);
-    const { email, prcLicenseNumber } = payload;
+    const { email } = payload;
 
     // The application account only ever lives in PostgreSQL
     const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
 
     if (existingUser.rows.length > 0) {
       return res.status(409).json(error(ErrorCodes.CONFLICT, 'Email is already registered'));
-    }
-
-    const existingLicense = await query(
-      'SELECT id FROM doctors WHERE prc_license_number = $1',
-      [prcLicenseNumber]
-    );
-
-    if (existingLicense.rows.length > 0) {
-      return res.status(409).json(error(ErrorCodes.CONFLICT, 'PRC license number is already registered'));
-    }
-
-    // Another in-flight sign-up (different email) must not stage the same license
-    const stagedLicense = await query(
-      `SELECT id FROM pending_doctor_signups
-        WHERE prc_license_number = $1 AND email <> $2 AND expires_at > CURRENT_TIMESTAMP`,
-      [prcLicenseNumber, email]
-    );
-
-    if (stagedLicense.rows.length > 0) {
-      return res.status(409).json(error(ErrorCodes.CONFLICT, 'PRC license number is already registered'));
     }
 
     const passwordHash = await bcrypt.hash(payload.password, 10);
@@ -164,24 +122,18 @@ router.post('/send', async (req: Request, res: Response) => {
 
     await query(
       `INSERT INTO pending_doctor_signups (
-         email, password_hash, first_name, middle_name, last_name, specialty, credentials,
-         prc_license_number, practice_name, practice_phone, room_number, expires_at
+         email, password_hash, first_name, middle_name, last_name, contact_number, expires_at
        )
        VALUES (
-         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-         CURRENT_TIMESTAMP + ($12::int * INTERVAL '1 minute')
+         $1, $2, $3, $4, $5, $6,
+         CURRENT_TIMESTAMP + ($7::int * INTERVAL '1 minute')
        )
        ON CONFLICT (email) DO UPDATE SET
          password_hash = EXCLUDED.password_hash,
          first_name = EXCLUDED.first_name,
          middle_name = EXCLUDED.middle_name,
          last_name = EXCLUDED.last_name,
-         specialty = EXCLUDED.specialty,
-         credentials = EXCLUDED.credentials,
-         prc_license_number = EXCLUDED.prc_license_number,
-         practice_name = EXCLUDED.practice_name,
-         practice_phone = EXCLUDED.practice_phone,
-         room_number = EXCLUDED.room_number,
+         contact_number = EXCLUDED.contact_number,
          expires_at = EXCLUDED.expires_at,
          updated_at = CURRENT_TIMESTAMP`,
       [
@@ -190,12 +142,7 @@ router.post('/send', async (req: Request, res: Response) => {
         payload.firstName,
         payload.middleName,
         payload.lastName,
-        payload.specialty,
-        payload.credentials,
-        payload.prcLicenseNumber,
-        payload.clinic,
         payload.contactNumber,
-        payload.roomNumber,
         PENDING_SIGNUP_TTL_MINUTES,
       ]
     );
@@ -280,16 +227,7 @@ router.post('/verify', async (req: Request, res: Response) => {
     const existingUser = await client.query('SELECT id FROM users WHERE email = $1', [email]);
 
     if (existingUser.rows.length > 0) {
-      throw { code: ErrorCodes.EMAIL_ALREADY_EXISTS, message: 'Email already registered' };
-    }
-
-    const existingLicense = await client.query(
-      'SELECT id FROM doctors WHERE prc_license_number = $1',
-      [pending.prc_license_number]
-    );
-
-    if (existingLicense.rows.length > 0) {
-      throw { code: ErrorCodes.CONFLICT, message: 'PRC license number is already registered' };
+      throw { code: ErrorCodes.CONFLICT, message: 'Email already registered' };
     }
 
     // Application account (credentials) - bcrypt hash, verified email
@@ -302,27 +240,22 @@ router.post('/verify', async (req: Request, res: Response) => {
 
     const user = userResult.rows[0];
 
-    // Doctor profile - every field captured by the sign-up page
+    // Doctor profile - basic information only, profile_completion_status = 'INCOMPLETE'
+    // Professional information will be collected in the profile completion step
     const doctorResult = await client.query(
       `INSERT INTO doctors (
-         user_id, first_name, middle_name, last_name, specialty, credentials,
-         prc_license_number, practice_name, practice_phone, practice_email, room_number, is_approved, approval_status
+         user_id, first_name, middle_name, last_name, contact_number,
+         is_approved, approval_status, profile_completion_status
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, 'PENDING')
-       RETURNING id, first_name, middle_name, last_name, specialty, credentials, prc_license_number,
-                 practice_name, practice_phone, practice_email, room_number, is_approved, approval_status, created_at`,
+       VALUES ($1, $2, $3, $4, $5, false, 'PENDING', 'INCOMPLETE')
+       RETURNING id, first_name, middle_name, last_name, contact_number,
+                 is_approved, approval_status, profile_completion_status, created_at`,
       [
         user.id,
         pending.first_name,
         pending.middle_name,
         pending.last_name,
-        pending.specialty,
-        pending.credentials,
-        pending.prc_license_number,
-        pending.practice_name,
-        pending.practice_phone,
-        email,
-        pending.room_number,
+        pending.contact_number,
       ]
     );
 
@@ -331,14 +264,18 @@ router.post('/verify', async (req: Request, res: Response) => {
 
     await client.query('COMMIT');
 
-    // Return success message - doctor must wait for admin approval
+    // Generate access token for the newly created doctor
+    const accessToken = generateAccessToken(user);
+
+    // Return success message with access token - doctor is automatically authenticated
     return res.status(201).json(
       success(
         {
           user: { id: user.id, email: user.email, role: user.role },
           doctor: doctorResult.rows[0],
+          accessToken: accessToken,
         },
-        'Doctor account created successfully. Your registration is pending administrator approval.'
+        'Doctor account created successfully. Please complete your professional profile to submit for administrator approval.'
       )
     );
   } catch (err: any) {
@@ -351,7 +288,7 @@ router.post('/verify', async (req: Request, res: Response) => {
     const errorMessage = err.message || 'OTP verification failed';
 
     if (errorCode === ErrorCodes.VALIDATION_ERROR) return res.status(400).json(error(errorCode, errorMessage));
-    if (errorCode === ErrorCodes.EMAIL_ALREADY_EXISTS || errorCode === ErrorCodes.CONFLICT || errorCode === '23505') {
+    if (errorCode === ErrorCodes.CONFLICT || errorCode === '23505') {
       return res.status(409).json(error(ErrorCodes.CONFLICT, errorMessage));
     }
 

@@ -39,6 +39,24 @@ export function errorHandler(
     );
   }
 
+  // Handle Multer file upload errors
+  if (err instanceof Error && err.message === 'Only PNG files are allowed') {
+    return res.status(400).json(
+      error(ErrorCodes.VALIDATION_ERROR, 'Only PNG files are allowed')
+    );
+  }
+
+  if (err instanceof Error && err.name === 'MulterError') {
+    if (err.message.includes('File too large')) {
+      return res.status(400).json(
+        error(ErrorCodes.VALIDATION_ERROR, 'File size exceeds 4MB limit')
+      );
+    }
+    return res.status(400).json(
+      error(ErrorCodes.VALIDATION_ERROR, err.message || 'File upload error')
+    );
+  }
+
   // Default error response
   res.status(500).json(
     error(ErrorCodes.SERVER_ERROR, 'An unexpected error occurred')

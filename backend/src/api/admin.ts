@@ -25,13 +25,15 @@ router.get('/users', authenticate, authorize('ADMIN'), async (req: AuthRequest, 
 router.get('/doctors', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const result = await query(
-      `SELECT 
+      `SELECT
         d.id,
         d.user_id,
         u.email,
         u.email_verified,
         d.first_name,
+        d.middle_name,
         d.last_name,
+        d.contact_number,
         d.specialty,
         d.credentials,
         d.prc_license_number,
@@ -39,8 +41,16 @@ router.get('/doctors', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (re
         d.practice_address,
         d.practice_phone,
         d.practice_email,
+        d.professional_photo_url,
+        d.years_of_experience,
+        d.areas_of_expertise,
+        d.biography,
+        d.consultation_fee,
+        d.languages_spoken,
         d.is_approved,
         d.approval_status,
+        d.profile_completion_status,
+        d.profile_submitted_at,
         d.reviewed_at,
         d.reviewed_by,
         d.rejection_reason,
@@ -59,7 +69,9 @@ router.get('/doctors', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (re
       email: doctor.email || '',
       emailVerified: doctor.email_verified || false,
       firstName: doctor.first_name || '',
+      middleName: doctor.middle_name || null,
       lastName: doctor.last_name || '',
+      contactNumber: doctor.contact_number || null,
       specialty: doctor.specialty || '',
       credentials: doctor.credentials || null,
       prcLicenseNumber: doctor.prc_license_number || '',
@@ -67,8 +79,16 @@ router.get('/doctors', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (re
       practiceAddress: doctor.practice_address || '',
       practicePhone: doctor.practice_phone || '',
       practiceEmail: doctor.practice_email || '',
+      professionalPhotoUrl: doctor.professional_photo_url || null,
+      yearsOfExperience: doctor.years_of_experience || null,
+      areasOfExpertise: doctor.areas_of_expertise || null,
+      biography: doctor.biography || null,
+      consultationFee: doctor.consultation_fee || null,
+      languagesSpoken: doctor.languages_spoken || null,
       isApproved: doctor.is_approved || false,
       approvalStatus: doctor.approval_status || 'PENDING',
+      profileCompletionStatus: doctor.profile_completion_status || 'INCOMPLETE',
+      profileSubmittedAt: doctor.profile_submitted_at || null,
       reviewedAt: doctor.reviewed_at || null,
       reviewedBy: doctor.reviewed_by || null,
       rejectionReason: doctor.rejection_reason || null,
@@ -121,18 +141,18 @@ router.get('/doctors/:id', authenticate, authorize('ADMIN', 'SUPERADMIN'), async
   try {
     const { id } = req.params;
     const result = await query(
-      `SELECT 
+      `SELECT
         d.*, u.email, u.email_verified
        FROM doctors d
        JOIN users u ON d.user_id = u.id
        WHERE d.id = $1`,
       [id]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor not found'));
     }
-    
+
     const doctor = result.rows[0];
     const formatted = {
       id: doctor.id,
@@ -140,7 +160,9 @@ router.get('/doctors/:id', authenticate, authorize('ADMIN', 'SUPERADMIN'), async
       email: doctor.email,
       emailVerified: doctor.email_verified,
       firstName: doctor.first_name,
+      middleName: doctor.middle_name,
       lastName: doctor.last_name,
+      contactNumber: doctor.contact_number,
       specialty: doctor.specialty,
       credentials: doctor.credentials,
       prcLicenseNumber: doctor.prc_license_number,
@@ -148,17 +170,54 @@ router.get('/doctors/:id', authenticate, authorize('ADMIN', 'SUPERADMIN'), async
       practiceAddress: doctor.practice_address,
       practicePhone: doctor.practice_phone,
       practiceEmail: doctor.practice_email,
+      professionalPhotoUrl: doctor.professional_photo_url,
+      yearsOfExperience: doctor.years_of_experience,
+      areasOfExpertise: doctor.areas_of_expertise,
+      biography: doctor.biography,
+      consultationFee: doctor.consultation_fee,
+      languagesSpoken: doctor.languages_spoken,
       approvalStatus: doctor.approval_status,
       isApproved: doctor.is_approved,
+      profileCompletionStatus: doctor.profile_completion_status,
+      profileSubmittedAt: doctor.profile_submitted_at,
       reviewedAt: doctor.reviewed_at,
       reviewedBy: doctor.reviewed_by,
       rejectionReason: doctor.rejection_reason,
       createdAt: doctor.created_at
     };
-    
+
     res.json(success(formatted));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor'));
+  }
+});
+
+// Get doctor schedules for admin review
+router.get('/doctors/:id/schedules', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const result = await query(
+      'SELECT * FROM doctor_schedules WHERE doctor_id = $1 ORDER BY day_of_week',
+      [id]
+    );
+
+    // Convert snake_case to camelCase for frontend consistency
+    const formattedSchedules = result.rows.map(schedule => ({
+      id: schedule.id,
+      doctorId: schedule.doctor_id,
+      dayOfWeek: schedule.day_of_week,
+      startTime: schedule.start_time,
+      endTime: schedule.end_time,
+      consultationDurationMinutes: schedule.consultation_duration_minutes,
+      isActive: schedule.is_active,
+      createdAt: schedule.created_at,
+      updatedAt: schedule.updated_at,
+    }));
+
+    res.json(success(formattedSchedules));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor schedules'));
   }
 });
 
@@ -166,24 +225,82 @@ router.get('/doctors/:id', authenticate, authorize('ADMIN', 'SUPERADMIN'), async
 router.patch('/doctors/:id/approve', authenticate, authorize('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    
-    // Check current state and get doctor info
-    const current = await query('SELECT approval_status, d.first_name, d.last_name, u.email FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.id = $1', [id]);
+
+    // Check current state and get complete doctor info
+    const current = await query(
+      `SELECT
+        d.approval_status,
+        d.first_name,
+        d.last_name,
+        d.contact_number,
+        d.specialty,
+        d.credentials,
+        d.prc_license_number,
+        d.practice_name,
+        u.email,
+        u.email_verified
+       FROM doctors d
+       JOIN users u ON d.user_id = u.id
+       WHERE d.id = $1`,
+      [id]
+    );
+
     if (current.rows.length === 0) {
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor not found'));
     }
-    
+
     if (current.rows[0].approval_status === 'ACTIVE') {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Doctor is already active'));
     }
-    
+
     if (current.rows[0].approval_status === 'REJECTED') {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot approve a rejected doctor'));
     }
 
+    // Validate critical information before approval
+    const doctor = current.rows[0];
+    const requiredFields = [
+      { field: 'first_name', value: doctor.first_name, name: 'First Name' },
+      { field: 'last_name', value: doctor.last_name, name: 'Last Name' },
+      { field: 'contact_number', value: doctor.contact_number, name: 'Contact Number' },
+      { field: 'specialty', value: doctor.specialty, name: 'Specialty' },
+      { field: 'credentials', value: doctor.credentials, name: 'Credentials' },
+      { field: 'prc_license_number', value: doctor.prc_license_number, name: 'PRC License Number' },
+      { field: 'practice_name', value: doctor.practice_name, name: 'Hospital/Clinic' },
+    ];
+
+    const missingFields = requiredFields.filter(f => {
+      if (f.value === null || f.value === undefined) {
+        return true;
+      }
+      if (typeof f.value === 'string' && f.value.trim() === '') {
+        return true;
+      }
+      return false;
+    });
+
+    if (missingFields.length > 0) {
+      return res.status(400).json(
+        error(
+          ErrorCodes.VALIDATION_ERROR,
+          `Cannot approve doctor: Missing required fields - ${missingFields.map(f => f.name).join(', ')}`
+        )
+      );
+    }
+
+    // Validate email verification
+    if (!doctor.email_verified || doctor.email_verified !== true) {
+      return res.status(400).json(
+        error(
+          ErrorCodes.VALIDATION_ERROR,
+          'Cannot approve doctor: Email must be verified'
+        )
+      );
+    }
+
     await query(
-      `UPDATE doctors 
-       SET approval_status = 'ACTIVE', 
+      `UPDATE doctors
+       SET approval_status = 'ACTIVE',
            is_approved = true,
            reviewed_at = CURRENT_TIMESTAMP,
            reviewed_by = $1
@@ -191,9 +308,8 @@ router.patch('/doctors/:id/approve', authenticate, authorize('ADMIN'), async (re
       [req.user.id, id]
     );
 
-    const doctor = current.rows[0];
     const doctorName = `${doctor.first_name} ${doctor.last_name}`;
-    
+
     // Send approval email (non-blocking)
     sendApprovalEmail(doctor.email, doctorName).catch(err => {
       console.error('Failed to send approval email:', err);
@@ -211,40 +327,45 @@ router.patch('/doctors/:id/reject', authenticate, authorize('ADMIN'), async (req
   try {
     const { id } = req.params;
     const { reason } = req.body;
-    
+
+    // Validate that reason is provided
+    if (!reason || (typeof reason === 'string' && reason.trim() === '')) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Rejection reason is required'));
+    }
+
     // Check current state and get doctor info
     const current = await query('SELECT approval_status, d.first_name, d.last_name, u.email FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.id = $1', [id]);
     if (current.rows.length === 0) {
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor not found'));
     }
-    
+
     if (current.rows[0].approval_status === 'ACTIVE') {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot reject an active doctor'));
     }
-    
+
     if (current.rows[0].approval_status === 'REJECTED') {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Doctor is already rejected'));
     }
-    
+
     await query(
-      `UPDATE doctors 
+      `UPDATE doctors
        SET approval_status = 'REJECTED',
            is_approved = false,
            reviewed_at = CURRENT_TIMESTAMP,
            reviewed_by = $1,
            rejection_reason = $2
        WHERE id = $3`,
-      [req.user.id, reason || null, id]
+      [req.user.id, reason, id]
     );
 
     const doctor = current.rows[0];
     const doctorName = `${doctor.first_name} ${doctor.last_name}`;
-    
+
     // Send rejection email (non-blocking)
     sendRejectionEmail(doctor.email, doctorName, reason).catch(err => {
       console.error('Failed to send rejection email:', err);
     });
-    
+
     res.json(success(null, 'Doctor rejected successfully'));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to reject doctor'));

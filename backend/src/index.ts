@@ -6,6 +6,7 @@ import { config } from './config';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { authenticate } from './middleware/auth';
 import { pool } from './database/connection';
+import path from 'path';
 
 // Import routers
 import authRouter from './api/auth';
@@ -47,6 +48,11 @@ app.use('/api/', limiter);
 // Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from uploads directory (before API routes)
+const uploadsDir = path.resolve(process.cwd(), config.upload.dir);
+app.use('/uploads', cors(config.cors));
+app.use('/uploads', express.static(uploadsDir));
 
 // Request logging
 // Passwords and tokens are never logged (see ARCHITECTURE-ESSENTIALS.md section 41)
