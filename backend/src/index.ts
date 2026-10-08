@@ -49,7 +49,8 @@ app.use('/api/', limiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from uploads directory (before API routes)
+// Serve static files from uploads directory (legacy support for existing photos)
+// New photos are stored in Supabase Storage, but existing /uploads/ URLs need to work
 const uploadsDir = path.resolve(process.cwd(), config.upload.dir);
 app.use('/uploads', cors(config.cors));
 app.use('/uploads', express.static(uploadsDir));

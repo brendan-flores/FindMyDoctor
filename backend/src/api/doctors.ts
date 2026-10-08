@@ -6,42 +6,20 @@ import { calculateCapacity, calculateCapacityRange } from '../modules/capacity/c
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
 import { config } from '../config';
+import { uploadDoctorPhoto, deleteDoctorPhoto, replaceDoctorPhoto, validateImageFile } from '../services/storageService';
 
 const router = Router();
 
-// Configure multer for photo upload
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = config.upload.dir;
-    // Create upload directory if it doesn't exist
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    // Generate unique filename: doctor_photo_<timestamp>_<random>.png
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, `doctor_photo_${uniqueSuffix}${path.extname(file.originalname)}`);
-  }
-});
+// Configure multer for photo upload (memory storage for Supabase)
+const storage = multer.memoryStorage();
 
-// File filter - accept common image types
+// File filter - accept PNG only per architecture requirements
 const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowedMimeTypes = [
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-    'image/gif',
-    'image/webp',
-    'image/bmp',
-  ];
-  if (allowedMimeTypes.includes(file.mimetype)) {
+  if (file.mimetype === 'image/png') {
     cb(null, true);
   } else {
-    cb(new Error('Only image files (JPEG, PNG, GIF, WebP, BMP) are allowed'));
+    cb(new Error('Only PNG files are allowed'));
   }
 };
 
@@ -1070,29 +1048,46 @@ router.post('/me/photo', authenticate, authorize('DOCTOR'), upload.single('photo
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'No file uploaded'));
     }
 
+    // Validate image file type and size
+    const validation = validateImageFile(req.file.buffer, req.file.mimetype);
+    if (!validation.valid) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, validation.error));
+    }
+
     // Get doctor_id from authenticated user
     const doctorResult = await query(
-      'SELECT id FROM doctors WHERE user_id = $1',
+      'SELECT id, professional_photo_url FROM doctors WHERE user_id = $1',
       [userId]
     );
 
     if (doctorResult.rows.length === 0) {
-      // Clean up uploaded file if doctor not found
-      if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
     }
 
-    // Store the file path in the database
-    const photoUrl = `/uploads/${req.file.filename}`;
+    const doctorId = doctorResult.rows[0].id;
+    const currentPhotoUrl = doctorResult.rows[0].professional_photo_url;
 
+    // Generate unique filename: doctor_photo_<doctor_id>_<timestamp>_<random>.ext
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const fileExtension = path.extname(req.file.originalname);
+    const fileName = `doctor_photo_${doctorId}_${uniqueSuffix}${fileExtension}`;
+
+    // Upload to Supabase Storage (handles replacement if old photo exists)
+    const uploadResult = currentPhotoUrl
+      ? await replaceDoctorPhoto(currentPhotoUrl, req.file.buffer, fileName, req.file.mimetype)
+      : await uploadDoctorPhoto(req.file.buffer, fileName, req.file.mimetype);
+
+    if (!uploadResult.success) {
+      return res.status(500).json(error(ErrorCodes.SERVER_ERROR, uploadResult.error || 'Failed to upload photo'));
+    }
+
+    // Update database with new photo URL
     const result = await query(
       `UPDATE doctors
        SET professional_photo_url = $1, updated_at = CURRENT_TIMESTAMP
        WHERE user_id = $2
        RETURNING professional_photo_url`,
-      [photoUrl, userId]
+      [uploadResult.url, userId]
     );
 
     res.json(success({
@@ -1100,12 +1095,6 @@ router.post('/me/photo', authenticate, authorize('DOCTOR'), upload.single('photo
     }, 'Photo uploaded successfully'));
   } catch (err: any) {
     console.error('Photo upload error:', err);
-
-    // Clean up uploaded file if error occurred
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to upload photo'));
   }
 });
@@ -1127,26 +1116,20 @@ router.delete('/me/photo', authenticate, authorize('DOCTOR'), async (req: AuthRe
 
     const currentPhotoUrl = doctorResult.rows[0].professional_photo_url;
 
+    // Delete from Supabase Storage if photo exists
+    if (currentPhotoUrl) {
+      const deleteResult = await deleteDoctorPhoto(currentPhotoUrl);
+      if (!deleteResult.success) {
+        console.error('Failed to delete photo from storage:', deleteResult.error);
+        // Continue with database update even if storage deletion fails
+      }
+    }
+
     // Clear database field
     await query(
       'UPDATE doctors SET professional_photo_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1',
       [userId]
     );
-
-    // Delete file if it exists and is a managed local file
-    if (currentPhotoUrl && currentPhotoUrl.startsWith('/uploads/')) {
-      const filename = currentPhotoUrl.split('/').pop();
-      if (filename) {
-        const filePath = path.join(config.upload.dir, filename);
-        // Verify the file is within the upload directory to prevent path traversal
-        const resolvedUploadDir = path.resolve(config.upload.dir);
-        const resolvedFilePath = path.resolve(filePath);
-
-        if (resolvedFilePath.startsWith(resolvedUploadDir) && fs.existsSync(resolvedFilePath)) {
-          fs.unlinkSync(resolvedFilePath);
-        }
-      }
-    }
 
     res.json(success(null, 'Photo deleted successfully'));
   } catch (err: any) {
