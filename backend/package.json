@@ -16,6 +16,7 @@
     "migrate:modify-pending-doctor-signup": "tsx src/database/applyModifyPendingDoctorSignup.ts",
     "migrate:relax-doctor-specialty-constraints": "tsx src/database/applyRelaxDoctorSpecialtyConstraints.ts",
     "migrate:relax-pending-doctor-signup-constraints": "tsx src/database/applyRelaxPendingDoctorSignupConstraints.ts",
+    "migrate:remove-consultation-type": "tsx src/database/applyRemoveConsultationType.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",

@@ -28,7 +28,6 @@ export interface Doctor {
   areasOfExpertise?: string | null;
   biography?: string | null;
   consultationFee?: number | null;
-  consultationType?: string | null;
   languagesSpoken?: string | null;
   isApproved: boolean;
   approvalStatus?: 'PENDING' | 'ACTIVE' | 'REJECTED';

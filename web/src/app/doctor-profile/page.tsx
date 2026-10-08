@@ -8,6 +8,8 @@ import type { DoctorProfile, UpdateProfileRequest } from '@/lib/api/doctorApi';
 import { CEBU_FACILITIES } from '@/data/cebuFacilities';
 import { MEDICAL_SPECIALTIES } from '@/data/medicalSpecialties';
 import { MEDICAL_CREDENTIALS } from '@/data/medicalCredentials';
+import { MEDICAL_EXPERTISE } from '@/data/medicalExpertise';
+import { LANGUAGES } from '@/data/languages';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import SearchableMultiSelect from '@/components/ui/SearchableMultiSelect';
 
@@ -17,7 +19,6 @@ export default function DoctorProfile() {
   const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
@@ -37,7 +38,6 @@ export default function DoctorProfile() {
     areas_of_expertise: '',
     biography: '',
     consultation_fee: '',
-    consultation_type: '',
     languages_spoken: '',
   });
 
@@ -68,11 +68,31 @@ export default function DoctorProfile() {
     return day ? day.label : dayValue;
   };
 
+  const formatTime = (timeString: string | undefined) => {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
   // Cebu hospital and clinic options for dropdown with area sublabels
   const cebuFacilityOptions = CEBU_FACILITIES.map((facility) => ({
     value: facility.name,
     label: facility.name,
     sublabel: `${facility.type} • ${facility.area}`,
+  }));
+
+  // Medical expertise options for dropdown
+  const expertiseOptions = MEDICAL_EXPERTISE.map((expertise) => ({
+    value: expertise,
+    label: expertise,
+  }));
+
+  // Language options for dropdown
+  const languageOptions = LANGUAGES.map((language) => ({
+    value: language,
+    label: language,
   }));
 
   // Check if selected facility has room number requirement
@@ -111,7 +131,6 @@ export default function DoctorProfile() {
           areas_of_expertise: response.data.areas_of_expertise || '',
           biography: response.data.biography || '',
           consultation_fee: response.data.consultation_fee?.toString() || '',
-          consultation_type: response.data.consultation_type || '',
           languages_spoken: response.data.languages_spoken || '',
         });
         if (response.data.professional_photo_url) {
@@ -301,43 +320,6 @@ export default function DoctorProfile() {
     return '';
   };
 
-  const handleSave = async () => {
-    setError('');
-    setSuccessMessage('');
-    setIsSaving(true);
-
-    try {
-      const updatePayload: UpdateProfileRequest = {
-        specialty: formData.specialty || undefined,
-        credentials: formData.credentials || undefined,
-        prc_license_number: formData.prc_license_number || undefined,
-        practice_name: formData.practice_name || undefined,
-        years_of_experience: formData.years_of_experience ? parseInt(formData.years_of_experience) : undefined,
-        areas_of_expertise: formData.areas_of_expertise || undefined,
-        biography: formData.biography || undefined,
-        consultation_fee: formData.consultation_fee ? parseFloat(formData.consultation_fee) : undefined,
-        consultation_type: formData.consultation_type || undefined,
-        languages_spoken: formData.languages_spoken || undefined,
-        professional_photo_url: formData.professional_photo_url || undefined,
-      };
-
-      const response = await doctorApi.updateProfile(updatePayload);
-
-      if (response.success && response.data) {
-        setProfile(response.data);
-        setSuccessMessage('Profile saved successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(response.error || 'Failed to save profile');
-      }
-    } catch (err) {
-      console.error('Save profile error:', err);
-      setError('An error occurred while saving your profile');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleSubmit = async () => {
     setError('');
     setSuccessMessage('');
@@ -351,6 +333,28 @@ export default function DoctorProfile() {
     setIsSubmitting(true);
 
     try {
+      // First, save the profile
+      const updatePayload: UpdateProfileRequest = {
+        specialty: formData.specialty || undefined,
+        credentials: formData.credentials || undefined,
+        prc_license_number: formData.prc_license_number || undefined,
+        practice_name: formData.practice_name || undefined,
+        years_of_experience: formData.years_of_experience ? parseInt(formData.years_of_experience) : undefined,
+        areas_of_expertise: formData.areas_of_expertise || undefined,
+        biography: formData.biography || undefined,
+        consultation_fee: formData.consultation_fee ? parseFloat(formData.consultation_fee) : undefined,
+        languages_spoken: formData.languages_spoken || undefined,
+        professional_photo_url: formData.professional_photo_url || undefined,
+      };
+
+      const saveResponse = await doctorApi.updateProfile(updatePayload);
+
+      if (!saveResponse.success) {
+        setError(saveResponse.error || 'Failed to save profile');
+        return;
+      }
+
+      // Then, submit for approval
       const response = await doctorApi.submitProfile();
 
       if (response.success) {
@@ -643,19 +647,21 @@ export default function DoctorProfile() {
                 <label className="block text-[15px] font-semibold text-[#334155] mb-2">
                   Areas of Expertise
                 </label>
-                <input
-                  type="text"
+                <select
                   value={formData.areas_of_expertise}
                   onChange={(e) => {
                     setFormData({ ...formData, areas_of_expertise: e.target.value });
                     setError('');
                   }}
-                  placeholder="e.g., Diabetes, Hypertension, Cardiology"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Separate multiple areas with commas
-                </p>
+                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                >
+                  <option value="">Select area of expertise</option>
+                  {expertiseOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Short Biography */}
@@ -694,44 +700,25 @@ export default function DoctorProfile() {
                 />
               </div>
 
-              {/* Consultation Type */}
-              <div>
-                <label className="block text-[15px] font-semibold text-[#334155] mb-2">
-                  Consultation Type
-                </label>
-                <select
-                  value={formData.consultation_type}
-                  onChange={(e) => {
-                    setFormData({ ...formData, consultation_type: e.target.value });
-                    setError('');
-                  }}
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
-                >
-                  <option value="">Select consultation type</option>
-                  <option value="In-Person">In-Person</option>
-                  <option value="Online">Online</option>
-                  <option value="Both">Both In-Person and Online</option>
-                </select>
-              </div>
-
               {/* Languages Spoken */}
               <div>
                 <label className="block text-[15px] font-semibold text-[#334155] mb-2">
                   Languages Spoken
                 </label>
-                <input
-                  type="text"
-                  value={formData.languages_spoken}
-                  onChange={(e) => {
-                    setFormData({ ...formData, languages_spoken: e.target.value });
+                <SearchableMultiSelect
+                  value={
+                    formData.languages_spoken
+                      ? formData.languages_spoken.split(',').map((l) => l.trim()).filter(Boolean)
+                      : []
+                  }
+                  onChange={(selectedList) => {
+                    setFormData({ ...formData, languages_spoken: selectedList.join(', ') });
                     setError('');
                   }}
-                  placeholder="e.g., English, Cebuano, Tagalog"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  options={languageOptions}
+                  placeholder="Search & select languages you speak..."
+                  noResultsText="No matching languages found"
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  Separate multiple languages with commas
-                </p>
               </div>
 
               {/* Available Schedule */}
@@ -805,7 +792,7 @@ export default function DoctorProfile() {
                         <div className="text-sm">
                           <span className="font-medium text-gray-900">{getDayLabel(schedule.day_of_week?.toString())}</span>
                           <span className="text-gray-600 ml-2">
-                            {schedule.start_time?.substring(0, 5)} - {schedule.end_time?.substring(0, 5)}
+                            {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
                           </span>
                         </div>
                         <button
@@ -825,21 +812,12 @@ export default function DoctorProfile() {
               </div>
 
               {/* Buttons */}
-              <div className="pt-4 space-y-3">
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={isSaving || !canEdit}
-                  className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#1A62CD] hover:bg-[#0D3B75] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1A62CD] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSaving ? 'Saving...' : 'Save Profile'}
-                </button>
-
+              <div className="pt-4">
                 {canSubmit && (
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    disabled={isSubmitting || isSaving}
+                    disabled={isSubmitting}
                     className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting ? 'Submitting...' : 'Submit for Approval'}

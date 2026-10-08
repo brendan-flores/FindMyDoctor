@@ -132,6 +132,14 @@ export default function DoctorManagement() {
   // Get unique specialties for filter dropdown
   const specialties = Array.from(new Set(doctors.map(d => d.specialty).filter(Boolean))).sort();
 
+  const formatTime = (timeString: string | undefined) => {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -455,7 +463,7 @@ export default function DoctorManagement() {
                           <img
                             src={selectedDoctor.professionalPhotoUrl}
                             alt="Professional Photo"
-                            className="w-28 h-28 rounded-xl object-cover border-2 border-slate-200 shadow-sm"
+                            className="w-28 h-28 rounded-full object-cover border-2 border-slate-200 shadow-sm"
                             onError={(e) => {
                               console.error('Image failed to load:', e.currentTarget.src);
                               console.error('Professional photo URL:', selectedDoctor.professionalPhotoUrl);
@@ -463,7 +471,7 @@ export default function DoctorManagement() {
                           />
                         </button>
                       ) : (
-                        <div className="w-28 h-28 rounded-xl border-2 border-dashed border-slate-300 bg-slate-100 flex items-center justify-center">
+                        <div className="w-28 h-28 rounded-full border-2 border-dashed border-slate-300 bg-slate-100 flex items-center justify-center">
                           <span className="text-xs text-slate-400">No photo</span>
                         </div>
                       )}
@@ -492,10 +500,6 @@ export default function DoctorManagement() {
                       <div className="bg-white rounded-lg p-3 border border-slate-200">
                         <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Consultation Fee</label>
                         <p className="text-sm font-medium text-slate-900 mt-1">{selectedDoctor.consultationFee ? `₱${selectedDoctor.consultationFee}` : 'N/A'}</p>
-                      </div>
-                      <div className="bg-white rounded-lg p-3 border border-slate-200">
-                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Consultation Type</label>
-                        <p className="text-sm font-medium text-slate-900 mt-1">{selectedDoctor.consultationType || 'N/A'}</p>
                       </div>
                       <div className="bg-white rounded-lg p-3 border border-slate-200">
                         <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Languages Spoken</label>
@@ -530,7 +534,7 @@ export default function DoctorManagement() {
                           <span className="text-sm font-semibold text-slate-900">{['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][schedule.dayOfWeek]}</span>
                         </div>
                         <div className="text-sm text-slate-600 font-medium">
-                          {schedule.startTime?.substring(0, 5)} - {schedule.endTime?.substring(0, 5)}
+                          {formatTime(schedule.startTime)} - {formatTime(schedule.endTime)}
                         </div>
                       </div>
                     ))}

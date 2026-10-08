@@ -109,7 +109,7 @@ export default function SecretarySettings() {
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
           <h2 className="text-xl font-semibold text-slate-900 mb-4">Security</h2>
-          
+
           <div className="flex items-center justify-between py-4 border-b border-slate-200">
             <div>
               <h3 className="font-semibold text-slate-900">Two-Factor Authentication</h3>
@@ -117,26 +117,17 @@ export default function SecretarySettings() {
                 Require a verification code every time you sign in
               </p>
             </div>
-            <button
-              onClick={handleToggle2FA}
-              disabled={isSaving}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                twoFactorEnabled ? 'bg-[#1A62CD]' : 'bg-slate-300'
-              } ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Enabled
+              </span>
+            </div>
           </div>
 
-          <div className="mt-4 p-4 bg-slate-50 rounded-xl">
-            <p className="text-sm text-slate-600">
-              {twoFactorEnabled
-                ? 'Two-factor authentication is enabled. You will be required to enter a verification code sent to your email each time you sign in.'
-                : 'Two-factor authentication is disabled. You can enable it to add an extra layer of security to your account.'}
+          <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+            <p className="text-sm text-emerald-800">
+              Two-factor authentication is mandatory for all secretary accounts. You will be required to enter a verification code sent to your email each time you sign in.
             </p>
           </div>
         </div>

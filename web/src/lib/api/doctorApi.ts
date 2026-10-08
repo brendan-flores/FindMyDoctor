@@ -14,7 +14,6 @@ export interface DoctorProfile {
   areas_of_expertise?: string | null;
   biography?: string | null;
   consultation_fee?: number | null;
-  consultation_type?: string | null;
   languages_spoken?: string | null;
   profile_completion_status?: 'INCOMPLETE' | 'COMPLETE' | 'SUBMITTED';
   profile_submitted_at?: string | null;
@@ -32,7 +31,6 @@ export interface UpdateProfileRequest {
   areas_of_expertise?: string;
   biography?: string;
   consultation_fee?: number;
-  consultation_type?: string;
   languages_spoken?: string;
 }
 

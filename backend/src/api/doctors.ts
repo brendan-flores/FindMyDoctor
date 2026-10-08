@@ -54,7 +54,7 @@ router.get('/me', authenticate, authorize('DOCTOR'), async (req: AuthRequest, re
         d.id, d.user_id, d.first_name, d.middle_name, d.last_name, d.specialty, d.credentials,
         d.prc_license_number, d.practice_name, d.practice_phone, d.practice_email, d.room_number,
         d.contact_number, d.professional_photo_url, d.years_of_experience, d.areas_of_expertise,
-        d.biography, d.consultation_fee, d.consultation_type, d.languages_spoken,
+        d.biography, d.consultation_fee, d.languages_spoken,
         d.two_factor_enabled, d.is_approved, d.approval_status, d.profile_completion_status,
         d.profile_submitted_at, d.rejection_reason
        FROM doctors d
@@ -108,7 +108,7 @@ router.get('/', async (req: any, res: Response) => {
         d.practice_phone, d.practice_email, d.practice_description,
         d.operating_hours_start, d.operating_hours_end,
         d.professional_photo_url, d.years_of_experience, d.areas_of_expertise,
-        d.consultation_type, d.languages_spoken
+        d.languages_spoken
       FROM doctors d
       WHERE d.approval_status = 'ACTIVE'
     `;
@@ -151,7 +151,7 @@ router.get('/:id', async (req: any, res: Response) => {
         d.practice_phone, d.practice_email, d.practice_description,
         d.operating_hours_start, d.operating_hours_end,
         d.professional_photo_url, d.years_of_experience, d.areas_of_expertise,
-        d.consultation_type, d.languages_spoken
+        d.languages_spoken
        FROM doctors d
        WHERE d.id = $1 AND d.approval_status = 'ACTIVE'`,
       [id]
@@ -809,7 +809,6 @@ router.put('/me/profile', authenticate, authorize('DOCTOR'), async (req: AuthReq
       areas_of_expertise,
       biography,
       consultation_fee,
-      consultation_type,
       languages_spoken,
     } = req.body;
 
@@ -880,11 +879,6 @@ router.put('/me/profile', authenticate, authorize('DOCTOR'), async (req: AuthReq
       paramCount++;
       updates.push(`consultation_fee = $${paramCount}`);
       values.push(consultation_fee);
-    }
-    if (consultation_type !== undefined) {
-      paramCount++;
-      updates.push(`consultation_type = $${paramCount}`);
-      values.push(consultation_type);
     }
     if (languages_spoken !== undefined) {
       paramCount++;

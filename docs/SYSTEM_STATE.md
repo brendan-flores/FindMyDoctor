@@ -44,6 +44,8 @@ Current System State (October 2026):
 - Patient registration requires username (minimum 3 characters, alphanumeric + underscores only)
 - User login accepts either email or username for authentication
 - SuperAdmins log in directly without OTP; regular Admins always require login OTP (no setting, no bypass)
+- All Doctor accounts require mandatory login OTP (no setting, no bypass)
+- All Secretary accounts require mandatory login OTP (no setting, no bypass)
 - Each Secretary has a required `doctor_id` relationship to one Doctor; Doctors can list only their own Secretaries via the authenticated backend API
 - Supabase is used only for OTP email verification, not for storing application data
 - Backend API includes comprehensive endpoints for doctors, admin, OTP, appointments, queue, payments, etc.
@@ -88,13 +90,13 @@ Current System State (October 2026):
 - Secretary must complete profile information (first name, last name, contact number) via `PUT /api/v1/secretaries/me`
 - Secretary must change password on first login (enforced by `must_change_password` flag)
 - Secretary profile page at `/secretary/profile` allows viewing and editing profile information
-- Secretary settings page at `/secretary/settings` provides optional two-factor authentication toggle
-- Doctor settings page at `/doctor/settings` provides optional two-factor authentication toggle
+- Secretary settings page at `/secretary/settings` provides optional two-factor authentication toggle (deprecated - OTP is now mandatory)
+- Doctor settings page at `/doctor/settings` provides optional two-factor authentication toggle (deprecated - OTP is now mandatory)
 - Role-based login OTP/2FA is implemented with server-side challenge state in PostgreSQL
 - Doctor, Secretary, and Admin web login pages submit their expected role; the backend rejects cross-role login attempts before OTP challenge creation or delivery with `Invalid credentials or account role.` Admin login continues to accept SUPERADMIN accounts
 - Admin/SuperAdmin login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
-- Doctor login requires OTP only if `doctors.two_factor_enabled = true` (optional 2FA)
-- Secretary login requires OTP only if `secretaries.two_factor_enabled = true` (optional 2FA)
+- Doctor login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
+- Secretary login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
 - PostgreSQL `login_otp_challenges` table stores server-side OTP challenge state with hashed challenge tokens (migration 014_add_login_otp_challenges.sql)
 - PostgreSQL `doctors` and `secretaries` tables include `two_factor_enabled` column (migration 013_add_two_factor_settings.sql)
 - Migration `015_enforce_secretary_doctor_relationship.sql` enforces the required foreign key and non-null assignment for `secretaries.doctor_id`
