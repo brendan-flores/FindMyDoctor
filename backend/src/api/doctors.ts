@@ -3,6 +3,7 @@ import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 import { calculateCapacity, calculateCapacityRange } from '../modules/capacity/capacityService';
+import { calculateAvailability, calculateAvailabilityRange } from '../modules/availability/availabilityService';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import path from 'path';
@@ -506,45 +507,21 @@ router.patch('/me/schedules/:id/reactivate', authenticate, authorize('DOCTOR'), 
 router.get('/:id/availability', async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, date } = req.query;
 
-    if (!startDate || !endDate) {
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start date and end date are required'));
+    if (date) {
+      // Get availability for a specific date
+      const availability = await calculateAvailability(id, String(date));
+      res.json(success(availability));
+    } else if (startDate && endDate) {
+      // Get availability for a date range
+      const availabilityRange = await calculateAvailabilityRange(id, String(startDate), String(endDate));
+      res.json(success(availabilityRange));
+    } else {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date or date range (startDate and endDate) is required'));
     }
-
-    // Get active unavailability periods (exceptions)
-    const unavailabilityResult = await query(
-      `SELECT * FROM doctor_unavailability
-       WHERE doctor_id = $1 AND is_active = true
-       AND (start_date <= $2 AND end_date >= $3)
-       ORDER BY start_date`,
-      [id, endDate, startDate]
-    );
-
-    // Get active break periods for the date range
-    const breakPeriodsResult = await query(
-      `SELECT * FROM doctor_break_periods
-       WHERE doctor_id = $1 AND is_active = true
-       AND break_date >= $2 AND break_date <= $3
-       ORDER BY break_date, start_time`,
-      [id, startDate, endDate]
-    );
-
-    // Get daily capacities
-    const capacityResult = await query(
-      `SELECT date, final_capacity, registered_count
-       FROM daily_capacities
-       WHERE doctor_id = $1 AND date >= $2 AND date <= $3
-       ORDER BY date`,
-      [id, startDate, endDate]
-    );
-
-    res.json(success({
-      unavailability: unavailabilityResult.rows,
-      breakPeriods: breakPeriodsResult.rows,
-      capacities: capacityResult.rows,
-    }));
   } catch (err: any) {
+    console.error('Error fetching doctor availability:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch availability'));
   }
 });

@@ -1,20 +1,113 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/services/doctor_service.dart';
 
 class DoctorSchedulePage extends StatefulWidget {
-  const DoctorSchedulePage({super.key});
+  final String doctorId;
+  final String? doctorName;
+  final String? specialty;
+  final String? clinic;
+  final String? consultationFee;
+
+  const DoctorSchedulePage({
+    super.key,
+    required this.doctorId,
+    this.doctorName,
+    this.specialty,
+    this.clinic,
+    this.consultationFee,
+  });
 
   @override
   State<DoctorSchedulePage> createState() => _DoctorSchedulePageState();
 }
 
 class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
-  final int _queueNumber = 4;
-  final int _slotsLeft = 4;
+  final DoctorService _doctorService = DoctorService();
+  
+  DateTime _currentMonth = DateTime.now();
+  DateTime? _selectedDate;
+  String? _selectedTimeSlot;
+  
+  Map<String, dynamic>? _availabilityData;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = DateTime.now();
+    _fetchAvailability();
+  }
+
+  Future<void> _fetchAvailability() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final startDate = DateTime(_currentMonth.year, _currentMonth.month, 1);
+      final endDate = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
+      
+      final availability = await _doctorService.getDoctorAvailability(
+        doctorId: widget.doctorId,
+        startDate: DateFormat('yyyy-MM-dd').format(startDate),
+        endDate: DateFormat('yyyy-MM-dd').format(endDate),
+      );
+
+      if (availability != null && availability['dates'] != null) {
+        setState(() {
+          _availabilityData = availability;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'No availability data found';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load availability: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _previousMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+    });
+    _fetchAvailability();
+  }
+
+  void _nextMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+    });
+    _fetchAvailability();
+  }
+
+  Map<String, dynamic>? _getDateAvailability(DateTime date) {
+    if (_availabilityData == null || _availabilityData!['dates'] == null) {
+      return null;
+    }
+
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final dates = _availabilityData!['dates'] as List;
+    
+    try {
+      return dates.firstWhere((d) => d['date'] == dateStr);
+    } catch (e) {
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +130,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                       const SizedBox(height: spacing.AppSpacing.gutterLg),
                       _buildCalendarSection(),
                       const SizedBox(height: spacing.AppSpacing.gutterLg),
-                      _buildTimeSlotsSection(),
+                      if (_selectedDate != null) _buildTimeSlotsSection(),
                       const SizedBox(height: spacing.AppSpacing.gutterLg),
                       _buildQueueSummary(),
                       const SizedBox(height: spacing.AppSpacing.gutter3xl),
@@ -127,7 +220,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Dr. Maria Angela Santos, MD',
+                  widget.doctorName ?? 'Doctor Name',
                   style: AppTextStyles.headlineSm.copyWith(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -135,7 +228,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 ),
                 const SizedBox(height: spacing.AppSpacing.gutterXs),
                 Text(
-                  'Adult Cardiology • St. Luke\'s BGC',
+                  '${widget.specialty ?? 'Specialty'} • ${widget.clinic ?? 'Clinic'}',
                   style: AppTextStyles.bodyMd.copyWith(
                     fontSize: 13,
                     color: AppColors.secondary,
@@ -170,7 +263,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                         border: Border.all(color: AppColors.surfaceContainerHighest),
                       ),
                       child: Text(
-                        '₱1,000 / consult',
+                        '₱${widget.consultationFee ?? '1,000'} / consult',
                         style: AppTextStyles.labelSm.copyWith(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -222,25 +315,27 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                       ),
                     ),
                     const SizedBox(height: spacing.AppSpacing.gutterXs),
-                    Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: AppColors.tertiary,
-                            shape: BoxShape.circle,
+                    if (_selectedDate != null) ...[
+                      Row(
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: AppColors.tertiary,
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: spacing.AppSpacing.gutterXs),
-                        Text(
-                          'Tue & Thu • 9:00 AM – 3:00 PM',
-                          style: AppTextStyles.labelMd.copyWith(
-                            color: AppColors.secondary,
+                          const SizedBox(width: spacing.AppSpacing.gutterXs),
+                          Text(
+                            _getWorkingHoursText(_selectedDate!),
+                            style: AppTextStyles.labelMd.copyWith(
+                              color: AppColors.secondary,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -251,7 +346,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                onPressed: () {},
+                onPressed: _previousMonth,
                 icon: const Icon(Icons.chevron_left),
                 constraints: const BoxConstraints(),
                 padding: EdgeInsets.zero,
@@ -259,7 +354,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               Row(
                 children: [
                   Text(
-                    'October 2025',
+                    DateFormat('MMMM yyyy').format(_currentMonth),
                     style: AppTextStyles.bodyMdMedium.copyWith(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
@@ -288,7 +383,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 ],
               ),
               IconButton(
-                onPressed: () {},
+                onPressed: _nextMonth,
                 icon: const Icon(Icons.chevron_right),
                 constraints: const BoxConstraints(),
                 padding: EdgeInsets.zero,
@@ -296,13 +391,44 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             ],
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
-          _buildCalendarGrid(),
+          if (_isLoading)
+            const Center(child: CircularProgressIndicator())
+          else if (_errorMessage != null)
+            Center(
+              child: Text(
+                _errorMessage!,
+                style: AppTextStyles.bodyMd.copyWith(color: AppColors.error),
+              ),
+            )
+          else
+            _buildCalendarGrid(),
         ],
       ),
     );
   }
 
+  String _getWorkingHoursText(DateTime date) {
+    final availability = _getDateAvailability(date);
+    if (availability == null || availability['workingHours'] == null) {
+      return 'No schedule';
+    }
+
+    final workingHours = availability['workingHours'] as List;
+    if (workingHours.isEmpty) {
+      return 'Not available';
+    }
+
+    final first = workingHours.first;
+    final last = workingHours.last;
+    return '${first['start']} – ${last['end']}';
+  }
+
   Widget _buildCalendarGrid() {
+    final firstDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month, 1);
+    final lastDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
+    final startWeekday = firstDayOfMonth.weekday % 7; // 0 = Sunday
+    final totalDays = lastDayOfMonth.day;
+
     return Column(
       children: [
         // Weekday headers
@@ -320,61 +446,122 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               .toList(),
         ),
         const SizedBox(height: spacing.AppSpacing.gutterSm),
-        // Calendar days (simplified for demo)
-        _buildCalendarRow([29, 30, 1, 2, 3, 4, 5]),
-        _buildCalendarRow([6, 7, 8, 9, 10, 11, 12]),
-        _buildCalendarRow([13, 14, 15, 16, 17, 18, 19]),
-        _buildCalendarRow([20, 21, 22, 23, 24, 25, 26]),
-        _buildCalendarRow([27, 28, 29, 30, 31, 1, 2]),
+        // Calendar days
+        ...List.generate(6, (weekIndex) {
+          final weekDays = <Widget>[];
+          
+          for (int dayIndex = 0; dayIndex < 7; dayIndex++) {
+            final dayNumber = weekIndex * 7 + dayIndex - startWeekday + 1;
+            
+            if (dayNumber > 0 && dayNumber <= totalDays) {
+              final date = DateTime(_currentMonth.year, _currentMonth.month, dayNumber);
+              final availability = _getDateAvailability(date);
+              final status = availability?['status'] ?? 'NON_WORKING';
+              final isSelected = _selectedDate != null && 
+                  date.year == _selectedDate!.year &&
+                  date.month == _selectedDate!.month &&
+                  date.day == _selectedDate!.day;
+              
+              weekDays.add(
+                Expanded(
+                  child: _buildCalendarDay(dayNumber, status, isSelected, date),
+                ),
+              );
+            } else {
+              weekDays.add(const Expanded(child: SizedBox()));
+            }
+          }
+          
+          return Padding(
+            padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterXs),
+            child: Row(children: weekDays),
+          );
+        }),
       ],
     );
   }
 
-  Widget _buildCalendarRow(List<int> days) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: days.map((day) {
-        final isSelected = day == 21; // Example selection
-        final isToday = day == 8; // Example today
-        final isAvailable = day != 23; // Example unavailable day
+  Widget _buildCalendarDay(int day, String status, bool isSelected, DateTime date) {
+    final isAvailable = status == 'AVAILABLE';
+    final isFull = status == 'FULL';
+    final isUnavailable = status == 'UNAVAILABLE';
+    final isPast = status == 'PAST';
+    final isNonWorking = status == 'NON_WORKING';
 
-        return GestureDetector(
-          onTap: isAvailable
-              ? () {
-                  // Date selection logic
-                }
-              : null,
-          child: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? AppColors.primary
-                  : isToday
-                      ? AppColors.surfaceContainer
-                      : Colors.transparent,
-              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-            ),
-            child: Center(
-              child: Text(
-                day.toString(),
-                style: AppTextStyles.labelSm.copyWith(
-                  color: isSelected
-                      ? AppColors.onPrimary
-                      : isAvailable
-                          ? AppColors.onSurface
-                          : AppColors.slate400,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
+    Color? backgroundColor;
+    Color? textColor;
+    
+    if (isSelected) {
+      backgroundColor = AppColors.primary;
+      textColor = AppColors.onPrimary;
+    } else if (isPast) {
+      backgroundColor = null;
+      textColor = AppColors.slate300;
+    } else if (isUnavailable) {
+      backgroundColor = AppColors.errorContainer.withValues(alpha: 0.3);
+      textColor = AppColors.error;
+    } else if (isFull) {
+      backgroundColor = AppColors.surfaceContainerHighest;
+      textColor = AppColors.slate400;
+    } else if (isNonWorking) {
+      backgroundColor = null;
+      textColor = AppColors.slate400;
+    } else {
+      backgroundColor = null;
+      textColor = AppColors.onSurface;
+    }
+
+    return GestureDetector(
+      onTap: isAvailable
+          ? () {
+              setState(() {
+                _selectedDate = date;
+                _selectedTimeSlot = null;
+              });
+            }
+          : null,
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 2),
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+          border: isSelected ? null : Border.all(
+            color: isAvailable ? AppColors.primary.withValues(alpha: 0.3) : Colors.transparent,
+            width: 1,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            day.toString(),
+            style: AppTextStyles.labelSm.copyWith(
+              color: textColor,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
-        );
-      }).toList(),
+        ),
+      ),
     );
   }
 
   Widget _buildTimeSlotsSection() {
+    if (_selectedDate == null) return const SizedBox();
+
+    final availability = _getDateAvailability(_selectedDate!);
+    if (availability == null) {
+      return AppCard(
+        padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+        child: Text(
+          'No availability data for selected date',
+          style: AppTextStyles.bodyMd.copyWith(color: AppColors.secondary),
+        ),
+      );
+    }
+
+    final timeSlots = availability['timeSlots'] as List?;
+    final capacity = availability['capacity'] as Map?;
+
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Column(
@@ -389,7 +576,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               ),
               const SizedBox(width: spacing.AppSpacing.gutterSm),
               Text(
-                'Selected Day & Queue Summary',
+                'Available Time Slots',
                 style: AppTextStyles.headlineSm.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -397,127 +584,155 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             ],
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
-          Container(
-            padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.surfaceContainer,
-                  AppColors.surfaceContainer.withValues(alpha: 0.6),
-                ],
+          if (capacity != null)
+            Container(
+              padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.surfaceContainer,
+                    AppColors.surfaceContainer.withValues(alpha: 0.6),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                border: Border.all(color: AppColors.surfaceContainerHighest),
               ),
-              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-              border: Border.all(color: AppColors.surfaceContainerHighest),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Queue',
-                        style: AppTextStyles.labelSm.copyWith(
-                          fontSize: 9,
-                          color: AppColors.primaryFixed,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        '#$_queueNumber',
-                        style: AppTextStyles.queueNum.copyWith(
-                          fontSize: 22,
-                          color: AppColors.onPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: spacing.AppSpacing.gutterMd),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Tuesday, Oct 21, 2025',
-                        style: AppTextStyles.bodyMdMedium.copyWith(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: spacing.AppSpacing.gutterXs),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.schedule,
-                            color: AppColors.primary,
-                            size: spacing.AppSpacing.iconSm,
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Slots',
+                          style: AppTextStyles.labelSm.copyWith(
+                            fontSize: 9,
+                            color: AppColors.primaryFixed,
+                            fontWeight: FontWeight.bold,
                           ),
-                          const SizedBox(width: spacing.AppSpacing.gutterXs),
-                          Text(
-                            '9:00 AM – 3:00 PM',
-                            style: AppTextStyles.labelSm.copyWith(
-                              fontSize: 12,
-                              color: AppColors.secondary,
-                            ),
+                        ),
+                        Text(
+                          '${capacity['remaining'] ?? 0}',
+                          style: AppTextStyles.queueNum.copyWith(
+                            fontSize: 22,
+                            color: AppColors.onPrimary,
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: spacing.AppSpacing.gutterSm,
-                    vertical: spacing.AppSpacing.gutterXs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.tertiary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
-                    border: Border.all(
-                      color: AppColors.tertiary.withValues(alpha: 0.3),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: AppColors.tertiary,
-                          shape: BoxShape.circle,
+                  const SizedBox(width: spacing.AppSpacing.gutterMd),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          DateFormat('EEEE, MMM d, yyyy').format(_selectedDate!),
+                          style: AppTextStyles.bodyMdMedium.copyWith(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: spacing.AppSpacing.gutterXs),
-                      Text(
-                        '$_slotsLeft Slots Left',
-                        style: AppTextStyles.labelSm.copyWith(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.tertiary,
+                        const SizedBox(height: spacing.AppSpacing.gutterXs),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.schedule,
+                              color: AppColors.primary,
+                              size: spacing.AppSpacing.iconSm,
+                            ),
+                            const SizedBox(width: spacing.AppSpacing.gutterXs),
+                            Text(
+                              _getWorkingHoursText(_selectedDate!),
+                              style: AppTextStyles.labelSm.copyWith(
+                                fontSize: 12,
+                                color: AppColors.secondary,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
           Divider(color: AppColors.slate200),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          if (timeSlots == null || timeSlots.isEmpty)
+            Text(
+              'No available time slots',
+              style: AppTextStyles.bodyMd.copyWith(color: AppColors.secondary),
+            )
+          else
+            Wrap(
+              spacing: spacing.AppSpacing.gutterSm,
+              runSpacing: spacing.AppSpacing.gutterSm,
+              children: timeSlots.map<Widget>((slot) {
+                final start = slot['start'];
+                final end = slot['end'];
+                final isAvailable = slot['isAvailable'];
+                final slotStatus = slot['status'];
+                final isSelected = _selectedTimeSlot == start;
+
+                return GestureDetector(
+                  onTap: isAvailable
+                      ? () {
+                          setState(() {
+                            _selectedTimeSlot = start;
+                          });
+                        }
+                      : null,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: spacing.AppSpacing.gutterMd,
+                      vertical: spacing.AppSpacing.gutterSm,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primary
+                          : isAvailable
+                              ? AppColors.surfaceContainer
+                              : AppColors.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.primary
+                            : isAvailable
+                                ? AppColors.primary.withValues(alpha: 0.3)
+                                : AppColors.slate300,
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      '$start - $end',
+                      style: AppTextStyles.labelSm.copyWith(
+                        color: isSelected
+                            ? AppColors.onPrimary
+                            : isAvailable
+                                ? AppColors.onSurface
+                                : AppColors.slate400,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
           _buildInfoRow(
             Icons.payments,
             'Consultation Fee',
-            '₱1,000 (Pay at clinic cashier)',
+            '₱${widget.consultationFee ?? '1,000'} (Pay at clinic cashier)',
           ),
           const SizedBox(height: spacing.AppSpacing.gutterSm),
           _buildInfoRow(
@@ -564,6 +779,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   }
 
   Widget _buildQueueSummary() {
+    if (_selectedDate == null) return const SizedBox();
+
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Column(
@@ -578,14 +795,16 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
           ),
           const SizedBox(height: spacing.AppSpacing.gutterSm),
           Text(
-            'Tuesday, Oct 21, 2025',
+            DateFormat('EEEE, MMM d, yyyy').format(_selectedDate!),
             style: AppTextStyles.bodyMdMedium.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: spacing.AppSpacing.gutterXs),
           Text(
-            '9:00 AM – 3:00 PM',
+            _selectedTimeSlot != null
+                ? '$_selectedTimeSlot - ${_getEndTime(_selectedTimeSlot!)}'
+                : _getWorkingHoursText(_selectedDate!),
             style: AppTextStyles.labelSm.copyWith(
               color: AppColors.secondary,
             ),
@@ -593,6 +812,16 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
         ],
       ),
     );
+  }
+
+  String _getEndTime(String startTime) {
+    final parts = startTime.split(':');
+    final hours = int.parse(parts[0]);
+    final minutes = int.parse(parts[1]);
+    final totalMinutes = hours * 60 + minutes + 30;
+    final endHours = totalMinutes ~/ 60;
+    final endMinutes = totalMinutes % 60;
+    return '${endHours.toString().padLeft(2, '0')}:${endMinutes.toString().padLeft(2, '0')}';
   }
 
   Widget _buildBottomConfirmationBar() {
@@ -632,7 +861,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                       ),
                     ),
                     Text(
-                      '₱1,000',
+                      '₱${widget.consultationFee ?? '1,000'}',
                       style: AppTextStyles.headlineMd.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -648,13 +877,14 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                         color: AppColors.slate600,
                       ),
                     ),
-                    Text(
-                      'Tue, Oct 21, 2025 (Clinic Day)',
-                      style: AppTextStyles.labelSm.copyWith(
-                        color: AppColors.tertiary,
-                        fontWeight: FontWeight.w600,
+                    if (_selectedDate != null)
+                      Text(
+                        DateFormat('EEE, MMM d, yyyy').format(_selectedDate!),
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.tertiary,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ],
@@ -662,9 +892,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             const SizedBox(height: spacing.AppSpacing.gutterMd),
             PrimaryButton(
               text: 'Confirm Clinic Date & Reserve Queue',
-              onPressed: () {
-                Navigator.of(context).pushNamed('/booking-confirmation');
-              },
+              onPressed: _selectedDate != null && _selectedTimeSlot != null
+                  ? () {
+                      Navigator.of(context).pushNamed('/booking-confirmation');
+                    }
+                  : null,
               icon: const Icon(Icons.arrow_forward, size: 20),
             ),
           ],

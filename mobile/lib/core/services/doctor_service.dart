@@ -38,4 +38,27 @@ class DoctorService {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>?> getDoctorAvailability({
+    required String doctorId,
+    String? date,
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      final response = await _apiService.getDoctorAvailability(
+        doctorId: doctorId,
+        date: date,
+        startDate: startDate,
+        endDate: endDate,
+      );
+      
+      if (response['success'] == true) {
+        return response['data'];
+      }
+      return null;
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

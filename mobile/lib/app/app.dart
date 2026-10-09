@@ -61,13 +61,32 @@ class _MyAppState extends State<MyApp> {
       title: 'FindMyDoctor',
       theme: AppTheme.lightTheme,
       home: _initialRoute == '/home' ? const HomePage() : const LoginPage(),
-      routes: {
-        '/login': (context) => const LoginPage(),
-        '/signup': (context) => const SignUpPage(),
-        '/home': (context) => const HomePage(),
-        '/doctors': (context) => const DoctorsPage(onNavigateToTab: null),
-        '/doctor-schedule': (context) => const DoctorSchedulePage(),
-        '/booking-confirmation': (context) => const BookingConfirmationPage(),
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/login':
+            return MaterialPageRoute(builder: (context) => const LoginPage());
+          case '/signup':
+            return MaterialPageRoute(builder: (context) => const SignUpPage());
+          case '/home':
+            return MaterialPageRoute(builder: (context) => const HomePage());
+          case '/doctors':
+            return MaterialPageRoute(builder: (context) => const DoctorsPage(onNavigateToTab: null));
+          case '/doctor-schedule':
+            final args = settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (context) => DoctorSchedulePage(
+                doctorId: args?['doctorId'] ?? '',
+                doctorName: args?['doctorName'],
+                specialty: args?['specialty'],
+                clinic: args?['clinic'],
+                consultationFee: args?['consultationFee'],
+              ),
+            );
+          case '/booking-confirmation':
+            return MaterialPageRoute(builder: (context) => const BookingConfirmationPage());
+          default:
+            return MaterialPageRoute(builder: (context) => const HomePage());
+        }
       },
       debugShowCheckedModeBanner: false,
     );
