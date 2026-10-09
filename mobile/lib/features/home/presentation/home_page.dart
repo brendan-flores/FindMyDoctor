@@ -3,6 +3,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/services/doctor_service.dart';
+import '../../../core/models/doctor.dart';
 import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
 
@@ -15,6 +17,58 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
+  String? _selectedSpecialtyFromHome;
+  final DoctorService _doctorService = DoctorService();
+  List<String> _specialties = [];
+  List<Doctor> _recommendedDoctors = [];
+  List<String> _hospitals = [];
+  bool _isLoadingSpecialties = true;
+  bool _isLoadingDoctors = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final allDoctors = await _doctorService.getDoctors();
+
+      // Extract unique specialties
+      final uniqueSpecialties = allDoctors
+          .map((d) => d.specialty)
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+
+      // Extract unique hospitals/clinics
+      final uniqueHospitals = allDoctors
+          .map((d) => d.practiceName)
+          .whereType<String>()
+          .where((h) => h.isNotEmpty && h != 'Private Practice')
+          .toSet()
+          .toList()
+        ..sort();
+
+      // Take first 2 doctors as recommended
+      final recommended = allDoctors.take(2).toList();
+
+      setState(() {
+        _specialties = uniqueSpecialties;
+        _hospitals = uniqueHospitals;
+        _recommendedDoctors = recommended;
+        _isLoadingSpecialties = false;
+        _isLoadingDoctors = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingSpecialties = false;
+        _isLoadingDoctors = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,9 +118,19 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildDoctorsContent() {
     return DoctorsPage(
+      specialty: _selectedSpecialtyFromHome,
+      onClearSpecialtyFromHome: () {
+        setState(() {
+          _selectedSpecialtyFromHome = null;
+        });
+      },
       onNavigateToTab: (index) {
         setState(() {
           _currentIndex = index;
+          // Clear specialty when navigating away from doctors tab
+          if (index != 1) {
+            _selectedSpecialtyFromHome = null;
+          }
         });
       },
     );
@@ -296,64 +360,96 @@ class _HomePageState extends State<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSpecialtyChip('All Doctors', Icons.medical_services, true),
+        _buildSpecialtyChip('All Doctors', Icons.medical_services, true, null),
         const SizedBox(height: spacing.AppSpacing.gutterXs),
-        SizedBox(
-          height: 40,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: [
-              _buildSpecialtyChip('Pediatrics', Icons.child_care, false),
-              const SizedBox(width: spacing.AppSpacing.gutterSm),
-              _buildSpecialtyChip('Dermatology', Icons.face_retouching_natural, false),
-              const SizedBox(width: spacing.AppSpacing.gutterSm),
-              _buildSpecialtyChip('Dentistry', Icons.sentiment_satisfied, false),
-              const SizedBox(width: spacing.AppSpacing.gutterSm),
-              _buildSpecialtyChip('OB-GYN', Icons.pregnant_woman, false),
-              const SizedBox(width: spacing.AppSpacing.gutterSm),
-              _buildSpecialtyChip('Cardiology', Icons.favorite, false),
-              const SizedBox(width: spacing.AppSpacing.gutterSm),
-              _buildSpecialtyChip('ENT', Icons.hearing, false),
-            ],
+        if (_isLoadingSpecialties)
+          const SizedBox(
+            height: 40,
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          )
+        else if (_specialties.isEmpty)
+          const SizedBox(
+            height: 40,
+            child: Center(
+              child: Text(
+                'No specialties available',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 40,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _specialties.length,
+              itemBuilder: (context, index) {
+                final specialty = _specialties[index];
+                return Padding(
+                  padding: EdgeInsets.only(right: spacing.AppSpacing.gutterSm),
+                  child: _buildSpecialtyChip(
+                    specialty,
+                    _getSpecialtyIcon(specialty),
+                    false,
+                    specialty,
+                  ),
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }
 
-  Widget _buildSpecialtyChip(String label, IconData icon, bool isSelected) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: spacing.AppSpacing.gutterMd,
-        vertical: spacing.AppSpacing.gutterXs,
-      ),
-      decoration: BoxDecoration(
-        color: isSelected ? AppColors.primary : AppColors.surfaceLowest,
-        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.slate800.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: spacing.AppSpacing.iconMd,
-            color: isSelected ? AppColors.onPrimary : AppColors.tertiary,
-          ),
-          const SizedBox(width: spacing.AppSpacing.gutterXs),
-          Text(
-            label,
-            style: AppTextStyles.labelMd.copyWith(
-              color: isSelected ? AppColors.onPrimary : AppColors.secondary,
+  Widget _buildSpecialtyChip(String label, IconData icon, bool isSelected, String? specialty) {
+    return GestureDetector(
+      onTap: specialty != null
+          ? () {
+              setState(() {
+                _selectedSpecialtyFromHome = specialty;
+                _currentIndex = 1;
+              });
+            }
+          : null,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: spacing.AppSpacing.gutterMd,
+          vertical: spacing.AppSpacing.gutterXs,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : AppColors.surfaceLowest,
+          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.slate800.withValues(alpha: 0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
             ),
-          ),
-        ],
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: spacing.AppSpacing.iconMd,
+              color: isSelected ? AppColors.onPrimary : AppColors.tertiary,
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterXs),
+            Text(
+              label,
+              style: AppTextStyles.labelMd.copyWith(
+                color: isSelected ? AppColors.onPrimary : AppColors.secondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -410,6 +506,7 @@ class _HomePageState extends State<HomePage> {
       onTap: () {
         if (title == 'Find a Doctor') {
           setState(() {
+            _selectedSpecialtyFromHome = null;
             _currentIndex = 1;
           });
         }
@@ -473,7 +570,12 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             TextButton(
-              onPressed: () {},
+              onPressed: () {
+                setState(() {
+                  _selectedSpecialtyFromHome = null;
+                  _currentIndex = 1;
+                });
+              },
               child: Text(
                 'See all',
                 style: AppTextStyles.labelMd,
@@ -482,22 +584,51 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         const SizedBox(height: spacing.AppSpacing.gutterMd),
-        _buildDoctorCard(
-          'Dr. Rafael Cruz, MD',
-          'Pediatrics • Medical City',
-          '₱700',
-        ),
-        const SizedBox(height: spacing.AppSpacing.gutterMd),
-        _buildDoctorCard(
-          'Dra. Lim',
-          'Dermatology • St. Luke\'s',
-          '₱800',
-        ),
+        if (_isLoadingDoctors)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_recommendedDoctors.isEmpty)
+          Padding(
+            padding: EdgeInsets.all(spacing.AppSpacing.gutterXl),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.person_search,
+                  size: 64,
+                  color: AppColors.outline,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No Doctors Found',
+                  style: AppTextStyles.headlineSm.copyWith(
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Register doctors to see them here',
+                  style: AppTextStyles.bodyMd.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          for (var doctor in _recommendedDoctors)
+            Padding(
+              padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
+              child: _buildDoctorCard(doctor),
+            ),
       ],
     );
   }
 
-  Widget _buildDoctorCard(String name, String specialty, String fee) {
+  Widget _buildDoctorCard(Doctor doctor) {
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Row(
@@ -521,16 +652,16 @@ class _HomePageState extends State<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  doctor.fullName,
                   style: AppTextStyles.bodyMdMedium,
                 ),
                 Text(
-                  specialty,
+                  '${doctor.specialty} • ${doctor.practiceName ?? 'Private Practice'}',
                   style: AppTextStyles.labelSm,
                 ),
                 const SizedBox(height: spacing.AppSpacing.gutterXs),
                 Text(
-                  fee,
+                  '₱${doctor.consultationFeeText ?? '1,000'}',
                   style: AppTextStyles.labelSm.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -543,6 +674,7 @@ class _HomePageState extends State<HomePage> {
             child: ElevatedButton(
               onPressed: () {
                 setState(() {
+                  _selectedSpecialtyFromHome = null;
                   _currentIndex = 1;
                 });
               },
@@ -596,24 +728,53 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         const SizedBox(height: spacing.AppSpacing.gutterMd),
-        _buildClinicCard(
-          'Healthway Multi-Specialty',
-          'Market! Market! BGC • 0.8 km',
-          '4 On Duty',
-          AppColors.secondaryContainer,
-        ),
-        const SizedBox(height: spacing.AppSpacing.gutterSm),
-        _buildClinicCard(
-          'Kindred Health Clinic',
-          'Serendra Piazza, BGC • 1.2 km',
-          'Women & Pedia',
-          AppColors.surfaceContainer,
-        ),
+        if (_isLoadingDoctors)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_hospitals.isEmpty)
+          Padding(
+            padding: EdgeInsets.all(spacing.AppSpacing.gutterXl),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.local_hospital_outlined,
+                  size: 64,
+                  color: AppColors.outline,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No Clinics Yet',
+                  style: AppTextStyles.headlineSm.copyWith(
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Register doctors to see clinics',
+                  style: AppTextStyles.bodyMd.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          for (var hospital in _hospitals)
+            Padding(
+              padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
+              child: _buildClinicCard(hospital),
+            ),
       ],
     );
   }
 
-  Widget _buildClinicCard(String name, String location, String status, Color statusColor) {
+  Widget _buildClinicCard(String hospitalName) {
+    final doctorCount = _recommendedDoctors.where((d) => d.practiceName == hospitalName).length;
+
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Row(
@@ -637,11 +798,11 @@ class _HomePageState extends State<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  hospitalName,
                   style: AppTextStyles.bodyMdMedium,
                 ),
                 Text(
-                  location,
+                  '$doctorCount Doctor${doctorCount != 1 ? 's' : ''}',
                   style: AppTextStyles.labelSm,
                 ),
               ],
@@ -653,12 +814,15 @@ class _HomePageState extends State<HomePage> {
               vertical: spacing.AppSpacing.gutterXs,
             ),
             decoration: BoxDecoration(
-              color: statusColor,
+              color: AppColors.secondaryContainer,
               borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
             ),
             child: Text(
-              status,
-              style: AppTextStyles.labelSm,
+              '$doctorCount',
+              style: AppTextStyles.labelSm.copyWith(
+                color: AppColors.onSecondaryFixed,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -709,6 +873,10 @@ class _HomePageState extends State<HomePage> {
       onTap: () {
         setState(() {
           _currentIndex = index;
+          // Clear specialty when switching tabs
+          if (index != 1) {
+            _selectedSpecialtyFromHome = null;
+          }
         });
       },
       child: Container(
@@ -736,5 +904,33 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  IconData _getSpecialtyIcon(String specialty) {
+    switch (specialty.toLowerCase()) {
+      case 'cardiology':
+        return Icons.favorite;
+      case 'pediatrics':
+        return Icons.child_care;
+      case 'dermatology':
+        return Icons.face;
+      case 'dentistry':
+        return Icons.mood;
+      case 'orthopedics':
+        return Icons.accessibility;
+      case 'ob-gyn':
+      case 'obstetrics':
+      case 'gynecology':
+        return Icons.pregnant_woman;
+      case 'ophthalmology':
+        return Icons.visibility;
+      case 'anesthesiology':
+        return Icons.medical_services;
+      case 'ent':
+      case 'otolaryngology':
+        return Icons.hearing;
+      default:
+        return Icons.medical_services;
+    }
   }
 }
