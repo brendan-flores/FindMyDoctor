@@ -22,6 +22,7 @@
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",
+    "check:doctors": "tsx src/database/checkDoctors.ts",
     "test": "jest"
   },
   "keywords": [
