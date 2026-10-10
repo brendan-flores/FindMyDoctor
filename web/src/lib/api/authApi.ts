@@ -4,6 +4,8 @@ export interface LoginCredentials {
   email: string;
   password: string;
   expectedRole: 'DOCTOR' | 'SECRETARY' | 'ADMIN';
+  rememberMe?: boolean;
+  trustedBrowserToken?: string;
 }
 
 export interface RegisterCredentials {
@@ -33,6 +35,7 @@ export interface LoginOtpRequiredResponse {
 export interface VerifyLoginOtpRequest {
   challengeId: string;
   otp: string;
+  rememberMe?: boolean;
 }
 
 export interface ResendLoginOtpRequest {
@@ -99,6 +102,10 @@ export const authApi = {
 
   logout: async () => {
     return apiClient.post('/auth/logout', {});
+  },
+
+  revokeTrustedBrowser: async () => {
+    return apiClient.post('/auth/revoke-trusted-browser', {});
   },
 
   refreshToken: async (refreshToken: string) => {

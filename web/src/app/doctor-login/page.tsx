@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
@@ -12,11 +12,20 @@ export default function DoctorLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showOtp, setShowOtp] = useState(false);
   const [challengeId, setChallengeId] = useState('');
   const router = useRouter();
+
+  // Check for session expired parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('session') === 'expired') {
+      setError('Your session has expired. Please log in again.');
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +33,19 @@ export default function DoctorLogin() {
     setError('');
 
     try {
-      const response = await authApi.login({ email, password, expectedRole: 'DOCTOR' });
+      // Get trusted browser token from cookies
+      const trustedBrowserToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('trustedBrowser='))
+        ?.split('=')[1];
+
+      const response = await authApi.login({
+        email,
+        password,
+        expectedRole: 'DOCTOR',
+        rememberMe,
+        trustedBrowserToken,
+      });
 
       if (response.success && response.data) {
         // Check if OTP is required
@@ -62,11 +83,14 @@ export default function DoctorLogin() {
 
   const handleOtpVerifySuccess = async (data: any) => {
     if (data.user.role === 'DOCTOR') {
-      await routeBasedOnApprovalStatus();
       apiClient.setToken(data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
+      // Store user data in localStorage
       localStorage.setItem('user', JSON.stringify(data.user));
-      router.push('/doctor/dashboard');
+      if (data.refreshToken) {
+        localStorage.setItem('refreshToken', data.refreshToken);
+      }
+      
+      await routeBasedOnApprovalStatus();
     } else {
       setError('Invalid username or password.');
       localStorage.removeItem('refreshToken');
@@ -251,7 +275,8 @@ export default function DoctorLogin() {
                 <input
                   id="remember-me"
                   type="checkbox"
-                  defaultChecked
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                   className="h-5 w-5 rounded-md border-[#CBD5E1] text-[#0D3B75] focus:ring-[#0D3B75] focus:ring-offset-0 transition duration-150 cursor-pointer"
                 />
                 <span className="ml-2.5 text-[15px] font-normal text-[#64748B]">Remember me</span>
@@ -276,6 +301,7 @@ export default function DoctorLogin() {
             onVerifyError={handleOtpVerifyError}
             onCancel={handleOtpCancel}
             onChallengeIdUpdate={handleChallengeIdUpdate}
+            rememberMe={rememberMe}
           />
         )}
 
