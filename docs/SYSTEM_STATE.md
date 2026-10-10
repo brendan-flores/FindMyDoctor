@@ -27,8 +27,10 @@ Current System State (October 2026):
 - Web Doctor profile page includes photo preview after successful upload and ability to remove photo
 - Web Doctor profile page supports saving draft profiles and submitting for approval with validation
 - Web Doctor profile page explicitly handles REJECTED state: shows rejection banner with reason, allows profile editing, allows resubmission, does not lock form when `profile_completion_status === 'SUBMITTED'` if `approval_status === 'REJECTED'`
-- Web Doctor profile page shows submission confirmation modal after successful profile submission with exact text: "Profile Submitted for Review", directing doctor to wait for email notification, with "Continue" button redirecting to `/doctor-login`
+- Web Doctor profile page shows submission confirmation modal after successful profile submission with title "Profile Submitted Successfully!", message stating "Your professional profile has been submitted successfully. Once approved, your doctor profile will be displayed to patients in the FindMyDoctor mobile app.", and "Go to Dashboard" button redirecting to `/doctor/dashboard`
 - Web Doctor login page routes authenticated Doctors based on approval_status: ACTIVE → `/doctor/dashboard`, REJECTED → `/doctor-profile`
+- Active Doctors can view their own personal and professional registration details on the read-only Doctor Portal page at `/doctor/profile`; it excludes schedule management and uses the authenticated `GET /api/v1/doctors/me` endpoint
+- The authenticated `GET /api/v1/doctors/me` endpoint includes the doctor's account email for display on their own profile page
 - Admin Doctor review interface at `/admin/doctors` displays two clearly separated sections: Basic Information (first name, middle name, last name, email, email verified, contact number) and Professional Information (professional photo, specialty, credentials, PRC license number, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule)
 - Admin Doctor review interface displays available schedules using existing `doctor_schedules` data via new endpoint `GET /api/v1/admin/doctors/:id/schedules`
 - Admin Doctor review interface displays uploaded professional photo if available
@@ -53,11 +55,13 @@ Current System State (October 2026):
 - Database schema includes `middle_name` field in `doctors` and `pending_doctor_signups` tables (migration 010_add_middle_name.sql)
 - Database schema includes extended doctor profile fields (migration 016_doctor_profile_fields.sql): contact_number, professional_photo_url, years_of_experience, areas_of_expertise (comma-separated text), consultation_type, languages_spoken (comma-separated text), profile_completion_status, profile_submitted_at
 - Migration `017_modify_pending_doctor_signup_for_basic_flow.sql` adds contact_number field to pending_doctor_signups for basic registration flow (professional fields remain in table for compatibility)
+- Database schema includes `trusted_browsers` table (migration 022_add_trusted_browsers.sql) for Remember Me trusted-browser functionality with columns: id, user_id, token_hash (SHA-256), device_info, expires_at (30 days), created_at, revoked_at, last_used_at
 - Users table includes username field (unique) for patient identification
 - Patients table does not include phone field (removed in favor of username)
 - Backend API endpoints for patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
 - Backend API endpoints for doctor profile: `PUT /api/v1/doctors/me/profile` (update profile), `POST /api/v1/doctors/me/profile/submit` (submit for approval), `POST /api/v1/doctors/me/photo` (upload professional photo)
+- Backend API endpoints for authentication: `POST /api/v1/auth/login` (with trusted-browser support), `POST /api/v1/auth/verify-login-otp` (with trusted-browser registration), `POST /api/v1/auth/logout` (clears all cookies), `POST /api/v1/auth/revoke-trusted-browser` (revokes current browser trust)
 - Backend API endpoints for doctor schedules: `GET /api/v1/doctors/me/schedules`, `POST /api/v1/doctors/me/schedules`, `PUT /api/v1/doctors/me/schedules/:id`, `DELETE /api/v1/doctors/me/schedules/:id`
 - Backend API endpoints for admin doctor review: `GET /api/v1/admin/doctors` (list all doctors with complete profile), `GET /api/v1/admin/doctors/:id` (get doctor details), `GET /api/v1/admin/doctors/:id/schedules` (get doctor schedules), `PATCH /api/v1/admin/doctors/:id/approve` (approve with validation), `PATCH /api/v1/admin/doctors/:id/reject` (reject with required reason)
 - Doctor registration uses separate first name, middle name (optional), and last name fields instead of a single full name field
@@ -74,8 +78,25 @@ Current System State (October 2026):
 - Web application provides role-specific dashboards for Doctor, Secretary, and Admin users
 - Mobile application includes OTP verification page for patient registration with full backend integration
 - Mobile application authentication persists across hot restarts using SharedPreferences for token storage
-- Web application authentication persists across page refreshes (Ctrl+R) via apiClient automatic localStorage token management
-- Web apiClient automatically loads token from localStorage on initialization and saves/clears it on setToken/clearToken operations
+- Web application authentication persists across page refreshes (Ctrl+R) via apiClient automatic localStorage token management (legacy)
+- Web application authentication for Doctor and Secretary accounts now uses trusted-browser Remember Me functionality
+- Doctor and Secretary login forms include Remember Me checkbox that controls trusted-browser registration and session persistence
+- When Remember Me is unchecked: does not establish or extend trusted-browser status; user must complete OTP verification on next login if 2FA is enabled; session cookies expire when browser closes; session inactivity timeout is 15 minutes (unchecked) or 7 days (checked but untrusted)
+- When Remember Me is checked: user must complete normal password and OTP flow the first time on an untrusted browser; after successful authentication, that browser is registered as trusted for 30 days; subsequent logins from the same trusted browser skip OTP but still require password; trusted-browser credential is stored in HttpOnly cookie with 30-day expiration; session persists across browser restarts with 7-day inactivity timeout and 30-day absolute session lifetime
+- Trusted-browser recognition uses cryptographically secure random tokens stored as SHA-256 hashes in PostgreSQL trusted_browsers table; each trusted-browser record includes user_id, token_hash, device_info, expires_at (30 days), created_at, revoked_at, and last_used_at
+- Trusted-browser lifetime is 30 days from successful trust registration; this is an absolute limit that does not reset on page refresh or session renewal
+- Session inactivity timeout is 7 days without meaningful user activity (for Remember Me checked); when Remember Me is unchecked, session inactivity timeout is 15 minutes
+- New browser or device always requires OTP; expired trusted-browser credential requires OTP; cleared cookies or trusted-browser data requires OTP
+- Password change or password reset revokes all existing trusted-browser credentials and requires OTP again on next login
+- Account suspended, rejected, or otherwise unauthorized denies access according to existing account-status rules; trusted-browser status never overrides account restrictions
+- Unchecking Remember Me during login revokes that browser's trust and clears the trusted-browser cookie
+- Token storage uses HttpOnly cookies with Secure flag enabled in production and SameSite=lax policy for security
+- Backend generates access tokens with different expiration based on rememberMe preference: 7 days when checked, 15 minutes when unchecked
+- Refresh tokens have 30-day expiration when Remember Me is checked, 7-day expiration when unchecked
+- Session expiration on frontend clears authentication cookies, rejects protected API requests, redirects to appropriate login page with message "Your session has expired. Please log in again."
+- Logout invalidates server-side session by clearing accessToken, refreshToken, and trustedBrowser cookies
+- Admin and SuperAdmin authentication behavior remains unchanged (no Remember Me modification)
+- Web apiClient automatically loads token from localStorage on initialization for backward compatibility, but prefers HttpOnly cookies when available
 - Web application uses toast notifications (auto-dismiss after 2 seconds with close button) for success/error messages instead of inline banners
 - Toast component at web/src/components/ui/Toast.tsx provides consistent notification UI across all pages
 - Web Doctors page displays real doctor records from database through backend API (no hardcoded data)
@@ -101,7 +122,8 @@ Current System State (October 2026):
 - Admin/SuperAdmin login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
 - Doctor login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
 - Secretary login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
-- PostgreSQL `login_otp_challenges` table stores server-side OTP challenge state with hashed challenge tokens (migration 014_add_login_otp_challenges.sql)
+- PostgreSQL `login_otp_challenges` table stores server-side OTP challenge state with hashed challenge tokens and remember_me column
+- PostgreSQL `trusted_browsers` table stores trusted-browser credentials for Remember Me functionality with columns: id, user_id, token_hash (SHA-256), device_info, expires_at (30 days), created_at, revoked_at, last_used_at
 - PostgreSQL `doctors` and `secretaries` tables include `two_factor_enabled` column (migration 013_add_two_factor_settings.sql)
 - Migration `015_enforce_secretary_doctor_relationship.sql` enforces the required foreign key and non-null assignment for `secretaries.doctor_id`
 - Login OTP flow: user submits credentials → backend checks role-specific OTP requirement → if required, creates challenge → sends OTP via Supabase → returns opaque challenge token → user submits OTP → backend verifies with Supabase → consumes challenge → issues application JWT
@@ -150,3 +172,28 @@ Current System State (October 2026):
 - Web doctor schedule page at /doctor/schedule and web secretary capacity page at /secretary/capacity feature a unified 5-metric responsive grid (Calculated, Configured, Final Limit, Registered, Remaining) with fixed-width input controls
 - Web secretary capacity page at /secretary/capacity allows secretaries to manage capacity for their assigned doctor with the exact same UI as the doctor schedule page
 - Secretary sidebar includes "Capacity" navigation item linking to /secretary/capacity
+- Web Doctor Sidebar includes a Setup Progress Tracker component that tracks 4 setup steps: Account Registration & Email Verification, Complete Professional Profile, Admin Approval, and Set Availability & Schedule
+- Setup Progress Tracker has a compact trigger button positioned above the "Clinical Workspace" navigation menu in the sidebar, displaying a circular progress indicator with the completed count inside, "Setup Progress" text, and a chevron
+- Setup Progress Tracker opens as a floating panel anchored to the left sidebar when the trigger is clicked, extending into the right-hand dashboard content area
+- Setup Progress Tracker floating panel has a white background, rounded corners, subtle shadow, and thin border, matching the existing royal-blue, white, and light blue-gray design
+- Setup Progress Tracker floating panel includes a close control and has a maximum height with internal scrolling if content exceeds viewport height
+- Setup Progress Tracker automatically determines step completion status from backend data: email_verified field for registration, profile_completion_status for profile, approval_status for admin approval, and schedule count for availability
+- Setup Progress Tracker also performs client-side validation to check if any profile fields are missing (specialty, credentials, PRC license, practice name, years of experience, areas of expertise, biography, consultation fee, languages spoken, professional photo) before marking the profile step as complete
+- Setup Progress Tracker does not include action buttons; it only displays progress status and missing information indicators
+- Setup Progress Tracker displays "Professional information incomplete" indicator when any profile field is missing, listing the specific missing fields (Specialty, Credentials, PRC License Number, Hospital/Clinic, Years of Experience, Areas of Expertise, Biography, Consultation Fee, Languages Spoken, Professional Photo)
+- Setup Progress Tracker displays schedule setup indicator when schedule is missing but profile is complete
+- Setup Progress Tracker closes when clicking outside the panel or clicking the close control
+- Setup Progress Tracker does not cause layout shifts when opened or closed; the sidebar navigation remains completely independent
+- Setup Progress Tracker automatically hides when all 4 steps are completed (verified email, all profile fields provided, ACTIVE approval status, and at least one schedule configured)
+- The /doctor/profile page (with slash) features an Edit Profile button that toggles inline edit mode for updating profile information
+- Edit Profile feature allows editing of personal information (first name, middle name, last name, contact number) and most professional information (specialty, credentials, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, languages spoken)
+- Edit Profile feature uses the same searchable dropdown selectors as registration: SearchableSelect for single-select fields (specialty, credentials, hospital/clinic) and SearchableMultiSelect for multi-select fields (areas of expertise, languages spoken)
+- Email address is read-only (requires separate email-change and verification process)
+- PRC License Number is read-only (requires dedicated license-update process with admin review)
+- Professional photo can be uploaded/replaced in edit mode with PNG-only validation and 4MB size limit via dedicated upload endpoint
+- Schedule management is handled entirely through the /doctor/schedule page; the profile page does not display schedule information
+- Edit mode includes Save Changes and Cancel buttons; Cancel discards unsaved changes and restores original values
+- Backend API PUT /api/v1/doctors/me/profile validates PRC license number format (7 digits) and uniqueness when provided
+- Backend API supports dynamic field updates for both personal and professional information fields
+- The /doctor-profile page (no slash) is the profile completion page used after OTP verification during initial registration and should only be accessed after OTP verification
+- Setup Progress Tracker component is located at web/src/components/ui/SetupProgressCard.tsx and is integrated into the Doctor Sidebar component (web/src/components/layout/DoctorSidebar.tsx)

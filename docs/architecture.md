@@ -370,8 +370,8 @@ After successful OTP verification, doctors must complete their professional prof
   - Sets `profile_completion_status = 'SUBMITTED'` and `profile_submitted_at` to current timestamp
   - Keeps `approval_status = 'PENDING'` (does not approve the doctor)
   - Returns message directing doctor to wait for admin approval
-  - Shows a confirmation modal with title "Profile Submitted for Review" after successful submission
-  - Modal directs doctor to wait for email notification and includes "Continue" button that redirects to `/doctor-login`
+  - Shows a confirmation modal with title "Profile Submitted Successfully!" after successful submission
+  - Modal states that the profile will be displayed to patients after approval and includes "Go to Dashboard" button that redirects to `/doctor/dashboard`
 
 - **Profile Completion Status Transitions:**
   - `INCOMPLETE` - Initial state after OTP verification, professional information not yet collected
