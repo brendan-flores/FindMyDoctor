@@ -1320,19 +1320,22 @@ class _DoctorsPageState extends State<DoctorsPage> {
                     shape: BoxShape.circle,
                   ),
                 ),
-                Expanded(
-                  child: Text(
-                    'Available Today',
-                    style: AppTextStyles.labelMd.copyWith(
-                      color: AppColors.tertiary,
-                    ),
-                  ),
-                ),
-                Text(
-                  'Check Schedule',
-                  style: AppTextStyles.labelSm.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                  ),
+                PrimaryButton(
+                  text: 'Book Visit',
+                  onPressed: () {
+                    // Navigate to doctor schedule page with doctor details
+                    Navigator.of(context).pushNamed(
+                      '/doctor-schedule',
+                      arguments: {
+                        'doctorId': doctor.id,
+                        'doctorName': doctor.fullName,
+                        'specialty': doctor.specialty,
+                        'clinic': doctor.practiceName,
+                        'consultationFee': doctor.consultationFee?.toString(),
+                      },
+                    );
+                  },
+                  height: 40,
                 ),
               ],
             ),

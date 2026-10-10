@@ -22,8 +22,9 @@ Current System State (October 2026):
 - Web Doctor profile page at `/doctor-profile` allows doctors to complete their professional profile with 12 fields: professional photo (PNG upload, max 4MB), specialty, credentials, PRC license, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule
 - Web Doctor profile page includes schedule management UI using existing schedule APIs (GET/POST/PUT/DELETE `/api/v1/doctors/me/schedules`)
 - Web Doctor profile page includes PNG photo upload with client-side validation (PNG only, max 4MB) and server-side validation via `POST /api/v1/doctors/me/photo` endpoint
-- Professional photo upload stores files in backend `./uploads` directory and serves them via `/uploads/<filename>` static route
-- Professional photo field `professional_photo_url` stores the relative path to the uploaded file
+- Professional photo upload stores files in Supabase Storage bucket `doctor-photos` and serves them via Supabase public URLs
+- Professional photo field `professional_photo_url` stores the Supabase public URL of the uploaded file
+- Legacy `/uploads/` URLs are still supported for existing photos (backward compatibility)
 - Web Doctor profile page includes photo preview after successful upload and ability to remove photo
 - Web Doctor profile page supports saving draft profiles and submitting for approval with validation
 - Web Doctor profile page explicitly handles REJECTED state: shows rejection banner with reason, allows profile editing, allows resubmission, does not lock form when `profile_completion_status === 'SUBMITTED'` if `approval_status === 'REJECTED'`
@@ -47,30 +48,37 @@ Current System State (October 2026):
 - All Doctor accounts require mandatory login OTP (no setting, no bypass)
 - All Secretary accounts require mandatory login OTP (no setting, no bypass)
 - Each Secretary has a required `doctor_id` relationship to one Doctor; Doctors can list only their own Secretaries via the authenticated backend API
-- Supabase is used only for OTP email verification, not for storing application data
+- Supabase is used only for OTP email verification and Storage, not for storing application data
+- Supabase Storage service (`backend/src/services/storageService.ts`) handles doctor photo operations: upload, delete, replace, and validation
+- Supabase Storage bucket name is configurable via `SUPABASE_STORAGE_BUCKET` environment variable (default: `doctor-photos`)
+- Supabase Storage service validates PNG files with signature checking, 4MB size limit, and MIME type validation
+- Supabase Storage credentials (service role key) remain backend-only and are never exposed to frontend applications
 - Backend API includes comprehensive endpoints for doctors, admin, OTP, appointments, queue, payments, etc.
 - Database schema includes approval status fields, pending doctor signups staging table (basic fields only), and pending patient signups staging table (with username)
 - Database schema includes `middle_name` field in `doctors` and `pending_doctor_signups` tables (migration 010_add_middle_name.sql)
 - Database schema includes extended doctor profile fields (migration 016_doctor_profile_fields.sql): contact_number, professional_photo_url, years_of_experience, areas_of_expertise (comma-separated text), consultation_type, languages_spoken (comma-separated text), profile_completion_status, profile_submitted_at
 - Migration `017_modify_pending_doctor_signup_for_basic_flow.sql` adds contact_number field to pending_doctor_signups for basic registration flow (professional fields remain in table for compatibility)
+- No database migration required for Supabase Storage implementation (doctor photos stored externally, database only stores URL references)
 - Users table includes username field (unique) for patient identification
 - Patients table does not include phone field (removed in favor of username)
 - Backend API endpoints for patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
-- Backend API endpoints for doctor profile: `PUT /api/v1/doctors/me/profile` (update profile), `POST /api/v1/doctors/me/profile/submit` (submit for approval), `POST /api/v1/doctors/me/photo` (upload professional photo)
+- Backend API endpoints for doctor profile: `PUT /api/v1/doctors/me/profile` (update profile), `POST /api/v1/doctors/me/profile/submit` (submit for approval), `POST /api/v1/doctors/me/photo` (upload professional photo), `DELETE /api/v1/doctors/me/photo` (delete professional photo)
+- Backend configuration includes `supabase.storageBucket` field for Supabase Storage bucket name (default: `doctor-photos`)
 - Backend API endpoints for doctor schedules: `GET /api/v1/doctors/me/schedules`, `POST /api/v1/doctors/me/schedules`, `PUT /api/v1/doctors/me/schedules/:id`, `DELETE /api/v1/doctors/me/schedules/:id`
 - Backend API endpoints for admin doctor review: `GET /api/v1/admin/doctors` (list all doctors with complete profile), `GET /api/v1/admin/doctors/:id` (get doctor details), `GET /api/v1/admin/doctors/:id/schedules` (get doctor schedules), `PATCH /api/v1/admin/doctors/:id/approve` (approve with validation), `PATCH /api/v1/admin/doctors/:id/reject` (reject with required reason)
 - Doctor registration uses separate first name, middle name (optional), and last name fields instead of a single full name field
 - Backend doctor OTP API accepts only basic fields (`firstName`, `middleName`, `lastName`, `email`, `contactNumber`, `password`) in the signup payload
 - Backend doctors API returns all profile fields including `profile_completion_status` and `profile_submitted_at`
-- Backend photo upload uses multer with disk storage, PNG-only file filter, and 4MB size limit
-- Backend serves uploaded photos via static file serving at `/uploads` route
-- Backend validates PNG files by checking the actual PNG magic number signature (0x89 50 4E 47 0D 0A 1A 0A) after upload
-- Backend deletes uploaded files if PNG validation fails or if errors occur during upload
+- Backend photo upload uses multer with memory storage, PNG-only file filter, and 4MB size limit
+- Backend uploads photos to Supabase Storage bucket `doctor-photos` using service role credentials (backend-only)
+- Backend serves uploaded photos via Supabase public URLs (CDN-backed)
+- Backend validates PNG files by checking the actual PNG magic number signature (0x89 50 4E 47 0D 0A 1A 0A) before upload
+- Backend photo replacement automatically deletes old photos from Supabase Storage or legacy local filesystem
 - Backend provides DELETE /api/v1/doctors/me/photo endpoint for authenticated doctors to delete their professional photo
-- Photo deletion clears the database field and deletes the corresponding file from the uploads directory
-- Photo deletion uses path resolution to prevent directory traversal attacks
-- Frontend resolves relative photo URLs against the configured backend API origin
+- Photo deletion clears the database field and deletes the file from Supabase Storage or legacy local filesystem
+- Photo deletion handles both Supabase URLs and legacy `/uploads/` paths for backward compatibility
+- Frontend displays photos using Supabase public URLs (new uploads) or legacy `/uploads/` URLs (existing photos)
 - Web application provides role-specific dashboards for Doctor, Secretary, and Admin users
 - Mobile application includes OTP verification page for patient registration with full backend integration
 - Mobile application authentication persists across hot restarts using SharedPreferences for token storage
@@ -116,6 +124,8 @@ Current System State (October 2026):
 - Admin deletion endpoint `DELETE /api/v1/admin/admins/:id` (SUPERADMIN only) preserves doctor review records by setting `reviewed_by = NULL` before deleting the admin account
 - PostgreSQL remains the single source of truth for all application account data (users, doctors, secretaries, patients)
 - Supabase Auth is used only for OTP delivery and verification, not for storing application accounts or credentials
+- Supabase Storage is used for doctor professional photo storage with bucket configured via `SUPABASE_STORAGE_BUCKET` environment variable
+- Supabase Storage service role key is required for backend photo operations and must not be exposed to frontend applications
 - Login OTP uses `shouldCreateUser: false` to prevent Supabase from creating application accounts
 - Web application includes shared `OtpVerification` component for login OTP verification (6-digit input, auto-focus, paste support, resend timer)
 - Doctor schedule management feature allows doctors to create, view, edit, deactivate, and reactivate recurring weekly working hours
@@ -131,6 +141,16 @@ Current System State (October 2026):
 - Doctor unavailability validation enforces: start date <= end date, valid date format, doctors can only access their own exceptions
 - Doctor break period validation enforces: start time < end time, valid time format, break must fall completely within working hours for the specific date, no overlapping breaks on the same date, doctors can only access their own breaks
 - Extended `GET /api/v1/doctors/:id/availability` endpoint to include active unavailability periods (exceptions) and active break periods in the response
+- Availability service (backend/src/modules/availability/availabilityService.ts) calculates available time slots considering: working hours, schedule exceptions, break periods, 30-minute consultation duration, daily capacity, existing reservations, and current date/time
+- Availability service detects overlapping appointment intervals (not just exact time matches) to correctly mark slots as booked
+- Availability service limits individual slot availability based on remaining daily capacity (slots marked as FULL when capacity exhausted)
+- Availability service returns time slots with status: AVAILABLE, BOOKED, BREAK, PAST, or FULL
+- Availability service returns date status: AVAILABLE, FULL, UNAVAILABLE, PAST, or NON_WORKING
+- Availability service includes break periods as visible but non-selectable slots in the response (not removed from slot list)
+- Mobile doctor schedule page at /doctor-schedule displays calendar with visual status indicators and legend for all date states
+- Mobile doctor schedule page displays time slots with status-specific visual treatment: available slots are selectable, break slots shown with red tint and "Break" label, booked/past/full slots are non-selectable
+- Mobile doctor schedule page confirmation button enables only after selecting both a valid date and a valid time slot
+- Backend appointment creation endpoint POST /api/v1/appointments validates: appointment is not in the past, date is AVAILABLE, specific time slot is available (within working hours, not during break, not booked), daily capacity is not exceeded, and no overlapping appointments exist
 - Web schedule page at `/doctor/schedule` now includes tabbed interface with four tabs: Working Hours, Exceptions, Break Periods, and Capacity
 - Web schedule page allows doctors to add, view, edit, and permanently delete date-specific exceptions (doctor leave, clinic closure, full-day unavailability)
 - Web schedule page allows doctors to add, view, edit, and permanently delete break periods within working hours (e.g., lunch breaks)

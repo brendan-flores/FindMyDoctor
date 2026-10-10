@@ -57,12 +57,13 @@ export const config = {
     origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(','),
   },
 
-  // Supabase (for OTP email verification and Edge Functions)
+  // Supabase (for OTP email verification, Edge Functions, and Storage)
   supabase: {
     url: process.env.SUPABASE_URL || '',
     anonKey: process.env.SUPABASE_ANON_KEY || '',
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     functionSecret: process.env.FUNCTION_SECRET || '',
+    storageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'doctor-photos',
   },
 
   // Frontend URL for email links

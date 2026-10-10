@@ -315,6 +315,23 @@ class ApiService {
     return await get('${ApiConstants.doctorDetails}/$id', requireAuth: false);
   }
 
+  Future<Map<String, dynamic>> getDoctorAvailability({
+    required String doctorId,
+    String? date,
+    String? startDate,
+    String? endDate,
+  }) async {
+    return await get(
+      '${ApiConstants.doctorDetails}/$doctorId/availability',
+      queryParams: {
+        if (date != null) 'date': date,
+        if (startDate != null) 'startDate': startDate,
+        if (endDate != null) 'endDate': endDate,
+      },
+      requireAuth: false,
+    );
+  }
+
   // ===========================
   // APPOINTMENTS METHODS
   // ===========================
