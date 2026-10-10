@@ -248,6 +248,14 @@ Each doctor profile should include:
 - Biography.
 - Consultation/checkup fee.
 - Availability.
+- Professional photo (PNG, max 4MB, stored in Supabase Storage).
+
+**Photo Storage:**
+- Doctor professional photos are stored in Supabase Storage bucket `doctor-photos`
+- Photos are served via Supabase public URLs
+- PNG format only, maximum 4MB file size
+- Server-side validation for file type, size, and PNG magic number signature
+- Legacy `/uploads/` URLs supported for existing photos (backward compatibility)
 
 ---
 
@@ -713,6 +721,26 @@ Patients shall be able to register accounts through email OTP verification. The 
 ## FR-002 — Authentication
 
 The system shall authenticate users before protected access.
+
+## FR-002-A — Remember Me and Trusted Browser Authentication
+
+The system shall provide a Remember Me feature for Doctor and Secretary accounts to improve user experience while maintaining security:
+
+1. Doctor and Secretary login forms shall include a Remember Me checkbox.
+2. When Remember Me is unchecked, users must complete OTP verification on every login (if 2FA is enabled), but sessions still persist across browser closes
+3. When Remember Me is checked:
+   - Users must complete normal password and OTP flow on first login from an untrusted browser (if 2FA is enabled)
+   - After successful authentication, the browser is registered as trusted for 30 days
+   - Subsequent logins from the same trusted browser skip OTP (if 2FA is enabled) but still require password
+   - Session persists across browser restarts with 7-day access token and 30-day refresh token
+4. Trusted-browser recognition shall use cryptographically secure random tokens stored as SHA-256 hashes in PostgreSQL.
+5. Password change or password reset shall revoke all existing trusted-browser credentials.
+6. Account suspended, rejected, or unauthorized shall deny access; trusted-browser status shall never override account restrictions.
+7. New browser or device shall always require OTP (if 2FA is enabled).
+8. Logout shall NOT revoke trusted-browser status (trust persists across logout/login cycles like Facebook).
+9. Users must manually uncheck Remember Me during login to revoke trust, or revoke via dedicated endpoint.
+10. Remember Me shall be available for Doctor and Secretary accounts only; Admin and SuperAdmin authentication behavior remains unchanged.
+11. Token storage shall use HttpOnly cookies with Secure flag enabled in production and SameSite=lax policy.
 
 ## FR-003 — Role-Based Access
 
@@ -1245,6 +1273,47 @@ FiDo Web
 - Admin, SuperAdmin, and Doctor accounts are rejected with a generic invalid-credentials/account-role error and do not proceed to OTP verification
 - Successful login redirects to `/secretary/dashboard`
 - Non-Secretary login attempts are denied
+
+### Remember Me and Trusted Browser Authentication
+
+The web application implements a Remember Me feature for Doctor and Secretary accounts to improve user experience while maintaining security:
+
+**Remember Me Behavior:**
+- Doctor and Secretary login forms include a Remember Me checkbox
+- **Facebook-style Session Persistence:** Sessions persist across browser closes regardless of Remember Me checkbox
+- Access tokens always have 7-day expiration (no 15-minute timeout)
+- Refresh tokens always have 30-day expiration (no session cookies)
+- Users are only logged out when they manually log out or tokens expire
+- **Remember Me CHECKED:**
+  - Browser is registered as trusted for 30 days
+  - Subsequent logins from the same trusted browser skip OTP (if 2FA is enabled) but still require password
+  - Trusted-browser credential stored in HttpOnly cookie with 30-day expiration
+- **Remember Me UNCHECKED:**
+  - Browser is NOT registered as trusted
+  - OTP is required on every login (if 2FA is enabled)
+  - Session still persists across browser closes (tokens are long-lived)
+  - If browser was previously trusted, trust is revoked
+
+**Trusted Browser Recognition:**
+- Uses cryptographically secure random tokens stored as SHA-256 hashes in PostgreSQL `trusted_browsers` table
+- Each trusted-browser record includes: user_id, token_hash, device_info, expires_at (30 days), created_at, revoked_at, last_used_at
+- Trusted-browser lifetime is 30 days from successful trust registration (absolute limit, does not reset on refresh)
+- New browser or device always requires OTP (if 2FA is enabled)
+- Expired trusted-browser credential requires OTP (if 2FA is enabled)
+- Cleared cookies or trusted-browser data requires OTP (if 2FA is enabled)
+
+**Security Requirements:**
+- Password change or password reset revokes all existing trusted-browser credentials
+- Account suspended, rejected, or unauthorized denies access; trusted-browser status never overrides account restrictions
+- Unchecking Remember Me during login revokes that browser's trust and clears the trusted-browser cookie
+- Logout does NOT revoke trusted-browser status (trust persists across logout/login cycles like Facebook)
+- Token storage uses HttpOnly cookies with Secure flag enabled in production and SameSite=lax policy
+- Backend generates access tokens with 7-day expiration and refresh tokens with 30-day expiration regardless of Remember Me (Facebook-style)
+
+**Scope:**
+- Remember Me is available for Doctor and Secretary accounts only
+- Admin and SuperAdmin authentication behavior remains unchanged (no Remember Me modification)
+- The feature applies only to the web application (doctor and secretary dashboards)
 
 ### Doctor Sign-Up (Self-Registration)
 

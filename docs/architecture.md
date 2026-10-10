@@ -69,10 +69,10 @@ The architecture consists of:
                       │
           ┌───────────┴────────────┐
           ▼                        ▼
-   External AI Provider       Secure File Storage
+   External AI Provider       Supabase Storage
                                   │
                                   ▼
-                         GCash Receipts / PDFs
+                         Doctor Professional Photos
 ```
 
 The mobile application must never connect directly to PostgreSQL.
@@ -351,16 +351,19 @@ After successful OTP verification, doctors must complete their professional prof
   - Accepts PNG files only via multipart/form-data
   - Validates file size: maximum 4MB
   - Validates MIME type server-side: only image/png allowed
-  - Validates actual PNG file signature (magic number) after upload to prevent renamed non-PNG files
-  - Stores uploaded file in `./uploads` directory with unique filename
-  - Updates `professional_photo_url` field with relative path to uploaded file
+  - Validates actual PNG file signature (magic number 0x89 50 4E 47 0D 0A 1A 0A) after upload to prevent renamed non-PNG files
+  - Uploads file to Supabase Storage bucket `doctor-photos` using service role credentials (backend-only)
+  - Supabase Storage bucket name is configurable via `SUPABASE_STORAGE_BUCKET` environment variable (default: `doctor-photos`)
+  - Updates `professional_photo_url` field with Supabase public URL
   - Returns the photo URL for client preview
+  - Photo replacement automatically deletes old photos from Supabase Storage or legacy local filesystem
   - Cleans up uploaded file on error or if PNG validation fails
 
 - **Professional Photo Deletion Endpoint:** `DELETE /api/v1/doctors/me/photo` (requires Doctor authentication)
   - Uses authenticated doctor's user ID to identify the doctor
   - Clears the `professional_photo_url` field in the database
-  - Deletes the corresponding file from the uploads directory if it exists
+  - Deletes the corresponding file from Supabase Storage if it exists
+  - Handles legacy `/uploads/` paths for backward compatibility
   - Uses path resolution to prevent directory traversal attacks
   - Safely ignores missing files
   - Returns success/error response in the project's standard format
@@ -378,7 +381,7 @@ After successful OTP verification, doctors must complete their professional prof
   - `COMPLETE` - Required professional fields filled, ready for submission
   - `SUBMITTED` - Profile submitted for admin review, awaiting approval decision
 
-- **Professional Photo Upload:** Supports PNG files up to 4MB. Files are stored in backend `./uploads` directory and served via `/uploads/<filename>` static route. Client-side validation ensures PNG format and 4MB limit before upload. Server-side validation confirms MIME type and file size. Photo preview is displayed after successful upload.
+- **Professional Photo Upload:** Supports PNG files up to 4MB. Files are stored in Supabase Storage bucket `doctor-photos` and served via Supabase public URLs. Client-side validation ensures PNG format and 4MB limit before upload. Server-side validation confirms MIME type, file size, and PNG magic number signature. Photo preview is displayed after successful upload. Legacy `/uploads/` URLs are still supported for existing photos (backward compatibility).
 
 ### Doctor Approval Workflow
 
@@ -516,6 +519,62 @@ The system implements role-based login OTP with optional two-factor authenticati
 - Challenge tokens are opaque and server-side hashed to prevent token guessing
 - OTP verification consumes the challenge atomically to prevent replay attacks
 - Backend enforces OTP requirement based on role, not frontend configuration
+
+### Remember Me and Trusted Browser Authentication
+
+The web application implements a Remember Me feature for Doctor and Secretary accounts using trusted-browser credentials:
+
+**Remember Me Behavior:**
+- Doctor and Secretary login forms include a Remember Me checkbox
+- **Facebook-style Session Persistence:** Sessions persist across browser closes regardless of Remember Me checkbox
+- Access tokens always have 7-day expiration (no 15-minute timeout)
+- Refresh tokens always have 30-day expiration (no session cookies)
+- Users are only logged out when they manually log out or tokens expire
+- **Remember Me CHECKED:**
+  - Browser is registered as trusted for 30 days
+  - Subsequent logins from the same trusted browser skip OTP (if 2FA is enabled) but still require password
+  - Trusted-browser credential stored in HttpOnly cookie with 30-day expiration
+- **Remember Me UNCHECKED:**
+  - Browser is NOT registered as trusted
+  - OTP is required on every login (if 2FA is enabled)
+  - Session still persists across browser closes (tokens are long-lived)
+  - If browser was previously trusted, trust is revoked
+
+**Trusted Browser Recognition:**
+- Uses cryptographically secure random tokens stored as SHA-256 hashes in PostgreSQL `trusted_browsers` table
+- Each trusted-browser record includes: user_id, token_hash, device_info, expires_at (30 days), created_at, revoked_at, last_used_at
+- Trusted-browser lifetime is 30 days from successful trust registration (absolute limit, does not reset on refresh)
+- New browser or device always requires OTP
+- Expired trusted-browser credential requires OTP
+- Cleared cookies or trusted-browser data requires OTP
+
+**Session Management:**
+- Facebook-style: Sessions persist across browser closes regardless of Remember Me checkbox
+- Access tokens always have 7-day expiration
+- Refresh tokens always have 30-day expiration
+- Password change or password reset revokes all existing trusted-browser credentials
+- Account suspended, rejected, or unauthorized denies access; trusted-browser status never overrides account restrictions
+- Unchecking Remember Me during login revokes that browser's trust and clears the trusted-browser cookie
+- Logout does NOT revoke trusted-browser status (trust persists across logout/login cycles like Facebook)
+- Users must manually uncheck Remember Me during login to revoke trust, or revoke via dedicated endpoint
+- Token storage uses HttpOnly cookies with Secure flag enabled in production and SameSite=lax policy
+- Session expiration on frontend clears authentication cookies, rejects protected API requests, redirects to login page
+
+**Trusted Browser API Endpoints:**
+- `POST /api/v1/auth/login` - Accepts `rememberMe` boolean parameter, returns trusted-browser registration info
+- `POST /api/v1/auth/verify-login-otp` - Registers trusted browser after successful OTP when Remember Me is checked
+- `POST /api/v1/auth/logout` - Clears accessToken, refreshToken, and trustedBrowser cookies
+- `POST /api/v1/auth/revoke-trusted-browser` - Revokes current browser's trust
+
+**Database Schema:**
+- `trusted_browsers` table (migration 022_add_trusted_browsers.sql) stores trusted-browser credentials
+- Columns: id, user_id, token_hash (SHA-256), device_info, expires_at (30 days), created_at, revoked_at, last_used_at
+- `login_otp_challenges` table includes `remember_me` column to track Remember Me preference during OTP challenge
+
+**Web Application Integration:**
+- Web apiClient automatically loads token from localStorage on initialization for backward compatibility, but prefers HttpOnly cookies when available
+- Doctor and Secretary login forms include Remember Me checkbox
+- Admin and SuperAdmin authentication behavior remains unchanged (no Remember Me modification)
 
 ### Role-Based Route Protection
 

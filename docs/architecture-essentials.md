@@ -979,7 +979,8 @@ The system implements role-based login OTP with server-side challenge state.
 These are non-negotiable role-based OTP requirements:
 
 ```text
-Admin/SuperAdmin: OTP ALWAYS mandatory (no setting, no bypass)
+Admin: OTP ALWAYS mandatory (no setting, no bypass)
+SuperAdmin: OTP not required (direct authentication)
 Doctor: OTP optional - required only if two_factor_enabled = true
 Secretary: OTP optional - required only if two_factor_enabled = true
 ```
@@ -987,7 +988,7 @@ Secretary: OTP optional - required only if two_factor_enabled = true
 Do not create:
 - Admin 2FA settings or toggles (OTP is always mandatory)
 - Frontend-only OTP requirement checks (must be enforced by backend)
-- OTP bypass mechanisms for Admin/SuperAdmin
+- OTP bypass mechanisms for Admin/Doctor/Secretary
 
 ### Login OTP Flow
 
@@ -1081,6 +1082,81 @@ Do not:
 - Create 2FA settings for Admin/SuperAdmin (OTP is always mandatory)
 - Allow frontend to override backend OTP requirement decision
 - Skip backend role check when determining OTP requirement
+
+### Remember Me and Trusted Browser Authentication
+
+The web application implements Remember Me for Doctor and Secretary accounts using trusted-browser credentials:
+
+**Remember Me Behavior:**
+- Doctor and Secretary login forms include a Remember Me checkbox
+- **Facebook-style Session Persistence:** Sessions persist across browser closes regardless of Remember Me checkbox
+- Access tokens always have 7-day expiration (no 15-minute timeout)
+- Refresh tokens always have 30-day expiration (no session cookies)
+- Users are only logged out when they manually log out or tokens expire
+- **Remember Me CHECKED:**
+  - Browser is registered as trusted for 30 days
+  - Subsequent logins from the same trusted browser skip OTP (if 2FA is enabled) but still require password
+  - Trusted-browser credential stored in HttpOnly cookie with 30-day expiration
+- **Remember Me UNCHECKED:**
+  - Browser is NOT registered as trusted
+  - OTP is required on every login (if 2FA is enabled)
+  - Session still persists across browser closes (tokens are long-lived)
+  - If browser was previously trusted, trust is revoked
+- Trusted-browser recognition uses SHA-256 hashed tokens stored in PostgreSQL `trusted_browsers` table
+- Password change or reset revokes all trusted-browser credentials
+- New browser/device always requires OTP (if 2FA enabled)
+- Logout does NOT revoke trusted-browser status (trust persists across logout/login cycles like Facebook)
+- Users must manually uncheck Remember Me during login to revoke trust, or revoke via dedicated endpoint
+
+**Security Requirements:**
+- Trusted-browser tokens stored as SHA-256 hashes in PostgreSQL
+- HttpOnly cookies with Secure flag and SameSite=lax policy
+- Trusted-browser status never overrides account restrictions (suspended, rejected, unauthorized)
+- Backend generates tokens with fixed expiration (7-day access, 30-day refresh) regardless of Remember Me
+- Remember Me works independently of 2FA status; users can have Remember Me enabled with or without 2FA
+
+**Database Schema:**
+- `trusted_browsers` table (migration 022_add_trusted_browsers.sql)
+- Columns: id, user_id, token_hash (SHA-256), device_info, expires_at (30 days), created_at, revoked_at, last_used_at
+- `login_otp_challenges` table includes `remember_me` column
+
+Do not:
+- Store trusted-browser tokens in plaintext
+- Allow Remember Me to bypass account status restrictions
+- Implement Remember Me for Admin/SuperAdmin (not applicable)
+
+### Supabase Storage for Doctor Photos
+
+Doctor professional photos are stored in Supabase Storage, not local filesystem:
+
+**Storage Configuration:**
+- Supabase Storage bucket: `doctor-photos` (configurable via `SUPABASE_STORAGE_BUCKET` environment variable)
+- Service role key is required for backend photo operations (backend-only, never exposed to frontend)
+- Photos served via Supabase public URLs (CDN-backed)
+- Legacy `/uploads/` URLs still supported for existing photos (backward compatibility)
+
+**File Validation:**
+- PNG files only (validated by magic number signature 0x89 50 4E 47 0D 0A 1A 0A)
+- Maximum file size: 4MB
+- Server-side MIME type validation
+- Client-side validation before upload
+
+**Photo Operations:**
+- Upload: `POST /api/v1/doctors/me/photo` - Uploads to Supabase Storage, returns public URL
+- Delete: `DELETE /api/v1/doctors/me/photo` - Deletes from Supabase Storage, clears database field
+- Replace: Automatically deletes old photo from Supabase Storage or legacy local filesystem
+
+**Security Requirements:**
+- Supabase Storage service role key must remain backend-only
+- Never expose service role key to mobile or web applications
+- Use `backend/src/services/storageService.ts` for all photo operations
+- Database stores only the Supabase public URL reference
+
+Do not:
+- Expose Supabase Storage service role key to frontend applications
+- Store photos in local filesystem for new uploads (use Supabase Storage)
+- Skip PNG magic number validation
+- Expose sensitive bucket configuration to frontend
 
 ---
 
