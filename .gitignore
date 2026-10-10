@@ -69,6 +69,10 @@ backend/node_modules/
 backend/dist/
 backend/.env
 backend/uploads/
+backend/test_*.js
+backend/test_*.ps1
+backend/scripts/add_schedules_new_doctor.js
+backend/scripts/fix_break_date.js
 
 # Database
 *.db
