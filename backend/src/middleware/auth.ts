@@ -15,15 +15,30 @@ export interface AuthRequest extends Request {
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
   try {
+    // First try to get token from Authorization header
+    let token: string | undefined;
+
     const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const headerToken = authHeader.substring(7).trim();
+      if (headerToken && headerToken !== 'undefined' && headerToken !== 'null') {
+        token = headerToken;
+      }
+    }
+
+    if (!token) {
+      // Fall back to cookie
+      const cookieToken = req.cookies?.accessToken;
+      if (cookieToken && cookieToken !== 'undefined' && cookieToken !== 'null') {
+        token = cookieToken;
+      }
+    }
+
+    if (!token) {
       return res.status(401).json(
         error(ErrorCodes.UNAUTHORIZED, 'No token provided')
       );
     }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     const decoded = jwt.verify(token, config.jwt.secret) as {
       id: string;

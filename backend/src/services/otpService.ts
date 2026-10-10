@@ -198,6 +198,9 @@ export async function sendLoginOtp(email: string): Promise<{ success: boolean; m
 
     if (error) {
       console.error('Supabase Auth OTP send error:', error);
+      if (error.message?.includes('security purposes') || error.status === 429 || error.message?.includes('rate limit')) {
+        throw { code: ErrorCodes.RATE_LIMIT, message: error.message };
+      }
       throw { code: ErrorCodes.SERVER_ERROR, message: error.message || 'Failed to send OTP' };
     }
 

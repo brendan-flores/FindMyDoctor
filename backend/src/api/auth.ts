@@ -97,7 +97,7 @@ router.post('/register/doctor', async (req: Request, res: Response) => {
 // Login
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    const { email, password, expectedRole } = req.body;
+    const { email, password, expectedRole, rememberMe, trustedBrowserToken } = req.body;
 
     if (!email || !password || !['DOCTOR', 'SECRETARY', 'ADMIN'].includes(expectedRole)) {
       return res.status(400).json(
@@ -105,20 +105,63 @@ router.post('/login', async (req: Request, res: Response) => {
       );
     }
 
-    const result = await login({ email, password, expectedRole });
+    const result = await login({ email, password, expectedRole, rememberMe, trustedBrowserToken });
 
     // If OTP is required, send OTP and return challenge
     if (result.requiresOtp) {
-      await sendLoginOtpForLogin(email);
-      console.log('🟢 Login OTP required for:', email);
+      try {
+        await sendLoginOtpForLogin(email);
+        console.log('🟢 Login OTP required for:', email);
+      } catch (otpErr: any) {
+        if (otpErr.code === ErrorCodes.RATE_LIMIT) {
+          console.warn('⚠️ Supabase rate limited OTP resend, proceeding with challengeId using existing OTP:', email);
+        } else {
+          throw otpErr;
+        }
+      }
       return res.json(
         success({ requiresOtp: true, challengeId: result.challengeId }, 'OTP required')
       );
     }
 
-    // Otherwise, normal login
+    // Otherwise, normal login - set HttpOnly cookies
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax' as const,
+      path: '/',
+    };
+
+    res.cookie('accessToken', result.accessToken, {
+      ...cookieOptions,
+      maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000,
+    });
+
+    res.cookie('refreshToken', result.refreshToken, {
+      ...cookieOptions,
+      maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined,
+    });
+
+    // If Remember Me is unchecked and browser was previously trusted, revoke trust
+    if (!rememberMe && trustedBrowserToken) {
+      const { revokeTrustedBrowser } = await import('../modules/auth/authService');
+      await revokeTrustedBrowser(result.user.id, trustedBrowserToken);
+      res.clearCookie('trustedBrowser', { path: '/' });
+    } else if (result.isTrustedBrowser && trustedBrowserToken) {
+      // Re-issue the trusted browser cookie for trusted browsers
+      res.cookie('trustedBrowser', trustedBrowserToken, {
+        ...cookieOptions,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+    }
+
     res.json(
-      success(result, 'Login successful')
+      success({
+        user: result.user,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      }, 'Login successful')
     );
   } catch (err: any) {
     const errorCode = err.code || ErrorCodes.SERVER_ERROR;
@@ -126,6 +169,9 @@ router.post('/login', async (req: Request, res: Response) => {
 
     if (errorCode === ErrorCodes.INVALID_CREDENTIALS) {
       return res.status(401).json(error(errorCode, errorMessage));
+    }
+    if (errorCode === ErrorCodes.RATE_LIMIT) {
+      return res.status(429).json(error(errorCode, errorMessage));
     }
 
     res.status(500).json(error(errorCode, errorMessage));
@@ -135,7 +181,7 @@ router.post('/login', async (req: Request, res: Response) => {
 // Verify login OTP
 router.post('/verify-login-otp', async (req: Request, res: Response) => {
   try {
-    const { challengeId, otp } = req.body;
+    const { challengeId, otp, rememberMe } = req.body;
 
     if (!challengeId || !otp) {
       return res.status(400).json(
@@ -143,12 +189,43 @@ router.post('/verify-login-otp', async (req: Request, res: Response) => {
       );
     }
 
-    const result = await verifyLoginOtp(challengeId, otp);
+    const result = await verifyLoginOtp(challengeId, otp, rememberMe);
 
     console.log('🟢 Login OTP verified for user:', result.user.email);
 
+    // Set HttpOnly cookies
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax' as const,
+      path: '/',
+    };
+
+    res.cookie('accessToken', result.accessToken, {
+      ...cookieOptions,
+      maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000,
+    });
+
+    res.cookie('refreshToken', result.refreshToken, {
+      ...cookieOptions,
+      maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined,
+    });
+
+    // If Remember Me is checked, register this browser as trusted
+    if (rememberMe && result.trustedBrowserToken) {
+      res.cookie('trustedBrowser', result.trustedBrowserToken, {
+        ...cookieOptions,
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+    }
+
     res.json(
-      success(result, 'Login successful')
+      success({
+        user: result.user,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      }, 'Login successful')
     );
   } catch (err: any) {
     const errorCode = err.code || ErrorCodes.SERVER_ERROR;
@@ -275,11 +352,34 @@ router.post('/refresh', (req: Request, res: Response) => {
 
 // Logout
 router.post('/logout', (req: Request, res: Response) => {
-  // For MVP, logout is client-side (remove token)
-  // In production, implement token blacklisting
+  res.clearCookie('accessToken');
+  res.clearCookie('refreshToken');
+  res.clearCookie('trustedBrowser');
   res.json(
     success(null, 'Logout successful')
   );
+});
+
+// Revoke trusted browser (called when user unchecks Remember Me)
+router.post('/revoke-trusted-browser', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const trustedBrowserToken = req.cookies.trustedBrowser;
+
+    if (trustedBrowserToken) {
+      const { revokeTrustedBrowser } = await import('../modules/auth/authService');
+      await revokeTrustedBrowser(userId, trustedBrowserToken);
+    }
+
+    res.clearCookie('trustedBrowser');
+    res.json(
+      success(null, 'Trusted browser revoked')
+    );
+  } catch (err: any) {
+    res.status(500).json(
+      error(ErrorCodes.SERVER_ERROR, 'Failed to revoke trusted browser')
+    );
+  }
 });
 
 // Change password
