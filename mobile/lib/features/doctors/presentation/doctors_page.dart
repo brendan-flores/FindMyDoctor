@@ -25,19 +25,24 @@ class DoctorsPage extends StatefulWidget {
 class _DoctorsPageState extends State<DoctorsPage> {
   final DoctorService _doctorService = DoctorService();
   final TextEditingController _searchController = TextEditingController();
-  String _selectedSpecialty = 'All';
+  String _selectedSpecialty = '';
   String _selectedHospital = 'All';
   bool _verifiedOnlyFilter = false;
+  bool _showAllDoctors = false; // Flag to show filtered list view with no specialty filter
+  bool _showAllHospitals = false; // Flag to show filtered list view with all hospitals
   List<Doctor> _doctors = [];
   List<Doctor> _allDoctors = []; // Store all doctors for counting
-  List<String> _specialties = ['All'];
+  List<String> _specialties = [];
   List<String> _hospitals = ['All'];
   bool _isLoading = true;
 
   bool get _isFilteredListView =>
-      _selectedSpecialty != 'All' ||
+      _selectedSpecialty.isNotEmpty ||
       _verifiedOnlyFilter ||
-      _selectedHospital != 'All';
+      _selectedHospital != 'All' ||
+      _showAllDoctors ||
+      _showAllHospitals ||
+      _searchController.text.isNotEmpty;
 
   List<String> get _displayHospitals =>
       _hospitals.where((h) => h != 'All' && h.isNotEmpty).toList();
@@ -84,7 +89,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
       var doctors = allDoctors;
 
       // Filter by specialty
-      if (_selectedSpecialty != 'All') {
+      if (_selectedSpecialty.isNotEmpty) {
         doctors = doctors.where((d) => d.specialty == _selectedSpecialty).toList();
       }
 
@@ -125,9 +130,15 @@ class _DoctorsPageState extends State<DoctorsPage> {
           .toList()
         ..sort();
 
+      // Filter hospitals by search if in all hospitals view
+      if (_showAllHospitals && _searchController.text.isNotEmpty) {
+        final query = _searchController.text.toLowerCase();
+        uniqueHospitals.retainWhere((h) => h.toLowerCase().contains(query));
+      }
+
       setState(() {
         _allDoctors = allDoctors;
-        _specialties = ['All', ...uniqueSpecialties];
+        _specialties = uniqueSpecialties;
         _hospitals = ['All', ...uniqueHospitals];
         _doctors = doctors;
         _isLoading = false;
@@ -147,9 +158,11 @@ class _DoctorsPageState extends State<DoctorsPage> {
 
   void _clearAllFilters({bool navigateHome = false}) {
     setState(() {
-      _selectedSpecialty = 'All';
+      _selectedSpecialty = '';
       _selectedHospital = 'All';
       _verifiedOnlyFilter = false;
+      _showAllDoctors = false;
+      _showAllHospitals = false;
     });
     widget.onClearSpecialtyFromHome?.call();
     _loadDoctors();
@@ -177,20 +190,22 @@ class _DoctorsPageState extends State<DoctorsPage> {
       children: [
         _buildHeader(),
         Expanded(
-          child: _isFilteredListView
-              ? _buildFilteredDoctorListView()
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 80),
-                  child: Column(
-                    children: [
-                      _buildSearchBar(),
-                      _buildLocationIndicator(),
-                      _buildSpecializations(),
-                      _buildTopDoctorsSection(),
-                      _buildHospitalsSection(),
-                    ],
-                  ),
-                ),
+          child: _showAllHospitals
+              ? _buildAllHospitalsView()
+              : _isFilteredListView
+                  ? _buildFilteredDoctorListView()
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 80),
+                      child: Column(
+                        children: [
+                          _buildSearchBar(),
+                          _buildLocationIndicator(),
+                          _buildSpecializations(),
+                          _buildTopDoctorsSection(),
+                          _buildHospitalsSection(),
+                        ],
+                      ),
+                    ),
         ),
       ],
     );
@@ -218,6 +233,35 @@ class _DoctorsPageState extends State<DoctorsPage> {
                         return Padding(
                           padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
                           child: _buildDetailedDoctorCard(_doctors[index]),
+                        );
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAllHospitalsView() {
+    return Column(
+      children: [
+        _buildSearchBar(),
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _displayHospitals.isEmpty
+                  ? _buildEmptyHospitalsState()
+                  : ListView.builder(
+                      padding: EdgeInsets.only(
+                        left: spacing.AppSpacing.screenPadding,
+                        right: spacing.AppSpacing.screenPadding,
+                        top: spacing.AppSpacing.gutterSm,
+                        bottom: 80,
+                      ),
+                      itemCount: _displayHospitals.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
+                          child: _buildHospitalCard(_displayHospitals[index]),
                         );
                       },
                     ),
@@ -256,6 +300,36 @@ class _DoctorsPageState extends State<DoctorsPage> {
     );
   }
 
+  Widget _buildEmptyHospitalsState() {
+    return Padding(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterXl),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.local_hospital_outlined,
+            size: 64,
+            color: AppColors.outline,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Hospitals Found',
+            style: AppTextStyles.headlineSm.copyWith(
+              color: AppColors.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'No hospitals or medical centers registered yet',
+            style: AppTextStyles.bodyMd.copyWith(
+              color: AppColors.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     if (_isFilteredListView) {
       final fromHomeSpecialty = widget.specialty != null &&
@@ -264,7 +338,13 @@ class _DoctorsPageState extends State<DoctorsPage> {
 
       String chipLabel;
       IconData chipIcon;
-      if (_selectedSpecialty != 'All') {
+      if (_showAllDoctors) {
+        chipLabel = 'All Doctors';
+        chipIcon = Icons.medical_services;
+      } else if (_showAllHospitals) {
+        chipLabel = 'All Hospitals';
+        chipIcon = Icons.local_hospital;
+      } else if (_selectedSpecialty.isNotEmpty) {
         chipLabel = _selectedSpecialty;
         chipIcon = _getSpecialtyIcon(_selectedSpecialty);
       } else if (_selectedHospital != 'All') {
@@ -297,6 +377,8 @@ class _DoctorsPageState extends State<DoctorsPage> {
               onPressed: () {
                 if (fromHomeSpecialty) {
                   _clearAllFilters(navigateHome: true);
+                } else if (_showAllDoctors || _showAllHospitals) {
+                  _clearAllFilters();
                 } else {
                   _clearAllFilters();
                 }
@@ -529,7 +611,9 @@ class _DoctorsPageState extends State<DoctorsPage> {
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Search doctors, specialties, or clinics...',
+                  hintText: _showAllHospitals 
+                      ? 'Search hospitals or medical centers...' 
+                      : 'Search doctors, specialties, or clinics...',
                   hintStyle: AppTextStyles.bodyMd.copyWith(
                     color: AppColors.outline,
                   ),
@@ -560,14 +644,16 @@ class _DoctorsPageState extends State<DoctorsPage> {
               ),
             ),
           ),
-          const SizedBox(width: spacing.AppSpacing.gutterSm),
-          // Filter button with dot indicator
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+          if (!_showAllHospitals)
+            const SizedBox(width: spacing.AppSpacing.gutterSm),
+          if (!_showAllHospitals)
+            // Filter button with dot indicator
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.slate800.withValues(alpha: 0.05),
@@ -606,7 +692,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
   }
 
   Widget _buildFilterChips() {
-    if (!_isFilteredListView) {
+    if (!_isFilteredListView || _showAllHospitals) {
       return const SizedBox.shrink();
     }
 
@@ -621,8 +707,12 @@ class _DoctorsPageState extends State<DoctorsPage> {
           children: [
             _buildFilterChip('All', _selectedHospital == 'All' && !_verifiedOnlyFilter),
             _buildFilterChip('Available Today', false, showDot: true),
-            ..._displayHospitals.take(3).map((hospital) =>
-              _buildFilterChip(hospital, _selectedHospital == hospital)),
+            if (_showAllHospitals)
+              ..._displayHospitals.map((hospital) =>
+                _buildFilterChip(hospital, _selectedHospital == hospital))
+            else
+              ..._displayHospitals.take(3).map((hospital) =>
+                _buildFilterChip(hospital, _selectedHospital == hospital)),
             _buildFilterChip('Top Rated', _verifiedOnlyFilter, showStar: true),
           ],
         ),
@@ -634,7 +724,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
     // Determine actual active state based on current filters
     bool isActuallyActive = isActive;
     if (label == 'All') {
-      isActuallyActive = _selectedHospital == 'All' && !_verifiedOnlyFilter;
+      isActuallyActive = _selectedHospital == 'All' && !_verifiedOnlyFilter && !_showAllHospitals;
     } else if (label == 'Top Rated') {
       isActuallyActive = _verifiedOnlyFilter;
     } else if (_displayHospitals.contains(label)) {
@@ -649,14 +739,17 @@ class _DoctorsPageState extends State<DoctorsPage> {
             if (label == 'All') {
               _selectedHospital = 'All';
               _verifiedOnlyFilter = false;
+              _showAllHospitals = false;
             } else if (label == 'Available Today') {
               // Filter for available today (placeholder for now)
             } else if (label == 'Top Rated') {
               _verifiedOnlyFilter = true;
               _selectedHospital = 'All';
+              _showAllHospitals = false;
             } else if (_displayHospitals.contains(label)) {
               _selectedHospital = label;
               _verifiedOnlyFilter = false;
+              _showAllHospitals = false;
             }
           });
           _loadDoctors();
@@ -790,7 +883,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                       borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
                     ),
                     child: Text(
-                      '${_specialties.length - 1}', // Exclude 'All' from count
+                      '${_specialties.length}',
                       style: AppTextStyles.labelSm.copyWith(
                         color: AppColors.onSecondaryContainer,
                       ),
@@ -799,7 +892,15 @@ class _DoctorsPageState extends State<DoctorsPage> {
                 ],
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  setState(() {
+                    _selectedSpecialty = '';
+                    _selectedHospital = 'All';
+                    _verifiedOnlyFilter = false;
+                    _showAllDoctors = true;
+                  });
+                  _loadDoctors();
+                },
                 child: Row(
                   children: [
                     Text(
@@ -913,15 +1014,16 @@ class _DoctorsPageState extends State<DoctorsPage> {
   }
 
   int _getDoctorCountForSpecialty(String specialty) {
-    if (specialty == 'All') return _allDoctors.length;
     return _allDoctors.where((d) => d.specialty == specialty).length;
   }
 
   void _openVerifiedDoctorsList() {
     setState(() {
       _verifiedOnlyFilter = true;
-      _selectedSpecialty = 'All';
+      _selectedSpecialty = '';
       _selectedHospital = 'All';
+      _showAllDoctors = false;
+      _showAllHospitals = false;
     });
     _loadDoctors();
   }
@@ -930,8 +1032,10 @@ class _DoctorsPageState extends State<DoctorsPage> {
     if (hospitalName == 'All') return;
     setState(() {
       _selectedHospital = hospitalName;
-      _selectedSpecialty = 'All';
+      _selectedSpecialty = '';
       _verifiedOnlyFilter = false;
+      _showAllDoctors = false;
+      _showAllHospitals = false;
     });
     _loadDoctors();
   }
@@ -1310,24 +1414,32 @@ class _DoctorsPageState extends State<DoctorsPage> {
                   ),
                 ],
               ),
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.slate800.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedSpecialty = '';
+                    _selectedHospital = 'All';
+                    _verifiedOnlyFilter = false;
+                    _showAllDoctors = false;
+                    _showAllHospitals = true;
+                  });
+                  _loadDoctors();
+                },
+                child: Row(
+                  children: [
+                    Text(
+                      'See all',
+                      style: AppTextStyles.labelMd.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      color: AppColors.primary,
+                      size: spacing.AppSpacing.iconSm,
                     ),
                   ],
-                ),
-                child: Icon(
-                  Icons.map,
-                  color: AppColors.onSurfaceVariant,
-                  size: spacing.AppSpacing.iconLg,
                 ),
               ),
             ],
