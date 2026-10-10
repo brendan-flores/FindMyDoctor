@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requirePasswordChange } from '../middleware/auth';
+import { calculateAvailability } from '../modules/availability/availabilityService';
 
 const router = Router();
 
@@ -116,8 +117,53 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
 
     const doctor = doctorResult.rows[0];
 
+    // Get appointment date and time
+    const appointmentDateTime = new Date(appointmentDate);
+    const appointmentDateOnly = appointmentDateTime.toISOString().split('T')[0];
+    const appointmentTime = appointmentDateTime.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
+
+    // Validate appointment is not in the past
+    const now = new Date();
+    if (appointmentDateTime < now) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot book appointments in the past'));
+    }
+
+    // Get availability for the date to validate working hours, breaks, exceptions
+    const availability = await calculateAvailability(doctorId, appointmentDateOnly);
+
+    // Check if date is available
+    if (availability.status !== 'AVAILABLE') {
+      await client.query('ROLLBACK');
+      const statusMessage = {
+        'FULL': 'No available slots for this date',
+        'UNAVAILABLE': 'Doctor is not available on this date',
+        'PAST': 'Cannot book appointments in the past',
+        'NON_WORKING': 'Doctor is not working on this date'
+      }[availability.status] || 'Date not available';
+      return res.status(400).json(error(ErrorCodes.APPOINTMENT_SLOT_UNAVAILABLE, statusMessage));
+    }
+
+    // Check if the specific time slot is available
+    const appointmentStartMinutes = parseInt(appointmentTime.split(':')[0]) * 60 + parseInt(appointmentTime.split(':')[1]);
+    const appointmentEndMinutes = appointmentStartMinutes + 30; // 30-minute consultation
+
+    const slotAvailable = availability.timeSlots.find(slot => {
+      const slotStartMinutes = parseInt(slot.start.split(':')[0]) * 60 + parseInt(slot.start.split(':')[1]);
+      const slotEndMinutes = parseInt(slot.end.split(':')[0]) * 60 + parseInt(slot.end.split(':')[1]);
+      
+      // Check if appointment time matches or overlaps with this slot
+      const timeMatches = appointmentStartMinutes >= slotStartMinutes && appointmentEndMinutes <= slotEndMinutes;
+      
+      return timeMatches && slot.isAvailable;
+    });
+
+    if (!slotAvailable) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.APPOINTMENT_SLOT_UNAVAILABLE, 'Selected time slot is not available'));
+    }
+
     // Check capacity
-    const appointmentDateOnly = new Date(appointmentDate).toISOString().split('T')[0];
     const capacityResult = await client.query(
       'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
       [doctorId, appointmentDateOnly]
@@ -135,17 +181,24 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
       return res.status(400).json(error(ErrorCodes.CAPACITY_FULL, 'No available slots for this date'));
     }
 
-    // Check for conflicting appointment
+    // Check for conflicting appointment (overlapping time intervals)
+    const consultationDuration = 30; // 30 minutes
     const conflictResult = await client.query(
       `SELECT * FROM appointments 
        WHERE patient_id = $1 AND doctor_id = $2 
-       AND appointment_date = $3 AND status NOT IN ('CANCELLED', 'NO_SHOW')`,
-      [patientId, doctorId, appointmentDate]
+       AND appointment_date BETWEEN $3 AND $4
+       AND status NOT IN ('CANCELLED', 'NO_SHOW')`,
+      [
+        patientId, 
+        doctorId, 
+        appointmentDate, 
+        new Date(appointmentDateTime.getTime() + consultationDuration * 60000).toISOString()
+      ]
     );
 
     if (conflictResult.rows.length > 0) {
       await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, 'You already have an appointment with this doctor at this time'));
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'You already have an overlapping appointment with this doctor'));
     }
 
     // Create appointment

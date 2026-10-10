@@ -6,7 +6,7 @@ export interface TimeSlot {
   start: string; // HH:MM format
   end: string; // HH:MM format
   isAvailable: boolean;
-  status: 'AVAILABLE' | 'BOOKED' | 'BREAK' | 'PAST';
+  status: 'AVAILABLE' | 'BOOKED' | 'BREAK' | 'PAST' | 'FULL';
 }
 
 export interface DateAvailability {
@@ -135,19 +135,44 @@ function subtractBreaks(workingRanges: TimeRange[], breakRanges: TimeRange[]): T
 }
 
 /**
- * Generate time slots from available time ranges
+ * Check if a time slot overlaps with any booked interval
+ */
+function isSlotOverlappingWithBookings(
+  slotStart: number,
+  slotEnd: number,
+  bookedIntervals: TimeRange[]
+): boolean {
+  for (const booking of bookedIntervals) {
+    const bookingStart = calculateMinutesBetween('00:00', booking.start);
+    const bookingEnd = calculateMinutesBetween('00:00', booking.end);
+    
+    // Check for overlap: slot overlaps if it starts before booking ends and ends after booking starts
+    if (slotStart < bookingEnd && slotEnd > bookingStart) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Generate time slots from working time ranges (including breaks)
+ * Break periods are shown as visible but non-selectable slots
  */
 function generateTimeSlots(
-  availableRanges: TimeRange[],
-  bookedTimes: string[],
+  workingRanges: TimeRange[],
+  bookedIntervals: TimeRange[],
   breakRanges: TimeRange[],
-  currentDate: Date
+  currentDate: Date,
+  remainingCapacity: number
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
   const now = new Date();
   const isToday = currentDate.toDateString() === now.toDateString();
   
-  for (const range of availableRanges) {
+  let availableSlotsCount = 0;
+  
+  // Generate slots for all working hours including breaks
+  for (const range of workingRanges) {
     const startMinutes = calculateMinutesBetween('00:00', range.start);
     const endMinutes = calculateMinutesBetween('00:00', range.end);
     
@@ -181,14 +206,23 @@ function generateTimeSlots(
         }
       }
       
-      // Check if slot is booked
-      const isBooked = bookedTimes.includes(slotStartStr);
+      // Check if slot overlaps with any booked appointment
+      const isBooked = isSlotOverlappingWithBookings(slotStartMinutes, slotEndMinutes, bookedIntervals);
+      
+      // Check if capacity allows this slot (only for non-break slots)
+      const hasCapacity = isBreak ? true : availableSlotsCount < remainingCapacity;
+      
+      const isAvailable = !isPast && !isBreak && !isBooked && hasCapacity;
+      
+      if (isAvailable && !isBreak) {
+        availableSlotsCount++;
+      }
       
       slots.push({
         start: slotStartStr,
         end: slotEndStr,
-        isAvailable: !isPast && !isBreak && !isBooked,
-        status: isPast ? 'PAST' : (isBreak ? 'BREAK' : (isBooked ? 'BOOKED' : 'AVAILABLE')),
+        isAvailable,
+        status: isPast ? 'PAST' : (isBreak ? 'BREAK' : (isBooked ? 'BOOKED' : (hasCapacity ? 'AVAILABLE' : 'FULL'))),
       });
       
       currentSlotStart = currentSlotEnd;
@@ -199,12 +233,17 @@ function generateTimeSlots(
 }
 
 /**
- * Get booked appointment times for a doctor on a specific date
+ * Get booked appointment intervals for a doctor on a specific date
+ * Returns array of {start, end} for overlapping interval checking
  */
-async function getBookedTimes(doctorId: string, date: string): Promise<string[]> {
+async function getBookedIntervals(doctorId: string, date: string): Promise<TimeRange[]> {
   const result = await query(
-    `SELECT EXTRACT(HOUR FROM appointment_date) * 60 + EXTRACT(MINUTE FROM appointment_date) as start_minutes
+    `SELECT 
+       EXTRACT(HOUR FROM appointment_date) * 60 + EXTRACT(MINUTE FROM appointment_date) as start_minutes,
+       EXTRACT(HOUR FROM appointment_date + (CONSULTATION_DURATION_MINUTES || ' minutes')::interval) * 60 + 
+       EXTRACT(MINUTE FROM appointment_date + (CONSULTATION_DURATION_MINUTES || ' minutes')::interval) as end_minutes
      FROM appointments
+     CROSS JOIN (SELECT 30 as CONSULTATION_DURATION_MINUTES) as duration
      WHERE doctor_id = $1
      AND DATE(appointment_date) = $2
      AND status IN ('SCHEDULED', 'CONFIRMED', 'IN_PROGRESS')
@@ -212,7 +251,10 @@ async function getBookedTimes(doctorId: string, date: string): Promise<string[]>
     [doctorId, date]
   );
   
-  return result.rows.map(row => formatMinutes(row.start_minutes));
+  return result.rows.map(row => ({
+    start: formatMinutes(row.start_minutes),
+    end: formatMinutes(row.end_minutes),
+  }));
 }
 
 /**
@@ -297,16 +339,7 @@ export async function calculateAvailability(
     end: row.end_time,
   }));
   
-  // Calculate available time after breaks
-  const availableRanges = subtractBreaks(workingRanges, breakRanges);
-  
-  // Get booked times
-  const bookedTimes = await getBookedTimes(doctorId, date);
-  
-  // Generate time slots
-  const timeSlots = generateTimeSlots(availableRanges, bookedTimes, breakRanges, dateObj);
-  
-  // Get capacity information
+  // Get capacity information first
   const capacityResult = await query(
     `SELECT calculated_capacity, configured_capacity, final_capacity, registered_count
      FROM daily_capacities
@@ -333,7 +366,7 @@ export async function calculateAvailability(
     };
   } else {
     // Calculate capacity from available ranges
-    const totalAvailableMinutes = availableRanges.reduce(
+    const totalAvailableMinutes = workingRanges.reduce(
       (total, range) => total + calculateMinutesBetween(range.start, range.end),
       0
     );
@@ -341,6 +374,15 @@ export async function calculateAvailability(
     capacity.final = capacity.calculated;
     capacity.remaining = capacity.calculated;
   }
+  
+  // Calculate available time after breaks
+  const availableRanges = subtractBreaks(workingRanges, breakRanges);
+  
+  // Get booked intervals (for overlapping check)
+  const bookedIntervals = await getBookedIntervals(doctorId, date);
+  
+  // Generate time slots with capacity limit using full working ranges (to show breaks)
+  const timeSlots = generateTimeSlots(workingRanges, bookedIntervals, breakRanges, dateObj, capacity.remaining);
   
   // Determine status
   let status: 'AVAILABLE' | 'FULL' | 'UNAVAILABLE' | 'PAST' | 'NON_WORKING' = 'AVAILABLE';
