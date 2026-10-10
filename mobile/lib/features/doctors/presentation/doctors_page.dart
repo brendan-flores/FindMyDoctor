@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/primary_button.dart';
 import '../../../core/models/doctor.dart';
 import '../../../core/services/doctor_service.dart';
 
@@ -1320,22 +1321,19 @@ class _DoctorsPageState extends State<DoctorsPage> {
                     shape: BoxShape.circle,
                   ),
                 ),
-                PrimaryButton(
-                  text: 'Book Visit',
-                  onPressed: () {
-                    // Navigate to doctor schedule page with doctor details
-                    Navigator.of(context).pushNamed(
-                      '/doctor-schedule',
-                      arguments: {
-                        'doctorId': doctor.id,
-                        'doctorName': doctor.fullName,
-                        'specialty': doctor.specialty,
-                        'clinic': doctor.practiceName,
-                        'consultationFee': doctor.consultationFee?.toString(),
-                      },
-                    );
-                  },
-                  height: 40,
+                Expanded(
+                  child: Text(
+                    'Available Today',
+                    style: AppTextStyles.labelMd.copyWith(
+                      color: AppColors.tertiary,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Check Schedule',
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -1366,7 +1364,19 @@ class _DoctorsPageState extends State<DoctorsPage> {
               const SizedBox(width: spacing.AppSpacing.gutterSm),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => widget.onNavigateToTab?.call(2),
+                  onPressed: () {
+                    // Navigate to doctor schedule page with doctor details
+                    Navigator.of(context).pushNamed(
+                      '/doctor-schedule',
+                      arguments: {
+                        'doctorId': doctor.id,
+                        'doctorName': doctor.fullName,
+                        'specialty': doctor.specialty,
+                        'clinic': doctor.practiceName,
+                        'consultationFee': doctor.consultationFee?.toString(),
+                      },
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.onPrimary,
