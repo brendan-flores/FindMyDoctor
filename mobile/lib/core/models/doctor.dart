@@ -15,6 +15,7 @@ class Doctor {
   final double? practiceLongitude;
   final String? practicePhone;
   final String? practiceEmail;
+  final String? professionalPhotoUrl;
 
   Doctor({
     required this.id,
@@ -33,6 +34,7 @@ class Doctor {
     this.practiceLongitude,
     this.practicePhone,
     this.practiceEmail,
+    this.professionalPhotoUrl,
   });
 
   String get fullName {
@@ -72,6 +74,7 @@ class Doctor {
       practiceLongitude: json['practice_longitude'] != null ? toDouble(json['practice_longitude']) : null,
       practicePhone: json['practice_phone']?.toString(),
       practiceEmail: json['practice_email']?.toString(),
+      professionalPhotoUrl: json['professional_photo_url']?.toString(),
     );
   }
 }
