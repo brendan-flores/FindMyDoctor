@@ -401,7 +401,13 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               ),
             )
           else
-            _buildCalendarGrid(),
+            Column(
+              children: [
+                _buildCalendarGrid(),
+                const SizedBox(height: spacing.AppSpacing.gutterMd),
+                _buildCalendarLegend(),
+              ],
+            ),
         ],
       ),
     );
@@ -684,6 +690,36 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 final slotStatus = slot['status'];
                 final isSelected = _selectedTimeSlot == start;
 
+                Color? backgroundColor;
+                Color? textColor;
+                String? labelText;
+
+                if (isSelected) {
+                  backgroundColor = AppColors.primary;
+                  textColor = AppColors.onPrimary;
+                } else if (slotStatus == 'BREAK') {
+                  backgroundColor = AppColors.errorContainer.withValues(alpha: 0.3);
+                  textColor = AppColors.error;
+                  labelText = 'Break';
+                } else if (slotStatus == 'PAST') {
+                  backgroundColor = AppColors.surfaceContainerHighest;
+                  textColor = AppColors.slate400;
+                } else if (slotStatus == 'BOOKED') {
+                  backgroundColor = AppColors.surfaceContainerHighest;
+                  textColor = AppColors.slate400;
+                  labelText = 'Booked';
+                } else if (slotStatus == 'FULL') {
+                  backgroundColor = AppColors.surfaceContainerHighest;
+                  textColor = AppColors.slate400;
+                  labelText = 'Full';
+                } else if (isAvailable) {
+                  backgroundColor = AppColors.surfaceContainer;
+                  textColor = AppColors.onSurface;
+                } else {
+                  backgroundColor = AppColors.surfaceContainerHighest;
+                  textColor = AppColors.slate400;
+                }
+
                 return GestureDetector(
                   onTap: isAvailable
                       ? () {
@@ -698,11 +734,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                       vertical: spacing.AppSpacing.gutterSm,
                     ),
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.primary
-                          : isAvailable
-                              ? AppColors.surfaceContainer
-                              : AppColors.surfaceContainerHighest,
+                      color: backgroundColor,
                       borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
                       border: Border.all(
                         color: isSelected
@@ -713,16 +745,42 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                         width: 1,
                       ),
                     ),
-                    child: Text(
-                      '$start - $end',
-                      style: AppTextStyles.labelSm.copyWith(
-                        color: isSelected
-                            ? AppColors.onPrimary
-                            : isAvailable
-                                ? AppColors.onSurface
-                                : AppColors.slate400,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '$start - $end',
+                          style: AppTextStyles.labelSm.copyWith(
+                            color: textColor,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        if (labelText != null) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: slotStatus == 'BREAK'
+                                  ? AppColors.error.withValues(alpha: 0.1)
+                                  : AppColors.slate300.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              labelText,
+                              style: AppTextStyles.labelSm.copyWith(
+                                fontSize: 9,
+                                color: slotStatus == 'BREAK'
+                                    ? AppColors.error
+                                    : AppColors.slate600,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 );
@@ -822,6 +880,51 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     final endHours = totalMinutes ~/ 60;
     final endMinutes = totalMinutes % 60;
     return '${endHours.toString().padLeft(2, '0')}:${endMinutes.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildCalendarLegend() {
+    return Container(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterSm),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+      ),
+      child: Wrap(
+        spacing: spacing.AppSpacing.gutterMd,
+        runSpacing: spacing.AppSpacing.gutterSm,
+        children: [
+          _buildLegendItem(AppColors.primary, 'Available'),
+          _buildLegendItem(AppColors.slate400, 'Past'),
+          _buildLegendItem(AppColors.error.withValues(alpha: 0.3), 'Unavailable'),
+          _buildLegendItem(AppColors.surfaceContainerHighest, 'Full'),
+          _buildLegendItem(AppColors.slate400, 'Non-working'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: AppTextStyles.labelSm.copyWith(
+            fontSize: 10,
+            color: AppColors.secondary,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildBottomConfirmationBar() {
