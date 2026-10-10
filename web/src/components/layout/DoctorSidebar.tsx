@@ -19,7 +19,7 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
   const [schedules, setSchedules] = useState<any[]>([]);
 
   // Load profile and schedules for setup progress
-  useEffect(() => {
+  const refreshProfile = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
@@ -42,6 +42,20 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
     }).catch(err => {
       console.error('Error loading schedules:', err);
     });
+  };
+
+  useEffect(() => {
+    refreshProfile();
+  }, [pathname]);
+
+  // Listen for profile/schedule save events to refresh the setup progress card immediately
+  useEffect(() => {
+    window.addEventListener('profileUpdated', refreshProfile);
+    window.addEventListener('schedulesUpdated', refreshProfile);
+    return () => {
+      window.removeEventListener('profileUpdated', refreshProfile);
+      window.removeEventListener('schedulesUpdated', refreshProfile);
+    };
   }, []);
 
   const activeTab = pathname === '/doctor'
@@ -93,9 +107,7 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
         </div>
 
         {/* Setup Progress Card */}
-        <div className="px-3 py-3">
-          {profile && <SetupProgressCard profile={profile} schedules={schedules} />}
-        </div>
+        {profile && <SetupProgressCard profile={profile} schedules={schedules} />}
 
         {/* Navigation Group */}
         <div className="px-5 pt-1 pb-2">

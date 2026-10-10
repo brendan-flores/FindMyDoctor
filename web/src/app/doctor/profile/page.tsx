@@ -162,6 +162,8 @@ export default function DoctorProfilePage() {
         setIsEditing(false);
         setSuccessMessage('Profile updated successfully');
         setTimeout(() => setSuccessMessage(''), 3000);
+        // Notify sidebar to refresh the setup progress card
+        window.dispatchEvent(new CustomEvent('profileUpdated'));
       } else {
         setError(response.error || 'Failed to update profile');
       }
@@ -219,6 +221,8 @@ export default function DoctorProfilePage() {
         setEditForm({ ...editForm, professional_photo_url: data.data.photoUrl });
         setSuccessMessage('Photo uploaded successfully');
         setTimeout(() => setSuccessMessage(''), 3000);
+        // Notify sidebar to refresh the setup progress card
+        window.dispatchEvent(new CustomEvent('profileUpdated'));
       } else {
         URL.revokeObjectURL(previewUrl);
         setPhotoPreview(null);

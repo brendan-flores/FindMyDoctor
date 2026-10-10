@@ -242,6 +242,8 @@ export default function DoctorSchedule() {
       setShowAddModal(false);
       setFormData({ dayOfWeek: 1, startTime: '08:00', endTime: '17:00', consultationDurationMinutes: 30 });
       fetchSchedules();
+      // Notify sidebar to refresh the setup progress card
+      window.dispatchEvent(new CustomEvent('schedulesUpdated'));
     } else {
       setError(response.error || 'Failed to create schedule');
     }
@@ -277,6 +279,8 @@ export default function DoctorSchedule() {
       setShowDeleteModal(false);
       setDeletingSchedule(null);
       fetchSchedules();
+      // Notify sidebar to refresh the setup progress card
+      window.dispatchEvent(new CustomEvent('schedulesUpdated'));
     } else {
       setError(response.error || 'Failed to delete schedule');
     }

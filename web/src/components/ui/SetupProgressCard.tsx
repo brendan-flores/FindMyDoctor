@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { doctorApi, DoctorProfile } from '@/lib/api/doctorApi';
+import { useRouter } from 'next/navigation';
+import { DoctorProfile } from '@/lib/api/doctorApi';
 
 interface SetupProgressCardProps {
   profile: DoctorProfile;
@@ -11,52 +12,19 @@ interface SetupProgressCardProps {
 interface SetupStep {
   label: string;
   completed: boolean;
+  path: string;
 }
 
 export default function SetupProgressCard({ profile, schedules }: SetupProgressCardProps) {
+  const router = useRouter();
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [steps, setSteps] = useState<SetupStep[]>([
-    { label: 'Account Registration & Email Verification', completed: false },
-    { label: 'Complete Professional Profile', completed: false },
-    { label: 'Admin Approval', completed: false },
-    { label: 'Set Availability & Schedule', completed: false },
+    { label: 'Account Registration & Email Verification', completed: false, path: '/doctor/profile' },
+    { label: 'Complete Professional Profile', completed: false, path: '/doctor/profile' },
+    { label: 'Admin Approval', completed: false, path: '/doctor/profile' },
+    { label: 'Set Availability & Schedule', completed: false, path: '/doctor/schedule' },
   ]);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  // Calculate setup progress
-  useEffect(() => {
-    const newSteps: SetupStep[] = [
-      {
-        label: 'Account Registration & Email Verification',
-        completed: !!profile.email_verified,
-      },
-      {
-        label: 'Complete Professional Profile',
-        completed: !hasMissingProfileFields() && (profile.profile_completion_status === 'COMPLETE' || profile.profile_completion_status === 'SUBMITTED'),
-      },
-      {
-        label: 'Admin Approval',
-        completed: profile.approval_status === 'ACTIVE',
-      },
-      {
-        label: 'Set Availability & Schedule',
-        completed: schedules.length > 0,
-      },
-    ];
-    setSteps(newSteps);
-  }, [profile, schedules]);
-
-  const completedCount = steps.filter((step) => step.completed).length;
-  const totalCount = steps.length;
-  const progressPercentage = (completedCount / totalCount) * 100;
-
-  // Determine if setup is complete
-  const isSetupComplete = completedCount === totalCount;
-
-  // Auto-hide if setup is complete
-  if (isSetupComplete) {
-    return null;
-  }
 
   // Check if any profile fields are missing
   const hasMissingProfileFields = () => {
@@ -80,6 +48,45 @@ export default function SetupProgressCard({ profile, schedules }: SetupProgressC
     });
   };
 
+  // Calculate setup progress
+  useEffect(() => {
+    const newSteps: SetupStep[] = [
+      {
+        label: 'Account Registration & Email Verification',
+        completed: !!profile.email_verified,
+        path: '/doctor/profile',
+      },
+      {
+        label: 'Complete Professional Profile',
+        completed: !hasMissingProfileFields() && (profile.profile_completion_status === 'COMPLETE' || profile.profile_completion_status === 'SUBMITTED'),
+        path: '/doctor/profile',
+      },
+      {
+        label: 'Admin Approval',
+        completed: profile.approval_status === 'ACTIVE',
+        path: '/doctor/profile',
+      },
+      {
+        label: 'Set Availability & Schedule',
+        completed: schedules.length > 0,
+        path: '/doctor/schedule',
+      },
+    ];
+    setSteps(newSteps);
+  }, [profile, schedules]);
+
+  const completedCount = steps.filter((step) => step.completed).length;
+  const totalCount = steps.length;
+  const progressPercentage = (completedCount / totalCount) * 100;
+
+  // Determine if setup is complete
+  const isSetupComplete = completedCount === totalCount;
+
+  // Auto-hide if setup is complete
+  if (isSetupComplete) {
+    return null;
+  }
+
   // Get missing profile fields
   const getMissingProfileFields = () => {
     const fieldLabels = [
@@ -100,6 +107,11 @@ export default function SetupProgressCard({ profile, schedules }: SetupProgressC
       if (typeof f.field === 'string' && f.field.trim() === '') return true;
       return false;
     }).map(f => f.label);
+  };
+
+  const handleNavigate = (path: string) => {
+    setIsPanelOpen(false);
+    router.push(path);
   };
 
   // Click outside to close
@@ -125,7 +137,7 @@ export default function SetupProgressCard({ profile, schedules }: SetupProgressC
       <div className="w-full px-3 py-3">
         <button
           onClick={() => setIsPanelOpen(true)}
-          className="w-full flex items-center justify-between px-3 py-2.5 bg-white rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-all shadow-sm"
+          className="w-full flex items-center justify-between px-3 py-2.5 bg-white rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-all shadow-sm group cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <div className="relative w-8 h-8">
@@ -162,11 +174,11 @@ export default function SetupProgressCard({ profile, schedules }: SetupProgressC
               </span>
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-slate-800">Setup Progress</p>
+              <p className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">Setup Progress</p>
               <p className="text-xs text-slate-500">{completedCount} of {totalCount} steps</p>
             </div>
           </div>
-          <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+          <span className="material-symbols-outlined text-slate-400 group-hover:text-blue-600 transition-colors">chevron_right</span>
         </button>
       </div>
 
@@ -185,7 +197,7 @@ export default function SetupProgressCard({ profile, schedules }: SetupProgressC
               </div>
               <button
                 onClick={() => setIsPanelOpen(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                 aria-label="Close setup panel"
               >
                 <span className="material-symbols-outlined text-slate-600">close</span>
@@ -201,13 +213,17 @@ export default function SetupProgressCard({ profile, schedules }: SetupProgressC
             </div>
 
             {/* Steps list */}
-            <div className="space-y-2 mb-4">
+            <div className="space-y-1.5 mb-4">
               {steps.map((step, index) => (
-                <div key={index} className="flex items-center gap-3">
+                <div
+                  key={index}
+                  onClick={() => handleNavigate(step.path)}
+                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors group"
+                >
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
                     step.completed
                       ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white'
-                      : 'bg-slate-200 text-slate-400'
+                      : 'bg-slate-200 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600'
                   }`}>
                     {step.completed ? (
                       <span className="material-symbols-outlined text-[14px]">check</span>
@@ -215,21 +231,43 @@ export default function SetupProgressCard({ profile, schedules }: SetupProgressC
                       <span className="text-xs font-semibold">{index + 1}</span>
                     )}
                   </div>
-                  <span className={`text-sm ${step.completed ? 'text-slate-600 line-through' : 'text-slate-800'}`}>
+                  <span className={`text-sm font-medium ${step.completed ? 'text-slate-500 line-through' : 'text-slate-800 group-hover:text-blue-600 transition-colors'}`}>
                     {step.label}
                   </span>
+                  {!step.completed && (
+                    <span className="material-symbols-outlined text-[16px] text-slate-400 ml-auto opacity-0 group-hover:opacity-100 group-hover:text-blue-600 transition-all">
+                      arrow_forward
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
 
             {/* Missing profile fields indicator */}
             {!steps[1].completed && steps[0].completed && (
-              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <p className="text-xs font-semibold text-amber-800 mb-1">Professional information incomplete</p>
-                <p className="text-xs text-amber-700 mb-2">Missing fields:</p>
-                <ul className="text-xs text-amber-700 space-y-0.5">
+              <div className="mb-4 p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl">
+                <div
+                  onClick={() => handleNavigate('/doctor/profile')}
+                  className="flex items-center justify-between cursor-pointer mb-2 group"
+                >
+                  <p className="text-xs font-bold text-amber-900 group-hover:text-blue-700 group-hover:underline">
+                    Professional information incomplete
+                  </p>
+                  <span className="text-xs font-semibold text-blue-600 group-hover:underline flex items-center gap-0.5">
+                    Complete <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                  </span>
+                </div>
+                <p className="text-xs text-amber-800 font-medium mb-1.5">Missing fields:</p>
+                <ul className="text-xs space-y-1">
                   {getMissingProfileFields().map((field, index) => (
-                    <li key={index}>• {field}</li>
+                    <li
+                      key={index}
+                      onClick={() => handleNavigate('/doctor/profile')}
+                      className="cursor-pointer hover:bg-amber-100/60 p-1 rounded-md transition-colors flex items-center justify-between text-amber-900 font-medium group"
+                    >
+                      <span className="group-hover:text-blue-700 group-hover:underline">• {field}</span>
+                      <span className="text-[10px] text-blue-600 opacity-0 group-hover:opacity-100 font-semibold transition-opacity">Edit &rarr;</span>
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -237,9 +275,19 @@ export default function SetupProgressCard({ profile, schedules }: SetupProgressC
 
             {/* Missing schedule indicator */}
             {!steps[3].completed && steps[2].completed && (
-              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <p className="text-xs font-semibold text-amber-800 mb-1">Availability & Schedule incomplete</p>
-                <p className="text-xs text-amber-700 mb-2">Missing: No schedules configured</p>
+              <div
+                onClick={() => handleNavigate('/doctor/schedule')}
+                className="mb-4 p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl cursor-pointer hover:border-amber-300 transition-colors group"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-bold text-amber-900 group-hover:text-blue-700 group-hover:underline">
+                    Availability & Schedule incomplete
+                  </p>
+                  <span className="text-xs font-semibold text-blue-600 group-hover:underline flex items-center gap-0.5">
+                    Configure <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                  </span>
+                </div>
+                <p className="text-xs text-amber-700">Missing: No schedules configured</p>
               </div>
             )}
           </div>
@@ -248,3 +296,4 @@ export default function SetupProgressCard({ profile, schedules }: SetupProgressC
     </>
   );
 }
+
