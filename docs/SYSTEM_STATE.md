@@ -136,6 +136,22 @@ Current System State (October 2026):
 - Web schedule page allows doctors to add, view, edit, and permanently delete break periods within working hours (e.g., lunch breaks)
 - Past exception and break dates are automatically filtered out from the displayed lists
 - Duplicate exception dates are prevented via disabled date picker options
+- Mobile Doctors page main design now matches UI prototype from `UI-Prototypes/users-mobile-ui/doctors_page`
+- Mobile Doctors page header redesigned with: logo with PH badge, notification icon with red dot indicator, profile picture with green dot indicator
+- Mobile Doctors page search bar updated with: sticky positioning, clear button (shows when text entered), filter button with blue dot indicator
+- Mobile Doctors page location indicator updated to show: "Metro Manila • Near me (5km)" with near_me icon, and active doctor count with teal color
+- Mobile Doctors page specialty chips maintain existing design: icon, name, doctor count, active state with primary color
+- Mobile Doctors page Top Verified Doctors section redesigned as horizontal carousel with detailed cards (288px width, 236px height) matching target prototype layout, displaying doctor portrait avatar with green online status dot, name, specialty, star rating with review count, hospital location with apartment icon, availability time slot, and bottom footer with consultation fee and Book Visit button
+- Mobile Doctors page Top Verified Doctors section now displays all doctors dynamically from backend (no hardcoded data), using doctor photos from backend when available, fallback to placeholder icon
+- Mobile Doctors page hospital cards dynamically populated from backend practice names (no hardcoded hospital data), displaying JCI badge, distance indicator, hospital name, location, and doctor count per hospital
+- Mobile Doctors page specialty list dynamically populated from backend specialties, merged with 'All' option
+- Mobile Doctors page hospital extraction includes all practice names (not excluding 'Private Practice') to ensure hospitals with that name are displayed
+- Mobile Doctors page filtered list view matches UI prototype design with updated header (back button, specialty chip, result count, Change button)
+- Mobile Doctors page filtered list view includes horizontal filter chips below search bar: All, Available Today, Hospital names (up to 3), Top Rated
+- Mobile Doctors page detailed doctor cards display: doctor avatar, name, specialty, location, rating with review count, consultation fee, availability banner, View Profile button, and Book Visit button
+- Mobile Doctors page filter chips track active state correctly: All clears hospital and verified filters, Top Rated enables verified filter, Hospital chips filter by specific hospital
+- Mobile Doctors page search functionality works with specialty and hospital filters applied
+- Mobile Doctors page result count dynamically updates based on current filters and search query
 - Active exceptions remove availability for the affected date range; active break periods remove availability for the affected time periods on specific dates
 - Capacity calculation service uses centralized 30-minute consultation duration to calculate maximum appointment slots based on available working time after excluding breaks and schedule exceptions
 - Capacity system provides: Calculated Capacity (maximum slots based on available time), Configured Capacity (lower limit set by doctor/secretary), Final Capacity (actual allowed appointments), Remaining Capacity (final capacity minus existing reservations)
