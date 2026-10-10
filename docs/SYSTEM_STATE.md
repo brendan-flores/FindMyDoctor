@@ -141,6 +141,16 @@ Current System State (October 2026):
 - Doctor unavailability validation enforces: start date <= end date, valid date format, doctors can only access their own exceptions
 - Doctor break period validation enforces: start time < end time, valid time format, break must fall completely within working hours for the specific date, no overlapping breaks on the same date, doctors can only access their own breaks
 - Extended `GET /api/v1/doctors/:id/availability` endpoint to include active unavailability periods (exceptions) and active break periods in the response
+- Availability service (backend/src/modules/availability/availabilityService.ts) calculates available time slots considering: working hours, schedule exceptions, break periods, 30-minute consultation duration, daily capacity, existing reservations, and current date/time
+- Availability service detects overlapping appointment intervals (not just exact time matches) to correctly mark slots as booked
+- Availability service limits individual slot availability based on remaining daily capacity (slots marked as FULL when capacity exhausted)
+- Availability service returns time slots with status: AVAILABLE, BOOKED, BREAK, PAST, or FULL
+- Availability service returns date status: AVAILABLE, FULL, UNAVAILABLE, PAST, or NON_WORKING
+- Availability service includes break periods as visible but non-selectable slots in the response (not removed from slot list)
+- Mobile doctor schedule page at /doctor-schedule displays calendar with visual status indicators and legend for all date states
+- Mobile doctor schedule page displays time slots with status-specific visual treatment: available slots are selectable, break slots shown with red tint and "Break" label, booked/past/full slots are non-selectable
+- Mobile doctor schedule page confirmation button enables only after selecting both a valid date and a valid time slot
+- Backend appointment creation endpoint POST /api/v1/appointments validates: appointment is not in the past, date is AVAILABLE, specific time slot is available (within working hours, not during break, not booked), daily capacity is not exceeded, and no overlapping appointments exist
 - Web schedule page at `/doctor/schedule` now includes tabbed interface with four tabs: Working Hours, Exceptions, Break Periods, and Capacity
 - Web schedule page allows doctors to add, view, edit, and permanently delete date-specific exceptions (doctor leave, clinic closure, full-day unavailability)
 - Web schedule page allows doctors to add, view, edit, and permanently delete break periods within working hours (e.g., lunch breaks)
