@@ -39,13 +39,14 @@ router.get('/me', authenticate, authorize('DOCTOR'), async (req: AuthRequest, re
 
     const result = await query(
       `SELECT
-        d.id, d.user_id, d.first_name, d.middle_name, d.last_name, d.specialty, d.credentials,
+        d.id, d.user_id, d.first_name, d.middle_name, d.last_name, u.email, u.email_verified, d.specialty, d.credentials,
         d.prc_license_number, d.practice_name, d.practice_phone, d.practice_email, d.room_number,
         d.contact_number, d.professional_photo_url, d.years_of_experience, d.areas_of_expertise,
         d.biography, d.consultation_fee, d.languages_spoken,
         d.two_factor_enabled, d.is_approved, d.approval_status, d.profile_completion_status,
         d.profile_submitted_at, d.rejection_reason
        FROM doctors d
+       JOIN users u ON u.id = d.user_id
        WHERE d.user_id = $1`,
       [userId]
     );
@@ -1124,6 +1125,10 @@ router.put('/me/profile', authenticate, authorize('DOCTOR'), async (req: AuthReq
   try {
     const userId = req.user!.id;
     const {
+      first_name,
+      middle_name,
+      last_name,
+      contact_number,
       professional_photo_url,
       specialty,
       credentials,
@@ -1159,6 +1164,26 @@ router.put('/me/profile', authenticate, authorize('DOCTOR'), async (req: AuthReq
     const values: any[] = [];
     let paramCount = 0;
 
+    if (first_name !== undefined) {
+      paramCount++;
+      updates.push(`first_name = $${paramCount}`);
+      values.push(first_name);
+    }
+    if (middle_name !== undefined) {
+      paramCount++;
+      updates.push(`middle_name = $${paramCount}`);
+      values.push(middle_name);
+    }
+    if (last_name !== undefined) {
+      paramCount++;
+      updates.push(`last_name = $${paramCount}`);
+      values.push(last_name);
+    }
+    if (contact_number !== undefined) {
+      paramCount++;
+      updates.push(`contact_number = $${paramCount}`);
+      values.push(contact_number);
+    }
     if (professional_photo_url !== undefined) {
       paramCount++;
       updates.push(`professional_photo_url = $${paramCount}`);

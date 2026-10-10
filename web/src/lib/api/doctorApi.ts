@@ -4,6 +4,8 @@ export interface DoctorProfile {
   first_name: string;
   middle_name?: string | null;
   last_name: string;
+  email?: string;
+  email_verified?: boolean;
   contact_number: string;
   professional_photo_url?: string | null;
   specialty?: string | null;
@@ -22,6 +24,10 @@ export interface DoctorProfile {
 }
 
 export interface UpdateProfileRequest {
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  contact_number?: string;
   professional_photo_url?: string;
   specialty?: string;
   credentials?: string;

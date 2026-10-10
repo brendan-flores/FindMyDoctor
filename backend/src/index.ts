@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import { config } from './config';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { authenticate } from './middleware/auth';
@@ -49,8 +50,10 @@ app.use('/api/', limiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from uploads directory (legacy support for existing photos)
-// New photos are stored in Supabase Storage, but existing /uploads/ URLs need to work
+// Cookie parsing
+app.use(cookieParser());
+
+// Serve static files from uploads directory (before API routes)
 const uploadsDir = path.resolve(process.cwd(), config.upload.dir);
 app.use('/uploads', cors(config.cors));
 app.use('/uploads', express.static(uploadsDir));

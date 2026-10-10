@@ -198,6 +198,9 @@ export async function sendLoginOtp(email: string): Promise<{ success: boolean; m
 
     if (error) {
       console.error('Supabase Auth OTP send error:', error);
+      if (error.message?.includes('security purposes') || error.status === 429 || error.message?.includes('rate limit')) {
+        throw { code: ErrorCodes.RATE_LIMIT, message: error.message };
+      }
       throw { code: ErrorCodes.SERVER_ERROR, message: error.message || 'Failed to send OTP' };
     }
 
@@ -393,11 +396,11 @@ export async function ensureSecretarySupabaseIdentity(email: string): Promise<{ 
 }
 
 /**
- * Ensure Doctor has Supabase Auth identity for mandatory OTP
+ * Ensure Doctor has Supabase Auth identity for optional 2FA OTP
  *
  * This function is called when creating Doctor accounts to ensure they have a
- * Supabase Auth user identity. This is required because login OTP uses
- * shouldCreateUser: false, which means the user must already exist in Supabase Auth.
+ * Supabase Auth user identity. This is required because if the doctor enables 2FA,
+ * login OTP uses shouldCreateUser: false, which means the user must already exist in Supabase Auth.
  *
  * This function is idempotent - it will not create duplicate identities.
  *

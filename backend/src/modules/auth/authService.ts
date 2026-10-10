@@ -18,6 +18,8 @@ export interface LoginData {
   email: string;
   password: string;
   expectedRole: 'DOCTOR' | 'SECRETARY' | 'ADMIN';
+  rememberMe?: boolean;
+  trustedBrowserToken?: string;
 }
 
 export interface DoctorRegistrationData {
@@ -89,7 +91,7 @@ export async function register(data: RegisterData) {
 }
 
 export async function login(data: LoginData) {
-  const { email, password, expectedRole } = data;
+  const { email, password, expectedRole, rememberMe = false, trustedBrowserToken } = data;
 
   // Find user by email or username
   const userResult = await query(
@@ -146,17 +148,72 @@ export async function login(data: LoginData) {
   }
 
   // Server-side OTP requirement decision
-  // All Admin, Secretary, and Doctor accounts require mandatory OTP for login
+  // Admin: OTP is ALWAYS mandatory (no setting, no bypass)
+  // Doctor: OTP is optional - required only if two_factor_enabled = true
+  // Secretary: OTP is optional - required only if two_factor_enabled = true
+  // Facebook-style: Sessions persist regardless of Remember Me
+  // Remember Me only controls trusted-browser registration (OTP skip on trusted devices)
+  // UNLESS they have a valid trusted-browser credential
   let requiresOtp = false;
+  let isTrustedBrowser = false;
 
-  if (user.role === 'ADMIN' || user.role === 'DOCTOR' || user.role === 'SECRETARY') {
-    // All these roles require mandatory OTP for login
-    requiresOtp = true;
+  if (user.role === 'ADMIN') {
+    // Admin always requires OTP unless trusted browser
+    if (trustedBrowserToken) {
+      const trustedBrowser = await checkTrustedBrowser(user.id, trustedBrowserToken);
+      if (trustedBrowser) {
+        isTrustedBrowser = true;
+        requiresOtp = false; // Skip OTP for trusted browser
+      } else {
+        requiresOtp = true; // Invalid or expired token, require OTP
+      }
+    } else {
+      requiresOtp = true; // No trusted browser token, require OTP
+    }
+  } else if (user.role === 'DOCTOR' || user.role === 'SECRETARY') {
+    // Doctor and Secretary require OTP only if two_factor_enabled = true
+    // Check two_factor_enabled from database
+    let twoFactorEnabled = false;
+    if (user.role === 'DOCTOR') {
+      const doctorResult = await query(
+        'SELECT two_factor_enabled FROM doctors WHERE user_id = $1',
+        [user.id]
+      );
+      if (doctorResult.rows.length > 0) {
+        twoFactorEnabled = doctorResult.rows[0].two_factor_enabled;
+      }
+    } else if (user.role === 'SECRETARY') {
+      const secretaryResult = await query(
+        'SELECT two_factor_enabled FROM secretaries WHERE user_id = $1',
+        [user.id]
+      );
+      if (secretaryResult.rows.length > 0) {
+        twoFactorEnabled = secretaryResult.rows[0].two_factor_enabled;
+      }
+    }
+
+    if (twoFactorEnabled) {
+      // 2FA is enabled, check trusted browser
+      if (trustedBrowserToken) {
+        const trustedBrowser = await checkTrustedBrowser(user.id, trustedBrowserToken);
+        if (trustedBrowser) {
+          isTrustedBrowser = true;
+          requiresOtp = false; // Skip OTP for trusted browser
+        } else {
+          requiresOtp = true; // Invalid or expired token, require OTP
+        }
+      } else {
+        requiresOtp = true; // No trusted browser token, require OTP
+      }
+    } else {
+      // 2FA is disabled, no OTP required
+      requiresOtp = false;
+    }
   }
 
   // If OTP is required, create challenge and return opaque token
   if (requiresOtp) {
-    const challengeToken = await createLoginOtpChallenge(user.id, user.email);
+    const challengeToken = await createLoginOtpChallenge(user.id, user.email, rememberMe);
 
     return {
       requiresOtp: true,
@@ -164,9 +221,9 @@ export async function login(data: LoginData) {
     };
   }
 
-  // Otherwise, normal login without OTP
-  const accessToken = generateAccessToken(user);
-  const refreshToken = generateRefreshToken(user);
+  // Otherwise, normal login without OTP (either SUPERADMIN or trusted browser)
+  const accessToken = generateAccessToken(user, rememberMe);
+  const refreshToken = generateRefreshToken(user, rememberMe);
 
   return {
     user: {
@@ -177,6 +234,7 @@ export async function login(data: LoginData) {
     },
     accessToken,
     refreshToken,
+    isTrustedBrowser,
   };
 }
 
@@ -208,6 +266,9 @@ export async function changePassword(userId: string, currentPassword: string, ne
     'UPDATE users SET password_hash = $1, must_change_password = false WHERE id = $2',
     [newPasswordHash, userId]
   );
+
+  // Revoke all trusted browsers for this user (security best practice)
+  await revokeAllTrustedBrowsers(userId);
 
   return { success: true };
 }
@@ -349,7 +410,11 @@ export async function registerDoctor(data: DoctorRegistrationData) {
   }
 }
 
-export function generateAccessToken(user: any) {
+export function generateAccessToken(user: any, rememberMe: boolean = false) {
+  // Facebook-style: Always use 7-day timeout regardless of Remember Me
+  // Sessions persist across browser closes unless manually logged out
+  const expiresIn = '7d';
+
   return jwt.sign(
     {
       id: user.id,
@@ -358,18 +423,22 @@ export function generateAccessToken(user: any) {
       mustChangePassword: user.must_change_password,
     },
     config.jwt.secret,
-    { expiresIn: config.jwt.expiresIn } as any
+    { expiresIn } as any
   );
 }
 
-export function generateRefreshToken(user: any) {
+export function generateRefreshToken(user: any, rememberMe: boolean = false) {
+  // Facebook-style: Always use 30-day absolute lifetime regardless of Remember Me
+  // Sessions persist across browser closes unless manually logged out
+  const expiresIn = '30d';
+
   return jwt.sign(
     {
       id: user.id,
       email: user.email,
     },
     config.jwt.secret,
-    { expiresIn: config.jwt.refreshExpiresIn } as any
+    { expiresIn } as any
   );
 }
 
@@ -394,19 +463,113 @@ export function hashChallengeToken(token: string): string {
 }
 
 /**
+ * Generate cryptographically random trusted-browser token
+ * This is an opaque identifier stored in an HttpOnly cookie to recognize trusted browsers
+ */
+export function generateTrustedBrowserToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+/**
+ * Hash trusted-browser token for secure storage in PostgreSQL
+ * We store only the hash, not the raw token
+ */
+export function hashTrustedBrowserToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+/**
+ * Check if a browser is trusted for a given user
+ * Returns the trusted browser record if valid, null otherwise
+ */
+export async function checkTrustedBrowser(userId: string, token: string): Promise<any | null> {
+  const tokenHash = hashTrustedBrowserToken(token);
+
+  const result = await query(
+    `SELECT * FROM trusted_browsers
+     WHERE user_id = $1
+     AND token_hash = $2
+     AND revoked_at IS NULL
+     AND expires_at > CURRENT_TIMESTAMP`,
+    [userId, tokenHash]
+  );
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  // Update last_used_at timestamp
+  await query(
+    `UPDATE trusted_browsers
+     SET last_used_at = CURRENT_TIMESTAMP
+     WHERE id = $1`,
+    [result.rows[0].id]
+  );
+
+  return result.rows[0];
+}
+
+/**
+ * Register a browser as trusted for a user
+ * Returns the raw token to be stored in an HttpOnly cookie
+ */
+export async function registerTrustedBrowser(userId: string, deviceInfo?: string): Promise<string> {
+  const token = generateTrustedBrowserToken();
+  const tokenHash = hashTrustedBrowserToken(token);
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+  await query(
+    `INSERT INTO trusted_browsers (user_id, token_hash, device_info, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [userId, tokenHash, deviceInfo || null, expiresAt]
+  );
+
+  return token;
+}
+
+/**
+ * Revoke trust for a specific browser by token
+ */
+export async function revokeTrustedBrowser(userId: string, token: string): Promise<void> {
+  const tokenHash = hashTrustedBrowserToken(token);
+
+  await query(
+    `UPDATE trusted_browsers
+     SET revoked_at = CURRENT_TIMESTAMP
+     WHERE user_id = $1
+     AND token_hash = $2
+     AND revoked_at IS NULL`,
+    [userId, tokenHash]
+  );
+}
+
+/**
+ * Revoke all trusted browsers for a user (e.g., on password change)
+ */
+export async function revokeAllTrustedBrowsers(userId: string): Promise<void> {
+  await query(
+    `UPDATE trusted_browsers
+     SET revoked_at = CURRENT_TIMESTAMP
+     WHERE user_id = $1
+     AND revoked_at IS NULL`,
+    [userId]
+  );
+}
+
+/**
  * Create LOGIN_OTP challenge in PostgreSQL
  * Stores server-side state for true one-time use guarantee
  */
-export async function createLoginOtpChallenge(userId: string, email: string): Promise<string> {
+export async function createLoginOtpChallenge(userId: string, email: string, rememberMe: boolean = false): Promise<string> {
   const challengeToken = generateChallengeToken();
   const challengeTokenHash = hashChallengeToken(challengeToken);
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
   const lastOtpSentAt = new Date(); // Track when OTP was last sent for this challenge
 
   await query(
-    `INSERT INTO login_otp_challenges (challenge_token_hash, user_id, email, expires_at, last_otp_sent_at)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [challengeTokenHash, userId, email, expiresAt, lastOtpSentAt]
+    `INSERT INTO login_otp_challenges (challenge_token_hash, user_id, email, expires_at, last_otp_sent_at, remember_me)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [challengeTokenHash, userId, email, expiresAt, lastOtpSentAt, rememberMe]
   );
 
   return challengeToken;
@@ -438,7 +601,7 @@ export async function sendLoginOtpForLogin(email: string): Promise<void> {
  * Verify login OTP and issue authenticated session
  * This is called after the user submits challengeId + OTP
  */
-export async function verifyLoginOtp(challengeId: string, otp: string) {
+export async function verifyLoginOtp(challengeId: string, otp: string, rememberMe?: boolean) {
   const challengeTokenHash = hashChallengeToken(challengeId);
 
   // First, verify OTP with Supabase (before consuming challenge)
@@ -457,6 +620,9 @@ export async function verifyLoginOtp(challengeId: string, otp: string) {
   }
 
   const challenge = challengeResult.rows[0];
+
+  // Use rememberMe from challenge if not provided in parameter
+  const shouldRemember = rememberMe !== undefined ? rememberMe : (challenge.remember_me || false);
 
   // Verify OTP with Supabase
   const otpVerification = await otpService.verifyLoginOtp(challenge.email, otp);
@@ -496,9 +662,16 @@ export async function verifyLoginOtp(challengeId: string, otp: string) {
 
   const user = userResult.rows[0];
 
-  // Generate FindMyDoctor tokens (ignore Supabase session)
-  const accessToken = generateAccessToken(user);
-  const refreshToken = generateRefreshToken(user);
+  // Generate FindMyDoctor tokens with appropriate expiration based on rememberMe
+  const accessToken = generateAccessToken(user, shouldRemember);
+  const refreshToken = generateRefreshToken(user, shouldRemember);
+
+  // If Remember Me is checked, register this browser as trusted
+  let trustedBrowserToken = null;
+  if (shouldRemember) {
+    const userAgent = 'unknown'; // Could extract from request headers in the API layer
+    trustedBrowserToken = await registerTrustedBrowser(user.id, userAgent);
+  }
 
   return {
     user: {
@@ -509,5 +682,6 @@ export async function verifyLoginOtp(challengeId: string, otp: string) {
     },
     accessToken,
     refreshToken,
+    trustedBrowserToken,
   };
 }

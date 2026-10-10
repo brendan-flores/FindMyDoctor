@@ -38,11 +38,17 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
     }
   };
 
-  const handleLogout = () => {
-    apiClient.clearToken();
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    router.push('/secretary-login');
+  const handleLogout = async () => {
+    try {
+      await apiClient.post('/auth/logout');
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      apiClient.clearToken();
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      router.push('/secretary-login');
+    }
   };
 
   return (

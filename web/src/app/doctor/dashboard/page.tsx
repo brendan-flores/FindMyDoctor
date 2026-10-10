@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
-import { doctorApi } from '@/lib/api/doctorApi';
+import { doctorApi, DoctorProfile } from '@/lib/api/doctorApi';
 import Toast from '@/components/ui/Toast';
 
 export default function DoctorDashboard() {
   const router = useRouter();
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [profile, setProfile] = useState<DoctorProfile | null>(null);
   const [stats, setStats] = useState({
     totalAppointments: 0,
     todayAppointments: 0,
@@ -48,6 +49,7 @@ export default function DoctorDashboard() {
           const approvalStatus = response.data.approval_status;
 
           if (approvalStatus === 'ACTIVE') {
+            setProfile(response.data);
             setIsLoadingAuth(false);
             // Load dashboard data from backend
             setStats({
@@ -143,7 +145,7 @@ export default function DoctorDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Metric Cards Row */}
+      {/* Metric Cards - Full Width */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Today's Appointments */}
         <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">

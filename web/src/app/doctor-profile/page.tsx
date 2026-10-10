@@ -380,7 +380,7 @@ export default function DoctorProfile() {
 
   const handleModalContinue = () => {
     setShowSubmissionModal(false);
-    router.push('/doctor-login');
+    router.push('/doctor/dashboard');
   };
 
   if (isLoading) {
@@ -852,20 +852,16 @@ export default function DoctorProfile() {
                 </svg>
               </div>
               <h2 className="text-2xl font-bold text-[#0F172A] mb-3">
-                Profile Submitted for Review
+                Profile Submitted Successfully!
               </h2>
               <p className="text-[#64748B] text-[15px] leading-relaxed mb-6">
-                Your professional profile has been submitted successfully
-                and is now awaiting administrator approval.
-                <br /><br />
-                Please wait for an email notification once your account
-                has been reviewed and approved.
+                Your professional profile has been submitted successfully. Once approved, your doctor profile will be displayed to patients in the FindMyDoctor mobile app.
               </p>
               <button
                 onClick={handleModalContinue}
                 className="w-full py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#1A62CD] hover:bg-[#0D3B75] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1A62CD] transition-colors duration-150"
               >
-                Continue
+                Go to Dashboard
               </button>
             </div>
           </div>
