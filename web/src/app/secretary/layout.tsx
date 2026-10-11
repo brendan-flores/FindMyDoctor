@@ -22,12 +22,14 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
 
-    if (!token) {
-      router.push('/secretary-login');
-      return;
-    }
+    let shouldRedirect = false;
+    let redirectPath = '';
+    let asyncLoadNeeded = false;
 
-    if (userStr) {
+    if (!token) {
+      shouldRedirect = true;
+      redirectPath = '/secretary-login';
+    } else if (userStr) {
       const user = JSON.parse(userStr);
       // Verify backend-returned role is SECRETARY
       if (user.role !== 'SECRETARY') {
@@ -35,65 +37,73 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
         apiClient.clearToken();
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        router.push('/secretary-login');
-        return;
-      }
-
-      // Check if password change is required
-      // Exclude the change-password page itself to avoid redirect loop
-      if (user.mustChangePassword === true && !pathname.includes('/change-password')) {
-        router.push('/secretary/change-password');
-        return;
-      }
-
-      // Check if profile completion is required (only after password change)
-      if (user.mustChangePassword === false && !pathname.includes('/complete-profile')) {
-        // Fetch secretary profile to check completion status and get real name
-        apiClient.get('/users/me')
-          .then((response) => {
-            if (response.success && response.data) {
-              const secretary = response.data as any;
-              // Check if required fields are complete
-              const isComplete =
-                secretary.first_name &&
-                secretary.first_name.trim() !== '' &&
-                secretary.last_name &&
-                secretary.last_name.trim() !== '' &&
-                secretary.contact_number &&
-                secretary.contact_number.trim() !== '';
-
-              if (!isComplete) {
-                router.push('/secretary/complete-profile');
-                return;
-              }
-
-              // If profile is complete, use real name
-              if (isComplete && secretary.first_name && secretary.last_name) {
-                setUserName(`${secretary.first_name} ${secretary.last_name}`);
-              } else {
-                // Fallback to username if real name not available
-                setUserName(user.email.split('@')[0] || 'Secretary');
-              }
-            } else {
-              // Fallback to username if API call fails
-              setUserName(user.email.split('@')[0] || 'Secretary');
-            }
-          })
-          .catch((err) => {
-            console.error('Error checking profile completion:', err);
-            // On error, fallback to username and allow access to avoid blocking
-            setUserName(user.email.split('@')[0] || 'Secretary');
-          });
+        shouldRedirect = true;
+        redirectPath = '/secretary-login';
       } else {
-        // If password change is required or on complete-profile page, use username
-        setUserName(user.email.split('@')[0] || 'Secretary');
-      }
+        // Check if password change is required
+        // Exclude the change-password page itself to avoid redirect loop
+        if (user.mustChangePassword === true && !pathname.includes('/change-password')) {
+          shouldRedirect = true;
+          redirectPath = '/secretary/change-password';
+        } else {
+          // Check if profile completion is required (only after password change)
+          if (user.mustChangePassword === false && !pathname.includes('/complete-profile')) {
+            asyncLoadNeeded = true;
+            // Fetch secretary profile to check completion status and get real name
+            apiClient.get('/users/me')
+              .then((response) => {
+                if (response.success && response.data) {
+                  const secretary = response.data as any;
+                  // Check if required fields are complete
+                  const isComplete =
+                    secretary.first_name &&
+                    secretary.first_name.trim() !== '' &&
+                    secretary.last_name &&
+                    secretary.last_name.trim() !== '' &&
+                    secretary.contact_number &&
+                    secretary.contact_number.trim() !== '';
 
-      setUserRole(user.role || 'Secretary');
-      apiClient.setToken(token);
+                  if (!isComplete) {
+                    router.push('/secretary/complete-profile');
+                  } else {
+                    // If profile is complete, use real name
+                    if (secretary.first_name && secretary.last_name) {
+                      setUserName(`${secretary.first_name} ${secretary.last_name}`);
+                    } else {
+                      // Fallback to username if real name not available
+                      setUserName(user.email.split('@')[0] || 'Secretary');
+                    }
+                  }
+                } else {
+                  // Fallback to username if API call fails
+                  setUserName(user.email.split('@')[0] || 'Secretary');
+                }
+                setIsLoading(false);
+              })
+              .catch((err) => {
+                console.error('Error checking profile completion:', err);
+                // On error, fallback to username and allow access to avoid blocking
+                setUserName(user.email.split('@')[0] || 'Secretary');
+                setIsLoading(false);
+              });
+          } else {
+            // If password change is required or on complete-profile page, use username
+            setUserName(user.email.split('@')[0] || 'Secretary');
+          }
+
+          setUserRole(user.role || 'Secretary');
+          apiClient.setToken(token);
+        }
+      }
     }
 
-    setIsLoading(false);
+    if (shouldRedirect) {
+      router.push(redirectPath);
+    }
+
+    if (!asyncLoadNeeded) {
+      setIsLoading(false);
+    }
   }, [router, pathname]);
 
   if (isLoading) {
