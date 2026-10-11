@@ -21,12 +21,13 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
 
-    if (!token) {
-      router.push('/doctor-login');
-      return;
-    }
+    let shouldRedirect = false;
+    let redirectPath = '';
 
-    if (userStr) {
+    if (!token) {
+      shouldRedirect = true;
+      redirectPath = '/doctor-login';
+    } else if (userStr) {
       const user = JSON.parse(userStr);
       // Verify backend-returned role is DOCTOR
       if (user.role !== 'DOCTOR') {
@@ -34,12 +35,17 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
         apiClient.clearToken();
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        router.push('/doctor-login');
-        return;
+        shouldRedirect = true;
+        redirectPath = '/doctor-login';
+      } else {
+        setUserName(user.email.split('@')[0] || 'Doctor');
+        setUserRole(user.role || 'Doctor');
+        apiClient.setToken(token);
       }
-      setUserName(user.email.split('@')[0] || 'Doctor');
-      setUserRole(user.role || 'Doctor');
-      apiClient.setToken(token);
+    }
+
+    if (shouldRedirect) {
+      router.push(redirectPath);
     }
 
     setIsLoading(false);
