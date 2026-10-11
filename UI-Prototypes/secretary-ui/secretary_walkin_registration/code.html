@@ -1,0 +1,545 @@
+<!DOCTYPE html><html lang="en"><head><title>FiDo - Secretary Walk-in Registration</title><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><style>@layer base { html, body { margin: 0; padding: 0; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; } body { overscroll-behavior: none; } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; } .material-symbols-outlined { font-display: block; }</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "surface-container-lowest": "#ffffff", "on-primary-fixed": "#001a40", "surface-dim": "#cbdbf5", "surface-container-low": "#eff4ff", "primary-container": "#1b5eb8", "on-tertiary-fixed": "#00201d", "inverse-surface": "#213145", "error": "#ba1a1a", "on-primary": "#ffffff", "inverse-on-surface": "#eaf1ff", "secondary-fixed": "#d6e3ff", "on-error-container": "#93000a", "surface-tint": "#185cb6", "surface": "#f8f9ff", "error-container": "#ffdad6", "on-background": "#0b1c30", "secondary-fixed-dim": "#a9c7ff", "tertiary-fixed": "#89f5e7", "on-error": "#ffffff", "surface-container": "#e5eeff", "on-primary-container": "#ccdbff", "secondary-container": "#a9c7ff", "on-secondary": "#ffffff", "outline": "#727783", "primary-fixed": "#d7e2ff", "on-secondary-fixed-variant": "#274777", "surface-container-highest": "#d3e4fe", "on-tertiary-fixed-variant": "#005049", "on-tertiary": "#ffffff", "tertiary-container": "#006c63", "primary-fixed-dim": "#acc7ff", "on-surface": "#0b1c30", "tertiary-fixed-dim": "#6bd8cb", "secondary": "#405f90", "surface-bright": "#f8f9ff", "on-secondary-fixed": "#001b3d", "on-surface-variant": "#424752", "tertiary": "#00524b", "outline-variant": "#c2c6d4", "on-secondary-container": "#345383", "on-tertiary-container": "#81eddf", "inverse-primary": "#acc7ff", "primary": "#004694", "surface-variant": "#d3e4fe", "on-primary-fixed-variant": "#004591", "background": "#f8f9ff", "surface-container-high": "#dce9ff" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "space-sm": "0.5rem", "space-xs": "0.25rem", "space-md": "0.75rem", "space-2xl": "2rem", "gutter-desktop": "1.5rem", "space-2xs": "0.125rem", "space-3xl": "2.5rem", "space-lg": "1.25rem", "space-base": "1rem", "profile-bar-height": "80px", "sidebar-width": "260px", "gutter-mobile": "1rem", "space-xl": "1.5rem", "sidebar-collapsed-width": "72px" }, "fontFamily": { "headline-md": ["Inter", "sans-serif"], "label-md": ["Inter", "sans-serif"], "label-lg": ["Inter", "sans-serif"], "body-md": ["Inter", "sans-serif"], "body-sm": ["Inter", "sans-serif"], "headline-lg-mobile": ["Inter", "sans-serif"], "body-lg": ["Inter", "sans-serif"], "headline-xl-mobile": ["Inter", "sans-serif"], "code-sm": ["JetBrains Mono", "monospace"], "headline-xl": ["Inter", "sans-serif"], "headline-lg": ["Inter", "sans-serif"], "label-sm": ["Inter", "sans-serif"] }, "fontSize": { "headline-md": ["18px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }], "label-lg": ["14px", { "lineHeight": "20px", "fontWeight": "600" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "headline-lg-mobile": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "headline-xl-mobile": ["26px", { "lineHeight": "34px", "letterSpacing": "-0.015em", "fontWeight": "700" }], "code-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }], "headline-xl": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "500" }] } } } };</script></head><body class="bg-background font-body-md text-on-surface antialiased selection:bg-primary-fixed selection:text-on-primary-fixed"><aside class="fixed left-0 top-0 h-screen w-sidebar-width bg-surface-container-lowest border-r border-surface-container-high z-50 flex flex-col justify-between overflow-y-auto"><div class="flex flex-col"><div class="px-space-base pt-space-lg pb-space-md border-b border-surface-container-high flex items-center justify-between"><div class="flex items-center gap-space-sm"><div class="w-9 h-9 rounded-lg bg-primary flex items-center justify-center text-on-primary shadow-sm"><span class="material-symbols-outlined text-[22px]">local_hospital</span></div><div class="flex flex-col"><span class="font-headline-md text-headline-md tracking-tight text-primary leading-none">FiDo</span><span class="font-label-sm text-label-sm tracking-wider text-outline uppercase mt-0.5">FIND A DOCTOR</span></div></div><span class="px-space-xs py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-semibold tracking-wide">DESK A</span></div><div class="p-space-base border-b border-surface-container-high bg-surface-container-low"><div class="flex items-center gap-space-md"><div class="relative flex-shrink-0"><div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center font-headline-md text-headline-md text-on-primary-fixed ring-2 ring-surface-container-lowest">SJ</div><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-tertiary ring-2 ring-surface-container-lowest"></span></div><div class="flex flex-col min-w-0"><span class="font-label-lg text-label-lg text-on-surface truncate">Sarah Jenkins</span><span class="font-label-sm text-label-sm text-secondary font-medium truncate">Chief Secretary</span><div class="flex items-center gap-1 mt-0.5"><span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span><span class="font-label-sm text-label-sm text-on-surface-variant truncate">Front Desk A • Reception</span></div></div></div></div><nav class="flex flex-col gap-0.5 p-space-sm" data-active-classes="bg-surface-container text-primary font-semibold border-l-4 border-primary"><a class="flex items-center justify-between px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="dashboard" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">grid_view</span><span class="font-label-lg text-label-lg">Dashboard</span></div></a><a class="flex items-center justify-between px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="todays-queue" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">group</span><span class="font-label-lg text-label-lg">Today's Queue</span></div><span class="px-2 py-0.5 rounded-full bg-surface-container-highest text-primary font-label-sm text-label-sm font-semibold">8</span></a><a class="flex items-center justify-between px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="appointments" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">calendar_today</span><span class="font-label-lg text-label-lg">Appointments</span></div><span class="px-2 py-0.5 rounded-full bg-surface-container-highest text-primary font-label-sm text-label-sm font-semibold">32</span></a><a aria-current="page" class="flex items-center justify-between px-space-md py-2.5 rounded-lg transition-colors bg-primary text-on-primary font-semibold shadow-sm" data-path="walk-in-registration" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px] text-on-primary">person_add</span><span class="font-label-lg text-label-lg text-on-primary">Walk-in Registration</span></div></a><a class="flex items-center justify-between px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="patients" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">patient_list</span><span class="font-label-lg text-label-lg">Patients</span></div></a><a class="flex items-center justify-between px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="payments" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">receipt_long</span><span class="font-label-lg text-label-lg">Payments</span></div></a><a class="flex items-center justify-between px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="conversations" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">chat_bubble</span><span class="font-label-lg text-label-lg">Conversations</span></div><span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm font-semibold">2</span></a><a class="flex items-center justify-between px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="settings" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">settings</span><span class="font-label-lg text-label-lg">Settings</span></div></a></nav></div><div class="p-space-sm border-t border-surface-container-high flex flex-col gap-1"><a class="flex items-center justify-between px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="switch-portal" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">swap_horiz</span><span class="font-label-lg text-label-lg">Switch to Doctor</span></div><span class="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-semibold">Portal</span></a><button class="w-full flex items-center gap-space-md px-space-md py-2.5 rounded-lg text-error hover:bg-error-container hover:text-on-error-container transition-colors text-left" type="button"><span class="material-symbols-outlined text-[20px]">logout</span><span class="font-label-lg text-label-lg">Logout Session</span></button></div></aside><div class="pl-sidebar-width"><header class="fixed top-0 left-sidebar-width right-0 h-profile-bar-height bg-surface-container-lowest/90 backdrop-blur-md border-b border-surface-container-high z-40 px-gutter-desktop flex items-center justify-between shadow-[0_1px_8px_rgba(0,0,0,0.02)]"><div class="flex items-center gap-space-md"><div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container text-primary font-label-sm text-label-sm font-semibold"><span class="w-2 h-2 rounded-full bg-primary"></span><span class="">Secretary Portal</span></div><div class="h-4 w-px bg-outline-variant"></div><div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-low border border-surface-container-high text-on-surface-variant font-label-sm text-label-sm"><span class="material-symbols-outlined text-[15px] text-secondary">schedule</span><span class="">Morning Shift • Reception Desk 1</span></div></div><div class="flex items-center gap-space-md"><button class="relative p-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors flex items-center justify-center" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface-container-lowest"></span></button><button class="h-10 px-space-lg rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center gap-1.5 shadow-sm transition-colors" type="button"><span class="material-symbols-outlined text-[18px]">add</span><span class="">New Walk-in</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center ml-1 ring-1 ring-surface-container-high"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="w-full pt-profile-bar-height min-h-screen bg-background p-gutter-desktop"><div class="flex flex-col w-full">
+<!-- BREADCRUMBS & PAGE TITLE BAR -->
+<div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-space-md mb-space-xl">
+<div class="flex flex-col gap-1 min-w-0">
+<div class="flex items-center gap-2 text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<span class="flex items-center gap-1 font-semibold text-primary">
+<span class="material-symbols-outlined text-[15px]">clinical_notes</span>
+<span class="">Patient Intake &amp; Triage</span>
+</span>
+<span class="">•</span>
+<span class="">Tuesday, Oct 24, 2026</span>
+<span class="">•</span>
+<span class="text-secondary font-medium">Central Medical Clinic</span>
+<span class="">•</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-primary font-code-sm text-code-sm">Room 101-105 Dispatch</span>
+</div>
+<h1 class="font-headline-xl text-headline-xl text-on-surface tracking-tight mt-0.5">Walk-in Registration</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">
+        Expedited front-desk intake, patient identification, physician scheduling, and automatic queue token dispatch.
+      </p>
+</div>
+<div class="flex items-center gap-space-sm flex-shrink-0">
+<button class="h-10 px-space-md rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-lg text-label-lg flex items-center gap-2 shadow-sm transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px] text-primary">qr_code_scanner</span>
+<span class="">Scan Barcode / QR ID</span>
+</button>
+<button class="h-10 w-10 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-secondary flex items-center justify-center shadow-sm transition-colors" title="Print Queue Slip Preview" type="button">
+<span class="material-symbols-outlined text-[20px]">print</span>
+</button>
+<button class="h-10 px-space-md rounded-lg bg-surface-container-highest hover:bg-surface-container text-primary font-label-lg text-label-lg flex items-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+<span class="">Recent (14)</span>
+</button>
+</div>
+</div>
+<!-- CAPACITY STATUS & METRICS ROW (4 Cards) -->
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md mb-space-xl">
+<!-- Metric 1 -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-outline">Today's Walk-ins</span>
+<div class="flex items-baseline gap-2 mt-1">
+<span class="font-headline-xl text-headline-xl text-on-surface">14</span>
+<span class="font-label-md text-label-md text-secondary font-medium">Registered</span>
+</div>
+</div>
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[22px]">person_add</span>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-3 pt-2 text-on-surface-variant font-label-sm text-label-sm">
+<span class="inline-flex items-center gap-1 text-tertiary font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> 8 Completed
+        </span>
+<span class="">•</span>
+<span class="inline-flex items-center gap-1 text-secondary font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> 6 In Progress
+        </span>
+</div>
+</div>
+<!-- Metric 2 -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-outline">Clinic Capacity</span>
+<div class="flex items-baseline gap-2 mt-1">
+<span class="font-headline-xl text-headline-xl text-on-surface">16 <span class="font-headline-md text-headline-md text-outline">/ 48</span></span>
+<span class="font-label-md text-label-md text-tertiary font-semibold">Slots Left</span>
+</div>
+</div>
+<div class="w-10 h-10 rounded-lg bg-tertiary-container/15 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[22px]">domain_verification</span>
+</div>
+</div>
+<div class="flex flex-col gap-1.5 mt-3 pt-2">
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary-container h-full rounded-full" style="width: 66.6%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant flex justify-between">
+<span class="">66% Booked Overall</span>
+<span class="font-medium text-primary">Optimal Flow</span>
+</span>
+</div>
+</div>
+<!-- Metric 3 -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-outline">Estimated Lobby Wait</span>
+<div class="flex items-baseline gap-2 mt-1">
+<span class="font-headline-xl text-headline-xl text-on-surface">~12</span>
+<span class="font-headline-md text-headline-md text-secondary font-normal">mins</span>
+</div>
+</div>
+<div class="w-10 h-10 rounded-lg bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed">
+<span class="material-symbols-outlined text-[22px]">hourglass_top</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 mt-3 pt-2 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[15px] text-tertiary">pace</span>
+<span class="">Next estimated consult at <strong class="text-on-surface">10:15 AM</strong></span>
+</div>
+</div>
+<!-- Metric 4 -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-outline">Next Auto Queue Token</span>
+<div class="flex items-baseline gap-2 mt-1">
+<span class="font-headline-xl text-headline-xl text-primary font-bold tracking-tight">Q-09</span>
+<span class="px-2 py-0.5 rounded-full bg-tertiary/10 text-tertiary font-label-sm text-label-sm font-semibold">Active Ready</span>
+</div>
+</div>
+<div class="w-10 h-10 rounded-lg bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[22px]">confirmation_number</span>
+</div>
+</div>
+<div class="flex items-center justify-between mt-3 pt-2 text-on-surface-variant font-label-sm text-label-sm">
+<span class="">Room 101/102 Ready</span>
+<span class="font-code-sm text-code-sm text-secondary font-medium">DISP-AUTO-2026</span>
+</div>
+</div>
+</div>
+<!-- MAIN TWO-COLUMN WORKSPACE -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-xl">
+<!-- LEFT COLUMN: PATIENT IDENTIFICATION & DETAILS (7 COLS) -->
+<div class="lg:col-span-7 flex flex-col gap-space-lg">
+<div class="p-space-xl rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-lg">
+<!-- CARD TOP: TABS & QUICK SEARCH -->
+<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-sm pb-space-sm">
+<div class="flex p-1 rounded-lg bg-surface-container-low">
+<button class="px-3.5 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">search</span>
+<span class="">Search Existing Patient</span>
+</button>
+<button class="px-3.5 py-1.5 rounded-md bg-surface-container-lowest text-primary font-label-md text-label-md shadow-xs flex items-center gap-1.5 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">person_add</span>
+<span class="">Register New Patient</span>
+<span class="ml-1 px-1.5 py-0.2 rounded-full bg-primary-fixed text-primary font-label-sm text-label-sm font-semibold">+ New Record</span>
+</button>
+</div>
+<div class="flex items-center gap-1 text-outline font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">bolt</span>
+<span class="">Fast Intake Mode</span>
+</div>
+</div>
+<!-- SEARCH / RETURNING PATIENT AUTOCOMPLETE BAR -->
+<div class="flex flex-col gap-2 p-space-md rounded-lg bg-surface-container-low">
+<label class="font-label-sm text-label-sm text-secondary font-semibold uppercase tracking-wider flex items-center justify-between">
+<span class="">Lookup Returning Patient / Verify Existing MRN</span>
+<span class="text-outline font-normal lowercase">optional shortcut</span>
+</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-[18px] text-outline">manage_search</span>
+<input class="w-full h-10 pl-9 pr-24 rounded-md bg-surface-container-lowest text-on-surface font-body-md text-body-md placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary shadow-xs" placeholder="Search by Patient Name, MRN (#PAT-XXXXX), Mobile No., or Government ID..." type="text" value="">
+<button class="absolute right-1.5 px-3 py-1 rounded bg-surface-container text-primary font-label-sm text-label-sm hover:bg-surface-container-high transition-colors" type="button">
+              Quick Find
+            </button>
+</div>
+<!-- Interactive quick suggestions -->
+<div class="flex items-center gap-2 flex-wrap pt-1">
+<span class="font-label-sm text-label-sm text-outline">Recent match:</span>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-lowest hover:bg-primary-fixed hover:text-primary text-on-surface font-label-sm text-label-sm flex items-center gap-1.5 transition-colors shadow-xs" type="button">
+<span class="font-semibold">Robert Davis</span>
+<span class="text-outline font-code-sm text-code-sm">#PAT-77419</span>
+<span class="material-symbols-outlined text-[14px] text-primary">arrow_forward</span>
+</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-lowest hover:bg-primary-fixed hover:text-primary text-on-surface font-label-sm text-label-sm flex items-center gap-1.5 transition-colors shadow-xs" type="button">
+<span class="font-semibold">Clara Higgins</span>
+<span class="text-outline font-code-sm text-code-sm">#PAT-66523</span>
+<span class="material-symbols-outlined text-[14px] text-primary">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- FORM SECTION A: BASIC PATIENT INFORMATION -->
+<div class="flex flex-col gap-space-md">
+<div class="flex items-center justify-between pb-1">
+<div class="flex items-center gap-2">
+<span class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-sm text-label-sm font-bold">A</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">Basic Patient Demographics</h2>
+</div>
+<span class="font-label-sm text-label-sm text-error font-medium">* Required for registration</span>
+</div>
+<!-- Name fields -->
+<div class="grid grid-cols-1 sm:grid-cols-12 gap-space-sm">
+<div class="sm:col-span-5 flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">First Name <span class="text-error">*</span></label>
+<input class="h-10 px-3 rounded-md bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-xs" placeholder="e.g. Gabriel" type="text" value="Gabriel">
+</div>
+<div class="sm:col-span-2 flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">M.I.</label>
+<input class="h-10 px-3 rounded-md bg-surface-container-low text-on-surface font-body-md text-body-md uppercase text-center focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-xs" placeholder="e.g. M." type="text" value="A.">
+</div>
+<div class="sm:col-span-5 flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">Last Name <span class="text-error">*</span></label>
+<input class="h-10 px-3 rounded-md bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-xs" placeholder="e.g. Santos" type="text" value="Santos">
+</div>
+</div>
+<!-- DOB, Gender, Status -->
+<div class="grid grid-cols-1 sm:grid-cols-12 gap-space-sm">
+<div class="sm:col-span-4 flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">Date of Birth <span class="text-error">*</span></label>
+<input class="h-10 px-3 rounded-md bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-xs" type="date" value="1989-06-14">
+</div>
+<div class="sm:col-span-4 flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">Biological Sex <span class="text-error">*</span></label>
+<select class="h-10 px-3 rounded-md bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-xs">
+<option selected="" value="Male">Male</option>
+<option value="Female">Female</option>
+<option value="Other">Other / Non-binary</option>
+</select>
+</div>
+<div class="sm:col-span-4 flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">Civil Status</label>
+<select class="h-10 px-3 rounded-md bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-xs">
+<option value="Single">Single</option>
+<option selected="" value="Married">Married</option>
+<option value="Widowed">Widowed</option>
+</select>
+</div>
+</div>
+<!-- Phone & Email -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-sm">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface flex items-center justify-between">
+<span class="">Contact Mobile Phone <span class="text-error">*</span></span>
+<span class="text-secondary font-normal">SMS queue alerts</span>
+</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-[18px] text-outline">smartphone</span>
+<input class="w-full h-10 pl-9 pr-3 rounded-md bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-xs" placeholder="+63 917 555 0192" type="tel" value="+63 917 882 4310">
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface flex items-center justify-between">
+<span class="">Email Address</span>
+<span class="text-secondary font-normal">e-receipt &amp; portal</span>
+</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-[18px] text-outline">mail</span>
+<input class="w-full h-10 pl-9 pr-3 rounded-md bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-xs" placeholder="patient@example.com" type="email" value="gsantos.dev@gmail.com">
+</div>
+</div>
+</div>
+<!-- Residential Address -->
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">Home Address / Current Residence</label>
+<input class="h-10 px-3 rounded-md bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-xs" placeholder="Street, Barangay, City, Province" type="text" value="Unit 402 Solstice Tower 1, Circuit Makati, Metro Manila">
+</div>
+</div>
+<!-- FORM SECTION B: CLINICAL TRIAGE & REASON FOR VISIT -->
+<div class="flex flex-col gap-space-md pt-2">
+<div class="flex items-center justify-between pb-1">
+<div class="flex items-center gap-2">
+<span class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-sm text-label-sm font-bold">B</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">Clinical Triage &amp; Reason for Visit</h2>
+</div>
+<span class="px-2 py-0.5 rounded bg-surface-container text-primary font-label-sm text-label-sm font-semibold">Triage Desk 1</span>
+</div>
+<!-- Chief Complaint -->
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">Chief Complaint / Primary Symptoms <span class="text-error">*</span></label>
+<textarea class="w-full p-3 rounded-md bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-xs" placeholder="Briefly describe patient symptoms, onset, and duration..." rows="2">Acute recurrent migraine with visual aura &amp; mild nausea since morning. Pain rated 6/10. Non-responsive to paracetamol.</textarea>
+</div>
+<!-- Triage Urgency Priority Selector -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">Intake Urgency Level</label>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-space-sm">
+<label class="flex items-center gap-2.5 p-3 rounded-lg bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors">
+<input checked="" class="w-4 h-4 text-primary focus:ring-primary" name="urgency" type="radio" value="standard">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface">Standard / Routine</span>
+<span class="font-label-sm text-label-sm text-outline">Normal queue priority</span>
+</div>
+</label>
+<label class="flex items-center gap-2.5 p-3 rounded-lg bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors">
+<input class="w-4 h-4 text-primary focus:ring-primary" name="urgency" type="radio" value="priority">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface">Priority / Senior</span>
+<span class="font-label-sm text-label-sm text-secondary font-medium">PWD / Pedia / Senior</span>
+</div>
+</label>
+<label class="flex items-center gap-2.5 p-3 rounded-lg bg-error-container/20 hover:bg-error-container/40 cursor-pointer transition-colors">
+<input class="w-4 h-4 text-error focus:ring-error" name="urgency" type="radio" value="urgent">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-error font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">emergency</span>
+                    Urgent Alert
+                  </span>
+<span class="font-label-sm text-label-sm text-error/80">Immediate triage call</span>
+</div>
+</label>
+</div>
+</div>
+<!-- Quick Vitals Intake (Optional Front-desk check) -->
+<div class="p-space-md rounded-lg bg-surface-container-low flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5 font-label-md text-label-md text-on-surface font-semibold">
+<span class="material-symbols-outlined text-[17px] text-tertiary">vital_signs</span>
+<span class="">Optional Front-Desk Vitals Check</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">Nurse station can complete later</span>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-space-sm">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Blood Pressure</label>
+<div class="flex items-center rounded-md bg-surface-container-lowest px-3 h-9 shadow-xs">
+<input class="w-full bg-transparent text-on-surface font-body-md text-body-md focus:outline-none" placeholder="120/80" type="text" value="122/82">
+<span class="font-label-sm text-label-sm text-outline">mmHg</span>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Heart Rate</label>
+<div class="flex items-center rounded-md bg-surface-container-lowest px-3 h-9 shadow-xs">
+<input class="w-full bg-transparent text-on-surface font-body-md text-body-md focus:outline-none" placeholder="72" type="text" value="76">
+<span class="font-label-sm text-label-sm text-outline">bpm</span>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Temperature</label>
+<div class="flex items-center rounded-md bg-surface-container-lowest px-3 h-9 shadow-xs">
+<input class="w-full bg-transparent text-on-surface font-body-md text-body-md focus:outline-none" placeholder="36.5" type="text" value="36.7">
+<span class="font-label-sm text-label-sm text-outline">°C</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT COLUMN: PHYSICIAN, SCHEDULE & QUEUE ASSIGNMENT (5 COLS) -->
+<div class="lg:col-span-5 flex flex-col gap-space-lg">
+<!-- MAIN SCHEDULING CARD -->
+<div class="p-space-xl rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-lg">
+<div class="flex items-center justify-between pb-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px] text-primary">stethoscope</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">Consultation Scheduling</h2>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-tertiary/10 text-tertiary font-label-sm text-label-sm font-semibold">Active Dispatch</span>
+</div>
+<!-- DOCTOR SELECTION LIST -->
+<div class="flex flex-col gap-space-sm">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface flex items-center justify-between">
+<span class="">Select Attending Physician <span class="text-error">*</span></span>
+<span class="text-primary font-label-sm text-label-sm">4 on duty</span>
+</label>
+<!-- Physician Card 1 (Selected: Dr. Marcus Mercer) -->
+<div class="p-space-md rounded-xl bg-surface-container-low shadow-sm flex flex-col gap-space-xs cursor-pointer">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-md">
+<div class="relative">
+<div class="w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center font-headline-md text-headline-md">
+                    MM
+                  </div>
+<span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-tertiary ring-2 ring-surface-container-lowest"></span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Dr. Marcus Mercer</span>
+<span class="px-1.5 py-0.2 rounded bg-primary-container text-on-primary font-label-sm text-label-sm">Room 101</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary">Cardiology &amp; Vascular Care</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-[22px] text-primary">check_circle</span>
+</div>
+<div class="flex items-center justify-between pt-2 text-on-surface-variant font-label-sm text-label-sm">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-secondary">groups</span>
+<strong>8</strong> patients in queue
+              </span>
+<span class="px-2 py-0.5 rounded bg-surface-container-highest text-primary font-semibold">
+                4 walk-in slots left
+              </span>
+</div>
+</div>
+<!-- Physician Option 2 (Alternative Quick Select) -->
+<div class="p-3 rounded-lg bg-surface-container-lowest hover:bg-surface-container-low flex items-center justify-between cursor-pointer transition-colors shadow-xs">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-label-sm text-label-sm font-semibold">
+                ER
+              </div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-medium">Dr. Elena Rostova • Room 102</span>
+<span class="font-label-sm text-label-sm text-outline">Internal Medicine (6 in queue • 7 slots left)</span>
+</div>
+</div>
+<button class="text-secondary hover:text-primary font-label-sm text-label-sm font-semibold" type="button">Switch</button>
+</div>
+<!-- Physician Option 3 (Alternative Quick Select) -->
+<div class="p-3 rounded-lg bg-surface-container-lowest hover:bg-surface-container-low flex items-center justify-between cursor-pointer transition-colors shadow-xs">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center font-label-sm text-label-sm font-semibold">
+                SL
+              </div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-medium">Dr. Sarah Lin • Room 105</span>
+<span class="font-label-sm text-label-sm text-outline">Pediatrics (3 in queue • 11 slots left)</span>
+</div>
+</div>
+<button class="text-secondary hover:text-primary font-label-sm text-label-sm font-semibold" type="button">Switch</button>
+</div>
+</div>
+<!-- DATE & TIME SELECTION -->
+<div class="flex flex-col gap-space-sm pt-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">Appointment Date</label>
+<div class="flex items-center gap-space-sm">
+<button class="flex-1 py-2 px-3 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm font-semibold flex items-center justify-center gap-1.5 shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">today</span>
+<span class="">Today — Oct 24, 2026 (Tue)</span>
+</button>
+<button class="flex-1 py-2 px-3 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">event</span>
+<span class="">Tomorrow (Oct 25)</span>
+</button>
+</div>
+<!-- Time Slot Chips -->
+<label class="font-label-sm text-label-sm font-semibold text-on-surface mt-2">Available Consultation Window</label>
+<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+<button class="p-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm font-semibold flex items-center justify-center gap-1 shadow-sm" type="button">
+<span class="material-symbols-outlined text-[15px]">check</span>
+<span class="">10:15 AM (Next)</span>
+</button>
+<button class="p-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm flex items-center justify-center transition-colors" type="button">
+              10:30 AM
+            </button>
+<button class="p-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm flex items-center justify-center transition-colors" type="button">
+              10:45 AM
+            </button>
+<button class="p-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm flex items-center justify-center transition-colors" type="button">
+              11:00 AM
+            </button>
+<button class="p-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm flex items-center justify-center transition-colors" type="button">
+              11:30 AM
+            </button>
+<button class="p-2 rounded-lg bg-surface-container-low/50 text-outline font-label-sm text-label-sm flex items-center justify-center cursor-not-allowed" type="button">
+              11:45 AM Full
+            </button>
+</div>
+</div>
+<!-- REMAINING CAPACITY MINI GAUGE -->
+<div class="p-space-md rounded-lg bg-surface-container-low flex flex-col gap-2">
+<div class="flex items-center justify-between text-on-surface font-label-sm text-label-sm">
+<span class="font-semibold text-secondary">Dr. Mercer's Daily Load</span>
+<span class="font-code-sm text-code-sm font-bold text-primary">20 / 24 Capacity (83%)</span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 83.3%;"></div>
+</div>
+<div class="flex items-center justify-between text-outline font-label-sm text-label-sm">
+<span class="">Only 4 walk-in intake tokens remaining for morning session</span>
+</div>
+</div>
+<!-- QUEUE TOKEN TICKET PREVIEW CARD -->
+<div class="relative overflow-hidden p-space-lg rounded-xl bg-surface-container-high text-on-surface flex flex-col gap-2 shadow-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm font-bold uppercase tracking-widest text-primary flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">receipt_long</span>
+              Generated Queue Token Preview
+            </span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-lowest text-primary font-label-sm text-label-sm font-semibold shadow-xs">Ready to Issue</span>
+</div>
+<div class="flex items-center justify-between my-2">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-secondary">TOKEN NUMBER</span>
+<span class="font-headline-xl text-headline-xl text-primary font-black tracking-tight leading-none">Q-09</span>
+</div>
+<div class="flex flex-col text-right">
+<span class="font-label-sm text-label-sm text-secondary">ESTIMATED CALL</span>
+<span class="font-headline-md text-headline-md text-on-surface font-bold">10:15 AM</span>
+<span class="font-label-sm text-label-sm text-outline">Dr. Mercer • Room 101</span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-2 text-on-surface-variant font-code-sm text-code-sm">
+<span class="">Central Med • Desk A</span>
+<span class="">TOKEN DISPATCH ID: #FD-2026-0924</span>
+</div>
+</div>
+<!-- PAYMENT COLLECTION METHOD -->
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">Payment / Consultation Fee Method</label>
+<div class="flex flex-col gap-2">
+<label class="flex items-center gap-2.5 p-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors">
+<input checked="" class="w-4 h-4 text-primary focus:ring-primary" name="payment_mode" type="radio">
+<div class="flex items-center justify-between w-full">
+<span class="font-label-md text-label-md text-on-surface font-medium">Pay at Front Desk Now (₱500.00)</span>
+<span class="font-label-sm text-label-sm text-outline">Cash / Card / GCash</span>
+</div>
+</label>
+<label class="flex items-center gap-2.5 p-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors">
+<input class="w-4 h-4 text-primary focus:ring-primary" name="payment_mode" type="radio">
+<div class="flex items-center justify-between w-full">
+<span class="font-label-md text-label-md text-on-surface font-medium">HMO / Health Card Guarantee</span>
+<span class="px-1.5 py-0.2 rounded bg-tertiary/15 text-tertiary font-label-sm text-label-sm font-semibold">Pre-approved</span>
+</div>
+</label>
+<label class="flex items-center gap-2.5 p-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors">
+<input class="w-4 h-4 text-primary focus:ring-primary" name="payment_mode" type="radio">
+<div class="flex items-center justify-between w-full">
+<span class="font-label-md text-label-md text-on-surface font-medium">Post-Consult Settlement</span>
+<span class="font-label-sm text-label-sm text-outline">Pay upon discharge</span>
+</div>
+</label>
+</div>
+</div>
+<!-- ACTIONS ROW -->
+<div class="flex flex-col gap-space-sm pt-2">
+<button class="w-full h-12 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99]" type="button">
+<span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+<span class="">Register Patient &amp; Issue Token Q-09</span>
+</button>
+<div class="flex items-center justify-between gap-space-sm">
+<button class="flex-1 h-9 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface-variant font-label-md text-label-md flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">restart_alt</span>
+<span class="">Clear Form</span>
+</button>
+<a class="flex-1 h-9 rounded-lg bg-surface-container-highest hover:bg-surface-container text-primary font-label-md text-label-md flex items-center justify-center gap-1.5 transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]">group</span>
+<span class="">View Live Queue (8 waiting)</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- TERMINAL FOOTER BAR -->
+<div class="mt-space-2xl pt-space-md pb-space-lg flex flex-col sm:flex-row items-center justify-between gap-space-sm text-outline font-label-sm text-label-sm">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="">FiDo Clinical Platform • Secretary Terminal 01A • Desk A</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="">Auto-sync active</span>
+<span class="">•</span>
+<span class="">Central Medical Clinic</span>
+<span class="">•</span>
+<span class="font-code-sm text-code-sm">v4.12.8-prod</span>
+</div>
+</div>
+</div></main></div>
+
+
+</body></html>
