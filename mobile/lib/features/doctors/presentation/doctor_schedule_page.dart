@@ -997,7 +997,18 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               text: 'Confirm Clinic Date & Reserve Queue',
               onPressed: _selectedDate != null && _selectedTimeSlot != null
                   ? () {
-                      Navigator.of(context).pushNamed('/booking-confirmation');
+                      Navigator.of(context).pushNamed(
+                        '/booking-confirmation',
+                        arguments: {
+                          'doctorId': widget.doctorId,
+                          'doctorName': widget.doctorName,
+                          'specialty': widget.specialty,
+                          'clinic': widget.clinic,
+                          'consultationFee': widget.consultationFee,
+                          'selectedDate': _selectedDate,
+                          'selectedTimeSlot': _selectedTimeSlot,
+                        },
+                      );
                     }
                   : null,
               icon: const Icon(Icons.arrow_forward, size: 20),

@@ -83,7 +83,18 @@ class _MyAppState extends State<MyApp> {
               ),
             );
           case '/booking-confirmation':
-            return MaterialPageRoute(builder: (context) => const BookingConfirmationPage());
+            final args = settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (context) => BookingConfirmationPage(
+                doctorId: args?['doctorId'] ?? '',
+                doctorName: args?['doctorName'],
+                specialty: args?['specialty'],
+                clinic: args?['clinic'],
+                consultationFee: args?['consultationFee'],
+                selectedDate: args?['selectedDate'],
+                selectedTimeSlot: args?['selectedTimeSlot'],
+              ),
+            );
           default:
             return MaterialPageRoute(builder: (context) => const HomePage());
         }
