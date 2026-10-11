@@ -155,6 +155,23 @@ Current System State (October 2026):
 - Admin seed script creates Admin accounts without immediate Supabase identity provisioning; identities are provisioned on-demand during API calls or via reconciliation endpoint
 - PostgreSQL remains the single source of truth for all application account data (users, doctors, secretaries, patients)
 - Supabase Auth is used only for OTP delivery and verification, not for storing application accounts or credentials
+
+## Patient Reservation Flow
+- Mobile patient app includes a complete reservation flow from slot selection to appointment confirmation
+- Reservation flow: Doctor Schedule & Date page (`/doctor-schedule`) → select date and time slot → Booking Confirmation page (`/booking-confirmation`) → automatic submission to backend → queue number assignment → display confirmation
+- Mobile Doctor Schedule page displays doctor availability via `GET /api/v1/doctors/:doctorId/availability` endpoint and allows patients to select available dates and time slots
+- Mobile Booking Confirmation page automatically submits the reservation to `POST /api/v1/appointments` when loaded, passing doctorId, appointmentDate (combined date+time), and reasonForVisit
+- Backend `POST /api/v1/appointments` performs comprehensive server-side validation including: patient authentication, doctor approval status, date/time validity, availability check (working hours, breaks, exceptions/unavailability), capacity check, time slot availability, conflict detection, queue number assignment, and notification creation
+- Backend validation rechecks all scheduling constraints at submission time to prevent race conditions and double-booking
+- Mobile patient Appointments page (`/appointments` tab in HomePage) connects to `GET /api/v1/appointments` and displays real appointment records with filters (Upcoming, Completed, Cancelled)
+- Mobile Appointments page removes all hardcoded data and uses dynamic data from backend with loading, empty, and error states
+- Web Doctor Appointments page at `/doctor/appointments` connects to `GET /api/v1/appointments` and displays real appointment records for the authenticated doctor with status filters and statistics
+- Web Secretary Appointments page at `/secretary/appointments` connects to `GET /api/v1/appointments` and displays real appointment records for the doctor the secretary is assigned to, with status filters and statistics
+- Backend `GET /api/v1/appointments` supports role-based filtering: PATIENT returns their own appointments, DOCTOR returns their appointments, SECRETARY returns appointments for their assigned doctor
+- Backend appointment creation includes queue number assignment via `queue_entries` table, capacity consumption via `daily_capacities` table, and notification creation
+- Queue number assignment is concurrency-safe using `SELECT COALESCE(MAX(queue_number), 0) + 1` pattern
+- After successful booking, the appointment is immediately visible on patient, doctor, and secretary Appointments pages without requiring app restart or manual refresh
+- Mobile Appointments page uses `didUpdateWidget` to refresh data when returning to the tab
 - Supabase Storage service role key is required for backend photo operations and must not be exposed to frontend applications
 
 ## Database Schema
