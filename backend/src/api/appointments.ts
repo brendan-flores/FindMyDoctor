@@ -45,6 +45,21 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
         WHERE a.doctor_id = (SELECT id FROM doctors WHERE user_id = $1)
       `;
       params.push(userId);
+    } else if (role === 'SECRETARY') {
+      // Get appointments for the doctor the secretary is assigned to
+      queryText = `
+        SELECT 
+          a.*,
+          p.first_name as patient_first_name, p.last_name as patient_last_name,
+          d.practice_name,
+          q.queue_number, q.status as queue_status
+        FROM appointments a
+        JOIN patients p ON a.patient_id = p.id
+        JOIN doctors d ON a.doctor_id = d.id
+        LEFT JOIN queue_entries q ON a.id = q.appointment_id
+        WHERE a.doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $1)
+      `;
+      params.push(userId);
     } else {
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Invalid role for appointments'));
     }
