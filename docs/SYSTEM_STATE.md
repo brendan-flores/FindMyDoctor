@@ -157,12 +157,13 @@ Current System State (October 2026):
 - Supabase Auth is used only for OTP delivery and verification, not for storing application accounts or credentials
 
 ## Patient Reservation Flow
-- Mobile patient app includes a complete reservation flow from slot selection to appointment confirmation
-- Reservation flow: Doctor Schedule & Date page (`/doctor-schedule`) → select date and time slot → Booking Confirmation page (`/booking-confirmation`) → automatic submission to backend → queue number assignment → display confirmation
-- Mobile Doctor Schedule page displays doctor availability via `GET /api/v1/doctors/:doctorId/availability` endpoint and allows patients to select available dates and time slots
-- Mobile Booking Confirmation page automatically submits the reservation to `POST /api/v1/appointments` when loaded, passing doctorId, appointmentDate (combined date+time), and reasonForVisit
-- Backend `POST /api/v1/appointments` performs comprehensive server-side validation including: patient authentication, doctor approval status, date/time validity, availability check (working hours, breaks, exceptions/unavailability), capacity check, time slot availability, conflict detection, queue number assignment, and notification creation
+- Mobile patient app includes a complete reservation flow from date selection to appointment confirmation
+- Reservation flow: Doctor Schedule & Date page (`/doctor-schedule`) → select date → Booking Confirmation page (`/booking-confirmation`) → automatic submission to backend → queue number assignment → display confirmation
+- Mobile Doctor Schedule page displays doctor availability via `GET /api/v1/doctors/:doctorId/availability` endpoint and allows patients to select available dates
+- Mobile Booking Confirmation page automatically submits the reservation to `POST /api/v1/appointments` when loaded, passing doctorId, appointmentDate (date-only format: yyyy-MM-dd), and reasonForVisit
+- Backend `POST /api/v1/appointments` performs comprehensive server-side validation including: patient authentication, doctor approval status, date validity, availability check (working hours, breaks, exceptions/unavailability), capacity check, conflict detection (same date only), queue number assignment, and notification creation
 - Backend validation rechecks all scheduling constraints at submission time to prevent race conditions and double-booking
+- Patients are assigned queue numbers based on first-come-first-served order for the selected date (no specific time slot assignment)
 - Mobile patient Appointments page (`/appointments` tab in HomePage) connects to `GET /api/v1/appointments` and displays real appointment records with filters (Upcoming, Completed, Cancelled)
 - Mobile Appointments page removes all hardcoded data and uses dynamic data from backend with loading, empty, and error states
 - Web Doctor Appointments page at `/doctor/appointments` connects to `GET /api/v1/appointments` and displays real appointment records for the authenticated doctor with status filters and statistics
@@ -206,16 +207,13 @@ Current System State (October 2026):
 
 ## Availability & Capacity
 - Extended `GET /api/v1/doctors/:id/availability` endpoint to include active unavailability periods (exceptions) and active break periods in the response
-- Availability service (backend/src/modules/availability/availabilityService.ts) calculates available time slots considering: working hours, schedule exceptions, break periods, 30-minute consultation duration, daily capacity, existing reservations, and current date/time
-- Availability service detects overlapping appointment intervals (not just exact time matches) to correctly mark slots as booked
-- Availability service limits individual slot availability based on remaining daily capacity (slots marked as FULL when capacity exhausted)
-- Availability service returns time slots with status: AVAILABLE, BOOKED, BREAK, PAST, or FULL
+- Availability service (backend/src/modules/availability/availabilityService.ts) calculates available dates considering: working hours, schedule exceptions, break periods, 30-minute consultation duration, daily capacity, existing reservations, and current date/time
+- Availability service limits date availability based on remaining daily capacity (dates marked as FULL when capacity exhausted)
 - Availability service returns date status: AVAILABLE, FULL, UNAVAILABLE, PAST, or NON_WORKING
-- Availability service includes break periods as visible but non-selectable slots in the response (not removed from slot list)
+- Availability service includes break periods information for display purposes
 - Mobile doctor schedule page at /doctor-schedule displays calendar with visual status indicators and legend for all date states
-- Mobile doctor schedule page displays time slots with status-specific visual treatment: available slots are selectable, break slots shown with red tint and "Break" label, booked/past/full slots are non-selectable
-- Mobile doctor schedule page confirmation button enables only after selecting both a valid date and a valid time slot
-- Backend appointment creation endpoint POST /api/v1/appointments validates: appointment is not in the past, date is AVAILABLE, specific time slot is available (within working hours, not during break, not booked), daily capacity is not exceeded, and no overlapping appointments exist
+- Mobile doctor schedule page confirmation button enables only after selecting a valid date with available capacity
+- Backend appointment creation endpoint POST /api/v1/appointments validates: appointment is not in the past, date is AVAILABLE, daily capacity is not exceeded, and no existing appointment on the same date
 - Capacity calculation service uses centralized 30-minute consultation duration to calculate maximum appointment slots based on available working time after excluding breaks and schedule exceptions
 - Capacity system provides: Calculated Capacity (maximum slots based on available time), Configured Capacity (lower limit set by doctor/secretary), Final Capacity (actual allowed appointments), Remaining Capacity (final capacity minus existing reservations)
 - Capacity calculation accounts for: working hours for the day of week, break periods on the specific date, full-day exceptions (unavailability) for the specific date

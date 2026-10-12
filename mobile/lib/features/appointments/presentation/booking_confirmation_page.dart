@@ -15,7 +15,6 @@ class BookingConfirmationPage extends StatefulWidget {
   final String? clinic;
   final String? consultationFee;
   final DateTime? selectedDate;
-  final String? selectedTimeSlot;
 
   const BookingConfirmationPage({
     super.key,
@@ -25,7 +24,6 @@ class BookingConfirmationPage extends StatefulWidget {
     this.clinic,
     this.consultationFee,
     this.selectedDate,
-    this.selectedTimeSlot,
   });
 
   @override
@@ -40,7 +38,7 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
   bool _isSuccess = false;
 
   Future<void> _submitReservation() async {
-    if (widget.doctorId == null || widget.selectedDate == null || widget.selectedTimeSlot == null) {
+    if (widget.doctorId == null || widget.selectedDate == null) {
       setState(() {
         _errorMessage = 'Missing required information';
       });
@@ -53,18 +51,12 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
     });
 
     try {
-      // Combine date and time into ISO format
-      final appointmentDateTime = DateTime(
-        widget.selectedDate!.year,
-        widget.selectedDate!.month,
-        widget.selectedDate!.day,
-        int.parse(widget.selectedTimeSlot!.split(':')[0]),
-        int.parse(widget.selectedTimeSlot!.split(':')[1]),
-      );
+      // Use only the date (no time)
+      final appointmentDate = DateFormat('yyyy-MM-dd').format(widget.selectedDate!);
 
       final response = await _apiService.bookAppointment(
         doctorId: widget.doctorId!,
-        appointmentDate: appointmentDateTime.toIso8601String(),
+        appointmentDate: appointmentDate,
         reasonForVisit: 'Regular consultation',
       );
 

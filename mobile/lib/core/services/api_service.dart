@@ -51,6 +51,9 @@ class ApiService {
 
     if (requireAuth && _accessToken != null) {
       headers['Authorization'] = 'Bearer $_accessToken';
+      print('🟢 Authorization header added: Bearer ${_accessToken?.substring(0, 20)}...');
+    } else if (requireAuth) {
+      print('🔴 requireAuth=true but _accessToken is null!');
     }
 
     return headers;
@@ -216,7 +219,15 @@ class ApiService {
   }
 
   Future<void> logout() async {
-    await _clearToken();
+    try {
+      // Call backend logout endpoint
+      await post('/auth/logout', requireAuth: true);
+    } catch (e) {
+      print('🔴 Backend logout failed (continuing with local logout): $e');
+    } finally {
+      // Always clear local token
+      await _clearToken();
+    }
   }
 
   // ===========================

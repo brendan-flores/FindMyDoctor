@@ -92,7 +92,6 @@ class _MyAppState extends State<MyApp> {
                 clinic: args?['clinic'],
                 consultationFee: args?['consultationFee'],
                 selectedDate: args?['selectedDate'],
-                selectedTimeSlot: args?['selectedTimeSlot'],
               ),
             );
           default:

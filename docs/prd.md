@@ -312,8 +312,8 @@ A reservation is successful when the system:
 1. Validates the doctor.
 2. Validates the schedule.
 3. Validates capacity.
-4. Validates the selected consultation period.
-5. Confirms no conflicting reservation exists.
+4. Validates the selected date.
+5. Confirms no conflicting reservation exists for the same date.
 6. Creates the reservation.
 7. Assigns the patient a queue number.
 8. Adds the patient to the unified daily queue.

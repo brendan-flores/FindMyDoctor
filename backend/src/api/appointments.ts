@@ -132,14 +132,14 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
 
     const doctor = doctorResult.rows[0];
 
-    // Get appointment date and time
-    const appointmentDateTime = new Date(appointmentDate);
-    const appointmentDateOnly = appointmentDateTime.toISOString().split('T')[0];
-    const appointmentTime = appointmentDateTime.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
+    // Get appointment date (date-only format expected: yyyy-MM-dd)
+    const appointmentDateOnly = appointmentDate; // Already in yyyy-MM-dd format from frontend
 
     // Validate appointment is not in the past
     const now = new Date();
-    if (appointmentDateTime < now) {
+    now.setHours(0, 0, 0, 0);
+    const appointmentDateObj = new Date(appointmentDateOnly);
+    if (appointmentDateObj < now) {
       await client.query('ROLLBACK');
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot book appointments in the past'));
     }
@@ -157,25 +157,6 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
         'NON_WORKING': 'Doctor is not working on this date'
       }[availability.status] || 'Date not available';
       return res.status(400).json(error(ErrorCodes.APPOINTMENT_SLOT_UNAVAILABLE, statusMessage));
-    }
-
-    // Check if the specific time slot is available
-    const appointmentStartMinutes = parseInt(appointmentTime.split(':')[0]) * 60 + parseInt(appointmentTime.split(':')[1]);
-    const appointmentEndMinutes = appointmentStartMinutes + 30; // 30-minute consultation
-
-    const slotAvailable = availability.timeSlots.find(slot => {
-      const slotStartMinutes = parseInt(slot.start.split(':')[0]) * 60 + parseInt(slot.start.split(':')[1]);
-      const slotEndMinutes = parseInt(slot.end.split(':')[0]) * 60 + parseInt(slot.end.split(':')[1]);
-      
-      // Check if appointment time matches or overlaps with this slot
-      const timeMatches = appointmentStartMinutes >= slotStartMinutes && appointmentEndMinutes <= slotEndMinutes;
-      
-      return timeMatches && slot.isAvailable;
-    });
-
-    if (!slotAvailable) {
-      await client.query('ROLLBACK');
-      return res.status(400).json(error(ErrorCodes.APPOINTMENT_SLOT_UNAVAILABLE, 'Selected time slot is not available'));
     }
 
     // Check capacity
@@ -196,32 +177,26 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
       return res.status(400).json(error(ErrorCodes.CAPACITY_FULL, 'No available slots for this date'));
     }
 
-    // Check for conflicting appointment (overlapping time intervals)
-    const consultationDuration = 30; // 30 minutes
+    // Check for existing appointment on the same date (no specific time slot - first-come-first-served)
     const conflictResult = await client.query(
       `SELECT * FROM appointments 
        WHERE patient_id = $1 AND doctor_id = $2 
-       AND appointment_date BETWEEN $3 AND $4
+       AND DATE(appointment_date) = $3
        AND status NOT IN ('CANCELLED', 'NO_SHOW')`,
-      [
-        patientId, 
-        doctorId, 
-        appointmentDate, 
-        new Date(appointmentDateTime.getTime() + consultationDuration * 60000).toISOString()
-      ]
+      [patientId, doctorId, appointmentDateOnly]
     );
 
     if (conflictResult.rows.length > 0) {
       await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, 'You already have an overlapping appointment with this doctor'));
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'You already have an appointment with this doctor on this date'));
     }
 
-    // Create appointment
+    // Create appointment (store as date at start of day)
     const appointmentResult = await client.query(
       `INSERT INTO appointments (patient_id, doctor_id, appointment_date, reason_for_visit, status)
        VALUES ($1, $2, $3, $4, 'SCHEDULED')
        RETURNING id`,
-      [patientId, doctorId, appointmentDate, reasonForVisit]
+      [patientId, doctorId, appointmentDateOnly, reasonForVisit]
     );
 
     const appointmentId = appointmentResult.rows[0].id;
