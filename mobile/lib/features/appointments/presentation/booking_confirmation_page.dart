@@ -1,13 +1,93 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/services/api_service.dart';
 
-class BookingConfirmationPage extends StatelessWidget {
-  const BookingConfirmationPage({super.key});
+class BookingConfirmationPage extends StatefulWidget {
+  final String? doctorId;
+  final String? doctorName;
+  final String? specialty;
+  final String? clinic;
+  final String? consultationFee;
+  final DateTime? selectedDate;
+
+  const BookingConfirmationPage({
+    super.key,
+    this.doctorId,
+    this.doctorName,
+    this.specialty,
+    this.clinic,
+    this.consultationFee,
+    this.selectedDate,
+  });
+
+  @override
+  State<BookingConfirmationPage> createState() => _BookingConfirmationPageState();
+}
+
+class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
+  final ApiService _apiService = ApiService();
+  bool _isSubmitting = false;
+  String? _errorMessage;
+  String? _queueNumber;
+  bool _isSuccess = false;
+
+  Future<void> _submitReservation() async {
+    if (widget.doctorId == null || widget.selectedDate == null) {
+      setState(() {
+        _errorMessage = 'Missing required information';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Use only the date (no time)
+      final appointmentDate = DateFormat('yyyy-MM-dd').format(widget.selectedDate!);
+
+      final response = await _apiService.bookAppointment(
+        doctorId: widget.doctorId!,
+        appointmentDate: appointmentDate,
+        reasonForVisit: 'Regular consultation',
+      );
+
+      if (response['success'] == true) {
+        setState(() {
+          _queueNumber = response['data']?['queueNumber']?.toString();
+          _isSuccess = true;
+          _isSubmitting = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = response['error']?['message'] ?? 'Failed to book appointment';
+          _isSubmitting = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to book appointment: $e';
+        _isSubmitting = false;
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-submit when page loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _submitReservation();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,23 +106,83 @@ class BookingConfirmationPage extends StatelessWidget {
                       const SizedBox(height: spacing.AppSpacing.gutterMd),
                       _buildHeader(context),
                       const SizedBox(height: spacing.AppSpacing.gutterLg),
-                      _buildSuccessMessage(),
-                      const SizedBox(height: spacing.AppSpacing.gutterLg),
-                      _buildQueueSlip(),
-                      const SizedBox(height: spacing.AppSpacing.gutterLg),
-                      _buildSecretaryChat(),
-                      const SizedBox(height: spacing.AppSpacing.gutterLg),
-                      _buildLocationCard(),
-                      const SizedBox(height: spacing.AppSpacing.gutter3xl),
+                      if (_isSubmitting)
+                        _buildLoadingState()
+                      else if (_errorMessage != null)
+                        _buildErrorState()
+                      else if (_isSuccess)
+                        _buildSuccessContent(),
                     ],
                   ),
                 ),
               ),
             ),
-            _buildBottomButton(context),
+            if (_isSuccess) _buildBottomButton(context),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(32.0),
+        child: Column(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Booking your appointment...'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(32.0),
+        child: Column(
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: AppColors.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage!,
+              style: AppTextStyles.bodyMd.copyWith(
+                color: AppColors.error,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Go Back'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSuccessContent() {
+    return Column(
+      children: [
+        _buildSuccessMessage(),
+        const SizedBox(height: spacing.AppSpacing.gutterLg),
+        _buildQueueSlip(),
+        const SizedBox(height: spacing.AppSpacing.gutterLg),
+        _buildSecretaryChat(),
+        const SizedBox(height: spacing.AppSpacing.gutterLg),
+        _buildLocationCard(),
+        const SizedBox(height: spacing.AppSpacing.gutter3xl),
+      ],
     );
   }
 
@@ -176,7 +316,9 @@ class BookingConfirmationPage extends StatelessWidget {
                         borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
                       ),
                       child: Text(
-                        'Oct 21, 2025',
+                        widget.selectedDate != null
+                            ? DateFormat('MMM d, yyyy').format(widget.selectedDate!)
+                            : 'Date',
                         style: AppTextStyles.labelSm.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -184,7 +326,7 @@ class BookingConfirmationPage extends StatelessWidget {
                     ),
                     const SizedBox(height: spacing.AppSpacing.gutterXs),
                     Text(
-                      'Ref: FMD-SLB-8831',
+                      'Ref: FMD-SLB-${DateTime.now().millisecondsSinceEpoch % 10000}',
                       style: AppTextStyles.labelSm.copyWith(
                         fontSize: 11,
                         color: AppColors.primaryFixed.withValues(alpha: 0.8),
@@ -243,18 +385,18 @@ class BookingConfirmationPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Dr. Maria Angela Santos',
+                        widget.doctorName ?? 'Doctor Name',
                         style: AppTextStyles.bodyLgMedium,
                       ),
                       Text(
-                        'Adult Cardiology & Heart Health',
+                        widget.specialty ?? 'Specialty',
                         style: AppTextStyles.bodyMd.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       Text(
-                        'Room 412, Medical Arts Bldg • St. Luke\'s BGC',
+                        widget.clinic ?? 'Clinic Location',
                         style: AppTextStyles.bodyMd.copyWith(
                           fontSize: 12,
                           color: AppColors.onSurfaceVariant,
@@ -282,7 +424,7 @@ class BookingConfirmationPage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      '#04',
+                      _queueNumber != null ? '#$_queueNumber' : '#--',
                       style: AppTextStyles.queueNum.copyWith(
                         fontSize: 60,
                         color: AppColors.primary,

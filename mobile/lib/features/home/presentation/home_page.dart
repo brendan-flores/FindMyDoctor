@@ -3,7 +3,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/doctor_service.dart';
+import '../../../core/services/api_service.dart';
 import '../../../core/models/doctor.dart';
 import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
@@ -19,6 +21,7 @@ class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
   String? _selectedSpecialtyFromHome;
   final DoctorService _doctorService = DoctorService();
+  final ApiService _apiService = ApiService();
   List<String> _specialties = [];
   List<Doctor> _recommendedDoctors = [];
   List<String> _hospitals = [];
@@ -68,6 +71,11 @@ class _HomePageState extends State<HomePage> {
         _isLoadingDoctors = false;
       });
     }
+  }
+
+  Future<void> _logout() async {
+    await _apiService.logout();
+    Navigator.of(context).pushReplacementNamed('/login');
   }
 
   @override
@@ -202,7 +210,7 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
             SizedBox(
-              height: MediaQuery.of(context).size.height - 200,
+              height: MediaQuery.of(context).size.height - 350,
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -230,6 +238,13 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
+            PrimaryButton(
+              text: 'Log Out',
+              onPressed: _logout,
+              icon: const Icon(Icons.logout, size: 20),
+            ),
+            const SizedBox(height: spacing.AppSpacing.gutter3xl),
           ],
         ),
       ),

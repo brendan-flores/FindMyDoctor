@@ -931,14 +931,16 @@ One successfully registered patient consumes one capacity unit.
 
 Responsibilities:
 
-- Create reservations.
+- Create reservations (date-only, no specific time slot).
 - View appointments.
 - Cancel appointments.
 - Reschedule appointments.
 - Update appointment states.
-- Prevent booking conflicts.
+- Prevent booking conflicts (same date only).
 
 Payment is intentionally separate from basic reservation creation.
+
+Patients select a date for their appointment (no specific time slot). Queue numbers are assigned based on first-come-first-served order for the selected date.
 
 ---
 
@@ -949,12 +951,14 @@ A regular reservation does not require payment.
 A successful reservation results in:
 
 ```text
-Appointment
+Appointment (date-only)
     +
 Queue Entry
     +
 Capacity Consumption
 ```
+
+Patients select a date for their appointment. Queue numbers are assigned sequentially based on the time of registration for that date. The secretary manages the actual order of patient service.
 
 Optional:
 
