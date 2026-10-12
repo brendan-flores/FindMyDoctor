@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: "FindMyDoctor - Healthcare Dashboard",
   description: "Doctor, Secretary, and Admin Dashboard for FindMyDoctor",
   icons: {
-    icon: "/images/fido_logo.png",
+    icon: '/favicon.png',
   },
 };
 
