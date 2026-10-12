@@ -363,6 +363,7 @@ class ApiService {
         'appointmentDate': appointmentDate,
         if (reasonForVisit != null) 'reasonForVisit': reasonForVisit,
       },
+      requireAuth: true,
     );
   }
 
