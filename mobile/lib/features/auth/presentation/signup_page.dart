@@ -282,33 +282,12 @@ class _SignUpPageState extends State<SignUpPage> {
   Widget _buildBrandHeader() {
     return Row(
       children: [
-        // Logo with gradient background
-        Container(
+        // FindMyDoctor Logo
+        Image.asset(
+          'assets/images/findmydoctor_logo.png',
           width: 48,
           height: 48,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.skyBlue,
-                AppColors.brandPrimary,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.15),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.location_on,
-            color: AppColors.onPrimary,
-            size: 24,
-          ),
+          fit: BoxFit.contain,
         ),
         const SizedBox(width: AppSpacing.gutterMd),
         Column(
