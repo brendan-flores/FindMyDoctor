@@ -82,11 +82,6 @@ export default function SetupProgressCard({ profile, schedules }: SetupProgressC
   // Determine if setup is complete
   const isSetupComplete = completedCount === totalCount;
 
-  // Auto-hide if setup is complete
-  if (isSetupComplete) {
-    return null;
-  }
-
   // Get missing profile fields
   const getMissingProfileFields = () => {
     const fieldLabels = [
@@ -130,6 +125,11 @@ export default function SetupProgressCard({ profile, schedules }: SetupProgressC
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isPanelOpen]);
+
+  // Auto-hide if setup is complete
+  if (isSetupComplete) {
+    return null;
+  }
 
   return (
     <>
