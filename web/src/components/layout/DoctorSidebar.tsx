@@ -93,17 +93,12 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
       {/* Top & Navigation Region */}
       <div className="flex flex-col min-h-0">
         {/* Brand Logo Header */}
-        <div className="h-16 px-6 border-b border-slate-100 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#1b5eb8] flex items-center justify-center text-white shadow-sm shadow-blue-500/20">
-            <span className="material-symbols-outlined text-[22px] font-bold">add_box</span>
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5 leading-none">
-              <span className="text-xl font-bold tracking-tight text-slate-900">FiDo</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-50 text-[#1b5eb8]">Clinic</span>
-            </div>
-            <span className="text-[11px] font-semibold tracking-wider text-slate-400 uppercase mt-0.5 block">Doctor Portal</span>
-          </div>
+        <div className="h-16 px-6 border-b border-slate-100 flex items-center">
+          <img
+            src="/images/findmydoctor_logo.png"
+            alt="FindMyDoctor Logo"
+            className="h-10 w-auto"
+          />
         </div>
 
         {/* Setup Progress Card */}

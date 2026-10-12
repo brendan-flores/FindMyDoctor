@@ -160,18 +160,11 @@ export default function DoctorLogin() {
     <div className="min-h-screen flex items-center justify-center bg-[#F3F5F9] px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-[460px] flex flex-col items-center">
         <div className="flex flex-col items-center mb-8 text-center">
-          <div className="flex items-center gap-2.5 mb-1.5">
-            <div className="w-12 h-12 bg-[#1A62CD] rounded-2xl flex items-center justify-center shadow-sm">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24">
-                <line x1="12" x2="12" y1="5" y2="19"></line>
-                <line x1="5" x2="19" y1="12" y2="12"></line>
-              </svg>
-            </div>
-            <span className="text-4xl font-extrabold tracking-tight text-[#165CBE]">FiDo</span>
-          </div>
-          <span className="text-[11px] font-bold text-[#8392A5] tracking-[0.18em] uppercase pl-0.5">
-            FIND A DOCTOR
-          </span>
+          <img
+            src="/images/findmydoctor_logo.png"
+            alt="FindMyDoctor Logo"
+            className="h-20 w-auto mb-2"
+          />
         </div>
 
         {!showOtp && (
