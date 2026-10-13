@@ -35,6 +35,7 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
   bool _isSubmitting = false;
   String? _errorMessage;
   String? _queueNumber;
+  int? _totalPatients;
   bool _isSuccess = false;
 
   Future<void> _submitReservation() async {
@@ -63,6 +64,10 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
       if (response['success'] == true) {
         setState(() {
           _queueNumber = response['data']?['queueNumber']?.toString();
+          final totalPatientsRaw = response['data']?['totalPatients'];
+          _totalPatients = totalPatientsRaw != null
+              ? (totalPatientsRaw is String ? int.tryParse(totalPatientsRaw) : totalPatientsRaw as int?)
+              : null;
           _isSuccess = true;
           _isSubmitting = false;
         });
@@ -455,7 +460,9 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
                       ),
                       const SizedBox(width: spacing.AppSpacing.gutterXs),
                       Text(
-                        'Serving #01 now • ~45 min estimated wait',
+                        _totalPatients != null && _queueNumber != null
+                            ? 'You are patient #$_queueNumber out of $_totalPatients'
+                            : 'Serving #01 now • ~45 min estimated wait',
                         style: AppTextStyles.bodyMdMedium.copyWith(
                           fontSize: 13,
                         ),
@@ -630,7 +637,10 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
         child: PrimaryButton(
           text: 'View in Appointments',
           onPressed: () {
-            Navigator.of(context).pushReplacementNamed('/home');
+            Navigator.of(context).pushReplacementNamed(
+              '/home',
+              arguments: {'initialTab': 2},
+            );
           },
           icon: const Icon(Icons.event_available, size: 20),
         ),

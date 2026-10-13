@@ -99,10 +99,10 @@ router.post('/create-account', authenticate, requireSecretaryPasswordChange, req
   }
 });
 
-// Register walk-in patient (atomic transaction)
+// Register walk-in patient (atomic transaction with concurrency-safe queue assignment)
 router.post('/', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
   const client = await getClient();
-  
+
   try {
     await client.query('BEGIN');
 
@@ -140,8 +140,23 @@ router.post('/', authenticate, requireSecretaryPasswordChange, requireSecretaryP
 
     // Check capacity
     const appointmentDateOnly = new Date(appointmentDate).toISOString().split('T')[0];
+
+    // Acquire advisory lock for queue assignment (based on doctor_id and date hash)
+    // This ensures concurrent requests for the same doctor/date are serialized
+    const lockHash = `md5(${doctorId}::text || ${appointmentDateOnly}::text)`;
+    const lockResult = await client.query(
+      `SELECT pg_try_advisory_xact_lock(hashtext($1)) as lock_acquired`,
+      [lockHash]
+    );
+
+    if (!lockResult.rows[0].lock_acquired) {
+      await client.query('ROLLBACK');
+      return res.status(429).json(error(ErrorCodes.SERVER_ERROR, 'System is busy, please try again'));
+    }
+
+    // Check capacity (re-check after acquiring lock to ensure capacity hasn't been filled)
     const capacityResult = await client.query(
-      'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
+      'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2 FOR UPDATE',
       [doctorId, appointmentDateOnly]
     );
 
@@ -159,8 +174,8 @@ router.post('/', authenticate, requireSecretaryPasswordChange, requireSecretaryP
 
     // Check for conflicting appointment
     const conflictResult = await client.query(
-      `SELECT * FROM appointments 
-       WHERE patient_id = $1 AND doctor_id = $2 
+      `SELECT * FROM appointments
+       WHERE patient_id = $1 AND doctor_id = $2
        AND appointment_date = $3 AND status NOT IN ('CANCELLED', 'NO_SHOW')`,
       [patientId, doctorId, appointmentDate]
     );
@@ -180,7 +195,7 @@ router.post('/', authenticate, requireSecretaryPasswordChange, requireSecretaryP
 
     const appointmentId = appointmentResult.rows[0].id;
 
-    // Get next queue number (concurrency-safe)
+    // Get next queue number (now safe due to advisory lock)
     const queueResult = await client.query(
       `SELECT COALESCE(MAX(queue_number), 0) + 1 as next_queue
        FROM queue_entries
@@ -203,6 +218,34 @@ router.post('/', authenticate, requireSecretaryPasswordChange, requireSecretaryP
       [doctorId, appointmentDateOnly]
     );
 
+    // Get total configured capacity for that day
+    const totalCapacityResult = await client.query(
+      `SELECT final_capacity as total_capacity
+       FROM daily_capacities
+       WHERE doctor_id = $1 AND date = $2`,
+      [doctorId, appointmentDateOnly]
+    );
+
+    let totalPatients = 0;
+    if (totalCapacityResult.rows.length > 0) {
+      totalPatients = totalCapacityResult.rows[0].total_capacity;
+    } else {
+      // If no capacity record exists, calculate from working hours (30 min per consultation)
+      const scheduleResult = await client.query(
+        `SELECT start_time, end_time FROM doctor_schedules
+         WHERE doctor_id = $1 AND day_of_week = EXTRACT(DOW FROM DATE($2))
+         AND is_active = true`,
+        [doctorId, appointmentDateOnly]
+      );
+
+      if (scheduleResult.rows.length > 0) {
+        const schedule = scheduleResult.rows[0];
+        const startMinutes = parseInt(schedule.start_time.split(':')[0]) * 60 + parseInt(schedule.start_time.split(':')[1]);
+        const endMinutes = parseInt(schedule.end_time.split(':')[0]) * 60 + parseInt(schedule.end_time.split(':')[1]);
+        totalPatients = Math.floor((endMinutes - startMinutes) / 30); // 30 min per consultation
+      }
+    }
+
     // Create notification
     await client.query(
       `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
@@ -211,11 +254,13 @@ router.post('/', authenticate, requireSecretaryPasswordChange, requireSecretaryP
     );
 
     await client.query('COMMIT');
+    // Advisory lock is automatically released when transaction ends
 
     res.status(201).json(
       success({
         appointmentId,
         queueNumber,
+        totalPatients,
       }, 'Walk-in registration successful')
     );
   } catch (err: any) {
