@@ -12,7 +12,7 @@ export interface TimeSlot {
 export interface DateAvailability {
   date: string;
   dayOfWeek: number;
-  status: 'AVAILABLE' | 'FULL' | 'UNAVAILABLE' | 'PAST' | 'NON_WORKING';
+  status: 'AVAILABLE' | 'FULL' | 'UNAVAILABLE' | 'PAST' | 'NON_WORKING' | 'ALREADY_BOOKED';
   workingHours: { start: string; end: string }[];
   timeSlots: TimeSlot[];
   capacity: {
@@ -262,7 +262,8 @@ async function getBookedIntervals(doctorId: string, date: string): Promise<TimeR
  */
 export async function calculateAvailability(
   doctorId: string,
-  date: string
+  date: string,
+  patientId?: string | null
 ): Promise<DateAvailability> {
   const [year, month, day] = date.split('-').map(Number);
   const dateObj = new Date(year, month - 1, day);
@@ -385,11 +386,26 @@ export async function calculateAvailability(
   const timeSlots = generateTimeSlots(workingRanges, bookedIntervals, breakRanges, dateObj, capacity.remaining);
   
   // Determine status
-  let status: 'AVAILABLE' | 'FULL' | 'UNAVAILABLE' | 'PAST' | 'NON_WORKING' = 'AVAILABLE';
+  let status: 'AVAILABLE' | 'FULL' | 'UNAVAILABLE' | 'PAST' | 'NON_WORKING' | 'ALREADY_BOOKED' = 'AVAILABLE';
   if (capacity.remaining <= 0) {
     status = 'FULL';
   }
-  
+
+  // Check if patient already has an appointment with this doctor on this date
+  if (patientId && status === 'AVAILABLE') {
+    const existingAppointmentResult = await query(
+      `SELECT id FROM appointments
+       WHERE patient_id = $1 AND doctor_id = $2
+       AND DATE(appointment_date) = $3
+       AND status NOT IN ('CANCELLED', 'NO_SHOW')`,
+      [patientId, doctorId, date]
+    );
+
+    if (existingAppointmentResult.rows.length > 0) {
+      status = 'ALREADY_BOOKED';
+    }
+  }
+
   return {
     date,
     dayOfWeek,
@@ -406,24 +422,25 @@ export async function calculateAvailability(
 export async function calculateAvailabilityRange(
   doctorId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  patientId?: string | null
 ): Promise<AvailabilityRange> {
   const results: DateAvailability[] = [];
-  
+
   const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
   const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
   const start = new Date(sYear, sMonth - 1, sDay);
   const end = new Date(eYear, eMonth - 1, eDay);
-  
+
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const yearStr = d.getFullYear();
     const monthStr = String(d.getMonth() + 1).padStart(2, '0');
     const dayStr = String(d.getDate()).padStart(2, '0');
     const dateStr = `${yearStr}-${monthStr}-${dayStr}`;
-    const availability = await calculateAvailability(doctorId, dateStr);
+    const availability = await calculateAvailability(doctorId, dateStr, patientId);
     results.push(availability);
   }
-  
+
   return {
     startDate,
     endDate,
