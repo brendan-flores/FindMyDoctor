@@ -339,7 +339,7 @@ class ApiService {
         if (startDate != null) 'startDate': startDate,
         if (endDate != null) 'endDate': endDate,
       },
-      requireAuth: false,
+      requireAuth: true,
     );
   }
 

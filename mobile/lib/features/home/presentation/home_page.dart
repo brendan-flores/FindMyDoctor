@@ -11,7 +11,9 @@ import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final int? initialTab;
+
+  const HomePage({super.key, this.initialTab});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -31,6 +33,9 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialTab != null) {
+      _currentIndex = widget.initialTab!;
+    }
     _loadData();
   }
 

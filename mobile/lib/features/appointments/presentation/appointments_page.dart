@@ -104,7 +104,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
 
   Widget _buildHeader() {
     final upcomingCount = _appointments.where((a) => a['status'] == 'SCHEDULED').length;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

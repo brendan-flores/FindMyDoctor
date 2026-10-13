@@ -68,7 +68,11 @@ class _MyAppState extends State<MyApp> {
           case '/signup':
             return MaterialPageRoute(builder: (context) => const SignUpPage());
           case '/home':
-            return MaterialPageRoute(builder: (context) => const HomePage());
+            final args = settings.arguments as Map<String, dynamic>?;
+            final initialTab = args?['initialTab'] as int?;
+            return MaterialPageRoute(
+              builder: (context) => HomePage(initialTab: initialTab),
+            );
           case '/doctors':
             return MaterialPageRoute(builder: (context) => const DoctorsPage(onNavigateToTab: null));
           case '/doctor-schedule':
