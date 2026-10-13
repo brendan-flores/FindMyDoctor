@@ -560,9 +560,20 @@ Available Capacity
 Available Consultation
 +
 No Conflict
++
+Doctor-Specific Patient Record
 ```
 
 before creating a reservation.
+
+### Doctor-Specific Patient Record Check
+
+Before confirming an appointment, the system must verify whether the patient has an existing record with the selected doctor (such as a previous appointment or completed consultation). If no record exists with that specific doctor, the system must prompt the patient to provide required details through the backend API before proceeding with reservation. The mobile application must never connect directly to PostgreSQL for record checks or updates.
+
+**Patient Details Access:**
+- Doctors access patient details through `/doctor/patients/` for patient management and `/doctor/appointments/:id` for appointment context
+- Secretaries access patient details through `/secretary/walk-ins/` for registration, `/secretary/patients/` for lookup, and `/secretary/queue/` for queue context
+- All patient detail operations must go through the backend API; web dashboards must not connect directly to PostgreSQL
 
 ---
 

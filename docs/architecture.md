@@ -150,6 +150,7 @@ Handles:
 - Payment workflows.
 - Messaging.
 - AI workflows.
+- Patient information validation.
 
 ### Domain Layer
 
@@ -937,10 +938,40 @@ Responsibilities:
 - Reschedule appointments.
 - Update appointment states.
 - Prevent booking conflicts (same date only).
+- Validate doctor-specific patient record before reservation.
 
 Payment is intentionally separate from basic reservation creation.
 
 Patients select a date for their appointment (no specific time slot). Queue numbers are assigned based on first-come-first-served order for the selected date.
+
+### Doctor-Specific Patient Record Validation
+
+Before confirming an appointment, the system must validate whether the patient has an existing record with the selected doctor.
+
+**Record Check Workflow:**
+1. Mobile application sends patient ID and selected doctor ID to backend before appointment confirmation
+2. Backend queries the appointments table to check if the patient has any appointments (past or present) with the selected doctor
+3. If an existing record is found, backend returns that the patient can proceed directly with booking
+4. If no existing record is found, backend returns that the patient must provide required details
+5. Mobile application displays form to collect required personal details
+6. Patient submits form through backend API endpoint
+7. Backend validates and saves the information, associating it with the patient and doctor
+8. After successful save, patient continues with appointment booking
+9. Appointment is associated with the patient's existing account (no duplicate accounts created)
+
+**Important Distinction:**
+- The check is specific to the selected doctor
+- Having an account or a record with another doctor does not automatically count as having an existing record with the selected doctor
+- The backend must perform a doctor-specific lookup in the appointments or visits table
+
+**Patient Details UI Pages:**
+- Doctor Dashboard: `/doctor/patients/` - View all patients, search, add/edit patient details
+- Doctor Dashboard: `/doctor/appointments/:id` - View patient details within appointment context
+- Secretary Dashboard: `/secretary/walk-ins/` - Save patient details during walk-in registration
+- Secretary Dashboard: `/secretary/patients/` - View and search patient details
+- Secretary Dashboard: `/secretary/queue/` - View patient details in queue context
+
+The mobile application must never connect directly to PostgreSQL. All record checks and updates must go through the backend REST API.
 
 ---
 

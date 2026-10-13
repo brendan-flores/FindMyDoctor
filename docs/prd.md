@@ -307,6 +307,33 @@ Patients may reserve regular consultation schedules without advance payment.
 
 Payment is **not required** for a successful regular reservation.
 
+### Doctor-Specific Patient Record Check
+
+When a patient selects a doctor and proceeds with appointment booking, the system must check whether that patient already has an existing record associated with the selected doctor.
+
+**Check Criteria:**
+- The system must verify if the patient has a prior relationship with the selected doctor (such as a previous appointment or completed consultation).
+- Having an account or a record with another doctor must not automatically count as having an existing record with the selected doctor.
+- The check must use the patient's authenticated account and the selected doctor's identity.
+
+**If No Existing Record:**
+- The system must prompt the patient to fill out the required personal details before proceeding with the booking.
+- After the patient submits the required details, the system must save them through the backend API and associate the resulting record with the correct patient and doctor.
+- The patient must be allowed to continue booking without restarting the process after successful save.
+
+**If Existing Record Exists:**
+- The patient may proceed directly with booking without filling out the same details again.
+- The system must not create duplicate patient accounts or duplicate doctor-patient records unnecessarily.
+
+**Patient Details Storage and Access:**
+- Doctors view and manage patient details on the Doctor Dashboard at `/doctor/patients/`
+- Doctors can also view patient details within appointment records at `/doctor/appointments/:id`
+- Secretaries save patient details during walk-in registration at `/secretary/walk-ins/`
+- Secretaries view and search patient details at `/secretary/patients/`
+- Patient details are also shown contextually in the queue view at `/secretary/queue/`
+
+### Reservation Success Criteria
+
 A reservation is successful when the system:
 
 1. Validates the doctor.
@@ -314,11 +341,12 @@ A reservation is successful when the system:
 3. Validates capacity.
 4. Validates the selected date.
 5. Confirms no conflicting reservation exists for the same date.
-6. Creates the reservation.
-7. Assigns the patient a queue number.
-8. Adds the patient to the unified daily queue.
-9. Updates the remaining daily capacity.
-10. Displays the queue confirmation.
+6. Validates that the patient has an existing record with the selected doctor or collects required details if none exists.
+7. Creates the reservation.
+8. Assigns the patient a queue number.
+9. Adds the patient to the unified daily queue.
+10. Updates the remaining daily capacity.
+11. Displays the queue confirmation.
 
 Example:
 

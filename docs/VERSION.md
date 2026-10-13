@@ -62,9 +62,15 @@ When evaluating whether to increment the major or minor version, consider:
 
 ---
 
+## Version History
+
+The complete version history is maintained in `/docs/VERSION_HISTORY.md`. Use that file to view all past versions and their changes.
+
+---
+
 ## Version History Template
 
-For each version, document the following information:
+When adding a new version to VERSION_HISTORY.md, document the following information:
 
 ```
 ### [VERSION_NUMBER] ([Release Date or "In Progress"])
@@ -95,35 +101,3 @@ For each version, document the following information:
 - Updated file 1: Description
 - Updated file 2: Description
 ```
-
----
-
-## Version History
-
-### 01.00 (Initial Release)
-
-**Purpose:** Initial recorded system version
-
-**Significant Features:**
-- Established system-wide version tracking for the web application, mobile application, and backend API
-- Implemented core patient, doctor, secretary, and admin user roles
-- Established authentication system with email/username login
-- Implemented OTP-based verification for patient registration
-- Established doctor profile completion and approval workflow
-- Implemented appointment reservation system with queue management
-- Implemented doctor availability and capacity management
-- Established role-based access control across all applications
-
-**Architecture:**
-- Modular monolith backend with REST API
-- Flutter mobile application for patients
-- Next.js web application for doctors, secretaries, and admins
-- PostgreSQL as the single source of truth
-- Supabase Auth for OTP delivery and verification only
-- Supabase Storage for doctor professional photos
-
-**Documentation:**
-- Established versioning rules and workflow
-- Created comprehensive architecture documentation
-- Established system state tracking in SYSTEM_STATE.md
-- Created AGENTS.md for AI agent guidelines
