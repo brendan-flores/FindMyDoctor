@@ -311,14 +311,26 @@ Payment is **not required** for a successful regular reservation.
 
 When a patient selects a doctor and proceeds with appointment booking, the system must check whether that patient already has an existing record associated with the selected doctor.
 
+**Backend API Endpoints:**
+- `GET /api/v1/patients/check-record?doctorId={id}` - Patient-only endpoint to check if they have an existing record with the selected doctor
+- `POST /api/v1/patients/submit-details` - Patient-only endpoint to submit required details for a specific doctor before first booking
+- `GET /api/v1/patients/me` - Patient-only endpoint to view their own profile
+- `PUT /api/v1/patients/me` - Patient-only endpoint to update their own profile (requires authentication)
+- `GET /api/v1/patients/doctor/:doctorId` - Doctor-only endpoint to list all patients who have associations or appointments with them
+- `GET /api/v1/patients/search` - Secretary-only endpoint to search patients by email, phone, or name for walk-in registration (restricted to assigned doctor's patients)
+- `GET /api/v1/patients/:id` - Doctor and Secretary endpoint to view specific patient details (with role-based authorization)
+
 **Check Criteria:**
-- The system must verify if the patient has a prior relationship with the selected doctor (such as a previous appointment or completed consultation).
+- The system must verify if the patient has a prior relationship with the selected doctor (such as a previous appointment, completed consultation, or submitted patient details).
 - Having an account or a record with another doctor must not automatically count as having an existing record with the selected doctor.
 - The check must use the patient's authenticated account and the selected doctor's identity.
+- The backend queries the `patient_doctor_associations` table for persistent associations, with fallback to the `appointments` table for backward compatibility.
 
 **If No Existing Record:**
 - The system must prompt the patient to fill out the required personal details before proceeding with the booking.
-- After the patient submits the required details, the system must save them through the backend API and associate the resulting record with the correct patient and doctor.
+- Required fields: first name (required), middle name (optional), last name (required), date of birth (required), sex (required: MALE, FEMALE, OTHER, NOT_SPECIFIED), mobile number (required), address (required)
+- Optional fields: emergency contact name, emergency contact phone, medical history, allergies, current medications
+- After the patient submits the required details via `POST /api/v1/patients/submit-details`, the system saves them in the `patients` table and creates a persistent association in the `patient_doctor_associations` table.
 - The patient must be allowed to continue booking without restarting the process after successful save.
 
 **If Existing Record Exists:**
@@ -329,8 +341,9 @@ When a patient selects a doctor and proceeds with appointment booking, the syste
 - Doctors view and manage patient details on the Doctor Dashboard at `/doctor/patients/`
 - Doctors can also view patient details within appointment records at `/doctor/appointments/:id`
 - Secretaries save patient details during walk-in registration at `/secretary/walk-ins/`
-- Secretaries view and search patient details at `/secretary/patients/`
+- Secretaries view and search patient details at `/secretary/patients/` (restricted to their assigned doctor's patients)
 - Patient details are also shown contextually in the queue view at `/secretary/queue/`
+- All patient details operations must go through the backend REST API; mobile and web applications must not connect directly to PostgreSQL
 
 ### Reservation Success Criteria
 

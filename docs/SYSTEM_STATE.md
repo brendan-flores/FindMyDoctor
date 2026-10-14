@@ -4,6 +4,17 @@ This document contains the current system state for the FindMyDoctor project. It
 
 Current System State (October 2026):
 
+## Walk-in Registration Legacy Patient Compatibility
+- Walk-in registration endpoint `POST /api/v1/walk-ins` preserves backward compatibility for legacy patients with appointment history but no association
+- When no association exists, the endpoint checks the appointments table as a fallback for legacy records
+- Legacy patients with complete profiles (all required fields populated) can register for walk-ins, and a COMPLETE association is created during registration
+- Legacy patients with incomplete profiles are rejected and must complete details via `POST /api/v1/walk-ins/submit-patient-details` first
+- Patient details submission endpoint `POST /api/v1/walk-ins/submit-patient-details` allows legacy patients with appointment history but no association to complete details
+- Explicit PENDING associations are authoritative and cannot be bypassed by appointment-history fallback
+- Patient profile completeness is verified before allowing registration: first name, last name, date of birth, valid sex, mobile number, and non-empty address
+- All operations use transactions to ensure consistency between patient records, appointments, queue entries, capacity updates, and patient-doctor associations
+- The unique constraint on (patient_id, doctor_id) in patient_doctor_associations prevents duplicate associations with conflict-safe writes
+
 ## Doctor Registration & Approval Workflow
 - Doctor self-registration creates accounts with `approval_status = 'PENDING'` requiring admin approval
 - Doctor self-registration uses a two-step flow: basic registration → OTP verification → profile completion → submission for approval
@@ -128,6 +139,56 @@ Current System State (October 2026):
 - Secretary must change password on first login (enforced by `must_change_password` flag)
 - Secretary profile page at `/secretary/profile` allows viewing and editing profile information
 - Migration `015_enforce_secretary_doctor_relationship.sql` enforces the required foreign key and non-null assignment for `secretaries.doctor_id`
+
+## Patient Record Management
+- Patient records are managed through the unified `/api/v1/patients` API router with role-based access control
+- Patient endpoints: `GET /api/v1/patients/me` (view own profile), `PUT /api/v1/patients/me` (update own profile) - requires PATIENT authentication
+- Patient details submission: `POST /api/v1/patients/submit-details` - Patient-only endpoint to submit required details for a specific doctor before first booking
+- Doctor-specific patient record check: `GET /api/v1/patients/check-record?doctorId={id}` - checks if authenticated patient has existing record with selected doctor
+- Patient record check queries the `patient_doctor_associations` table for any association, respecting the explicit status (PENDING or COMPLETE), with fallback to `appointments` table for backward compatibility with legacy records
+- Patient-doctor associations are tracked in the `patient_doctor_associations` table to support persistent records before the first appointment
+- Patient-doctor associations have a `details_completion_status` field with values: 'PENDING' (incomplete walk-in account with only email, first name, last name) or 'COMPLETE' (full required details submitted including date of birth, sex, phone, address)
+- An explicit PENDING association is authoritative - it cannot be bypassed by appointment-history fallback
+- If no existing record exists with the selected doctor, the patient must submit required details via `POST /api/v1/patients/submit-details` before booking
+- Patient details are stored in the `patients` table and associated with the authenticated user account via `user_id` foreign key
+- Doctor patient access: `GET /api/v1/patients/doctor/:doctorId` - returns all patients who have associations or appointments with the authenticated doctor
+- Secretary patient search: `GET /api/v1/patients/search` - allows secretaries to search patients by email, phone, first name, or last name for walk-in registration, restricted to their assigned doctor's patients
+- Secretary patient access: `GET /api/v1/patients/:id` - allows secretaries to view patient details only if the patient has associations or appointments with their assigned doctor
+- Doctor patient access: `GET /api/v1/patients/:id` - allows doctors to view patient details only if the patient has associations or appointments with them
+- Patient profile fields: first_name (required), middle_name (optional), last_name (required), date_of_birth (required), sex (required: MALE, FEMALE, OTHER, NOT_SPECIFIED), phone (required, mobile number), address (required for new submissions via API, historical NULL values preserved in database), emergency_contact_name, emergency_contact_phone, medical_history, allergies, current_medications
+- Patient profile updates use server-side validation for required fields (first name, last name, date of birth, sex, phone, address) and optional field formatting
+- Mobile number validation: Must contain only digits, spaces, hyphens, plus sign, or parentheses; 1-20 characters
+- Date of birth validation: Must be a valid date and cannot be in the future
+- Patient-doctor relationship is tracked through the `patient_doctor_associations` table (for persistent records before booking) and the `appointments` table (for actual consultations)
+- The patient record check ensures that patients don't need to re-enter details for doctors they've already submitted details for or seen in consultation
+- All patient operations require authentication and proper role-based authorization to prevent unauthorized access
+- Migration `023_add_patient_required_fields.sql` adds middle_name, sex (with NOT NULL DEFAULT 'NOT_SPECIFIED'), and creates patient_doctor_associations table
+- Migration `023_add_patient_required_fields.sql` does NOT make address NOT NULL; it preserves historical NULL addresses for existing patients, but new API submissions validate address as a required field
+- Migration `024_add_walk_in_completion_status.sql` adds `details_completion_status` column to patient_doctor_associations to distinguish between pending preliminary accounts and completed patient records
+- Migration `024_add_walk_in_completion_status.sql` determines completion status from actual patient data: COMPLETE only when all required details are valid and populated (first name, last name, date of birth, valid sex, mobile number, non-empty address); otherwise PENDING
+
+## Walk-in Registration Security
+- Walk-in registration endpoints enforce secretary-to-doctor assignment verification before allowing any operation
+- Secretary search endpoint `GET /api/v1/walk-ins/search` is restricted to patients associated with the secretary's assigned doctor only
+- Secretary account creation endpoint `POST /api/v1/walk-ins/create-account` requires doctorId and verifies the secretary is assigned to that doctor
+- Walk-in account creation creates a PENDING patient-doctor association with only email, first name, and last name; full required details must be submitted later
+- Walk-in registration endpoint `POST /api/v1/walk-ins` verifies the secretary is assigned to the requested doctor before creating appointments or queue entries
+- Walk-in registration requires the patient to have a COMPLETE patient-doctor association before booking; PENDING associations are rejected with an error message
+- Walk-in registration preserves backward compatibility for legacy patients with appointment history but no association: checks appointments table as fallback, verifies profile completeness, and creates COMPLETE association during registration
+- Patient-doctor associations are automatically created or updated during walk-in registration within the same transaction as appointment and queue creation
+- New endpoint `POST /api/v1/walk-ins/submit-patient-details` allows secretaries to submit complete patient details (first name, middle name, last name, date of birth, sex, phone, address, emergency contacts, medical history, allergies, medications) during walk-in registration
+- Patient details submission allows legacy patients with appointment history but no association to complete details, enabling subsequent walk-in registration
+- Patient details submission validates that the patient is associated with the secretary's assigned doctor before allowing profile updates (via association or appointment history)
+- Patient details submission validates all required fields server-side (first name, last name, date of birth, sex, phone, address) and optional fields (middle name, emergency contacts, medical history, allergies, medications)
+- Patient details submission updates the patient-doctor association to COMPLETE status, allowing subsequent bookings
+- Patient details submission uses INSERT with ON CONFLICT UPDATE to prevent duplicate associations and safely handle legacy patients
+- All walk-in operations use transactions to ensure consistency between patient records, appointments, queue entries, capacity updates, and patient-doctor associations
+- Unauthorized secretary requests (secretary not assigned to the requested doctor) are rejected with 403 Forbidden before any database modifications
+- Explicit PENDING associations are authoritative and cannot be bypassed by appointment-history fallback
+- Migration `023_add_patient_required_fields.sql` adds middle_name, sex (with NOT NULL DEFAULT 'NOT_SPECIFIED'), and creates patient_doctor_associations table
+- Migration `023_add_patient_required_fields.sql` does NOT make address NOT NULL; it preserves historical NULL addresses for existing patients, but new API submissions validate address as a required field
+- Migration `024_add_walk_in_completion_status.sql` adds `details_completion_status` column to patient_doctor_associations to distinguish between pending preliminary accounts and completed patient records
+- Migration `024_add_walk_in_completion_status.sql` determines completion status from actual patient data: COMPLETE only when all required details are valid and populated (first name, last name, date of birth, valid sex, mobile number, non-empty address); otherwise PENDING
 
 ## Supabase Integration
 - Supabase Storage service (`backend/src/services/storageService.ts`) handles doctor photo operations: upload, delete, replace, and validation
