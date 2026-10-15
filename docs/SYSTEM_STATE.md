@@ -167,6 +167,23 @@ Current System State (October 2026):
 - Migration `024_add_walk_in_completion_status.sql` adds `details_completion_status` column to patient_doctor_associations to distinguish between pending preliminary accounts and completed patient records
 - Migration `024_add_walk_in_completion_status.sql` determines completion status from actual patient data: COMPLETE only when all required details are valid and populated (first name, last name, date of birth, valid sex, mobile number, non-empty address); otherwise PENDING
 
+## Doctor Dashboard Patient Records
+- Web Doctor Dashboard includes patient management functionality at `/doctor/patients` for viewing patient records
+- Doctor patient list page displays all patients who have associations or appointments with the authenticated doctor via `GET /api/v1/patients/doctor/:doctorId`
+- Doctor patient list page includes client-side search by name, email, and phone (server-side authorization is authoritative; client-side filtering is for convenience only)
+- Doctor patient list page displays statistics: Total Patients, Active Patients, Filtered Results, Search Active status
+- Doctor patient detail page at `/doctor/patients/[id]` displays read-only patient information including demographics, contact information, medical information, emergency contact, and consultation history
+- Doctor patient detail page fetches patient details via `GET /api/v1/patients/:id` with proper authorization
+- Doctor patient detail page fetches appointment history via `GET /api/v1/appointments?patientId=X` (DOCTOR-only endpoint with patientId filter)
+- Doctor patient detail page fetches prescription history via `GET /api/v1/prescriptions/patients/:id` (DOCTOR-authorized endpoint)
+- Backend `GET /api/v1/appointments` endpoint now supports optional `patientId` query parameter for DOCTOR role to filter appointments by patient
+- Backend patientId filter for appointments is safe because the query already filters by doctor_id (authenticated doctor), preventing cross-patient access
+- Doctor patient records are read-only; no editing endpoints are provided (patient identity fields remain patient-controlled)
+- Doctor consultation history includes appointments and prescriptions; visit history is deferred to future enhancement (no efficient endpoint exists for listing visits by patient)
+- All authorization is enforced on the backend; client-side filtering is NOT an authorization boundary
+- Web API client includes patient methods in `doctorApi.ts`: `getPatients()`, `getPatientById()`, `getPatientPrescriptions()`
+- TypeScript interfaces for Patient and Prescription are defined in `doctorApi.ts`
+
 ## Walk-in Registration Security
 - Walk-in registration endpoints enforce secretary-to-doctor assignment verification before allowing any operation
 - Secretary search endpoint `GET /api/v1/walk-ins/search` is restricted to patients associated with the secretary's assigned doctor only

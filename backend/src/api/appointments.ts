@@ -14,7 +14,7 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
   try {
     const userId = req.user!.id;
     const role = req.user!.role;
-    const { status, startDate, endDate } = req.query;
+    const { status, startDate, endDate, patientId } = req.query;
 
     let queryText = '';
     const params: any[] = [];
@@ -81,6 +81,12 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
     if (endDate) {
       params.push(endDate);
       queryText += ` AND a.appointment_date <= $${params.length}`;
+    }
+
+    // Add patientId filter for DOCTOR role (safe because query already filters by doctor_id)
+    if (role === 'DOCTOR' && patientId) {
+      params.push(patientId);
+      queryText += ` AND a.patient_id = $${params.length}`;
     }
 
     queryText += ' ORDER BY a.appointment_date DESC';

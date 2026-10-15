@@ -14,9 +14,11 @@ jest.mock('../database/connection', () => ({
   getClient: jest.fn(),
 }));
 
+let mockUser = { id: 'test-user-id', role: 'PATIENT' };
+
 jest.mock('../middleware/auth', () => ({
   authenticate: (req: any, res: any, next: any) => {
-    req.user = { id: 'test-user-id', role: 'PATIENT' };
+    req.user = mockUser;
     next();
   },
   authorize: (role: string) => (req: any, res: any, next: any) => {
@@ -39,6 +41,7 @@ describe('Patient API Validation', () => {
     app.use(express.json());
     app.use('/api/v1/patients', patientsRouter);
     jest.clearAllMocks();
+    mockUser = { id: 'test-user-id', role: 'PATIENT' };
   });
 
   describe('POST /api/v1/patients/submit-details', () => {
@@ -439,6 +442,182 @@ describe('Patient API Validation', () => {
       expect(response.status).toBe(200);
       expect(response.body.data.hasRecord).toBe(true);
       expect(response.body.message).toContain('Patient has existing record with this doctor');
+    });
+  });
+
+  describe('GET /api/v1/patients/:id authorization', () => {
+    it('should allow doctor to access patient through association', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('FROM patients p') && sql.includes('WHERE p.id = $1') && sql.includes('EXISTS')) {
+          // Main query with EXISTS subqueries
+          expect(params).toEqual(['patient-123', 'doctor-user-id']);
+          expect(sql).toContain('SELECT id FROM doctors WHERE user_id = $2');
+          return Promise.resolve({
+            rows: [{
+              id: 'patient-123',
+              user_id: 'patient-user-id',
+              first_name: 'John',
+              last_name: 'Doe',
+              email: 'john@example.com'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/patient-123');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.id).toBe('patient-123');
+    });
+
+    it('should allow doctor to access patient through appointment', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('FROM patients p') && sql.includes('WHERE p.id = $1') && sql.includes('EXISTS')) {
+          // Main query with EXISTS subqueries - association branch would be empty but appointment branch succeeds
+          expect(params).toEqual(['patient-123', 'doctor-user-id']);
+          expect(sql).toContain('SELECT id FROM doctors WHERE user_id = $2');
+          expect(sql).toContain('patient_doctor_associations');
+          expect(sql).toContain('appointments');
+          return Promise.resolve({
+            rows: [{
+              id: 'patient-123',
+              user_id: 'patient-user-id',
+              first_name: 'John',
+              last_name: 'Doe',
+              email: 'john@example.com'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/patient-123');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.id).toBe('patient-123');
+    });
+
+    it('should deny doctor access to unrelated patient (404)', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('FROM patients p') && sql.includes('WHERE p.id = $1') && sql.includes('EXISTS')) {
+          // Empty result from the actual detail query (no association or appointment)
+          expect(params).toEqual(['unrelated-patient', 'doctor-user-id']);
+          return Promise.resolve({ rows: [] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/unrelated-patient');
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.message).toContain('Patient not found or access denied');
+    });
+
+    it('should allow secretary to access patient through assigned doctor association', async () => {
+      mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('FROM patients p') && sql.includes('WHERE p.id = $1') && sql.includes('EXISTS')) {
+          // Main query with EXISTS subqueries
+          expect(params).toEqual(['patient-123', 'secretary-user-id']);
+          expect(sql).toContain('SELECT doctor_id FROM secretaries WHERE user_id = $2');
+          return Promise.resolve({
+            rows: [{
+              id: 'patient-123',
+              user_id: 'patient-user-id',
+              first_name: 'John',
+              last_name: 'Doe',
+              email: 'john@example.com'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/patient-123');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.id).toBe('patient-123');
+    });
+
+    it('should allow secretary to access patient through assigned doctor appointment', async () => {
+      mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('FROM patients p') && sql.includes('WHERE p.id = $1') && sql.includes('EXISTS')) {
+          // Main query with EXISTS subqueries - association branch would be empty but appointment branch succeeds
+          expect(params).toEqual(['patient-123', 'secretary-user-id']);
+          expect(sql).toContain('SELECT doctor_id FROM secretaries WHERE user_id = $2');
+          expect(sql).toContain('patient_doctor_associations');
+          expect(sql).toContain('appointments');
+          return Promise.resolve({
+            rows: [{
+              id: 'patient-123',
+              user_id: 'patient-user-id',
+              first_name: 'John',
+              last_name: 'Doe',
+              email: 'john@example.com'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/patient-123');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.id).toBe('patient-123');
+    });
+
+    it('should deny secretary access to unrelated patient (404)', async () => {
+      mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('FROM patients p') && sql.includes('WHERE p.id = $1') && sql.includes('EXISTS')) {
+          // Empty result from the actual detail query (no association or appointment)
+          expect(params).toEqual(['unrelated-patient', 'secretary-user-id']);
+          return Promise.resolve({ rows: [] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/unrelated-patient');
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.message).toContain('Patient not found or access denied');
+    });
+
+    it('should reject unsupported roles with 403', async () => {
+      mockUser = { id: 'admin-user-id', role: 'ADMIN' };
+
+      const response = await request(app)
+        .get('/api/v1/patients/patient-123');
+
+      expect(response.status).toBe(403);
+      expect(response.body.error.message).toContain('Invalid role');
+    });
+
+    it('should reject patient role with 403', async () => {
+      mockUser = { id: 'patient-user-id', role: 'PATIENT' };
+
+      const response = await request(app)
+        .get('/api/v1/patients/patient-123');
+
+      expect(response.status).toBe(403);
+      expect(response.body.error.message).toContain('Invalid role');
     });
   });
 });

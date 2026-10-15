@@ -1,6 +1,8 @@
 import { apiClient } from './apiClient';
 
 export interface DoctorProfile {
+  id: string;
+  user_id: string;
   first_name: string;
   middle_name?: string | null;
   last_name: string;
@@ -48,6 +50,46 @@ export interface SubmitProfileResponse {
   error?: string;
 }
 
+export interface Patient {
+  id: string;
+  user_id: string;
+  first_name: string;
+  middle_name?: string | null;
+  last_name: string;
+  date_of_birth?: string;
+  sex?: string;
+  phone?: string;
+  address?: string;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  medical_history?: string | null;
+  allergies?: string | null;
+  current_medications?: string | null;
+  email?: string;
+}
+
+export interface Prescription {
+  id: string;
+  visit_id: string;
+  patient_id: string;
+  doctor_id: string;
+  prescription_date: string;
+  notes?: string | null;
+  doctor_first_name?: string;
+  doctor_last_name?: string;
+  items?: PrescriptionItem[];
+}
+
+export interface PrescriptionItem {
+  id: string;
+  prescription_id: string;
+  medication_name: string;
+  dosage?: string;
+  frequency?: string;
+  duration?: string;
+  instructions?: string;
+}
+
 export const doctorApi = {
   // Get current doctor's profile
   getProfile: async (): Promise<{ success: boolean; data?: DoctorProfile; error?: string }> => {
@@ -87,5 +129,20 @@ export const doctorApi = {
   // Delete professional photo
   deletePhoto: async (): Promise<{ success: boolean; error?: string }> => {
     return apiClient.delete<{ success: boolean }>('/doctors/me/photo');
+  },
+
+  // Get patients for the authenticated doctor
+  getPatients: async (doctorId: string): Promise<{ success: boolean; data?: Patient[]; error?: string }> => {
+    return apiClient.get<Patient[]>(`/patients/doctor/${doctorId}`);
+  },
+
+  // Get patient by ID
+  getPatientById: async (patientId: string): Promise<{ success: boolean; data?: Patient; error?: string }> => {
+    return apiClient.get<Patient>(`/patients/${patientId}`);
+  },
+
+  // Get patient's prescriptions
+  getPatientPrescriptions: async (patientId: string): Promise<{ success: boolean; data?: Prescription[]; error?: string }> => {
+    return apiClient.get<Prescription[]>(`/prescriptions/patients/${patientId}`);
   },
 };
