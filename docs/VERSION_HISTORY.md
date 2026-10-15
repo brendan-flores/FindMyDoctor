@@ -4,6 +4,38 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.02 (In Progress)
+
+**Purpose:** Secretary queue management web dashboard
+
+**Significant Features:**
+- Secretary queue management page: Implemented complete daily queue management interface for secretaries at `/secretary/queue`
+- Date filtering: Added date picker to view queue for specific dates
+- Doctor assignment enforcement: Queue automatically filtered to show only patients for the secretary's assigned doctor
+- Unified queue display: Shows both online and walk-in patients in a single unified queue with queue numbers
+- Queue status management: Implemented status-based actions (Call Next, Start Checkup, Complete, Skip, Not Present)
+- Registration source display: Shows whether each patient registered online or as a walk-in
+
+**Improvements:**
+- Queue status color coding: Visual indicators for different queue statuses (Waiting, Called, In Checkup, Completed, Not Present, Skipped, Cancelled, No Show)
+- Action button state management: Buttons dynamically appear based on current queue status
+- Loading and empty states: Proper loading indicators and empty state messages
+- Toast notifications: Success and error feedback for all queue actions
+- Responsive date picker: Custom date picker component for selecting queue dates
+
+**Architecture:**
+- Web: Added complete queue management page at `/web/src/app/secretary/queue/page.tsx`
+- Web: Connected to existing backend queue API endpoints (`/api/v1/queue`)
+- Web: Integrated with existing apiClient for authenticated API calls
+- Web: Reused existing Toast component for notifications
+- Web: Followed established web component patterns from doctor schedule page
+
+**Documentation:**
+- Updated CURRENT_VERSION.md to 01.02
+- Added VERSION_HISTORY.md entry for 01.02
+
+---
+
 ### 01.01 (In Progress)
 
 **Purpose:** Queue management improvements and navigation fixes
