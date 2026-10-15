@@ -96,7 +96,9 @@ backend/
 │   ├── 014_add_login_otp_challenges.sql
 │   ├── 015_enforce_secretary_doctor_relationship.sql
 │   ├── 016_doctor_profile_fields.sql
-│   └── 017_modify_pending_doctor_signup_for_basic_flow.sql
+│   ├── 017_modify_pending_doctor_signup_for_basic_flow.sql
+│   ├── 024_add_walk_in_completion_status.sql
+│   └── 025_restore_phone_column.sql
 ├── .env.example
 ├── package.json
 ├── tsconfig.json
@@ -369,7 +371,7 @@ If no capacity row exists, the system calculates capacity from doctor's working 
 
 ## Database Schema
 
-The backend uses the PostgreSQL schema defined in the `/database/` directory with sequential migrations:
+The backend uses the PostgreSQL schema defined in the `/database/` directory with sequential migrations (selected migrations shown):
 
 - `001_initial_schema.sql` - Base schema with users, patients, doctors, appointments, queue, visits, prescriptions, payments, conversations, notifications
 - `002_sample_data.sql` - Sample data for testing
@@ -383,6 +385,8 @@ The backend uses the PostgreSQL schema defined in the `/database/` directory wit
 - `015_enforce_secretary_doctor_relationship.sql` - Added doctor_id to secretaries
 - `016_doctor_profile_fields.sql` - Added extended doctor profile fields
 - `017_modify_pending_doctor_signup_for_basic_flow.sql` - Simplified doctor signup flow
+- `024_add_walk_in_completion_status.sql` - Added completion status to patient_doctor_associations for walk-in workflow
+- `025_restore_phone_column.sql` - Restores phone column to patients table (required for patient-details and profile-completion workflows)
 
 Key tables:
 - `users` - Base user accounts with authentication
@@ -467,6 +471,9 @@ Additional migrations are applied individually:
 npm run migrate:remove-clinics       # 003_remove_clinics.sql
 npm run migrate:doctor-registration  # 005_doctor_self_registration.sql
 ```
+
+**Important Migration Note:**
+Migration `025_restore_phone_column.sql` restores the `phone` column to the `patients` table. This column is required by the patient-details and profile-completion workflows. If your existing database is missing the `phone` column, you must apply migration 025 before migration 024_add_walk_in_completion_status.sql to avoid errors during the update logic that references `p.phone`. Fresh databases created from migration 001 already include the column.
 
 ### Building for Production
 ```bash

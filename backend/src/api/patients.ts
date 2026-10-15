@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requirePasswordChange } from '../middleware/auth';
+import { validate as uuidValidate } from 'uuid';
 
 const router = Router();
 
@@ -664,6 +665,295 @@ router.get('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
   } catch (err: any) {
     console.error('Patient fetch error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch patient'));
+  }
+});
+
+// Update patient by ID (for doctors and secretaries)
+// Doctor: can only update patients they have associations or appointments with
+// Secretary: can only update patients of their assigned doctor
+router.put('/:id', authenticate, requirePasswordChange, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id: patientId } = req.params;
+    const userId = req.user!.id;
+    const role = req.user!.role;
+
+    // UUID validation
+    if (!uuidValidate(patientId)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid patient ID format'));
+    }
+
+    // Reject unsupported roles
+    if (role !== 'DOCTOR' && role !== 'SECRETARY') {
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Invalid role'));
+    }
+
+    const {
+      firstName,
+      lastName,
+      dateOfBirth,
+      sex,
+      phone,
+      address,
+      middleName,
+      emergencyContactName,
+      emergencyContactPhone,
+      medicalHistory,
+      allergies,
+      currentMedications
+    } = req.body;
+
+    // Validate required fields (must be present in request)
+    if (firstName === undefined) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'First name is required'));
+    }
+    if (lastName === undefined) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name is required'));
+    }
+    if (dateOfBirth === undefined) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date of birth is required'));
+    }
+    if (sex === undefined) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Sex is required'));
+    }
+    if (phone === undefined) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number is required'));
+    }
+    if (address === undefined) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Address is required'));
+    }
+
+    // Validate required field types
+    if (typeof firstName !== 'string') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'First name must be a string'));
+    }
+    if (typeof lastName !== 'string') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name must be a string'));
+    }
+    if (typeof sex !== 'string') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Sex must be a string'));
+    }
+    if (typeof phone !== 'string') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be a string'));
+    }
+    if (typeof address !== 'string') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Address must be a string'));
+    }
+
+    // Trim required fields
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+    const trimmedSex = sex.trim().toUpperCase();
+    const trimmedPhone = phone.trim();
+    const trimmedAddress = address.trim();
+
+    // Validate trimmed required fields
+    if (trimmedFirstName.length === 0 || trimmedFirstName.length > 100) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'First name must be 1-100 characters'));
+    }
+    if (trimmedLastName.length === 0 || trimmedLastName.length > 100) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name must be 1-100 characters'));
+    }
+    if (trimmedPhone.length === 0 || trimmedPhone.length > 20) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 1-20 characters'));
+    }
+    if (trimmedAddress.length === 0) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Address is required'));
+    }
+
+    // Validate sex value
+    if (!VALID_SEX_VALUES.includes(trimmedSex)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Sex must be one of: MALE, FEMALE, OTHER, NOT_SPECIFIED'));
+    }
+
+    // Validate mobile number format
+    if (!MOBILE_REGEX.test(trimmedPhone)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must contain only digits, spaces, hyphens, plus sign, or parentheses'));
+    }
+
+    // Date validation order: string type → exact YYYY-MM-DD syntax → valid calendar date → year range (1900–2100) → not in future
+    if (typeof dateOfBirth !== 'string') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date of birth must be a string'));
+    }
+
+    // Validate exact YYYY-MM-DD syntax
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(dateOfBirth)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date of birth must be in YYYY-MM-DD format'));
+    }
+
+    // Parse components for calendar date validation
+    const parts = dateOfBirth.split('-');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+
+    // Validate calendar date (impossible dates like February 30)
+    const dob = new Date(Date.UTC(year, month - 1, day));
+    if (
+      dob.getUTCFullYear() !== year ||
+      dob.getUTCMonth() !== month - 1 ||
+      dob.getUTCDate() !== day
+    ) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid date of birth'));
+    }
+
+    // Validate year range (1900-2100)
+    if (year < 1900 || year > 2100) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date of birth year must be between 1900 and 2100'));
+    }
+
+    // Validate not in future (timezone-independent)
+    const now = new Date();
+    const nowUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    if (dob > nowUtc) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date of birth cannot be in the future'));
+    }
+
+    // Optional field validation helper (returns string | null, never undefined)
+    const validateOptionalString = (value: unknown, fieldName: string): string | null => {
+      if (value === null) return null; // Explicit null → SQL NULL
+      if (typeof value !== 'string') {
+        throw new Error(`${fieldName} must be a string or null`);
+      }
+      const trimmed = value.trim();
+      if (trimmed === '') return null; // Empty/whitespace → SQL NULL
+      return trimmed; // Non-empty → trimmed string
+    };
+
+    // Presence flags derived from request field presence (using 'in' operator)
+    const hasMiddleName = 'middleName' in req.body;
+    const hasEmergencyContactName = 'emergencyContactName' in req.body;
+    const hasEmergencyContactPhone = 'emergencyContactPhone' in req.body;
+    const hasMedicalHistory = 'medicalHistory' in req.body;
+    const hasAllergies = 'allergies' in req.body;
+    const hasCurrentMedications = 'currentMedications' in req.body;
+
+    // Validate optional fields
+    let validatedMiddleName: string | null = null;
+    let validatedEmergencyContactName: string | null = null;
+    let validatedEmergencyContactPhone: string | null = null;
+    let validatedMedicalHistory: string | null = null;
+    let validatedAllergies: string | null = null;
+    let validatedCurrentMedications: string | null = null;
+
+    try {
+      validatedMiddleName = hasMiddleName ? validateOptionalString(middleName, 'middleName') : null;
+      validatedEmergencyContactName = hasEmergencyContactName ? validateOptionalString(emergencyContactName, 'emergencyContactName') : null;
+      validatedEmergencyContactPhone = hasEmergencyContactPhone ? validateOptionalString(emergencyContactPhone, 'emergencyContactPhone') : null;
+      validatedMedicalHistory = hasMedicalHistory ? validateOptionalString(medicalHistory, 'medicalHistory') : null;
+      validatedAllergies = hasAllergies ? validateOptionalString(allergies, 'allergies') : null;
+      validatedCurrentMedications = hasCurrentMedications ? validateOptionalString(currentMedications, 'currentMedications') : null;
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Validation error';
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, errorMessage));
+    }
+
+    // Validate middle name length if present
+    if (validatedMiddleName && validatedMiddleName.length > 100) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Middle name must be maximum 100 characters'));
+    }
+
+    // Build SQL query based on role
+    let queryText = '';
+    const params = [
+      patientId,                        // $1 (patient ID from req.params.id)
+      userId,                           // $2 (authenticated user ID from req.user.id)
+      trimmedFirstName,                 // $3 (required: first_name)
+      trimmedLastName,                  // $4 (required: last_name)
+      dateOfBirth,                      // $5 (required: date_of_birth)
+      trimmedSex,                       // $6 (required: sex)
+      trimmedPhone,                     // $7 (required: phone)
+      trimmedAddress,                   // $8 (required: address)
+      hasMiddleName,                    // $9 (optional: middle_name presence flag)
+      validatedMiddleName,              // $10 (optional: middle_name value)
+      hasEmergencyContactName,          // $11 (optional: emergency_contact_name presence flag)
+      validatedEmergencyContactName,    // $12 (optional: emergency_contact_name value)
+      hasEmergencyContactPhone,         // $13 (optional: emergency_contact_phone presence flag)
+      validatedEmergencyContactPhone,  // $14 (optional: emergency_contact_phone value)
+      hasMedicalHistory,               // $15 (optional: medical_history presence flag)
+      validatedMedicalHistory,          // $16 (optional: medical_history value)
+      hasAllergies,                     // $17 (optional: allergies presence flag)
+      validatedAllergies,               // $18 (optional: allergies value)
+      hasCurrentMedications,            // $19 (optional: current_medications presence flag)
+      validatedCurrentMedications,      // $20 (optional: current_medications value)
+    ];
+
+    if (role === 'DOCTOR') {
+      queryText = `
+        UPDATE patients SET
+          first_name = $3,
+          last_name = $4,
+          date_of_birth = $5::date,
+          sex = $6,
+          phone = $7,
+          address = $8,
+          middle_name = CASE WHEN $9::boolean THEN $10 ELSE middle_name END,
+          emergency_contact_name = CASE WHEN $11::boolean THEN $12 ELSE emergency_contact_name END,
+          emergency_contact_phone = CASE WHEN $13::boolean THEN $14 ELSE emergency_contact_phone END,
+          medical_history = CASE WHEN $15::boolean THEN $16 ELSE medical_history END,
+          allergies = CASE WHEN $17::boolean THEN $18 ELSE allergies END,
+          current_medications = CASE WHEN $19::boolean THEN $20 ELSE current_medications END,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        AND (
+          EXISTS (
+            SELECT 1 FROM patient_doctor_associations pda
+            WHERE pda.patient_id = $1
+            AND pda.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)
+          )
+          OR EXISTS (
+            SELECT 1 FROM appointments a
+            WHERE a.patient_id = $1
+            AND a.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)
+          )
+        )
+        RETURNING id, first_name, middle_name, last_name, date_of_birth, sex, phone, address,
+                 emergency_contact_name, emergency_contact_phone, medical_history, allergies, current_medications
+      `;
+    } else if (role === 'SECRETARY') {
+      queryText = `
+        UPDATE patients SET
+          first_name = $3,
+          last_name = $4,
+          date_of_birth = $5::date,
+          sex = $6,
+          phone = $7,
+          address = $8,
+          middle_name = CASE WHEN $9::boolean THEN $10 ELSE middle_name END,
+          emergency_contact_name = CASE WHEN $11::boolean THEN $12 ELSE emergency_contact_name END,
+          emergency_contact_phone = CASE WHEN $13::boolean THEN $14 ELSE emergency_contact_phone END,
+          medical_history = CASE WHEN $15::boolean THEN $16 ELSE medical_history END,
+          allergies = CASE WHEN $17::boolean THEN $18 ELSE allergies END,
+          current_medications = CASE WHEN $19::boolean THEN $20 ELSE current_medications END,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        AND (
+          EXISTS (
+            SELECT 1 FROM patient_doctor_associations pda
+            WHERE pda.patient_id = $1
+            AND pda.doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2)
+          )
+          OR EXISTS (
+            SELECT 1 FROM appointments a
+            WHERE a.patient_id = $1
+            AND a.doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2)
+          )
+        )
+        RETURNING id, first_name, middle_name, last_name, date_of_birth, sex, phone, address,
+                 emergency_contact_name, emergency_contact_phone, medical_history, allergies, current_medications
+      `;
+    }
+
+    const result = await query(queryText, params);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Patient not found or access denied'));
+    }
+
+    res.json(success(result.rows[0], 'Patient updated successfully'));
+  } catch (err: any) {
+    console.error('Patient update error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update patient'));
   }
 });
 

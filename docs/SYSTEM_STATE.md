@@ -167,6 +167,32 @@ Current System State (October 2026):
 - Migration `024_add_walk_in_completion_status.sql` adds `details_completion_status` column to patient_doctor_associations to distinguish between pending preliminary accounts and completed patient records
 - Migration `024_add_walk_in_completion_status.sql` determines completion status from actual patient data: COMPLETE only when all required details are valid and populated (first name, last name, date of birth, valid sex, mobile number, non-empty address); otherwise PENDING
 
+## Secretary Patient Record Management
+- Secretary can update patient records via `PUT /api/v1/patients/:id` (requires SECRETARY authentication, restricted to patients of their assigned doctor)
+- Doctor can update patient records via `PUT /api/v1/patients/:id` (requires DOCTOR authentication, restricted to patients they have associations or appointments with)
+- Authorization for patient updates uses unambiguous SQL with EXISTS subqueries to verify patient-doctor relationship before allowing updates
+- DOCTOR authorization SQL: `WHERE patients.id = $1 AND (EXISTS association with authenticated doctor OR EXISTS appointment with authenticated doctor)`
+- SECRETARY authorization SQL: `WHERE patients.id = $1 AND (EXISTS association with secretary's assigned doctor OR EXISTS appointment with secretary's assigned doctor)`
+- Authorization subqueries include `patient_id = $1` in each EXISTS clause to prevent bypass attacks
+- Unauthorized patient update attempts return unified 404 response (non-disclosing, no information leakage)
+- Patient update endpoint requires six required fields on every update: firstName, lastName, dateOfBirth, sex, phone, address
+- Optional fields (middleName, emergencyContactName, emergencyContactPhone, medicalHistory, allergies, currentMedications) support explicit clearing via null or empty string
+- Optional field presence is tracked using boolean flags derived from request field presence (using 'in' operator), not from validated values
+- Date validation order: string type check → exact YYYY-MM-DD syntax validation → calendar date validation (impossible dates like February 30) → year range validation (1900-2100) → future date check (timezone-independent using UTC)
+- UUID validation uses existing `uuid` package dependency (v9.0.1) to validate patient ID format before database operations
+- Optional field validation uses `unknown` type with narrowing before error message extraction (type-safe error handling)
+- TypeScript interface `UpdatePatientRequest` in secretaryApi.ts reflects the required field contract (six required fields, optional fields with null support)
+- Web Secretary patient list page at `/secretary/patients` displays patients of the secretary's assigned doctor via `GET /api/v1/patients/search`
+- Web Secretary patient detail/edit page at `/secretary/patients/[id]` allows viewing and editing patient information with edit mode toggle
+- Web Secretary patient detail page includes help text below optional fields: "Leave empty to clear this field"
+- Web Secretary API client (`secretaryApi.ts`) provides TypeScript interfaces and methods for secretary-specific operations
+- Web Secretary walk-ins page at `/secretary/walk-ins` provides complete multi-step walk-in registration workflow
+- Walk-ins workflow: Search patient by email → Create account if not found → Submit patient details → Select appointment date → Confirm → Register with queue assignment
+- Walk-ins page displays assigned doctor only (no doctor selection dropdown per user decision)
+- Walk-ins page shows temporary password to secretary after account creation for patient credential delivery
+- All backend patient update operations use transactions and proper parameter mapping to ensure data consistency
+- Backend tests verify SQL structure, parameter mapping, validation logic, role rejection, and error responses for PUT /api/v1/patients/:id endpoint
+
 ## Doctor Dashboard Patient Records
 - Web Doctor Dashboard includes patient management functionality at `/doctor/patients` for viewing patient records
 - Doctor patient list page displays all patients who have associations or appointments with the authenticated doctor via `GET /api/v1/patients/doctor/:doctorId`
