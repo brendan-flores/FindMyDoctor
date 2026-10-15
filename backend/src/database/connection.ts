@@ -6,6 +6,7 @@ const poolConfig: PoolConfig = config.database.url
   ? {
       connectionString: config.database.url,
       max: 10, // Reduced pool size for remote connections
+      ssl: { rejectUnauthorized: false }, // Required for Render PostgreSQL
       idleTimeoutMillis: 10000, // Close idle clients after 10 seconds
       connectionTimeoutMillis: 10000, // Increased timeout for remote connections (10 seconds)
       statement_timeout: 30000, // Query timeout (30 seconds)
