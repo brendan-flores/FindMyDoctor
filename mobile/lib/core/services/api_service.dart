@@ -179,6 +179,7 @@ class ApiService {
       body: {
         'email': email,
         'password': password,
+        'expectedRole': 'PATIENT',
       },
       requireAuth: false,
     );

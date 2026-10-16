@@ -16,7 +16,7 @@ router.get('/:date', authenticate, requireSecretaryPasswordChange, requireSecret
     let queryText = `
       SELECT q.*,
              p.first_name as patient_first_name, p.last_name as patient_last_name,
-             p.email as patient_email,
+             u.email as patient_email,
              d.first_name as doctor_first_name, d.last_name as doctor_last_name,
              COALESCE(q.registration_source, 'ONLINE') as registration_source
       FROM queue_entries q

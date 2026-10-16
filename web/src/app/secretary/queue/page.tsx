@@ -53,8 +53,10 @@ export default function SecretaryQueue() {
     try {
       const response = await secretaryApi.getQueue(selectedDate);
 
-      if (response.success && response.data) {
+      if (response.success && Array.isArray(response.data)) {
         setQueueEntries(response.data);
+      } else if (response.success) {
+        setError('Invalid queue data received from server');
       } else {
         setError(response.error || 'Failed to fetch queue');
       }

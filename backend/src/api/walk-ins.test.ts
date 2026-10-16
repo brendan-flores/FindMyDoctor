@@ -1929,5 +1929,135 @@ describe('Walk-ins API Security', () => {
       expect(response.status).toBe(201);
       expect(response.body.data.queueNumber).toBe(5);
     });
+
+    it('should persist all database records in correct order with correct data', async () => {
+      const executionOrder: string[] = [];
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          executionOrder.push(sql.substring(0, 50));
+
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'assigned-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors WHERE id = $1 AND is_approved = true')) {
+            return { rows: [{ id: 'assigned-doctor-id', first_name: 'Dr.', last_name: 'Smith', is_approved: true }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [] };
+          }
+          if (sql.includes('INSERT INTO users')) {
+            // Verify user insert includes must_change_password = true and PATIENT role
+            expect(sql).toContain('must_change_password');
+            expect(sql).toContain('true');
+            expect(sql).toContain('PATIENT');
+            return { rows: [{ id: 'new-user-id', email: 'new@example.com', must_change_password: true }] };
+          }
+          if (sql.includes('INSERT INTO patients')) {
+            // Verify patient insert includes all required fields
+            expect(sql).toContain('first_name');
+            expect(sql).toContain('middle_name');
+            expect(sql).toContain('last_name');
+            expect(sql).toContain('date_of_birth');
+            expect(sql).toContain('sex');
+            expect(sql).toContain('phone');
+            expect(sql).toContain('address');
+            expect(params[1]).toBe('John');
+            expect(params[3]).toBe('Doe');
+            expect(params[5]).toBe('MALE');
+            expect(params[7]).toBe('123 Street');
+            return { rows: [{ id: 'new-patient-id' }] };
+          }
+          if (sql.includes('INSERT INTO patient_doctor_associations')) {
+            // Verify association is COMPLETE and uses assigned doctor
+            expect(sql).toContain('COMPLETE');
+            expect(params[1]).toBe('assigned-doctor-id');
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT pg_try_advisory_xact_lock')) {
+            return { rows: [{ lock_acquired: true }] };
+          }
+          if (sql.includes('SELECT * FROM daily_capacities')) {
+            return { rows: [{ registered_count: 0, final_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO appointments')) {
+            // Verify appointment uses clinic date
+            expect(sql).toContain('appointment_date');
+            expect(sql).toContain('SCHEDULED');
+            return { rows: [{ id: 'new-appointment-id' }] };
+          }
+          if (sql.includes('SELECT COALESCE(MAX(queue_number)')) {
+            return { rows: [{ next_queue: 3 }] };
+          }
+          if (sql.includes('INSERT INTO queue_entries')) {
+            // Verify queue entry has correct fields
+            expect(sql).toContain('patient_id');
+            expect(sql).toContain('doctor_id');
+            expect(sql).toContain('appointment_id');
+            expect(sql).toContain('queue_date');
+            expect(sql).toContain('queue_number');
+            expect(sql).toContain('registration_source');
+            expect(sql).toContain('WALK_IN');
+            expect(sql).toContain('WAITING');
+            expect(params[4]).toBe(3); // queue_number
+            return { rows: [] };
+          }
+          if (sql.includes('UPDATE daily_capacities')) {
+            // Verify capacity is incremented
+            expect(sql).toContain('registered_count = registered_count + 1');
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT final_capacity')) {
+            return { rows: [{ total_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO notifications')) {
+            return { rows: [] };
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'new@example.com',
+          firstName: 'John',
+          middleName: 'A',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Street'
+        });
+
+      expect(response.status).toBe(201);
+
+      // Verify execution order: users -> patients -> associations -> lock -> capacity -> appointment -> queue -> capacity update
+      const insertUserIndex = executionOrder.findIndex(s => s.includes('INSERT INTO users'));
+      const insertPatientIndex = executionOrder.findIndex(s => s.includes('INSERT INTO patients'));
+      const insertAssociationIndex = executionOrder.findIndex(s => s.includes('INSERT INTO patient_doctor_associations'));
+      const insertAppointmentIndex = executionOrder.findIndex(s => s.includes('INSERT INTO appointments'));
+      const insertQueueIndex = executionOrder.findIndex(s => s.includes('INSERT INTO queue_entries'));
+      const updateCapacityIndex = executionOrder.findIndex(s => s.includes('UPDATE daily_capacities'));
+
+      expect(insertUserIndex).toBeGreaterThanOrEqual(0);
+      expect(insertPatientIndex).toBeGreaterThan(insertUserIndex);
+      expect(insertAssociationIndex).toBeGreaterThan(insertPatientIndex);
+      expect(insertAppointmentIndex).toBeGreaterThan(insertAssociationIndex);
+      expect(insertQueueIndex).toBeGreaterThan(insertAppointmentIndex);
+      expect(updateCapacityIndex).toBeGreaterThan(insertQueueIndex);
+
+      // Verify COMMIT was called (not ROLLBACK)
+      const commitCalls = mockClient.query.mock.calls.filter((call: any[]) =>
+        call[0].includes('COMMIT')
+      );
+      expect(commitCalls.length).toBe(1);
+
+      const rollbackCalls = mockClient.query.mock.calls.filter((call: any[]) =>
+        call[0].includes('ROLLBACK')
+      );
+      expect(rollbackCalls.length).toBe(0);
+    });
   });
 });

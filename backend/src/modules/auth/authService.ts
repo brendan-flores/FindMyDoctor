@@ -17,7 +17,7 @@ export interface RegisterData {
 export interface LoginData {
   email: string;
   password: string;
-  expectedRole: 'DOCTOR' | 'SECRETARY' | 'ADMIN';
+  expectedRole: 'PATIENT' | 'DOCTOR' | 'SECRETARY' | 'ADMIN';
   rememberMe?: boolean;
   trustedBrowserToken?: string;
 }
