@@ -227,14 +227,19 @@ web/
 │   │   ├── doctor/            # Doctor dashboard namespace
 │   │   │   ├── dashboard/     # Doctor dashboard
 │   │   │   ├── appointments/
-│   │   │   ├── schedule/
+│   │   │   ├── schedule/      # Working Hours, Exceptions, Break Periods, Capacity
 │   │   │   ├── patients/
+│   │   │   ├── secretaries/
 │   │   │   ├── prescriptions/
+│   │   │   ├── profile/
 │   │   │   └── settings/      # Doctor settings (2FA toggle)
 │   │   └── secretary/         # Secretary dashboard namespace
 │   │       ├── dashboard/     # Secretary dashboard
 │   │       ├── queue/
 │   │       ├── walk-ins/
+│   │       ├── patients/
+│   │       ├── appointments/
+│   │       ├── schedule/      # Working Hours, Exceptions, Break Periods, Capacity
 │   │       ├── payments/
 │   │       ├── conversations/
 │   │       ├── profile/       # Secretary profile (view/edit)
@@ -741,10 +746,13 @@ Appointments
 
 Schedule
  ├── Working Hours
- ├── Availability
- └── Daily Capacity
+ ├── Exceptions
+ ├── Break Periods
+ └── Capacity
 
 Patients
+
+Secretary
 
 Prescriptions
 
@@ -762,11 +770,15 @@ Dashboard
 
 Daily Queue
 
+Walk-ins
+
+Patients
+
 Appointments
 
-Conversations
+Schedule
 
-Walk-in Registration
+Conversations
 
 Payments
 
@@ -775,7 +787,7 @@ Profile
 Settings
 ```
 
-The secretary is the primary operational user for daily queue and payment verification.
+The Secretary Schedule page is at `/secretary/schedule`, replacing `/secretary/capacity`; its tabs are Working Hours (read-only), Exceptions, Break Periods, and Capacity. The secretary is the primary operational user for daily queue and payment verification.
 
 ---
 
@@ -836,6 +848,10 @@ The schedule module manages:
 - Unavailable periods.
 - Doctor availability.
 
+Doctors may create, edit, and delete weekly working hours. Authorized secretaries may view, but not create, edit, or delete, their assigned doctor's weekly working hours; they may add, edit, and delete the assigned doctor's exceptions and break periods. Schedule writes are restricted to the authenticated doctor's own records or the secretary's assigned doctor (`secretaries.doctor_id`); unauthorized access returns 404. Validate start <= end, require breaks to fall within working hours, and prevent overlapping breaks.
+
+Before saving an exception or break-period change that affects dates with active appointments, warn the doctor or secretary with the number of affected appointments and require explicit confirmation. After confirmation, save the change and notify affected patients through the notification module. Do not automatically cancel affected appointments; the secretary handles them through the existing cancellation and rescheduling flows.
+
 The default consultation duration is:
 
 **30 minutes**
@@ -874,13 +890,13 @@ Example:
 
 ### Final Capacity
 
-If the doctor/secretary has configured a lower maximum:
+If the doctor or an authorized secretary has configured a lower maximum for the date:
 
 ```text
 Final Capacity = MIN(Calculated Capacity, Configured Capacity)
 ```
 
-If there is no configured lower limit, the calculated capacity can be used.
+If there is no configured lower limit, the calculated capacity can be used. A secretary may configure capacity only for their assigned doctor.
 
 ---
 
@@ -1644,6 +1660,7 @@ Notifications may be generated when:
 - Payment is verified.
 - Prescription is created.
 - Appointment changes.
+- A confirmed exception or break-period change affects dates with active appointments.
 - Waitlist status changes.
 
 ---
@@ -1662,7 +1679,29 @@ Base:
 GET  /doctors/:id/capacity
 PUT  /doctors/:id/capacity
 POST /doctors/:id/capacity/:date
+
+GET  /secretaries/managed-doctors/capacity
+PUT  /secretaries/managed-doctors/capacity
+POST /secretaries/managed-doctors/capacity/:date
 ```
+
+### Secretary Schedule
+
+```text
+GET    /secretaries/managed-doctors/schedules
+
+GET    /secretaries/managed-doctors/unavailability
+POST   /secretaries/managed-doctors/unavailability
+PUT    /secretaries/managed-doctors/unavailability/:id
+DELETE /secretaries/managed-doctors/unavailability/:id
+
+GET    /secretaries/managed-doctors/break-periods
+POST   /secretaries/managed-doctors/break-periods
+PUT    /secretaries/managed-doctors/break-periods/:id
+DELETE /secretaries/managed-doctors/break-periods/:id
+```
+
+Secretary schedule endpoints use the `secretaries.doctor_id` ownership check. Weekly schedules are read-only for secretaries. Exception and break-period writes that affect active appointments require the warning and explicit confirmation before saving.
 
 ### Queue
 

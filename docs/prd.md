@@ -18,7 +18,7 @@ Patients can search for doctors, view doctor profiles and availability, reserve 
 
 Doctors can manage their availability, daily patient capacity, appointments, patient information, visit history, and digital prescriptions.
 
-Secretaries are responsible for operational tasks such as walk-in registration, daily queue management, patient communication, payment verification, daily capacity management, and appointment-related assistance.
+Secretaries are responsible for operational tasks such as walk-in registration, daily queue management, patient communication, payment verification, daily capacity management, day-to-day exception and break-period changes, and appointment-related assistance.
 
 Administrators manage users, doctors, secretaries, and approvals.
 
@@ -170,6 +170,7 @@ Doctors can:
 - Manage their profile.
 - Manage working hours.
 - Manage availability.
+- Manage date-specific exceptions and break periods.
 - Configure daily patient capacity.
 - View appointments.
 - View queue information where authorized.
@@ -189,7 +190,9 @@ Secretaries can:
 - Register walk-in patients.
 - Locate existing patient accounts.
 - Create patient accounts.
-- Manage daily patient capacity where authorized.
+- View their assigned doctor's weekly working hours without changing them.
+- Add, edit, and delete date-specific exceptions and break periods for their assigned doctor.
+- Configure daily patient capacity for their assigned doctor.
 - Manage the unified queue.
 - Call patients.
 - Skip or mark patients as not present.
@@ -291,13 +294,19 @@ The system may calculate this as the estimated daily capacity.
 
 ### Configured Capacity
 
-The doctor and authorized secretary may configure a lower maximum patient capacity for a particular date.
+The doctor and an authorized secretary may configure a lower maximum patient capacity for a particular date. A secretary may configure capacity only for their assigned doctor.
 
 The configured limit shall override the calculated capacity when it is lower.
 
 ### Final Daily Capacity
 
 The final allowed capacity is the effective maximum used for the daily queue.
+
+### Schedule Management Permissions
+
+Doctors may create, edit, and delete weekly working hours, exceptions, and break periods. Secretaries may view weekly working hours but may not create, edit, or delete them. A secretary may add, edit, and delete date-specific exceptions and break periods only for their assigned doctor, and may configure capacity for that doctor.
+
+Schedule changes must follow the doctor schedule validation rules: start <= end, breaks must fall within working hours, and breaks must not overlap. Before saving an exception or break-period change that affects dates with active appointments, the system must show the secretary or doctor the number of affected appointments and require explicit confirmation. After confirmation, the change is saved and affected patients are notified through the notification module. Appointments are not automatically cancelled; the secretary handles them through the existing cancel and reschedule flows.
 
 ---
 
@@ -827,11 +836,11 @@ The system shall calculate estimated daily capacity from available consultation 
 
 ## FR-009 — Configured Capacity
 
-The doctor and authorized secretary shall be able to configure a daily maximum.
+The doctor and an authorized secretary shall be able to configure a daily maximum for a particular date. A secretary may configure capacity only for their assigned doctor.
 
 ## FR-010 — Capacity Override
 
-The configured lower maximum shall override calculated capacity.
+The configured lower maximum shall override calculated capacity. A secretary may configure this limit only for their assigned doctor.
 
 ## FR-011 — Reservation Without Payment
 
@@ -947,7 +956,7 @@ The system shall generate prescription PDFs.
 
 ## FR-039 — Notification System
 
-The system shall provide relevant application notifications.
+The system shall provide relevant application notifications, including notifications to affected patients after a confirmed doctor or secretary exception or break-period change affects dates with active appointments.
 
 ## FR-040 — Doctor Approval
 
@@ -1004,6 +1013,10 @@ The Doctor's Secretary/Team page shall show only Secretaries assigned to that Do
 ### Secretary — Capacity
 
 **As a secretary,** I want to configure the daily patient limit so that the system does not exceed its capacity.
+
+### Secretary — Schedule Changes
+
+**As a secretary,** I want to view my assigned doctor's weekly working hours and manage date-specific exceptions and break periods, with confirmation when active appointments are affected, so that I can help with day-to-day schedule changes without changing the doctor's weekly commitment.
 
 ### Doctor — Capacity
 
@@ -1202,6 +1215,8 @@ Patient Views Professional Details
 - Patient chat.
 - Walk-in registration.
 - Account creation.
+- Weekly working hours view (read-only).
+- Exception and break-period management for the assigned doctor.
 - Daily capacity management.
 - Queue management.
 - Patient calling.
@@ -1256,6 +1271,7 @@ The web application provides role-specific dashboards for doctors, secretaries, 
 **Secretary Web Dashboard:**
 - Daily queue management
 - Walk-in registration
+- Schedule management (weekly working hours view only, exceptions, break periods, and capacity)
 - Payment verification
 - Patient communication
 
@@ -1416,7 +1432,7 @@ Doctors can manage their available schedules through authenticated endpoints tha
   - Verifies ownership - only allows deletion of schedules belonging to the authenticated doctor
   - Returns success confirmation
 
-This reuses the existing `doctor_schedules` table and does not create a new schedule representation. The schedule infrastructure supports both doctor self-management and administrative configuration.
+This reuses the existing `doctor_schedules` table and does not create a new schedule representation. Weekly working hours are managed by doctors only; secretaries may view their assigned doctor's weekly hours and manage date-specific exceptions and break periods. This does not grant schedule-management permissions to ADMIN or SUPERADMIN.
 
 Administrator-provisioned doctor accounts remain available for accounts created on a doctor's behalf.
 

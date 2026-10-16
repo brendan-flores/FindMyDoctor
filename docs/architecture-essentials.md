@@ -57,7 +57,7 @@ Do not invent roles without changing the project requirements.
 
 ### Clinic and Consultation Operations Boundary
 
-Clinic and consultation operations belong to doctors and authorized secretaries. `ADMIN` and `SUPERADMIN` roles are limited to platform, account, and approval oversight and must not receive permissions to manage working hours, availability, break periods, daily capacity, reservations, queues, payment verification, or consultation records.
+Clinic and consultation operations belong to doctors and authorized secretaries. Doctors alone may create, edit, or delete weekly working hours. Secretaries may view weekly working hours and may manage exceptions, break periods, and daily capacity only for their assigned doctor. `ADMIN` and `SUPERADMIN` roles are limited to platform, account, and approval oversight and must not receive permissions to manage schedules, availability, break periods, daily capacity, reservations, queues, payment verification, or consultation records.
 
 ---
 
@@ -895,6 +895,27 @@ Patient Can Login
 - The Doctor Secretary list endpoint `GET /api/v1/doctors/secretaries` filters by that authenticated user's Doctor profile; it must never return a global Secretary list to Doctors.
 - Secretary password/profile setup does not modify the stored Doctor assignment.
 - App data is accessed through the backend PostgreSQL connection, not directly through Supabase; enforce this access boundary in backend authorization and queries.
+
+### Secretary Schedule Management
+
+Secretaries may view weekly working hours but cannot create, edit, or delete them. They may add, edit, and delete exceptions and break periods, and configure capacity, only for their assigned doctor using `secretaries.doctor_id`. Follow the existing secretary capacity ownership check; unauthorized access returns 404.
+
+Use the `/api/v1/secretaries/managed-doctors/...` API convention:
+
+- `GET /schedules` for read-only weekly working hours.
+- `GET`, `POST`, `PUT`, and `DELETE` for `/unavailability` and `/break-periods`.
+
+Apply the doctor schedule validation rules: start <= end, breaks must fall within working hours, and breaks must not overlap.
+
+When an exception or break-period change affects dates with active appointments, warn the doctor or secretary with the number of affected appointments and require explicit confirmation before saving. After confirmation, save the change and notify affected patients through the notification module. Do not automatically cancel affected appointments; the secretary handles them through existing cancellation and rescheduling flows.
+
+Do not:
+- Allow a Secretary to create, edit, or delete weekly working hours
+- Allow a Secretary to manage a schedule, exception, break period, or capacity outside their assigned Doctor
+- Return a successful response for unauthorized schedule access; return 404
+- Save an appointment-impacting exception or break-period change without explicit confirmation
+- Automatically cancel appointments affected by a confirmed schedule change
+- Allow ADMIN or SUPERADMIN to manage schedules, availability, breaks, or capacity
 
 ### Backend Integration
 
