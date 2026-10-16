@@ -419,12 +419,12 @@ Current System State (October 2026):
 - Capacity calculation service at backend/src/modules/capacity/capacityService.ts handles time range merging, break period subtraction, and minute-based slot calculation
 - Backend capacity endpoints updated to use real calculation: GET /api/v1/doctors/:id/capacity (supports date or date range query params), PUT /api/v1/doctors/:id/capacity (with ownership validation and capacity limit enforcement), POST /api/v1/doctors/:id/capacity/:date (with real calculation and validation)
 - Backend adds authenticated doctor capacity endpoints: GET /api/v1/doctors/me/capacity, PUT /api/v1/doctors/me/capacity, POST /api/v1/doctors/me/capacity/:date (registered before parameterized /:id/capacity routes to prevent route shadowing, and returning updated capacity objects on save)
-- Backend adds secretary capacity endpoints: GET /api/v1/secretaries/managed-doctors/capacity, PUT /api/v1/secretaries/managed-doctors/capacity, POST /api/v1/secretaries/managed-doctors/capacity/:date
+- Backend adds secretary capacity endpoints: GET /api/v1/secretaries/managed-doctors/capacity, PUT /api/v1/secretaries/managed-doctors/capacity, POST /api/v1/secretaries/managed-doctors/capacity/:date (integrated into Secretary Schedule page Capacity tab)
 - Backend enforces ownership validation: doctors can only manage their own capacity, secretaries can only manage capacity for doctors they are assigned to
 - Backend validates configured capacity cannot exceed calculated capacity on both frontend and backend
-- Web doctor schedule page at /doctor/schedule and web secretary capacity page at /secretary/capacity feature a unified 5-metric responsive grid (Calculated, Configured, Final Limit, Registered, Remaining) with fixed-width input controls
-- Web secretary capacity page at /secretary/capacity allows secretaries to manage capacity for their assigned doctor with the exact same UI as the doctor schedule page
-- Secretary sidebar includes "Capacity" navigation item linking to /secretary/capacity
+- Web doctor schedule page at /doctor/schedule and web secretary schedule page at /secretary/schedule feature a unified 5-metric responsive grid (Calculated, Configured, Final Limit, Registered, Remaining) with fixed-width input controls
+- Web secretary schedule page at /secretary/schedule allows secretaries to manage capacity for their assigned doctor in the Capacity tab with the exact same UI as the doctor schedule page
+- Secretary sidebar includes "Schedule" navigation item linking to /secretary/schedule; old `/secretary/capacity` route redirects to `/secretary/schedule` for backward compatibility
 
 ## Mobile Doctors Page
 - Mobile Doctors page main design matches UI prototype from `UI-Prototypes/users-mobile-ui/doctors_page`
@@ -482,3 +482,21 @@ Current System State (October 2026):
 - Backend doctors API returns all profile fields including `profile_completion_status` and `profile_submitted_at`
 - Patient-facing doctor search endpoint `GET /api/v1/doctors` does not expose PRC license number, personal contact number, or email address
 - Patient-facing doctor by ID endpoint `GET /api/v1/doctors/:id` does not expose PRC license number, personal contact number, or email address
+
+## Secretary Schedule Management
+- Secretary Portal navigation updated: "Capacity" replaced with "Schedule" linking to `/secretary/schedule`
+- Doctor Portal navigation updated: "My Profile" label changed to "Profile"
+- Redirect from `/secretary/capacity` to `/secretary/schedule` for backward compatibility
+- Secretary Schedule page at `/secretary/schedule` provides four tabs: Working Hours (read-only), Exceptions (add/edit/delete), Break Periods (add/edit/delete), and Capacity
+- Working Hours tab displays the assigned doctor's weekly working hours with no write controls for secretaries
+- Exceptions tab allows secretaries to add, edit, and delete date-specific exceptions for their assigned doctor
+- Break Periods tab allows secretaries to add, edit, and delete break periods for their assigned doctor
+- Capacity tab preserves the existing Secretary Capacity page behavior and UI
+- Backend secretary schedule endpoints: `GET /api/v1/secretaries/managed-doctors/schedules` (read-only), `GET/POST/PUT/DELETE /api/v1/secretaries/managed-doctors/unavailability`, `GET/POST/PUT/DELETE /api/v1/secretaries/managed-doctors/break-periods`
+- Secretary schedule endpoints use ownership check: `SELECT doctor_id FROM secretaries WHERE user_id = $1` to derive the target doctor from the authenticated secretary
+- Unauthorized access to another doctor's records returns 404 (non-disclosing, no information leakage)
+- Secretary schedule endpoints are SECRETARY-only; other roles receive 403 Forbidden
+- Weekly working hours remain doctor-only to create, edit, and delete; secretaries have read-only access
+- Schedule validation for exceptions: start date <= end date, valid date format
+- Schedule validation for break periods: start time < end time, valid time format (HH:MM)
+- Backend tests verify secretary schedule access is restricted to assigned doctor, ownership enforcement, and validation rules

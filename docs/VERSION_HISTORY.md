@@ -4,9 +4,68 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
-### 01.02 (In Progress)
+### 01.03
 
-**Purpose:** Secretary queue management web dashboard
+**Purpose:** Secretary Schedule Management
+
+**Significant Features:**
+- Secretary Schedule page: Implemented complete schedule management interface for secretaries at `/secretary/schedule`
+- Four-tab interface: Working Hours (read-only), Exceptions (add/edit/delete), Break Periods (add/edit/delete), Capacity
+- Navigation updates: Doctor sidebar "My Profile" renamed to "Profile"; Secretary sidebar "Capacity" replaced with "Schedule"
+- Backward compatibility: Redirect from `/secretary/capacity` to `/secretary/schedule` for existing bookmarks
+
+**Backend API Endpoints:**
+- GET `/api/v1/secretaries/managed-doctors/schedules` - Read-only access to assigned doctor's weekly working hours
+- GET `/api/v1/secretaries/managed-doctors/unavailability` - List date-specific exceptions
+- POST `/api/v1/secretaries/managed-doctors/unavailability` - Create exception
+- PUT `/api/v1/secretaries/managed-doctors/unavailability/:id` - Update exception
+- DELETE `/api/v1/secretaries/managed-doctors/unavailability/:id` - Delete exception
+- GET `/api/v1/secretaries/managed-doctors/break-periods` - List break periods
+- POST `/api/v1/secretaries/managed-doctors/break-periods` - Create break period
+- PUT `/api/v1/secretaries/managed-doctors/break-periods/:id` - Update break period
+- DELETE `/api/v1/secretaries/managed-doctors/break-periods/:id` - Delete break period
+
+**Security & Authorization:**
+- Ownership enforcement: All secretary schedule endpoints derive doctor_id from authenticated secretary's `secretaries.doctor_id`
+- Non-disclosing 404: Requests for records outside assigned doctor's scope return 404 without revealing existence
+- Role-based access: Endpoints restricted to SECRETARY role only; other roles receive 403 Forbidden
+- Read-only working hours: Secretaries can view but not modify weekly working hours (doctor-only feature)
+
+**Validation:**
+- Exception validation: Start date must be <= end date, valid date format required
+- Break period validation: Start time must be < end time, valid HH:MM time format required
+- Transaction support: Exception and break period modifications use database transactions for data integrity
+
+**Testing:**
+- Comprehensive test suite: Added `backend/src/api/secretaries.test.ts` with 23 tests covering:
+  - Schedule read access restricted to assigned doctor
+  - Exception CRUD operations with ownership enforcement
+  - Break period CRUD operations with ownership enforcement
+  - Role-based authorization (SECRETARY-only)
+  - Validation rules enforcement
+  - 404 responses for out-of-scope records
+- All new tests passing
+- Backend test suite: 234 tests passing (3 pre-existing timezone test failures unrelated to this work)
+
+**Architecture:**
+- Web: Created Secretary Schedule page at `/web/src/app/secretary/schedule/page.tsx`
+- Web: Created redirect page at `/web/src/app/secretary/capacity/page.tsx`
+- Web: Updated Doctor sidebar in `/web/src/components/layout/DoctorSidebar.tsx`
+- Web: Updated Secretary sidebar in `/web/src/components/layout/SecretarySidebar.tsx`
+- Backend: Enhanced `/backend/src/api/secretaries.ts` with schedule management endpoints
+- Backend: Added getClient import for transaction support
+- Documentation: Updated `docs/SYSTEM_STATE.md` to reflect implemented changes
+
+**Documentation:**
+- Updated CURRENT_VERSION.md to 01.03
+- Added VERSION_HISTORY.md entry for 01.03
+- Updated SYSTEM_STATE.md to remove planned changes and document implemented Secretary Schedule functionality
+
+---
+
+### 01.02
+
+**Purpose:** Secretary queue management web dashboard (Completed)
 
 **Significant Features:**
 - Secretary queue management page: Implemented complete daily queue management interface for secretaries at `/secretary/queue`
@@ -36,9 +95,9 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
-### 01.01 (In Progress)
+### 01.01
 
-**Purpose:** Queue management improvements and navigation fixes
+**Purpose:** Queue management improvements and navigation fixes (Completed)
 
 **Significant Features:**
 - Queue reassignment on appointment cancellation: When a patient cancels their appointment, all patients with higher queue numbers are automatically shifted down (e.g., if #6 cancels, #7 becomes #6, #8 becomes #7)
