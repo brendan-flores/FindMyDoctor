@@ -39,6 +39,7 @@ interface SecretaryProfile {
   doctor_first_name: string;
   doctor_last_name: string;
   practice_name: string;
+  room_number?: string | null;
 }
 
 type TabType = 'all' | 'waiting' | 'in-consultation' | 'completed' | 'skipped';
@@ -381,7 +382,7 @@ export default function SecretaryQueue() {
             {/* Location and Doctor Info */}
             <div className="text-sm text-slate-600 mb-3 flex items-center gap-2">
               <span className="material-symbols-outlined text-[16px] text-slate-500">location_on</span>
-              {secretary?.practice_name || 'Clinic'} • Room 101 • Dr. {secretary?.doctor_first_name} {secretary?.doctor_last_name}
+              {secretary?.practice_name || 'Clinic'} {secretary?.room_number ? `• ${secretary.room_number}` : ''} • Dr. {secretary?.doctor_first_name} {secretary?.doctor_last_name}
             </div>
             
             {/* Main Title */}
@@ -464,7 +465,7 @@ export default function SecretaryQueue() {
           </div>
           {inConsultation > 0 && (
             <div className="mt-2 text-xs text-emerald-600 font-medium">
-              Room 101 • Dr. {secretary?.doctor_first_name} {secretary?.doctor_last_name}
+              {secretary?.room_number || 'Room 101'} • Dr. {secretary?.doctor_first_name} {secretary?.doctor_last_name}
             </div>
           )}
         </div>

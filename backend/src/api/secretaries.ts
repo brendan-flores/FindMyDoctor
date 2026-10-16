@@ -16,7 +16,7 @@ router.get('/me', authenticate, authorize('SECRETARY'), async (req: AuthRequest,
         s.id, s.user_id, s.doctor_id, s.first_name, s.middle_name, s.last_name, s.contact_number,
         s.two_factor_enabled, s.is_approved,
         u.email, u.role, u.must_change_password,
-        d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.practice_name
+        d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.practice_name, d.room_number
        FROM secretaries s
        INNER JOIN users u ON s.user_id = u.id
        INNER JOIN doctors d ON s.doctor_id = d.id
