@@ -172,11 +172,19 @@ export default function SecretaryCapacity() {
     };
 
     const handleToday = () => {
-      const today = new Date();
-      const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      // Get current date in Asia/Manila timezone
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Manila',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      const dateStr = formatter.format(now);
       onChange(dateStr);
-      setViewMonth(today.getMonth());
-      setViewYear(today.getFullYear());
+      const [year, month, day] = dateStr.split('-').map(Number);
+      setViewMonth(month - 1);
+      setViewYear(year);
       setShowPicker(false);
     };
 

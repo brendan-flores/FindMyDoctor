@@ -9,6 +9,7 @@ import '../features/home/presentation/home_page.dart';
 import '../features/doctors/presentation/doctor_schedule_page.dart';
 import '../features/doctors/presentation/doctors_page.dart';
 import '../features/appointments/presentation/booking_confirmation_page.dart';
+import '../features/patients/presentation/patient_details_page.dart';
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -90,6 +91,18 @@ class _MyAppState extends State<MyApp> {
             final args = settings.arguments as Map<String, dynamic>?;
             return MaterialPageRoute(
               builder: (context) => BookingConfirmationPage(
+                doctorId: args?['doctorId'] ?? '',
+                doctorName: args?['doctorName'],
+                specialty: args?['specialty'],
+                clinic: args?['clinic'],
+                consultationFee: args?['consultationFee'],
+                selectedDate: args?['selectedDate'],
+              ),
+            );
+          case '/patient-details':
+            final args = settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (context) => PatientDetailsPage(
                 doctorId: args?['doctorId'] ?? '',
                 doctorName: args?['doctorName'],
                 specialty: args?['specialty'],

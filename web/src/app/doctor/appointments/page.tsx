@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
 
 interface Appointment {
@@ -13,9 +14,11 @@ interface Appointment {
   queue_number?: number;
   queue_status?: string;
   practice_name?: string;
+  registration_source?: string;
 }
 
 export default function DoctorAppointments() {
+  const router = useRouter();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -243,6 +246,15 @@ export default function DoctorAppointments() {
                           Queue #{appointment.queue_number}
                         </span>
                       )}
+                      {appointment.registration_source && (
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          appointment.registration_source === 'WALK_IN'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {appointment.registration_source === 'WALK_IN' ? 'Walk-in' : 'Online'}
+                        </span>
+                      )}
                     </div>
                     
                     <h3 className="text-lg font-semibold text-slate-800">
@@ -274,7 +286,11 @@ export default function DoctorAppointments() {
                   </div>
                   
                   <div className="ml-4 flex gap-2">
-                    <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                    <button
+                      onClick={() => router.push(`/doctor/appointments/${appointment.id}`)}
+                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="View Details"
+                    >
                       <span className="material-symbols-outlined">visibility</span>
                     </button>
                     {appointment.status === 'SCHEDULED' && (

@@ -79,7 +79,7 @@ router.put('/:id', authenticate, authorize('DOCTOR'), async (req: AuthRequest, r
     const { diagnosis, notes, bloodPressure, weight, height, temperature } = req.body;
 
     await query(
-      `UPDATE visits 
+      `UPDATE visits
        SET diagnosis = COALESCE($1, diagnosis),
            notes = COALESCE($2, notes),
            blood_pressure = COALESCE($3, blood_pressure),
@@ -94,6 +94,45 @@ router.put('/:id', authenticate, authorize('DOCTOR'), async (req: AuthRequest, r
     res.json(success(null, 'Visit updated successfully'));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update visit'));
+  }
+});
+
+// Get visits for a specific patient (doctor only, with authorization)
+router.get('/patient/:patientId', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { patientId } = req.params;
+    const userId = req.user!.id;
+
+    // Verify the doctor has authorization to view this patient's visits
+    // Doctor can only view visits for patients they have associations or appointments with
+    const result = await query(
+      `SELECT v.*,
+              a.appointment_date,
+              d.first_name as doctor_first_name, d.last_name as doctor_last_name
+       FROM visits v
+       LEFT JOIN appointments a ON v.appointment_id = a.id
+       LEFT JOIN doctors d ON v.doctor_id = d.id
+       WHERE v.patient_id = $1
+       AND (
+         EXISTS (
+           SELECT 1 FROM patient_doctor_associations pda
+           WHERE pda.patient_id = $1
+           AND pda.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)
+         )
+         OR EXISTS (
+           SELECT 1 FROM appointments a
+           WHERE a.patient_id = $1
+           AND a.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)
+         )
+       )
+       ORDER BY v.visit_date DESC`,
+      [patientId, userId]
+    );
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    console.error('Patient visits fetch error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch patient visits'));
   }
 });
 

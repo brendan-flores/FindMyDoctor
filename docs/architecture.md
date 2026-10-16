@@ -948,27 +948,39 @@ Patients select a date for their appointment (no specific time slot). Queue numb
 
 Before confirming an appointment, the system must validate whether the patient has an existing record with the selected doctor.
 
+**Backend API Endpoints:**
+- `GET /api/v1/patients/check-record?doctorId={id}` - Patient-only endpoint to check if they have an existing record with the selected doctor
+- `POST /api/v1/patients/submit-details` - Patient-only endpoint to submit required details for a specific doctor before first booking
+- `GET /api/v1/patients/me` - Patient-only endpoint to view their own profile
+- `PUT /api/v1/patients/me` - Patient-only endpoint to update their own profile (requires authentication)
+- `GET /api/v1/patients/doctor/:doctorId` - Doctor-only endpoint to list all patients who have associations or appointments with them
+- `GET /api/v1/patients/search` - Secretary-only endpoint to search patients by email, phone, or name for walk-in registration (restricted to assigned doctor's patients)
+- `GET /api/v1/patients/:id` - Doctor and Secretary endpoint to view specific patient details (with role-based authorization)
+
 **Record Check Workflow:**
-1. Mobile application sends patient ID and selected doctor ID to backend before appointment confirmation
-2. Backend queries the appointments table to check if the patient has any appointments (past or present) with the selected doctor
-3. If an existing record is found, backend returns that the patient can proceed directly with booking
-4. If no existing record is found, backend returns that the patient must provide required details
-5. Mobile application displays form to collect required personal details
-6. Patient submits form through backend API endpoint
-7. Backend validates and saves the information, associating it with the patient and doctor
-8. After successful save, patient continues with appointment booking
-9. Appointment is associated with the patient's existing account (no duplicate accounts created)
+1. Mobile application calls `GET /api/v1/patients/check-record?doctorId={id}` before appointment confirmation
+2. Backend queries the `patient_doctor_associations` table to check if the authenticated patient has a persistent association with the selected doctor
+3. If no association exists, backend checks the `appointments` table as a fallback for backward compatibility
+4. If an existing record is found, backend returns `{ hasRecord: true }` and the patient can proceed directly with booking
+5. If no existing record is found, backend returns `{ hasRecord: false }` and the patient must provide required details
+6. Mobile application displays form to collect required personal details (first name, middle name, last name, date of birth, sex, mobile number, address, and optional fields)
+7. Patient submits form through `POST /api/v1/patients/submit-details` to update their profile and create a persistent doctor association
+8. Backend validates all required fields, updates the `patients` table, and creates an entry in `patient_doctor_associations` table
+9. After successful save, patient continues with appointment booking
+10. Appointment is associated with the patient's existing account (no duplicate accounts created)
 
 **Important Distinction:**
 - The check is specific to the selected doctor
 - Having an account or a record with another doctor does not automatically count as having an existing record with the selected doctor
-- The backend must perform a doctor-specific lookup in the appointments or visits table
+- The backend performs a doctor-specific lookup in the `patient_doctor_associations` table (primary) and `appointments` table (fallback)
+- Patient-doctor relationship is tracked through the `patient_doctor_associations` table (for persistent records before booking) and the `appointments` table (for actual consultations)
+- The `patient_doctor_associations` table has a unique constraint on (patient_id, doctor_id) to prevent duplicate associations
 
 **Patient Details UI Pages:**
 - Doctor Dashboard: `/doctor/patients/` - View all patients, search, add/edit patient details
 - Doctor Dashboard: `/doctor/appointments/:id` - View patient details within appointment context
 - Secretary Dashboard: `/secretary/walk-ins/` - Save patient details during walk-in registration
-- Secretary Dashboard: `/secretary/patients/` - View and search patient details
+- Secretary Dashboard: `/secretary/patients/` - View and search patient details (restricted to assigned doctor's patients)
 - Secretary Dashboard: `/secretary/queue/` - View patient details in queue context
 
 The mobile application must never connect directly to PostgreSQL. All record checks and updates must go through the backend REST API.

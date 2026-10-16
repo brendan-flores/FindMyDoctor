@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import path from 'path';
 import { config } from '../config';
+import { toClinicDateString } from '../utils/date';
 import { uploadDoctorPhoto, deleteDoctorPhoto, replaceDoctorPhoto, validateImageFile } from '../services/storageService';
 
 const router = Router();
@@ -531,8 +532,8 @@ router.get('/:id/availability', authenticate, async (req: AuthRequest, res: Resp
       endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
 
       // Override request parameters to this week
-      req.query.startDate = startOfWeek.toISOString().split('T')[0];
-      req.query.endDate = endOfWeek.toISOString().split('T')[0];
+      req.query.startDate = toClinicDateString(startOfWeek);
+      req.query.endDate = toClinicDateString(endOfWeek);
     }
 
     if (date) {

@@ -6,6 +6,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/doctor_service.dart';
+import '../../../core/services/api_service.dart';
 
 class DoctorSchedulePage extends StatefulWidget {
   final String doctorId;
@@ -29,11 +30,13 @@ class DoctorSchedulePage extends StatefulWidget {
 
 class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   final DoctorService _doctorService = DoctorService();
+  final ApiService _apiService = ApiService();
 
   DateTime? _selectedDate;
 
   Map<String, dynamic>? _availabilityData;
   bool _isLoading = true;
+  bool _isCheckingRecord = false;
   String? _errorMessage;
 
   @override
@@ -826,6 +829,86 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     );
   }
 
+  Future<void> _handleBookingConfirmation() async {
+    if (_selectedDate == null) return;
+
+    setState(() {
+      _isCheckingRecord = true;
+    });
+
+    try {
+      // Check if patient has an existing record with this doctor
+      final response = await _apiService.checkPatientRecord(
+        doctorId: widget.doctorId,
+      );
+
+      setState(() {
+        _isCheckingRecord = false;
+      });
+
+      if (response['success'] == true) {
+        final hasRecord = response['data']?['hasRecord'] as bool? ?? false;
+
+        if (hasRecord) {
+          // Patient has complete record - proceed directly to booking
+          if (mounted) {
+            Navigator.of(context).pushNamed(
+              '/booking-confirmation',
+              arguments: {
+                'doctorId': widget.doctorId,
+                'doctorName': widget.doctorName,
+                'specialty': widget.specialty,
+                'clinic': widget.clinic,
+                'consultationFee': widget.consultationFee,
+                'selectedDate': _selectedDate,
+              },
+            );
+          }
+        } else {
+          // Patient needs to submit details first
+          if (mounted) {
+            Navigator.of(context).pushNamed(
+              '/patient-details',
+              arguments: {
+                'doctorId': widget.doctorId,
+                'doctorName': widget.doctorName,
+                'specialty': widget.specialty,
+                'clinic': widget.clinic,
+                'consultationFee': widget.consultationFee,
+                'selectedDate': _selectedDate,
+              },
+            );
+          }
+        }
+      } else {
+        // API error - show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                response['error']?['message'] ?? 'Failed to check patient record',
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isCheckingRecord = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to check patient record: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildBottomConfirmationBar() {
     final availability = _selectedDate != null ? _getDateAvailability(_selectedDate!) : null;
     final status = availability?['status'] as String?;
@@ -897,21 +980,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             ),
             const SizedBox(height: spacing.AppSpacing.gutterMd),
             PrimaryButton(
-              text: isAlreadyBooked ? 'Already Booked' : 'Confirm Clinic Date & Reserve Queue',
-              onPressed: _selectedDate != null && !isAlreadyBooked
-                  ? () {
-                      Navigator.of(context).pushNamed(
-                        '/booking-confirmation',
-                        arguments: {
-                          'doctorId': widget.doctorId,
-                          'doctorName': widget.doctorName,
-                          'specialty': widget.specialty,
-                          'clinic': widget.clinic,
-                          'consultationFee': widget.consultationFee,
-                          'selectedDate': _selectedDate,
-                        },
-                      );
-                    }
+              text: _isCheckingRecord
+                  ? 'Checking...'
+                  : (isAlreadyBooked ? 'Already Booked' : 'Confirm Clinic Date & Reserve Queue'),
+              onPressed: _selectedDate != null && !isAlreadyBooked && !_isCheckingRecord
+                  ? _handleBookingConfirmation
                   : null,
               icon: const Icon(Icons.arrow_forward, size: 20),
             ),

@@ -99,7 +99,7 @@ router.post('/login', async (req: Request, res: Response) => {
   try {
     const { email, password, expectedRole, rememberMe, trustedBrowserToken } = req.body;
 
-    if (!email || !password || !['DOCTOR', 'SECRETARY', 'ADMIN'].includes(expectedRole)) {
+    if (!email || !password || !['PATIENT', 'DOCTOR', 'SECRETARY', 'ADMIN'].includes(expectedRole)) {
       return res.status(400).json(
         error(ErrorCodes.INVALID_CREDENTIALS, 'Invalid credentials or account role.')
       );
@@ -181,6 +181,9 @@ router.post('/login', async (req: Request, res: Response) => {
     const errorMessage = err.message || 'Login failed';
 
     if (errorCode === ErrorCodes.INVALID_CREDENTIALS) {
+      return res.status(401).json(error(errorCode, errorMessage));
+    }
+    if (errorCode === ErrorCodes.DOCTOR_PENDING_APPROVAL) {
       return res.status(401).json(error(errorCode, errorMessage));
     }
     if (errorCode === ErrorCodes.RATE_LIMIT) {

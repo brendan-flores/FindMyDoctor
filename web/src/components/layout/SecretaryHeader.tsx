@@ -23,18 +23,23 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
       .slice(0, 2);
   };
 
-  const currentDate = new Date();
-  const formattedDate = currentDate.toLocaleDateString('en-US', {
+  // Get current date/time in Asia/Manila timezone
+  const now = new Date();
+  const dateFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
     weekday: 'long',
     month: 'short',
     day: 'numeric',
     year: 'numeric'
   });
-  const formattedTime = currentDate.toLocaleTimeString('en-US', {
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
     hour: '2-digit',
     minute: '2-digit',
     timeZoneName: 'short'
   });
+  const formattedDate = dateFormatter.format(now);
+  const formattedTime = timeFormatter.format(now);
 
   // Close dropdown when clicking outside
   useEffect(() => {

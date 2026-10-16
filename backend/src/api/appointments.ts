@@ -3,15 +3,19 @@ import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requirePasswordChange } from '../middleware/auth';
 import { calculateAvailability } from '../modules/availability/availabilityService';
+import { toClinicDateString } from '../utils/date';
 
 const router = Router();
+
+// Valid sex values
+const VALID_SEX_VALUES = ['MALE', 'FEMALE', 'OTHER', 'NOT_SPECIFIED'];
 
 // Get appointments for current user
 router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const role = req.user!.role;
-    const { status, startDate, endDate } = req.query;
+    const { status, startDate, endDate, patientId } = req.query;
 
     let queryText = '';
     const params: any[] = [];
@@ -37,7 +41,8 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
           a.*,
           p.first_name as patient_first_name, p.last_name as patient_last_name,
           d.practice_name,
-          q.queue_number, q.status as queue_status
+          q.queue_number, q.status as queue_status,
+          COALESCE(q.registration_source, 'ONLINE') as registration_source
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         JOIN doctors d ON a.doctor_id = d.id
@@ -80,6 +85,12 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
       queryText += ` AND a.appointment_date <= $${params.length}`;
     }
 
+    // Add patientId filter for DOCTOR role (safe because query already filters by doctor_id)
+    if (role === 'DOCTOR' && patientId) {
+      params.push(patientId);
+      queryText += ` AND a.patient_id = $${params.length}`;
+    }
+
     queryText += ' ORDER BY a.appointment_date DESC';
 
     const result = await query(queryText, params);
@@ -118,6 +129,77 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
     }
 
     const patientId = patientResult.rows[0].id;
+
+    // Check if patient has an association with this doctor (doctor-specific check)
+    // An explicit PENDING association must be respected - it overrides the appointment-history fallback
+    const associationResult = await client.query(
+      `SELECT details_completion_status
+       FROM patient_doctor_associations
+       WHERE patient_id = $1 AND doctor_id = $2`,
+      [patientId, doctorId]
+    );
+
+    if (associationResult.rows.length > 0) {
+      // Explicit association exists - respect its status
+      const status = associationResult.rows[0].details_completion_status;
+
+      if (status !== 'COMPLETE') {
+        await client.query('ROLLBACK');
+        return res.status(400).json(error(
+          ErrorCodes.VALIDATION_ERROR,
+          'Patient record is incomplete. Please submit required details for this doctor before booking. Use POST /api/v1/patients/submit-details first.'
+        ));
+      }
+      // COMPLETE association - proceed with booking
+    } else {
+      // No association exists - check appointments table for backward compatibility with legacy records
+      const appointmentRecordResult = await client.query(
+        `SELECT COUNT(*) as count
+         FROM appointments
+         WHERE patient_id = $1 AND doctor_id = $2`,
+        [patientId, doctorId]
+      );
+
+      const hasAppointments = parseInt(appointmentRecordResult.rows[0].count) > 0;
+
+      if (!hasAppointments) {
+        await client.query('ROLLBACK');
+        return res.status(400).json(error(
+          ErrorCodes.VALIDATION_ERROR,
+          'Patient must submit required details for this doctor before booking. Use POST /api/v1/patients/submit-details first.'
+        ));
+      }
+
+      // Legacy appointment history exists - verify patient profile is complete before allowing booking
+      const patientProfileResult = await client.query(
+        'SELECT first_name, last_name, date_of_birth, sex, phone, address FROM patients WHERE id = $1',
+        [patientId]
+      );
+
+      if (patientProfileResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Patient profile not found'));
+      }
+
+      const patient = patientProfileResult.rows[0];
+      const isProfileComplete =
+        patient.first_name && patient.first_name.trim() !== '' &&
+        patient.last_name && patient.last_name.trim() !== '' &&
+        patient.date_of_birth !== null &&
+        patient.sex !== null && VALID_SEX_VALUES.includes(patient.sex) &&
+        patient.phone && patient.phone.trim() !== '' &&
+        patient.address && patient.address.trim() !== '';
+
+      if (!isProfileComplete) {
+        await client.query('ROLLBACK');
+        return res.status(400).json(error(
+          ErrorCodes.VALIDATION_ERROR,
+          'Patient record is incomplete. Please submit required details for this doctor before booking. Use POST /api/v1/patients/submit-details first.'
+        ));
+      }
+
+      // Legacy patient has complete profile - proceed with booking
+    }
 
     // Get doctor info
     const doctorResult = await client.query(
@@ -371,7 +453,7 @@ router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATI
       return res.status(400).json(error(ErrorCodes.INVALID_APPOINTMENT_STATUS, 'Cannot cancel this appointment'));
     }
 
-    const appointmentDate = new Date(appointment.appointment_date).toISOString().split('T')[0];
+    const appointmentDate = toClinicDateString(new Date(appointment.appointment_date));
     const cancelledQueueNumber = appointment.queue_number;
     const queueDate = appointment.queue_date;
 
@@ -482,7 +564,7 @@ router.patch('/:id/reschedule', authenticate, requirePasswordChange, authorize('
     const appointment = appointmentResult.rows[0];
 
     // Check capacity for new date
-    const newDateOnly = new Date(newAppointmentDate).toISOString().split('T')[0];
+    const newDateOnly = toClinicDateString(new Date(newAppointmentDate));
     const capacityResult = await query(
       'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
       [appointment.doctor_id, newDateOnly]

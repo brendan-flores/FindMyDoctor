@@ -6,6 +6,7 @@ interface ApiResponse<T> {
   error?: string;
   errorCode?: string;
   message?: string;
+  httpStatus?: number;
 }
 
 /**
@@ -29,7 +30,7 @@ function parseErrorResponse<T>(status: number, text: string): ApiResponse<T> {
     const json = JSON.parse(text);
     const normalized = normalizeApiResponse<T>(json);
     if (normalized && normalized.error) {
-      return normalized;
+      return { ...normalized, httpStatus: status };
     }
   } catch {
     // not valid JSON
@@ -37,6 +38,7 @@ function parseErrorResponse<T>(status: number, text: string): ApiResponse<T> {
   return {
     success: false,
     error: `Server error (${status}): ${text}`,
+    httpStatus: status,
   };
 }
 
@@ -215,6 +217,7 @@ class ApiClient {
         return {
           success: false,
           error: 'Session expired',
+          httpStatus: 401,
         };
       }
 
@@ -264,6 +267,7 @@ class ApiClient {
         return {
           success: false,
           error: 'Session expired',
+          httpStatus: 401,
         };
       }
 
@@ -313,6 +317,7 @@ class ApiClient {
         return {
           success: false,
           error: 'Session expired',
+          httpStatus: 401,
         };
       }
 
@@ -362,6 +367,7 @@ class ApiClient {
         return {
           success: false,
           error: 'Session expired',
+          httpStatus: 401,
         };
       }
 
@@ -409,6 +415,7 @@ class ApiClient {
         return {
           success: false,
           error: 'Session expired',
+          httpStatus: 401,
         };
       }
 
