@@ -59,8 +59,7 @@ export default function DoctorLogin() {
         // Type guard: this is now AuthResponse (not LoginOtpRequiredResponse)
         const authData = response.data as { user: any; accessToken: string; refreshToken: string };
 
-        apiClient.setToken(authData.accessToken);
-        localStorage.setItem('refreshToken', authData.refreshToken);
+        apiClient.setToken(authData.accessToken, authData.refreshToken);
         localStorage.setItem('user', JSON.stringify(authData.user));
 
         if (authData.user.role === 'DOCTOR') {
@@ -83,12 +82,9 @@ export default function DoctorLogin() {
 
   const handleOtpVerifySuccess = async (data: any) => {
     if (data.user.role === 'DOCTOR') {
-      apiClient.setToken(data.accessToken);
+      apiClient.setToken(data.accessToken, data.refreshToken);
       // Store user data in localStorage
       localStorage.setItem('user', JSON.stringify(data.user));
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken);
-      }
       
       await routeBasedOnApprovalStatus();
     } else {
