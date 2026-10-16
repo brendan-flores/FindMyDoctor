@@ -71,7 +71,7 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
     { id: 'patients', label: 'Patients', icon: 'people' },
     { id: 'secretary', label: 'Secretary', icon: 'badge' },
     { id: 'prescriptions', label: 'Prescriptions', icon: 'medication' },
-    { id: 'profile', label: 'My Profile', icon: 'account_circle' },
+    { id: 'profile', label: 'Profile', icon: 'account_circle' },
     { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
 

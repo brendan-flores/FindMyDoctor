@@ -24,7 +24,7 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
     { id: 'walk-ins', label: 'Walk-ins', icon: 'person_add' },
     { id: 'patients', label: 'Patients', icon: 'medical_services' },
     { id: 'appointments', label: 'Appointments', icon: 'calendar_month' },
-    { id: 'capacity', label: 'Capacity', icon: 'analytics' },
+    { id: 'schedule', label: 'Schedule', icon: 'schedule' },
     { id: 'conversations', label: 'Conversations', icon: 'chat' },
     { id: 'payments', label: 'Payments', icon: 'payments' },
     { id: 'profile', label: 'Profile', icon: 'account_circle' },
