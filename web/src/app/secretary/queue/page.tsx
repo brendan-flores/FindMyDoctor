@@ -1,46 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { apiClient } from '@/lib/api/apiClient';
+import { secretaryApi, QueueEntry, SecretaryProfile } from '@/lib/api/secretaryApi';
 import Toast from '@/components/ui/Toast';
 
-interface QueueEntry {
-  id: string;
-  queue_number: number;
-  queue_date: string;
-  status: string;
-  registration_source: string;
-  patient_id: string;
-  patient_first_name: string;
-  patient_last_name: string;
-  mrn?: string;
-  age?: number;
-  gender?: string;
-  appointment_time?: string;
-  payment_status?: string;
-  payment_amount?: number;
-  payment_method?: string;
-  doctor_id: string;
-  doctor_first_name: string;
-  doctor_last_name: string;
-  called_at: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
-interface SecretaryProfile {
-  id: string;
-  user_id: string;
-  doctor_id: string;
-  first_name: string;
-  last_name: string;
-  doctor_first_name: string;
-  doctor_last_name: string;
-  practice_name: string;
-  room_number?: string | null;
-}
 
 type TabType = 'all' | 'waiting' | 'in-consultation' | 'completed' | 'skipped';
 
@@ -70,8 +34,15 @@ export default function SecretaryQueue() {
   const [secretary, setSecretary] = useState<SecretaryProfile | null>(null);
   const [queueEntries, setQueueEntries] = useState<QueueEntry[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    // Get current date in Asia/Manila timezone (same as backend getClinicDate)
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    return formatter.format(now);
   });
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,7 +65,7 @@ export default function SecretaryQueue() {
 
   const fetchSecretaryProfile = async () => {
     setLoading(true);
-    const response = await apiClient.get<SecretaryProfile>('/secretaries/me');
+    const response = await secretaryApi.getProfile();
     if (response.success && response.data) {
       setSecretary(response.data);
     } else {
@@ -109,7 +80,7 @@ export default function SecretaryQueue() {
     setLoading(true);
     setError(null);
 
-    const response = await apiClient.get<QueueEntry[]>(`/queue/${selectedDate}?doctorId=${secretary.doctor_id}`);
+    const response = await secretaryApi.getQueue(selectedDate);
     if (response.success && response.data) {
       setQueueEntries(response.data);
     } else {
@@ -119,15 +90,11 @@ export default function SecretaryQueue() {
   };
 
   const handleCallNext = async () => {
-    if (!secretary) return;
-
     setActionLoading(true);
     setError(null);
     setSuccess(null);
 
-    const response = await apiClient.post<QueueEntry>(`/queue/${selectedDate}/next`, {
-      doctorId: secretary.doctor_id,
-    });
+    const response = await secretaryApi.callNextPatient(selectedDate);
 
     if (response.success) {
       setSuccess('Next patient called successfully');
@@ -143,7 +110,7 @@ export default function SecretaryQueue() {
     setError(null);
     setSuccess(null);
 
-    const response = await apiClient.post(`/queue/${queueId}/start-checkup`);
+    const response = await secretaryApi.startCheckup(queueId);
 
     if (response.success) {
       setSuccess('Checkup started successfully');
@@ -159,7 +126,7 @@ export default function SecretaryQueue() {
     setError(null);
     setSuccess(null);
 
-    const response = await apiClient.post(`/queue/${queueId}/complete`);
+    const response = await secretaryApi.completeCheckup(queueId);
 
     if (response.success) {
       setSuccess('Checkup completed successfully');
@@ -175,7 +142,7 @@ export default function SecretaryQueue() {
     setError(null);
     setSuccess(null);
 
-    const response = await apiClient.post(`/queue/${queueId}/skip`);
+    const response = await secretaryApi.skipPatient(queueId);
 
     if (response.success) {
       setSuccess('Patient skipped successfully');
@@ -191,7 +158,7 @@ export default function SecretaryQueue() {
     setError(null);
     setSuccess(null);
 
-    const response = await apiClient.post(`/queue/${queueId}/not-present`);
+    const response = await secretaryApi.markNotPresent(queueId);
 
     if (response.success) {
       setSuccess('Patient marked as not present');
@@ -591,26 +558,15 @@ export default function SecretaryQueue() {
               <thead className="bg-slate-100 border-b border-slate-200">
                 <tr>
                   <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Queue #</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Patient & MRN</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Time</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Patient</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Source</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Queue Status</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Payment</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {filteredEntries.map((entry) => {
-                  const formatTime = (time: string | null | undefined) => {
-                    if (!time) return '--:--';
-                    const [hours, minutes] = time.split(':');
-                    const hour = parseInt(hours);
-                    const ampm = hour >= 12 ? 'PM' : 'AM';
-                    const hour12 = hour % 12 || 12;
-                    return `${hour12}:${minutes}`;
-                  };
-
-                  const getTimeAgo = (timestamp: string | null) => {
+                  const getTimeAgo = (timestamp: string | null | undefined) => {
                     if (!timestamp) return '';
                     const now = new Date();
                     const past = new Date(timestamp);
@@ -636,17 +592,9 @@ export default function SecretaryQueue() {
                               {entry.patient_first_name} {entry.patient_last_name}
                             </div>
                             <div className="text-xs text-slate-500 mt-0.5">
-                              MRN: {entry.mrn || 'N/A'} • {entry.age || '--'}y • {entry.gender || '--'}
+                              {entry.patient_email || 'No email'}
                             </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm font-medium text-slate-900">
-                          {formatTime(entry.appointment_time)}
-                        </div>
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          {entry.appointment_time && parseInt(entry.appointment_time.split(':')[0]) >= 12 ? 'PM' : 'AM'}
                         </div>
                       </td>
                       <td className="px-4 py-4">
@@ -667,23 +615,6 @@ export default function SecretaryQueue() {
                           'bg-slate-100 text-slate-600'
                         }`}>
                           {QUEUE_STATUS_LABELS[entry.status] || entry.status} {getTimeAgo(entry.called_at)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
-                          entry.payment_status === 'PAID' ? 'bg-emerald-50 text-emerald-700' :
-                          entry.payment_status === 'PENDING_VERIFICATION' ? 'bg-red-50 text-red-700' :
-                          'bg-slate-100 text-slate-600'
-                        }`}>
-                          {entry.payment_status === 'PAID' ? (
-                            `Paid (P${entry.payment_amount || 0} • ${entry.payment_method || 'Card'})`
-                          ) : entry.payment_status === 'PENDING_VERIFICATION' ? (
-                            `Pending Payment (P${entry.payment_amount || 0})`
-                          ) : entry.payment_status === 'UNPAID' ? (
-                            `Unpaid (P${entry.payment_amount || 0})`
-                          ) : (
-                            '--'
-                          )}
                         </span>
                       </td>
                       <td className="px-4 py-4">

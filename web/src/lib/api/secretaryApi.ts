@@ -36,6 +36,7 @@ export interface SecretaryProfile {
   doctor_first_name?: string;
   doctor_last_name?: string;
   practice_name?: string;
+  room_number?: string | null;
 }
 
 // Walk-in search response (verified from walk-ins.ts lines 38-39)
@@ -140,7 +141,7 @@ export interface UpdatePatientRequest {
   currentMedications?: string | null;
 }
 
-// Queue entry interface (from queue_entries table)
+// Queue entry interface (from queue_entries table and joined patient/doctor data)
 export interface QueueEntry {
   id: string;
   patient_id: string;
@@ -150,9 +151,9 @@ export interface QueueEntry {
   queue_number: number;
   registration_source: 'ONLINE' | 'WALK_IN';
   status: 'WAITING' | 'CALLED' | 'NOT_PRESENT' | 'SKIPPED' | 'IN_CHECKUP' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
-  called_at?: string;
-  started_at?: string;
-  completed_at?: string;
+  called_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
   created_at: string;
   updated_at: string;
   patient_first_name: string;
