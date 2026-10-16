@@ -1136,4 +1136,798 @@ describe('Walk-ins API Security', () => {
       expect(associationCalls.length).toBeGreaterThan(0);
     });
   });
+
+  describe('POST /api/v1/walk-ins/direct-register', () => {
+    it('should register walk-in patient directly without mandatory search', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'test-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors')) {
+            return { rows: [{ id: 'test-doctor-id', is_approved: true, first_name: 'John', last_name: 'Smith' }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [] }; // Email does not exist
+          }
+          if (sql.includes('INSERT INTO users')) {
+            return { rows: [{ id: 'test-user-id', email: 'test@example.com', must_change_password: true }] };
+          }
+          if (sql.includes('INSERT INTO patients')) {
+            return { rows: [{ id: 'test-patient-id' }] };
+          }
+          if (sql.includes('INSERT INTO patient_doctor_associations')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT pg_try_advisory_xact_lock')) {
+            return { rows: [{ lock_acquired: true }] };
+          }
+          if (sql.includes('SELECT * FROM daily_capacities')) {
+            return { rows: [{ registered_count: 0, final_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO appointments')) {
+            return { rows: [{ id: 'test-appointment-id' }] };
+          }
+          if (sql.includes('SELECT COALESCE(MAX(queue_number)')) {
+            return { rows: [{ next_queue: 1 }] };
+          }
+          if (sql.includes('INSERT INTO queue_entries')) {
+            return { rows: [] };
+          }
+          if (sql.includes('UPDATE daily_capacities')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT final_capacity')) {
+            return { rows: [{ total_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO notifications')) {
+            return { rows: [] };
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'test@example.com',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'FEMALE',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('temporaryPassword');
+      expect(response.body.data).toHaveProperty('queueNumber');
+      expect(response.body.data).toHaveProperty('patientEmail', 'test@example.com');
+    });
+
+    it('should reject duplicate email during direct registration', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'test-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors')) {
+            return { rows: [{ id: 'test-doctor-id', is_approved: true, first_name: 'John', last_name: 'Smith' }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [{ id: 'existing-user-id' }] }; // Email already exists
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'existing@example.com',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'FEMALE',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error.message || response.body.error).toContain('Email already registered');
+    });
+
+    it('should require all required fields in direct registration', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'test-doctor-id' }] };
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'test@example.com',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          // Missing required fields
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message || response.body.error).toContain('required');
+    });
+
+    it('should validate mobile number format in direct registration', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'test-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors')) {
+            return { rows: [{ id: 'test-doctor-id', is_approved: true, first_name: 'John', last_name: 'Smith' }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [] };
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'test@example.com',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'FEMALE',
+          phone: 'invalid-phone!', // Invalid characters
+          address: '123 Main St',
+
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message || response.body.error).toContain('Mobile number must contain only digits');
+    });
+
+    it('should enforce queue capacity in direct registration', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'test-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors')) {
+            return { rows: [{ id: 'test-doctor-id', is_approved: true, first_name: 'John', last_name: 'Smith' }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [] };
+          }
+          if (sql.includes('INSERT INTO users')) {
+            return { rows: [{ id: 'test-user-id', email: 'test@example.com', must_change_password: true }] };
+          }
+          if (sql.includes('INSERT INTO patients')) {
+            return { rows: [{ id: 'test-patient-id' }] };
+          }
+          if (sql.includes('INSERT INTO patient_doctor_associations')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT pg_try_advisory_xact_lock')) {
+            return { rows: [{ lock_acquired: true }] };
+          }
+          if (sql.includes('SELECT * FROM daily_capacities')) {
+            return { rows: [{ registered_count: 10, final_capacity: 10 }] }; // Full capacity
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'test@example.com',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'FEMALE',
+          phone: '09123456789',
+          address: '123 Main St',
+
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message || response.body.error).toContain('No available slots');
+    });
+
+    it('should use secretary\'s assigned doctor in direct registration', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'assigned-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors')) {
+            return { rows: [{ id: 'assigned-doctor-id', is_approved: true, first_name: 'John', last_name: 'Smith' }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [] };
+          }
+          if (sql.includes('INSERT INTO users')) {
+            return { rows: [{ id: 'test-user-id', email: 'test@example.com', must_change_password: true }] };
+          }
+          if (sql.includes('INSERT INTO patients')) {
+            return { rows: [{ id: 'test-patient-id' }] };
+          }
+          if (sql.includes('INSERT INTO patient_doctor_associations')) {
+            // Verify the doctor_id is the assigned doctor's ID
+            expect(params[1]).toBe('assigned-doctor-id');
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT pg_try_advisory_xact_lock')) {
+            return { rows: [{ lock_acquired: true }] };
+          }
+          if (sql.includes('SELECT * FROM daily_capacities')) {
+            return { rows: [{ registered_count: 0, final_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO appointments')) {
+            return { rows: [{ id: 'test-appointment-id' }] };
+          }
+          if (sql.includes('SELECT COALESCE(MAX(queue_number)')) {
+            return { rows: [{ next_queue: 1 }] };
+          }
+          if (sql.includes('INSERT INTO queue_entries')) {
+            return { rows: [] };
+          }
+          if (sql.includes('UPDATE daily_capacities')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT final_capacity')) {
+            return { rows: [{ total_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO notifications')) {
+            return { rows: [] };
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'test@example.com',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'FEMALE',
+          phone: '09123456789',
+          address: '123 Main St',
+
+        });
+
+      expect(response.status).toBe(201);
+    });
+
+    it('should set must_change_password to true for walk-in accounts', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'test-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors')) {
+            return { rows: [{ id: 'test-doctor-id', is_approved: true, first_name: 'John', last_name: 'Smith' }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [] };
+          }
+          if (sql.includes('INSERT INTO users')) {
+            // Verify must_change_password is set to true (hardcoded in SQL)
+            expect(sql).toContain('must_change_password');
+            expect(sql).toContain('true'); // The hardcoded value
+            return { rows: [{ id: 'test-user-id', email: 'test@example.com', must_change_password: true }] };
+          }
+          if (sql.includes('INSERT INTO patients')) {
+            return { rows: [{ id: 'test-patient-id' }] };
+          }
+          if (sql.includes('INSERT INTO patient_doctor_associations')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT pg_try_advisory_xact_lock')) {
+            return { rows: [{ lock_acquired: true }] };
+          }
+          if (sql.includes('SELECT * FROM daily_capacities')) {
+            return { rows: [{ registered_count: 0, final_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO appointments')) {
+            return { rows: [{ id: 'test-appointment-id' }] };
+          }
+          if (sql.includes('SELECT COALESCE(MAX(queue_number)')) {
+            return { rows: [{ next_queue: 1 }] };
+          }
+          if (sql.includes('INSERT INTO queue_entries')) {
+            return { rows: [] };
+          }
+          if (sql.includes('UPDATE daily_capacities')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT final_capacity')) {
+            return { rows: [{ total_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO notifications')) {
+            return { rows: [] };
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'test@example.com',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'FEMALE',
+          phone: '09123456789',
+          address: '123 Main St',
+
+        });
+
+      expect(response.status).toBe(201);
+    });
+
+    it('should create COMPLETE patient-doctor association in direct registration', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'test-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors')) {
+            return { rows: [{ id: 'test-doctor-id', is_approved: true, first_name: 'John', last_name: 'Smith' }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [] };
+          }
+          if (sql.includes('INSERT INTO users')) {
+            return { rows: [{ id: 'test-user-id', email: 'test@example.com', must_change_password: true }] };
+          }
+          if (sql.includes('INSERT INTO patients')) {
+            return { rows: [{ id: 'test-patient-id' }] };
+          }
+          if (sql.includes('INSERT INTO patient_doctor_associations')) {
+            // Verify association is COMPLETE
+            expect(sql).toContain('COMPLETE');
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT pg_try_advisory_xact_lock')) {
+            return { rows: [{ lock_acquired: true }] };
+          }
+          if (sql.includes('SELECT * FROM daily_capacities')) {
+            return { rows: [{ registered_count: 0, final_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO appointments')) {
+            return { rows: [{ id: 'test-appointment-id' }] };
+          }
+          if (sql.includes('SELECT COALESCE(MAX(queue_number)')) {
+            return { rows: [{ next_queue: 1 }] };
+          }
+          if (sql.includes('INSERT INTO queue_entries')) {
+            return { rows: [] };
+          }
+          if (sql.includes('UPDATE daily_capacities')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT final_capacity')) {
+            return { rows: [{ total_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO notifications')) {
+            return { rows: [] };
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'test@example.com',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'FEMALE',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(201);
+    });
+
+    it('should generate password with both letters and numbers', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'test-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors')) {
+            return { rows: [{ id: 'test-doctor-id', is_approved: true, first_name: 'John', last_name: 'Smith' }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [] };
+          }
+          if (sql.includes('INSERT INTO users')) {
+            return { rows: [{ id: 'test-user-id', email: 'test@example.com', must_change_password: true }] };
+          }
+          if (sql.includes('INSERT INTO patients')) {
+            return { rows: [{ id: 'test-patient-id' }] };
+          }
+          if (sql.includes('INSERT INTO patient_doctor_associations')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT pg_try_advisory_xact_lock')) {
+            return { rows: [{ lock_acquired: true }] };
+          }
+          if (sql.includes('SELECT * FROM daily_capacities')) {
+            return { rows: [{ registered_count: 0, final_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO appointments')) {
+            return { rows: [{ id: 'test-appointment-id' }] };
+          }
+          if (sql.includes('SELECT COALESCE(MAX(queue_number)')) {
+            return { rows: [{ next_queue: 1 }] };
+          }
+          if (sql.includes('INSERT INTO queue_entries')) {
+            return { rows: [] };
+          }
+          if (sql.includes('UPDATE daily_capacities')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT final_capacity')) {
+            return { rows: [{ total_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO notifications')) {
+            return { rows: [] };
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'test@example.com',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'FEMALE',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.data).toHaveProperty('temporaryPassword');
+      const password = response.body.data.temporaryPassword;
+      expect(password).toMatch(/[A-Za-z]/); // Contains letters
+      expect(password).toMatch(/[0-9]/); // Contains numbers
+      expect(password.length).toBe(12); // 12 characters
+    });
+
+    it('should not return temporary password on failure', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'test-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors')) {
+            return { rows: [{ id: 'test-doctor-id', is_approved: true, first_name: 'John', last_name: 'Smith' }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [{ id: 'existing-user-id' }] }; // Email already exists
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'existing@example.com',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'FEMALE',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(409);
+      expect(response.body.data).toBeUndefined(); // No data returned on failure
+      // If data is undefined, it cannot have temporaryPassword property
+    });
+
+    it('should rollback transaction on capacity check failure', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'test-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors')) {
+            return { rows: [{ id: 'test-doctor-id', is_approved: true, first_name: 'John', last_name: 'Smith' }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [] };
+          }
+          if (sql.includes('INSERT INTO users')) {
+            return { rows: [{ id: 'test-user-id', email: 'test@example.com', must_change_password: true }] };
+          }
+          if (sql.includes('INSERT INTO patients')) {
+            return { rows: [{ id: 'test-patient-id' }] };
+          }
+          if (sql.includes('INSERT INTO patient_doctor_associations')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT pg_try_advisory_xact_lock')) {
+            return { rows: [{ lock_acquired: true }] };
+          }
+          if (sql.includes('SELECT * FROM daily_capacities')) {
+            return { rows: [] }; // No capacity configured
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'test@example.com',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'FEMALE',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message || response.body.error).toContain('No capacity configured');
+
+      // Verify ROLLBACK was called
+      const rollbackCalls = mockClient.query.mock.calls.filter((call: any[]) =>
+        call[0].includes('ROLLBACK')
+      );
+      expect(rollbackCalls.length).toBeGreaterThan(0);
+    });
+
+    it('should prevent duplicate queue entries on concurrent requests (transaction rollback)', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'test-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors')) {
+            return { rows: [{ id: 'test-doctor-id', is_approved: true, first_name: 'John', last_name: 'Smith' }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [] };
+          }
+          if (sql.includes('INSERT INTO users')) {
+            return { rows: [{ id: 'test-user-id', email: 'test@example.com', must_change_password: true }] };
+          }
+          if (sql.includes('INSERT INTO patients')) {
+            return { rows: [{ id: 'test-patient-id' }] };
+          }
+          if (sql.includes('INSERT INTO patient_doctor_associations')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT pg_try_advisory_xact_lock')) {
+            return { rows: [{ lock_acquired: true }] };
+          }
+          if (sql.includes('SELECT * FROM daily_capacities')) {
+            return { rows: [{ registered_count: 0, final_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO appointments')) {
+            return { rows: [{ id: 'test-appointment-id' }] };
+          }
+          if (sql.includes('SELECT COALESCE(MAX(queue_number)')) {
+            return { rows: [{ next_queue: 1 }] };
+          }
+          if (sql.includes('INSERT INTO queue_entries')) {
+            // Simulate unique constraint violation (duplicate queue number)
+            const error: any = new Error('Duplicate queue entry');
+            error.code = '23505';
+            error.constraint = 'queue_entries_queue_date_doctor_id_queue_number_key';
+            throw error;
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'test@example.com',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'FEMALE',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(409); // Conflict
+
+      // Verify ROLLBACK was called on constraint violation
+      const rollbackCalls = mockClient.query.mock.calls.filter((call: any[]) =>
+        call[0].includes('ROLLBACK')
+      );
+      expect(rollbackCalls.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Direct Walk-In Queue Integration', () => {
+    it('should create queue entry that appears in secretary\'s authorized queue', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'assigned-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors WHERE id = $1 AND is_approved = true')) {
+            return { rows: [{ id: 'assigned-doctor-id', first_name: 'Dr.', last_name: 'Smith', is_approved: true }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [] };
+          }
+          if (sql.includes('INSERT INTO users')) {
+            return { rows: [{ id: 'new-user-id', email: 'walkin@example.com', must_change_password: true }] };
+          }
+          if (sql.includes('INSERT INTO patients')) {
+            return { rows: [{ id: 'new-patient-id' }] };
+          }
+          if (sql.includes('INSERT INTO patient_doctor_associations')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT pg_try_advisory_xact_lock')) {
+            return { rows: [{ lock_acquired: true }] };
+          }
+          if (sql.includes('SELECT * FROM daily_capacities')) {
+            return { rows: [{ registered_count: 0, final_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO appointments')) {
+            return { rows: [{ id: 'new-appointment-id' }] };
+          }
+          if (sql.includes('SELECT COALESCE(MAX(queue_number)')) {
+            return { rows: [{ next_queue: 1 }] };
+          }
+          if (sql.includes('INSERT INTO queue_entries')) {
+            return { rows: [] };
+          }
+          if (sql.includes('UPDATE daily_capacities')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT final_capacity')) {
+            return { rows: [{ total_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO notifications')) {
+            return { rows: [] };
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'walkin@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Main St'
+        });
+
+      expect(response.status).toBe(201);
+
+      // Verify queue entry was created with WALK_IN source
+      const queueInsertCalls = mockClient.query.mock.calls.filter((call: any[]) =>
+        call[0].includes('INSERT INTO queue_entries')
+      );
+      expect(queueInsertCalls.length).toBeGreaterThan(0);
+      expect(queueInsertCalls[0][0]).toContain('WALK_IN');
+      expect(queueInsertCalls[0][0]).toContain('WAITING');
+    });
+
+    it('should include queue_number in direct walk-in response', async () => {
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT doctor_id FROM secretaries')) {
+            return { rows: [{ doctor_id: 'assigned-doctor-id' }] };
+          }
+          if (sql.includes('SELECT * FROM doctors WHERE id = $1 AND is_approved = true')) {
+            return { rows: [{ id: 'assigned-doctor-id', first_name: 'Dr.', last_name: 'Smith', is_approved: true }] };
+          }
+          if (sql.includes('SELECT id FROM users WHERE email')) {
+            return { rows: [] };
+          }
+          if (sql.includes('INSERT INTO users')) {
+            return { rows: [{ id: 'new-user-id', email: 'walkin@example.com', must_change_password: true }] };
+          }
+          if (sql.includes('INSERT INTO patients')) {
+            return { rows: [{ id: 'new-patient-id' }] };
+          }
+          if (sql.includes('INSERT INTO patient_doctor_associations')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT pg_try_advisory_xact_lock')) {
+            return { rows: [{ lock_acquired: true }] };
+          }
+          if (sql.includes('SELECT * FROM daily_capacities')) {
+            return { rows: [{ registered_count: 0, final_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO appointments')) {
+            return { rows: [{ id: 'new-appointment-id' }] };
+          }
+          if (sql.includes('SELECT COALESCE(MAX(queue_number)')) {
+            return { rows: [{ next_queue: 5 }] };
+          }
+          if (sql.includes('INSERT INTO queue_entries')) {
+            return { rows: [] };
+          }
+          if (sql.includes('UPDATE daily_capacities')) {
+            return { rows: [] };
+          }
+          if (sql.includes('SELECT final_capacity')) {
+            return { rows: [{ total_capacity: 10 }] };
+          }
+          if (sql.includes('INSERT INTO notifications')) {
+            return { rows: [] };
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/walk-ins/direct-register')
+        .send({
+          email: 'walkin@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Main St'
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.data.queueNumber).toBe(5);
+    });
+  });
 });

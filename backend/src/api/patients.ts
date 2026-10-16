@@ -518,13 +518,10 @@ router.get('/doctor/:doctorId', authenticate, requirePasswordChange, authorize('
 
 // Search patients (for secretaries to find patients for walk-in registration)
 // Restricted to patients of the secretary's assigned doctor
+// If no search parameters are provided, returns all patients of the assigned doctor (initial listing)
 router.get('/search', authenticate, requirePasswordChange, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { email, phone, firstName, lastName } = req.query;
-
-    if (!email && !phone && !firstName && !lastName) {
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'At least one search parameter is required'));
-    }
 
     // Get secretary's assigned doctor ID
     const secretaryResult = await query(
@@ -665,6 +662,251 @@ router.get('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
   } catch (err: any) {
     console.error('Patient fetch error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch patient'));
+  }
+});
+
+// Create patient-doctor association and submit initial patient details (doctor only)
+// This allows doctors to add existing patients to their patient list
+// Constraint: Patient user account must already exist (created through mobile registration)
+// Doctor cannot create user accounts directly due to password generation and email verification requirements
+router.post('/associate', authenticate, requirePasswordChange, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const userId = req.user!.id;
+    const { email, firstName, middleName, lastName, dateOfBirth, sex, phone, address, emergencyContactName, emergencyContactPhone, medicalHistory, allergies, currentMedications } = req.body;
+
+    // Validate required fields
+    if (!email || typeof email !== 'string') {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Patient email is required'));
+    }
+
+    if (!firstName || typeof firstName !== 'string') {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'First name is required'));
+    }
+
+    if (!lastName || typeof lastName !== 'string') {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name is required'));
+    }
+
+    if (!dateOfBirth || typeof dateOfBirth !== 'string') {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date of birth is required'));
+    }
+
+    if (!sex || typeof sex !== 'string') {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Sex is required'));
+    }
+
+    if (!phone || typeof phone !== 'string') {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number is required'));
+    }
+
+    if (!address || typeof address !== 'string') {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Address is required'));
+    }
+
+    // Trim whitespace
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedFirstName = firstName.trim();
+    const trimmedMiddleName = middleName ? middleName.trim() : null;
+    const trimmedLastName = lastName.trim();
+    const trimmedSex = sex.trim().toUpperCase();
+    const trimmedPhone = phone.trim();
+    const trimmedAddress = address.trim();
+
+    // Length validation
+    if (trimmedFirstName.length === 0 || trimmedFirstName.length > 100) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'First name must be 1-100 characters'));
+    }
+
+    if (trimmedMiddleName && trimmedMiddleName.length > 100) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Middle name must be maximum 100 characters'));
+    }
+
+    if (trimmedLastName.length === 0 || trimmedLastName.length > 100) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name must be 1-100 characters'));
+    }
+
+    if (trimmedPhone.length === 0 || trimmedPhone.length > 20) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 1-20 characters'));
+    }
+
+    if (trimmedAddress.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Address is required'));
+    }
+
+    // Validate sex value
+    if (!VALID_SEX_VALUES.includes(trimmedSex)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Sex must be one of: MALE, FEMALE, OTHER, NOT_SPECIFIED'));
+    }
+
+    // Validate mobile number format
+    if (!MOBILE_REGEX.test(trimmedPhone)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must contain only digits, spaces, hyphens, plus sign, or parentheses'));
+    }
+
+    // Validate date of birth
+    const dob = new Date(dateOfBirth);
+    if (isNaN(dob.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid date of birth format'));
+    }
+
+    // Ensure date of birth is not in the future
+    const now = new Date();
+    if (dob > now) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date of birth cannot be in the future'));
+    }
+
+    // Get authenticated doctor's ID
+    const doctorResult = await client.query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Check if patient user account exists
+    const userResult = await client.query(
+      'SELECT id, email FROM users WHERE email = $1 AND role = $2',
+      [trimmedEmail, 'PATIENT']
+    );
+
+    if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Patient account not found. Please ask the patient to register through the mobile app first.'));
+    }
+
+    const patientUserId = userResult.rows[0].id;
+
+    // Get or create patient record
+    const patientResult = await client.query(
+      'SELECT id FROM patients WHERE user_id = $1',
+      [patientUserId]
+    );
+
+    let patientId: string;
+
+    if (patientResult.rows.length === 0) {
+      // Create patient record
+      const newPatientResult = await client.query(
+        `INSERT INTO patients (user_id, first_name, middle_name, last_name, date_of_birth, sex, phone, address, emergency_contact_name, emergency_contact_phone, medical_history, allergies, current_medications)
+         VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12, $13)
+         RETURNING id`,
+        [
+          patientUserId,
+          trimmedFirstName,
+          trimmedMiddleName,
+          trimmedLastName,
+          dateOfBirth,
+          trimmedSex,
+          trimmedPhone,
+          trimmedAddress,
+          emergencyContactName || null,
+          emergencyContactPhone || null,
+          medicalHistory || null,
+          allergies || null,
+          currentMedications || null
+        ]
+      );
+      patientId = newPatientResult.rows[0].id;
+    } else {
+      // Update existing patient record
+      patientId = patientResult.rows[0].id;
+
+      await client.query(
+        `UPDATE patients
+         SET first_name = $1,
+             middle_name = $2,
+             last_name = $3,
+             date_of_birth = $4::date,
+             sex = $5,
+             phone = $6,
+             address = $7,
+             emergency_contact_name = COALESCE($8, emergency_contact_name),
+             emergency_contact_phone = COALESCE($9, emergency_contact_phone),
+             medical_history = COALESCE($10, medical_history),
+             allergies = COALESCE($11, allergies),
+             current_medications = COALESCE($12, current_medications),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $13`,
+        [
+          trimmedFirstName,
+          trimmedMiddleName,
+          trimmedLastName,
+          dateOfBirth,
+          trimmedSex,
+          trimmedPhone,
+          trimmedAddress,
+          emergencyContactName || null,
+          emergencyContactPhone || null,
+          medicalHistory || null,
+          allergies || null,
+          currentMedications || null,
+          patientId
+        ]
+      );
+    }
+
+    // Create or update patient-doctor association with COMPLETE status
+    await client.query(
+      `INSERT INTO patient_doctor_associations (patient_id, doctor_id, details_completion_status, first_details_submitted_at)
+       VALUES ($1, $2, 'COMPLETE', CURRENT_TIMESTAMP)
+       ON CONFLICT (patient_id, doctor_id) DO UPDATE SET
+         details_completion_status = 'COMPLETE',
+         first_details_submitted_at = LEAST(patient_doctor_associations.first_details_submitted_at, CURRENT_TIMESTAMP),
+         updated_at = CURRENT_TIMESTAMP`,
+      [patientId, doctorId]
+    );
+
+    await client.query('COMMIT');
+
+    // Fetch updated patient record to return
+    const updatedPatientResult = await query(
+      `SELECT p.id, p.user_id, p.first_name, p.middle_name, p.last_name, p.date_of_birth, p.sex, p.phone, p.address,
+              p.emergency_contact_name, p.emergency_contact_phone, p.medical_history, p.allergies, p.current_medications,
+              u.email
+       FROM patients p
+       JOIN users u ON u.id = p.user_id
+       WHERE p.id = $1`,
+      [patientId]
+    );
+
+    res.json(success(updatedPatientResult.rows[0], 'Patient associated successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Doctor patient association error:', err);
+
+    // Handle unique constraint violations
+    if (err.code === '23505') {
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Patient is already associated with this doctor'));
+    }
+
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to associate patient'));
+  } finally {
+    client.release();
   }
 });
 

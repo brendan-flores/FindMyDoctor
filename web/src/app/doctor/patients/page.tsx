@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { doctorApi, Patient } from '@/lib/api/doctorApi';
+import { doctorApi, Patient, AssociatePatientRequest } from '@/lib/api/doctorApi';
 
 export default function DoctorPatients() {
   const router = useRouter();
@@ -12,6 +12,24 @@ export default function DoctorPatients() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addFormData, setAddFormData] = useState<AssociatePatientRequest>({
+    email: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
+    dateOfBirth: '',
+    sex: 'MALE',
+    phone: '',
+    address: '',
+    emergencyContactName: '',
+    emergencyContactPhone: '',
+    medicalHistory: '',
+    allergies: '',
+    currentMedications: '',
+  });
 
   useEffect(() => {
     fetchDoctorProfile();
@@ -145,6 +163,17 @@ export default function DoctorPatients() {
         </div>
       </div>
 
+      {/* Add Patient Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
+        >
+          <span className="material-symbols-outlined">add</span>
+          Add Patient
+        </button>
+      </div>
+
       {/* Search Bar */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
         <div className="relative">
@@ -190,8 +219,7 @@ export default function DoctorPatients() {
             {filteredPatients.map((patient) => (
               <div
                 key={patient.id}
-                className="p-6 hover:bg-slate-50 transition-colors cursor-pointer"
-                onClick={() => router.push(`/doctor/patients/${patient.id}`)}
+                className="p-6 hover:bg-slate-50 transition-colors"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -231,8 +259,12 @@ export default function DoctorPatients() {
                   </div>
 
                   <div className="ml-4">
-                    <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                      <span className="material-symbols-outlined">arrow_forward</span>
+                    <button
+                      onClick={() => router.push(`/doctor/patients/${patient.id}`)}
+                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="View Details"
+                    >
+                      <span className="material-symbols-outlined">visibility</span>
                     </button>
                   </div>
                 </div>
@@ -241,6 +273,291 @@ export default function DoctorPatients() {
           </div>
         )}
       </div>
+
+      {/* Add Patient Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-100">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-slate-800">Add Patient</h2>
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setAddError(null);
+                    setAddFormData({
+                      email: '',
+                      firstName: '',
+                      middleName: '',
+                      lastName: '',
+                      dateOfBirth: '',
+                      sex: 'MALE',
+                      phone: '',
+                      address: '',
+                      emergencyContactName: '',
+                      emergencyContactPhone: '',
+                      medicalHistory: '',
+                      allergies: '',
+                      currentMedications: '',
+                    });
+                  }}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 mt-1">
+                Enter the patient&apos;s email to associate them with your practice. The patient must have an existing account.
+              </p>
+            </div>
+
+            {addError && (
+              <div className="p-4 bg-red-50 border border-red-200 mx-6 mt-4 rounded-lg">
+                <p className="text-red-600 text-sm">{addError}</p>
+              </div>
+            )}
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm text-slate-500 mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={addFormData.email}
+                  onChange={(e) => setAddFormData({ ...addFormData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="patient@example.com"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-500 mb-1">First Name *</label>
+                  <input
+                    type="text"
+                    value={addFormData.firstName}
+                    onChange={(e) => setAddFormData({ ...addFormData, firstName: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-500 mb-1">Middle Name</label>
+                  <input
+                    type="text"
+                    value={addFormData.middleName}
+                    onChange={(e) => setAddFormData({ ...addFormData, middleName: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-500 mb-1">Last Name *</label>
+                <input
+                  type="text"
+                  value={addFormData.lastName}
+                  onChange={(e) => setAddFormData({ ...addFormData, lastName: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-500 mb-1">Date of Birth *</label>
+                  <input
+                    type="date"
+                    value={addFormData.dateOfBirth}
+                    onChange={(e) => setAddFormData({ ...addFormData, dateOfBirth: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-500 mb-1">Sex *</label>
+                  <select
+                    value={addFormData.sex}
+                    onChange={(e) => setAddFormData({ ...addFormData, sex: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                    <option value="NOT_SPECIFIED">Not Specified</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-500 mb-1">Phone *</label>
+                <input
+                  type="text"
+                  value={addFormData.phone}
+                  onChange={(e) => setAddFormData({ ...addFormData, phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="09123456789"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-500 mb-1">Address *</label>
+                <input
+                  type="text"
+                  value={addFormData.address}
+                  onChange={(e) => setAddFormData({ ...addFormData, address: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-500 mb-1">Emergency Contact Name</label>
+                  <input
+                    type="text"
+                    value={addFormData.emergencyContactName}
+                    onChange={(e) => setAddFormData({ ...addFormData, emergencyContactName: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-500 mb-1">Emergency Contact Phone</label>
+                  <input
+                    type="text"
+                    value={addFormData.emergencyContactPhone}
+                    onChange={(e) => setAddFormData({ ...addFormData, emergencyContactPhone: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-500 mb-1">Medical History</label>
+                <textarea
+                  value={addFormData.medicalHistory}
+                  onChange={(e) => setAddFormData({ ...addFormData, medicalHistory: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-500 mb-1">Allergies</label>
+                <textarea
+                  value={addFormData.allergies}
+                  onChange={(e) => setAddFormData({ ...addFormData, allergies: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-500 mb-1">Current Medications</label>
+                <textarea
+                  value={addFormData.currentMedications}
+                  onChange={(e) => setAddFormData({ ...addFormData, currentMedications: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setAddError(null);
+                  setAddFormData({
+                    email: '',
+                    firstName: '',
+                    middleName: '',
+                    lastName: '',
+                    dateOfBirth: '',
+                    sex: 'MALE',
+                    phone: '',
+                    address: '',
+                    emergencyContactName: '',
+                    emergencyContactPhone: '',
+                    medicalHistory: '',
+                    allergies: '',
+                    currentMedications: '',
+                  });
+                }}
+                className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
+                disabled={isAdding}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  // Client-side validation
+                  if (!addFormData.email.trim()) {
+                    setAddError('Email is required');
+                    return;
+                  }
+                  if (!addFormData.firstName.trim()) {
+                    setAddError('First name is required');
+                    return;
+                  }
+                  if (!addFormData.lastName.trim()) {
+                    setAddError('Last name is required');
+                    return;
+                  }
+                  if (!addFormData.dateOfBirth) {
+                    setAddError('Date of birth is required');
+                    return;
+                  }
+                  if (!addFormData.phone.trim()) {
+                    setAddError('Phone is required');
+                    return;
+                  }
+                  if (!addFormData.address.trim()) {
+                    setAddError('Address is required');
+                    return;
+                  }
+
+                  setIsAdding(true);
+                  setAddError(null);
+
+                  try {
+                    const response = await doctorApi.associatePatient(addFormData);
+
+                    if (response.success && response.data) {
+                      setShowAddModal(false);
+                      setAddError(null);
+                      setAddFormData({
+                        email: '',
+                        firstName: '',
+                        middleName: '',
+                        lastName: '',
+                        dateOfBirth: '',
+                        sex: 'MALE',
+                        phone: '',
+                        address: '',
+                        emergencyContactName: '',
+                        emergencyContactPhone: '',
+                        medicalHistory: '',
+                        allergies: '',
+                        currentMedications: '',
+                      });
+                      // Refresh patient list
+                      if (doctorId) {
+                        fetchPatients(doctorId);
+                      }
+                    } else {
+                      setAddError(response.error || 'Failed to add patient');
+                    }
+                  } catch (err) {
+                    setAddError('Network error occurred');
+                  } finally {
+                    setIsAdding(false);
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isAdding}
+              >
+                {isAdding ? 'Adding...' : 'Add Patient'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

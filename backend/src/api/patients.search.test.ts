@@ -117,13 +117,13 @@ describe('Secretary Patient Search with Legacy Support', () => {
       expect(response.body.data).toEqual([]);
     });
 
-    it('should require at least one search parameter', async () => {
+    it('should return all patients of assigned doctor when no search parameters provided (initial listing)', async () => {
       const response = await request(app)
         .get('/api/v1/patients/search')
         .query({});
 
-      expect(response.status).toBe(400);
-      expect(response.body.error.message || response.body.error).toContain('At least one search parameter is required');
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body.data)).toBe(true);
     });
   });
 });

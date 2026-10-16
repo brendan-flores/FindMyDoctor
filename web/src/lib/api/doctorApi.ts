@@ -90,6 +90,55 @@ export interface PrescriptionItem {
   instructions?: string;
 }
 
+export interface UpdatePatientRequest {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  sex: string;
+  phone: string;
+  address: string;
+  middleName?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  medicalHistory?: string;
+  allergies?: string;
+  currentMedications?: string;
+}
+
+export interface AssociatePatientRequest {
+  email: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  sex: string;
+  phone: string;
+  address: string;
+  middleName?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  medicalHistory?: string;
+  allergies?: string;
+  currentMedications?: string;
+}
+
+export interface Visit {
+  id: string;
+  appointment_id?: string;
+  patient_id: string;
+  doctor_id: string;
+  visit_date: string;
+  reason_for_visit?: string;
+  diagnosis?: string;
+  notes?: string;
+  blood_pressure?: string;
+  weight?: number;
+  height?: number;
+  temperature?: number;
+  appointment_date?: string;
+  doctor_first_name?: string;
+  doctor_last_name?: string;
+}
+
 export const doctorApi = {
   // Get current doctor's profile
   getProfile: async (): Promise<{ success: boolean; data?: DoctorProfile; error?: string }> => {
@@ -144,5 +193,20 @@ export const doctorApi = {
   // Get patient's prescriptions
   getPatientPrescriptions: async (patientId: string): Promise<{ success: boolean; data?: Prescription[]; error?: string }> => {
     return apiClient.get<Prescription[]>(`/prescriptions/patients/${patientId}`);
+  },
+
+  // Update patient information
+  updatePatient: async (patientId: string, payload: UpdatePatientRequest): Promise<{ success: boolean; data?: Patient; error?: string }> => {
+    return apiClient.put<Patient>(`/patients/${patientId}`, payload);
+  },
+
+  // Get patient's visit history
+  getPatientVisits: async (patientId: string): Promise<{ success: boolean; data?: Visit[]; error?: string }> => {
+    return apiClient.get<Visit[]>(`/visits/patient/${patientId}`);
+  },
+
+  // Associate patient with doctor (create association and submit initial details)
+  associatePatient: async (payload: AssociatePatientRequest): Promise<{ success: boolean; data?: Patient; error?: string }> => {
+    return apiClient.post<Patient>('/patients/associate', payload);
   },
 };

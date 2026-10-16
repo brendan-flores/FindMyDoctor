@@ -21,8 +21,8 @@ jest.mock('../middleware/auth', () => ({
     req.user = mockUser;
     next();
   },
-  authorize: (role: string) => (req: any, res: any, next: any) => {
-    if (req.user?.role === role) {
+  authorize: (...roles: string[]) => (req: any, res: any, next: any) => {
+    if (roles.includes(req.user?.role)) {
       next();
     } else {
       res.status(403).json({ error: 'Forbidden' });
@@ -1431,6 +1431,589 @@ describe('Patient API Validation', () => {
             // middleName omitted
           });
       });
+    });
+  });
+
+  describe('PUT /api/v1/patients/:id - Doctor-specific authorization', () => {
+    it('should allow doctor to update patient they have association with', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('UPDATE patients SET') && sql.includes('EXISTS')) {
+          // Successful update with association
+          return Promise.resolve({
+            rows: [{ id: '550e8400-e29b-41d4-a716-446655440000', first_name: 'John', last_name: 'Doe' }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .put('/api/v1/patients/550e8400-e29b-41d4-a716-446655440000')
+        .send({
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Main St'
+        });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should allow doctor to update patient they have appointment with', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('UPDATE patients SET') && sql.includes('EXISTS')) {
+          // Successful update with appointment (no association)
+          return Promise.resolve({
+            rows: [{ id: '550e8400-e29b-41d4-a716-446655440000', first_name: 'John', last_name: 'Doe' }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .put('/api/v1/patients/550e8400-e29b-41d4-a716-446655440000')
+        .send({
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Main St'
+        });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should deny doctor access to another doctor\'s patient (404)', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('UPDATE patients SET') && sql.includes('EXISTS')) {
+          // No association or appointment - empty result
+          return Promise.resolve({ rows: [] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .put('/api/v1/patients/550e8400-e29b-41d4-a716-446655440001')
+        .send({
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Main St'
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.message).toContain('Patient not found or access denied');
+    });
+
+    it('should validate that doctor cannot update patient without association or appointment', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('UPDATE patients SET')) {
+          // Zero rows updated due to authorization failure
+          return Promise.resolve({ rows: [] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .put('/api/v1/patients/550e8400-e29b-41d4-a716-446655440000')
+        .send({
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Main St'
+        });
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/v1/patients/associate (doctor patient creation)', () => {
+    it('should require email field', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      const response = await request(app)
+        .post('/api/v1/patients/associate')
+        .send({
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Main St',
+          // email missing
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message || response.body.error).toContain('Patient email is required');
+    });
+
+    it('should require all required fields', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      const response = await request(app)
+        .post('/api/v1/patients/associate')
+        .send({
+          email: 'patient@example.com',
+          firstName: 'John',
+          // lastName missing
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message || response.body.error).toContain('Last name is required');
+    });
+
+    it('should validate sex enum values', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      const response = await request(app)
+        .post('/api/v1/patients/associate')
+        .send({
+          email: 'patient@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'INVALID',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message || response.body.error).toContain('Sex must be one of');
+    });
+
+    it('should validate mobile number format', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      const response = await request(app)
+        .post('/api/v1/patients/associate')
+        .send({
+          email: 'patient@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: 'invalid-phone',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message || response.body.error).toContain('Mobile number must contain only');
+    });
+
+    it('should reject non-doctor roles with 403', async () => {
+      mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+      const response = await request(app)
+        .post('/api/v1/patients/associate')
+        .send({
+          email: 'patient@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(403);
+    });
+
+    it('should return 404 if patient account does not exist', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT id FROM doctors WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'doctor-id' }] });
+        }
+        if (sql.includes('SELECT id, email FROM users WHERE email')) {
+          return Promise.resolve({ rows: [] }); // No patient account found
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/patients/associate')
+        .send({
+          email: 'nonexistent@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.message).toContain('Patient account not found');
+    });
+
+    it('should create patient-doctor association for existing patient', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT id FROM doctors WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'doctor-id' }] });
+        }
+        if (sql.includes('SELECT id, email FROM users WHERE email')) {
+          return Promise.resolve({ rows: [{ id: 'patient-user-id', email: 'patient@example.com' }] });
+        }
+        if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'patient-id' }] }); // Patient record exists
+        }
+        if (sql.includes('UPDATE patients')) {
+          return Promise.resolve({ rows: [{ id: 'patient-id' }] });
+        }
+        if (sql.includes('INSERT INTO patient_doctor_associations')) {
+          return Promise.resolve({ rows: [] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/patients/associate')
+        .send({
+          email: 'patient@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should prevent duplicate associations', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      const uniqueConstraintError = new Error('Unique constraint violation');
+      (uniqueConstraintError as any).code = '23505';
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT id FROM doctors WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'doctor-id' }] });
+        }
+        if (sql.includes('SELECT id, email FROM users WHERE email')) {
+          return Promise.resolve({ rows: [{ id: 'patient-user-id', email: 'patient@example.com' }] });
+        }
+        if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'patient-id' }] });
+        }
+        if (sql.includes('UPDATE patients')) {
+          return Promise.resolve({ rows: [{ id: 'patient-id' }] });
+        }
+        if (sql.includes('INSERT INTO patient_doctor_associations')) {
+          return Promise.reject(uniqueConstraintError); // Duplicate association
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/patients/associate')
+        .send({
+          email: 'patient@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          sex: 'MALE',
+          phone: '09123456789',
+          address: '123 Main St',
+        });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error.message).toContain('Patient is already associated with this doctor');
+    });
+  });
+
+  describe('GET /api/v1/patients/search (Secretary)', () => {
+    it('should allow secretary to list all patients of assigned doctor with no search parameters', async () => {
+      mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM patients p') && sql.includes('JOIN users u')) {
+          // Main query without search filters
+          expect(params[0]).toBe('assigned-doctor-id');
+          expect(sql).toContain('patient_doctor_associations');
+          expect(sql).toContain('appointments');
+          return Promise.resolve({
+            rows: [
+              {
+                id: 'patient-1',
+                user_id: 'user-1',
+                first_name: 'John',
+                last_name: 'Doe',
+                email: 'john@example.com'
+              },
+              {
+                id: 'patient-2',
+                user_id: 'user-2',
+                first_name: 'Jane',
+                last_name: 'Smith',
+                email: 'jane@example.com'
+              }
+            ]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/search');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toHaveLength(2);
+      expect(response.body.data[0].first_name).toBe('John');
+      expect(response.body.data[1].first_name).toBe('Jane');
+    });
+
+    it('should filter by email when search parameter is provided', async () => {
+      mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM patients p') && sql.includes('u.email ILIKE')) {
+          expect(params[0]).toBe('assigned-doctor-id');
+          expect(params[1]).toBe('%john@example.com%');
+          return Promise.resolve({
+            rows: [{
+              id: 'patient-1',
+              user_id: 'user-1',
+              first_name: 'John',
+              last_name: 'Doe',
+              email: 'john@example.com'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/search')
+        .query({ email: 'john@example.com' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].email).toBe('john@example.com');
+    });
+
+    it('should filter by firstName when search parameter is provided', async () => {
+      mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM patients p') && sql.includes('p.first_name ILIKE')) {
+          expect(params[0]).toBe('assigned-doctor-id');
+          expect(params[1]).toBe('%John%');
+          return Promise.resolve({
+            rows: [{
+              id: 'patient-1',
+              user_id: 'user-1',
+              first_name: 'John',
+              last_name: 'Doe',
+              email: 'john@example.com'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/search')
+        .query({ firstName: 'John' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].first_name).toBe('John');
+    });
+
+    it('should filter by lastName when search parameter is provided', async () => {
+      mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM patients p') && sql.includes('p.last_name ILIKE')) {
+          expect(params[0]).toBe('assigned-doctor-id');
+          expect(params[1]).toBe('%Doe%');
+          return Promise.resolve({
+            rows: [{
+              id: 'patient-1',
+              user_id: 'user-1',
+              first_name: 'John',
+              last_name: 'Doe',
+              email: 'john@example.com'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/search')
+        .query({ lastName: 'Doe' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].last_name).toBe('Doe');
+    });
+
+    it('should filter by phone when search parameter is provided', async () => {
+      mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM patients p') && sql.includes('p.phone ILIKE')) {
+          expect(params[0]).toBe('assigned-doctor-id');
+          expect(params[1]).toBe('%09123456789%');
+          return Promise.resolve({
+            rows: [{
+              id: 'patient-1',
+              user_id: 'user-1',
+              first_name: 'John',
+              last_name: 'Doe',
+              phone: '09123456789'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/search')
+        .query({ phone: '09123456789' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].phone).toBe('09123456789');
+    });
+
+    it('should only return patients with association or appointment to assigned doctor', async () => {
+      mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM patients p') && sql.includes('EXISTS')) {
+          // Verify the query includes both association and appointment checks
+          expect(sql).toContain('patient_doctor_associations');
+          expect(sql).toContain('appointments');
+          expect(params[0]).toBe('assigned-doctor-id');
+          return Promise.resolve({
+            rows: [{
+              id: 'patient-1',
+              user_id: 'user-1',
+              first_name: 'John',
+              last_name: 'Doe',
+              email: 'john@example.com'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/search');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toHaveLength(1);
+    });
+
+    it('should return 404 if secretary profile not found', async () => {
+      mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/patients/search');
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.message).toContain('Secretary profile not found');
+    });
+
+    it('should deny access to non-secretary roles', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      const response = await request(app)
+        .get('/api/v1/patients/search');
+
+      expect(response.status).toBe(403);
     });
   });
 });

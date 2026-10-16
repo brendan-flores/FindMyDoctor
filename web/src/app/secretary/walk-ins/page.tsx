@@ -1,60 +1,30 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { secretaryApi, SecretaryProfile, WalkInPatientSearch, CreateWalkInAccountRequest, WalkInPatientDetailsRequest, WalkInRegistrationRequest } from '@/lib/api/secretaryApi';
+import { secretaryApi, SecretaryProfile, DirectWalkInRegistrationRequest } from '@/lib/api/secretaryApi';
 
-type Step = 'search' | 'create-account' | 'patient-details' | 'appointment' | 'confirm' | 'success';
+type Step = 'form' | 'success';
 
 export default function SecretaryWalkIns() {
-  const [step, setStep] = useState<Step>('search');
+  const [step, setStep] = useState<Step>('form');
   const [secretaryProfile, setSecretaryProfile] = useState<SecretaryProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Step 1: Search
-  const [searchEmail, setSearchEmail] = useState('');
-  const [searchResult, setSearchResult] = useState<WalkInPatientSearch | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
-
-  // Step 2: Create Account
-  const [newAccountData, setNewAccountData] = useState<CreateWalkInAccountRequest>({
+  // Direct registration form
+  const [formData, setFormData] = useState<DirectWalkInRegistrationRequest>({
     email: '',
     firstName: '',
-    lastName: '',
-    doctorId: '',
-  });
-  const [createdAccount, setCreatedAccount] = useState<any>(null);
-  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
-
-  // Step 3: Patient Details
-  const [patientDetails, setPatientDetails] = useState<WalkInPatientDetailsRequest>({
-    patientId: '',
-    doctorId: '',
-    firstName: '',
+    middleName: '',
     lastName: '',
     dateOfBirth: '',
     sex: 'MALE',
     phone: '',
     address: '',
-    middleName: '',
-    emergencyContactName: '',
-    emergencyContactPhone: '',
-    medicalHistory: '',
-    allergies: '',
-    currentMedications: '',
-  });
-  const [isSubmittingDetails, setIsSubmittingDetails] = useState(false);
-
-  // Step 4: Appointment
-  const [appointmentData, setAppointmentData] = useState<WalkInRegistrationRequest>({
-    patientId: '',
-    doctorId: '',
-    appointmentDate: '',
-    reasonForVisit: '',
   });
   const [isRegistering, setIsRegistering] = useState(false);
 
-  // Step 5: Success
+  // Success result
   const [registrationResult, setRegistrationResult] = useState<any>(null);
 
   useEffect(() => {
@@ -67,10 +37,6 @@ export default function SecretaryWalkIns() {
       const response = await secretaryApi.getProfile();
       if (response.success && response.data) {
         setSecretaryProfile(response.data);
-        const doctorId = response.data.doctor_id || '';
-        setNewAccountData(prev => ({ ...prev, doctorId }));
-        setPatientDetails(prev => ({ ...prev, doctorId }));
-        setAppointmentData(prev => ({ ...prev, doctorId }));
       } else {
         setError(response.error || 'Failed to fetch secretary profile');
       }
@@ -81,114 +47,15 @@ export default function SecretaryWalkIns() {
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchEmail.trim()) {
-      setError('Email is required');
-      return;
-    }
-
-    setIsSearching(true);
-    setError(null);
-
-    try {
-      const response = await secretaryApi.searchWalkInPatient(searchEmail.trim());
-
-      if (response.success && response.data) {
-        const data = response.data;
-        setSearchResult(data);
-        setPatientDetails(prev => ({
-          ...prev,
-          patientId: data.patient_id!,
-          firstName: data.first_name!,
-          lastName: data.last_name!,
-        }));
-        setAppointmentData(prev => ({
-          ...prev,
-          patientId: data.patient_id!,
-        }));
-        setStep('patient-details');
-      } else if (response.httpStatus === 404) {
-        // Only offer account creation for confirmed 404
-        setSearchResult(null);
-        setNewAccountData(prev => ({
-          ...prev,
-          email: searchEmail.trim(),
-        }));
-        setStep('create-account');
-      } else {
-        // Any other error (500, network, 401, etc.) shows error and stays on search
-        setError(response.error || 'Failed to search for patient');
-      }
-    } catch (err) {
-      setError('Network error occurred');
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleCreateAccount = async () => {
-    if (!newAccountData.email.trim() || !newAccountData.firstName.trim() || !newAccountData.lastName.trim()) {
-      setError('All fields are required');
-      return;
-    }
-
-    setIsCreatingAccount(true);
-    setError(null);
-
-    try {
-      const response = await secretaryApi.createWalkInAccount(newAccountData);
-
-      if (response.success && response.data) {
-        const data = response.data;
-        setCreatedAccount(data);
-        setPatientDetails(prev => ({
-          ...prev,
-          patientId: data.patient?.id || '',
-          firstName: newAccountData.firstName,
-          lastName: newAccountData.lastName,
-        }));
-        setAppointmentData(prev => ({
-          ...prev,
-          patientId: data.patient?.id || '',
-        }));
-        setStep('patient-details');
-      } else {
-        setError(response.error || 'Failed to create account');
-      }
-    } catch (err) {
-      setError('Network error occurred');
-    } finally {
-      setIsCreatingAccount(false);
-    }
-  };
-
-  const handleSubmitPatientDetails = async () => {
-    if (!patientDetails.dateOfBirth || !patientDetails.phone.trim() || !patientDetails.address.trim()) {
-      setError('Date of birth, phone, and address are required');
-      return;
-    }
-
-    setIsSubmittingDetails(true);
-    setError(null);
-
-    try {
-      const response = await secretaryApi.submitWalkInPatientDetails(patientDetails);
-
-      if (response.success && response.data) {
-        setStep('appointment');
-      } else {
-        setError(response.error || 'Failed to submit patient details');
-      }
-    } catch (err) {
-      setError('Network error occurred');
-    } finally {
-      setIsSubmittingDetails(false);
-    }
-  };
-
-  const handleRegisterWalkIn = async () => {
-    if (!appointmentData.appointmentDate) {
-      setError('Appointment date is required');
+  const handleDirectRegister = async () => {
+    // Validate required fields
+    if (!formData.email.trim() ||
+        !formData.firstName.trim() ||
+        !formData.lastName.trim() ||
+        !formData.dateOfBirth ||
+        !formData.phone.trim() ||
+        !formData.address.trim()) {
+      setError('All required fields must be filled');
       return;
     }
 
@@ -196,7 +63,7 @@ export default function SecretaryWalkIns() {
     setError(null);
 
     try {
-      const response = await secretaryApi.registerWalkIn(appointmentData);
+      const response = await secretaryApi.directRegisterWalkIn(formData);
 
       if (response.success && response.data) {
         setRegistrationResult(response.data);
@@ -212,31 +79,16 @@ export default function SecretaryWalkIns() {
   };
 
   const handleReset = () => {
-    setStep('search');
-    setSearchEmail('');
-    setSearchResult(null);
-    setCreatedAccount(null);
-    setPatientDetails({
-      patientId: '',
-      doctorId: secretaryProfile?.doctor_id || '',
+    setStep('form');
+    setFormData({
+      email: '',
       firstName: '',
+      middleName: '',
       lastName: '',
       dateOfBirth: '',
       sex: 'MALE',
       phone: '',
       address: '',
-      middleName: '',
-      emergencyContactName: '',
-      emergencyContactPhone: '',
-      medicalHistory: '',
-      allergies: '',
-      currentMedications: '',
-    });
-    setAppointmentData({
-      patientId: '',
-      doctorId: secretaryProfile?.doctor_id || '',
-      appointmentDate: '',
-      reasonForVisit: '',
     });
     setRegistrationResult(null);
     setError(null);
@@ -298,266 +150,10 @@ export default function SecretaryWalkIns() {
         <p className="text-xs text-slate-500 mt-0.5">Register walk-in patients and manage queue</p>
       </div>
 
-      {/* Step Progress Indicator */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          {['search', 'create-account', 'patient-details', 'appointment', 'confirm'].map((s, index) => (
-            <div key={s} className="flex items-center flex-1">
-              <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
-                step === s ? 'bg-emerald-600 text-white' :
-                ['search', 'create-account', 'patient-details', 'appointment', 'confirm'].indexOf(step) > index ? 'bg-emerald-600 text-white' :
-                'bg-slate-200 text-slate-600'
-              }`}>
-                {index + 1}
-              </div>
-              {index < 4 && (
-                <div className={`flex-1 h-1 mx-2 ${
-                  ['search', 'create-account', 'patient-details', 'appointment', 'confirm'].indexOf(step) > index ? 'bg-emerald-600' : 'bg-slate-200'
-                }`} />
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-between mt-2 text-xs text-slate-500">
-          <span>Search</span>
-          <span>Create Account</span>
-          <span>Details</span>
-          <span>Appointment</span>
-          <span>Confirm</span>
-        </div>
-      </div>
-
-      {/* Step 1: Search Patient */}
-      {step === 'search' && (
+      {/* Direct Registration Form */}
+      {step === 'form' && (
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">Search Patient by Email</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-slate-600 mb-2">Patient Email</label>
-              <input
-                type="email"
-                value={searchEmail}
-                onChange={(e) => setSearchEmail(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="Enter patient email"
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <button
-              onClick={handleSearch}
-              disabled={isSearching}
-              className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {isSearching ? 'Searching...' : 'Search Patient'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 2: Create Account */}
-      {step === 'create-account' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">Create New Patient Account</h2>
-          <p className="text-sm text-slate-600 mb-4">
-            No patient found with email <strong>{searchEmail}</strong>. Create a new account?
-          </p>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-slate-600 mb-2">Email</label>
-              <input
-                type="email"
-                value={newAccountData.email}
-                disabled
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-600 mb-2">First Name *</label>
-              <input
-                type="text"
-                value={newAccountData.firstName}
-                onChange={(e) => setNewAccountData(prev => ({ ...prev, firstName: e.target.value }))}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-600 mb-2">Last Name *</label>
-              <input
-                type="text"
-                value={newAccountData.lastName}
-                onChange={(e) => setNewAccountData(prev => ({ ...prev, lastName: e.target.value }))}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={handleReset}
-                className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateAccount}
-                disabled={isCreatingAccount}
-                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {isCreatingAccount ? 'Creating...' : 'Create Account'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Patient Details */}
-      {step === 'patient-details' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">
-            {searchResult ? 'Update Patient Details' : 'Complete Patient Profile'}
-          </h2>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-slate-600 mb-2">First Name</label>
-                <input
-                  type="text"
-                  value={patientDetails.firstName}
-                  disabled
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-600 mb-2">Middle Name</label>
-                <input
-                  type="text"
-                  value={patientDetails.middleName || ''}
-                  onChange={(e) => setPatientDetails(prev => ({ ...prev, middleName: e.target.value }))}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm text-slate-600 mb-2">Last Name</label>
-              <input
-                type="text"
-                value={patientDetails.lastName}
-                disabled
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-500"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-slate-600 mb-2">Date of Birth *</label>
-                <input
-                  type="date"
-                  value={patientDetails.dateOfBirth}
-                  onChange={(e) => setPatientDetails(prev => ({ ...prev, dateOfBirth: e.target.value }))}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-600 mb-2">Sex *</label>
-                <select
-                  value={patientDetails.sex}
-                  onChange={(e) => setPatientDetails(prev => ({ ...prev, sex: e.target.value }))}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                  <option value="OTHER">Other</option>
-                  <option value="NOT_SPECIFIED">Not Specified</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm text-slate-600 mb-2">Phone *</label>
-              <input
-                type="text"
-                value={patientDetails.phone}
-                onChange={(e) => setPatientDetails(prev => ({ ...prev, phone: e.target.value }))}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-600 mb-2">Address *</label>
-              <textarea
-                value={patientDetails.address}
-                onChange={(e) => setPatientDetails(prev => ({ ...prev, address: e.target.value }))}
-                rows={2}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-slate-600 mb-2">Emergency Contact Name</label>
-                <input
-                  type="text"
-                  value={patientDetails.emergencyContactName || ''}
-                  onChange={(e) => setPatientDetails(prev => ({ ...prev, emergencyContactName: e.target.value }))}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-600 mb-2">Emergency Contact Phone</label>
-                <input
-                  type="text"
-                  value={patientDetails.emergencyContactPhone || ''}
-                  onChange={(e) => setPatientDetails(prev => ({ ...prev, emergencyContactPhone: e.target.value }))}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm text-slate-600 mb-2">Medical History</label>
-              <textarea
-                value={patientDetails.medicalHistory || ''}
-                onChange={(e) => setPatientDetails(prev => ({ ...prev, medicalHistory: e.target.value }))}
-                rows={2}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-slate-600 mb-2">Allergies</label>
-                <textarea
-                  value={patientDetails.allergies || ''}
-                  onChange={(e) => setPatientDetails(prev => ({ ...prev, allergies: e.target.value }))}
-                  rows={2}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-600 mb-2">Current Medications</label>
-                <textarea
-                  value={patientDetails.currentMedications || ''}
-                  onChange={(e) => setPatientDetails(prev => ({ ...prev, currentMedications: e.target.value }))}
-                  rows={2}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={handleReset}
-                className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitPatientDetails}
-                disabled={isSubmittingDetails}
-                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {isSubmittingDetails ? 'Submitting...' : 'Continue'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 4: Appointment */}
-      {step === 'appointment' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">Schedule Appointment</h2>
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">Register Walk-in Patient</h2>
           <div className="space-y-4">
             <div>
               <label className="block text-sm text-slate-600 mb-2">Assigned Doctor</label>
@@ -569,92 +165,111 @@ export default function SecretaryWalkIns() {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-2">Appointment Date *</label>
+              <label className="block text-sm text-slate-600 mb-2">Email *</label>
               <input
-                type="date"
-                value={appointmentData.appointmentDate}
-                onChange={(e) => setAppointmentData(prev => ({ ...prev, appointmentDate: e.target.value }))}
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="Enter patient email"
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-slate-600 mb-2">First Name *</label>
+                <input
+                  type="text"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                  placeholder="First name"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-600 mb-2">Middle Name</label>
+                <input
+                  type="text"
+                  value={formData.middleName || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, middleName: e.target.value }))}
+                  placeholder="Middle name (optional)"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm text-slate-600 mb-2">Last Name *</label>
+              <input
+                type="text"
+                value={formData.lastName}
+                onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                placeholder="Last name"
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-slate-600 mb-2">Date of Birth *</label>
+                <input
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={(e) => setFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-600 mb-2">Sex *</label>
+                <select
+                  value={formData.sex}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sex: e.target.value }))}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                  <option value="OTHER">Other</option>
+                  <option value="NOT_SPECIFIED">Not Specified</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm text-slate-600 mb-2">Mobile Number *</label>
+              <input
+                type="text"
+                value={formData.phone}
+                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="Mobile number"
                 className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-2">Reason for Visit</label>
+              <label className="block text-sm text-slate-600 mb-2">Address *</label>
               <textarea
-                value={appointmentData.reasonForVisit || ''}
-                onChange={(e) => setAppointmentData(prev => ({ ...prev, reasonForVisit: e.target.value }))}
-                rows={3}
+                value={formData.address}
+                onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                rows={2}
+                placeholder="Address"
                 className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
             <div className="flex gap-3">
               <button
-                onClick={() => setStep('patient-details')}
+                onClick={handleReset}
                 className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
               >
-                Back
+                Cancel
               </button>
               <button
-                onClick={() => setStep('confirm')}
-                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-              >
-                Review
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 5: Confirm */}
-      {step === 'confirm' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">Confirm Registration</h2>
-          <div className="space-y-4">
-            <div className="bg-slate-50 rounded-lg p-4">
-              <h3 className="font-medium text-slate-800 mb-2">Patient Information</h3>
-              <p className="text-sm text-slate-600">
-                <strong>Name:</strong> {patientDetails.firstName} {patientDetails.middleName} {patientDetails.lastName}
-              </p>
-              <p className="text-sm text-slate-600">
-                <strong>Date of Birth:</strong> {patientDetails.dateOfBirth}
-              </p>
-              <p className="text-sm text-slate-600">
-                <strong>Phone:</strong> {patientDetails.phone}
-              </p>
-            </div>
-            <div className="bg-slate-50 rounded-lg p-4">
-              <h3 className="font-medium text-slate-800 mb-2">Appointment Details</h3>
-              <p className="text-sm text-slate-600">
-                <strong>Doctor:</strong> {secretaryProfile ? `Dr. ${secretaryProfile.doctor_first_name} ${secretaryProfile.doctor_last_name}` : ''}
-              </p>
-              <p className="text-sm text-slate-600">
-                <strong>Date:</strong> {appointmentData.appointmentDate}
-              </p>
-              {appointmentData.reasonForVisit && (
-                <p className="text-sm text-slate-600">
-                  <strong>Reason:</strong> {appointmentData.reasonForVisit}
-                </p>
-              )}
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setStep('appointment')}
-                className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
-              >
-                Back
-              </button>
-              <button
-                onClick={handleRegisterWalkIn}
+                onClick={handleDirectRegister}
                 disabled={isRegistering}
                 className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
               >
-                {isRegistering ? 'Registering...' : 'Confirm & Register'}
+                {isRegistering ? 'Registering...' : 'Register Walk-in'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Step 6: Success */}
+      {/* Success */}
       {step === 'success' && registrationResult && (
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
           <div className="text-center">
@@ -673,15 +288,28 @@ export default function SecretaryWalkIns() {
                 Total patients in queue: {registrationResult.totalPatients}
               </p>
             </div>
-            {createdAccount && createdAccount.temporaryPassword && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                <p className="text-sm font-medium text-amber-800 mb-2">Temporary Password</p>
-                <p className="text-lg font-mono text-amber-900">{createdAccount.temporaryPassword}</p>
-                <p className="text-xs text-amber-600 mt-2">
-                  Please provide this to the patient. They will need to change it on first login.
-                </p>
-              </div>
-            )}
+            <div className="bg-slate-50 rounded-lg p-4 mb-6 text-left">
+              <h3 className="font-medium text-slate-800 mb-2">Patient Information</h3>
+              <p className="text-sm text-slate-600">
+                <strong>Name:</strong> {registrationResult.patientName}
+              </p>
+              <p className="text-sm text-slate-600">
+                <strong>Email:</strong> {registrationResult.patientEmail}
+              </p>
+              <p className="text-sm text-slate-600">
+                <strong>Doctor:</strong> {registrationResult.doctorName}
+              </p>
+              <p className="text-sm text-slate-600">
+                <strong>Status:</strong> {registrationResult.registrationStatus}
+              </p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+              <p className="text-sm font-medium text-amber-800 mb-2">Temporary Password</p>
+              <p className="text-lg font-mono text-amber-900">{registrationResult.temporaryPassword}</p>
+              <p className="text-xs text-amber-600 mt-2">
+                Please provide this to the patient. They will need to change it on first login.
+              </p>
+            </div>
             <button
               onClick={handleReset}
               className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"

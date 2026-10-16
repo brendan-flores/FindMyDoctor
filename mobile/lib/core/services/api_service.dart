@@ -303,6 +303,59 @@ class ApiService {
   }
 
   // ===========================
+  // PATIENT METHODS
+  // ===========================
+
+  // Get current patient's own profile
+  Future<Map<String, dynamic>> getCurrentPatient() async {
+    return await get('/patients/me');
+  }
+
+  // Check if authenticated patient has an existing record with a specific doctor
+  Future<Map<String, dynamic>> checkPatientRecord({required String doctorId}) async {
+    return await get(
+      '/patients/check-record',
+      queryParams: {'doctorId': doctorId},
+    );
+  }
+
+  // Submit patient details for a specific doctor (before first booking)
+  Future<Map<String, dynamic>> submitPatientDetails({
+    required String doctorId,
+    required String firstName,
+    String? middleName,
+    required String lastName,
+    required String dateOfBirth,
+    required String sex,
+    required String phone,
+    required String address,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
+    String? medicalHistory,
+    String? allergies,
+    String? currentMedications,
+  }) async {
+    return await post(
+      '/patients/submit-details',
+      body: {
+        'doctorId': doctorId,
+        'firstName': firstName,
+        if (middleName != null) 'middleName': middleName,
+        'lastName': lastName,
+        'dateOfBirth': dateOfBirth,
+        'sex': sex,
+        'phone': phone,
+        'address': address,
+        if (emergencyContactName != null) 'emergencyContactName': emergencyContactName,
+        if (emergencyContactPhone != null) 'emergencyContactPhone': emergencyContactPhone,
+        if (medicalHistory != null) 'medicalHistory': medicalHistory,
+        if (allergies != null) 'allergies': allergies,
+        if (currentMedications != null) 'currentMedications': currentMedications,
+      },
+    );
+  }
+
+  // ===========================
   // DOCTORS METHODS
   // ===========================
 

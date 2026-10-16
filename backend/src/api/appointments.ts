@@ -3,6 +3,7 @@ import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requirePasswordChange } from '../middleware/auth';
 import { calculateAvailability } from '../modules/availability/availabilityService';
+import { toClinicDateString } from '../utils/date';
 
 const router = Router();
 
@@ -40,7 +41,8 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
           a.*,
           p.first_name as patient_first_name, p.last_name as patient_last_name,
           d.practice_name,
-          q.queue_number, q.status as queue_status
+          q.queue_number, q.status as queue_status,
+          COALESCE(q.registration_source, 'ONLINE') as registration_source
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         JOIN doctors d ON a.doctor_id = d.id
@@ -451,7 +453,7 @@ router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATI
       return res.status(400).json(error(ErrorCodes.INVALID_APPOINTMENT_STATUS, 'Cannot cancel this appointment'));
     }
 
-    const appointmentDate = new Date(appointment.appointment_date).toISOString().split('T')[0];
+    const appointmentDate = toClinicDateString(new Date(appointment.appointment_date));
     const cancelledQueueNumber = appointment.queue_number;
     const queueDate = appointment.queue_date;
 
@@ -562,7 +564,7 @@ router.patch('/:id/reschedule', authenticate, requirePasswordChange, authorize('
     const appointment = appointmentResult.rows[0];
 
     // Check capacity for new date
-    const newDateOnly = new Date(newAppointmentDate).toISOString().split('T')[0];
+    const newDateOnly = toClinicDateString(new Date(newAppointmentDate));
     const capacityResult = await query(
       'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
       [appointment.doctor_id, newDateOnly]

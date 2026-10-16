@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, requireSecretaryProfileCompletion } from '../middleware/auth';
+import { getClinicDate, getClinicDateTime, toClinicDateString } from '../utils/date';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
@@ -273,7 +274,7 @@ router.post('/', authenticate, requireSecretaryPasswordChange, requireSecretaryP
     const doctor = doctorResult.rows[0];
 
     // Check capacity
-    const appointmentDateOnly = new Date(appointmentDate).toISOString().split('T')[0];
+    const appointmentDateOnly = toClinicDateString(new Date(appointmentDate));
 
     // Acquire advisory lock for queue assignment (based on doctor_id and date hash)
     // This ensures concurrent requests for the same doctor/date are serialized
@@ -665,6 +666,302 @@ router.post('/submit-patient-details', authenticate, requireSecretaryPasswordCha
     }
 
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to submit patient details'));
+  } finally {
+    client.release();
+  }
+});
+
+// Direct walk-in registration endpoint (consolidated flow)
+// This endpoint allows secretaries to register walk-in patients directly without mandatory search
+// It creates a new account, validates patient details, and registers in the queue in one transaction
+// Uses today's date automatically for walk-in registration
+router.post('/direct-register', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const {
+      email,
+      firstName,
+      middleName,
+      lastName,
+      dateOfBirth,
+      sex,
+      phone,
+      address
+    } = req.body;
+
+    // Validate required fields
+    if (!email || !firstName || !lastName || !dateOfBirth || !sex || !phone || !address) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Email, first name, last name, date of birth, sex, mobile number, and address are required'));
+    }
+
+    // Verify secretary is assigned to a doctor
+    const secretaryResult = await client.query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    // Verify doctor exists and is approved
+    const doctorResult = await client.query(
+      'SELECT * FROM doctors WHERE id = $1 AND is_approved = true',
+      [assignedDoctorId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Assigned doctor not found or not approved'));
+    }
+
+    // Check if email already exists (prevent duplicate accounts)
+    const existingUser = await client.query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (existingUser.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json(error(ErrorCodes.EMAIL_ALREADY_EXISTS, 'Email already registered. Patient already has an account.'));
+    }
+
+    // Trim and validate fields
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedFirstName = firstName.trim();
+    const trimmedMiddleName = middleName ? middleName.trim() : null;
+    const trimmedLastName = lastName.trim();
+    const trimmedSex = sex.trim().toUpperCase();
+    const trimmedPhone = phone.trim();
+    const trimmedAddress = address.trim();
+
+    // Length validation
+    if (trimmedFirstName.length === 0 || trimmedFirstName.length > 100) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'First name must be 1-100 characters'));
+    }
+
+    if (trimmedMiddleName && trimmedMiddleName.length > 100) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Middle name must be maximum 100 characters'));
+    }
+
+    if (trimmedLastName.length === 0 || trimmedLastName.length > 100) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name must be 1-100 characters'));
+    }
+
+    if (trimmedPhone.length === 0 || trimmedPhone.length > 20) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 1-20 characters'));
+    }
+
+    if (trimmedAddress.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Address is required'));
+    }
+
+    // Validate sex value
+    if (!VALID_SEX_VALUES.includes(trimmedSex)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Sex must be one of: MALE, FEMALE, OTHER, NOT_SPECIFIED'));
+    }
+
+    // Validate mobile number format
+    if (!MOBILE_REGEX.test(trimmedPhone)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must contain only digits, spaces, hyphens, plus sign, or parentheses'));
+    }
+
+    // Validate date of birth
+    const dob = new Date(dateOfBirth);
+    if (isNaN(dob.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid date of birth format'));
+    }
+
+    // Ensure date of birth is not in the future
+    const now = new Date();
+    if (dob > now) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date of birth cannot be in the future'));
+    }
+
+    // Use today's date for walk-in registration (clinic timezone)
+    const appointmentDateOnly = getClinicDate();
+    const appointmentDate = getClinicDateTime();
+
+    // Generate cryptographically secure random temporary password with letters and numbers
+    const crypto = require('crypto');
+    const generateSecurePassword = (): string => {
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+      const numbers = '0123456789';
+      const chars = letters + numbers;
+      const randomBytes = crypto.randomBytes(12);
+      let password = '';
+      for (let i = 0; i < 12; i++) {
+        password += chars[randomBytes[i] % chars.length];
+      }
+      // Ensure at least one letter and one number
+      if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+        // Regenerate if criteria not met
+        return generateSecurePassword();
+      }
+      return password;
+    };
+    const temporaryPassword = generateSecurePassword();
+    const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+
+    // Create user with temporary password
+    const userResult = await client.query(
+      `INSERT INTO users (email, password_hash, role, must_change_password)
+       VALUES ($1, $2, 'PATIENT', true)
+       RETURNING id, email, must_change_password`,
+      [trimmedEmail, passwordHash]
+    );
+
+    const user = userResult.rows[0];
+
+    // Create patient profile with all required details
+    const patientResult = await client.query(
+      `INSERT INTO patients (user_id, first_name, middle_name, last_name, date_of_birth, sex, phone, address)
+       VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8)
+       RETURNING id`,
+      [user.id, trimmedFirstName, trimmedMiddleName, trimmedLastName, dateOfBirth, trimmedSex, trimmedPhone, trimmedAddress]
+    );
+
+    const patientId = patientResult.rows[0].id;
+
+    // Create patient-doctor association with COMPLETE status (all required details provided)
+    await client.query(
+      `INSERT INTO patient_doctor_associations (patient_id, doctor_id, details_completion_status, first_details_submitted_at)
+       VALUES ($1, $2, 'COMPLETE', CURRENT_TIMESTAMP)
+       ON CONFLICT (patient_id, doctor_id) DO UPDATE SET
+         details_completion_status = 'COMPLETE',
+         first_details_submitted_at = LEAST(patient_doctor_associations.first_details_submitted_at, CURRENT_TIMESTAMP),
+         updated_at = CURRENT_TIMESTAMP`,
+      [patientId, assignedDoctorId]
+    );
+
+    // Acquire advisory lock for queue assignment (based on doctor_id and date hash)
+    const lockHash = `md5(${assignedDoctorId}::text || ${appointmentDateOnly}::text)`;
+    const lockResult = await client.query(
+      `SELECT pg_try_advisory_xact_lock(hashtext($1)) as lock_acquired`,
+      [lockHash]
+    );
+
+    if (!lockResult.rows[0].lock_acquired) {
+      await client.query('ROLLBACK');
+      return res.status(429).json(error(ErrorCodes.SERVER_ERROR, 'System is busy, please try again'));
+    }
+
+    // Check capacity
+    const capacityResult = await client.query(
+      'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2 FOR UPDATE',
+      [assignedDoctorId, appointmentDateOnly]
+    );
+
+    if (capacityResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.APPOINTMENT_SLOT_UNAVAILABLE, 'No capacity configured for this date'));
+    }
+
+    const capacity = capacityResult.rows[0];
+
+    if (capacity.registered_count >= capacity.final_capacity) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.CAPACITY_FULL, 'No available slots for this date'));
+    }
+
+    // Create appointment
+    const appointmentResult = await client.query(
+      `INSERT INTO appointments (patient_id, doctor_id, appointment_date, status)
+       VALUES ($1, $2, $3, 'SCHEDULED')
+       RETURNING id`,
+      [patientId, assignedDoctorId, appointmentDate]
+    );
+
+    const appointmentId = appointmentResult.rows[0].id;
+
+    // Get next queue number (concurrency-safe due to advisory lock)
+    const queueResult = await client.query(
+      `SELECT COALESCE(MAX(queue_number), 0) + 1 as next_queue
+       FROM queue_entries
+       WHERE queue_date = $1 AND doctor_id = $2`,
+      [appointmentDateOnly, assignedDoctorId]
+    );
+
+    const queueNumber = queueResult.rows[0].next_queue;
+
+    // Create queue entry with WALK_IN source
+    await client.query(
+      `INSERT INTO queue_entries (patient_id, doctor_id, appointment_id, queue_date, queue_number, registration_source, status)
+       VALUES ($1, $2, $3, $4, $5, 'WALK_IN', 'WAITING')`,
+      [patientId, assignedDoctorId, appointmentId, appointmentDateOnly, queueNumber]
+    );
+
+    // Update registered count
+    await client.query(
+      'UPDATE daily_capacities SET registered_count = registered_count + 1 WHERE doctor_id = $1 AND date = $2',
+      [assignedDoctorId, appointmentDateOnly]
+    );
+
+    // Get total configured capacity for that day
+    const totalCapacityResult = await client.query(
+      `SELECT final_capacity as total_capacity
+       FROM daily_capacities
+       WHERE doctor_id = $1 AND date = $2`,
+      [assignedDoctorId, appointmentDateOnly]
+    );
+
+    let totalPatients = 0;
+    if (totalCapacityResult.rows.length > 0) {
+      totalPatients = totalCapacityResult.rows[0].total_capacity;
+    }
+
+    // Create notification
+    await client.query(
+      `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
+       VALUES ($1, 'APPOINTMENT_CONFIRMED', 'Walk-in Registration Confirmed', 'Your walk-in registration has been confirmed', 'appointment', $2)`,
+      [user.id, appointmentId]
+    );
+
+    await client.query('COMMIT');
+    // Advisory lock is automatically released when transaction ends
+
+    // Return registration details including temporary password (only shown once)
+    res.status(201).json(
+      success({
+        patientName: `${trimmedFirstName} ${trimmedMiddleName ? trimmedMiddleName + ' ' : ''}${trimmedLastName}`,
+        doctorName: `${doctorResult.rows[0].first_name} ${doctorResult.rows[0].last_name}`,
+        queueNumber,
+        registrationStatus: 'REGISTERED',
+        patientEmail: trimmedEmail,
+        temporaryPassword,
+        appointmentId,
+        totalPatients,
+      }, 'Walk-in registration successful')
+    );
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Direct walk-in registration error:', err);
+
+    // Handle unique constraint violations
+    if (err.code === '23505') {
+      if (err.constraint === 'users_email_key') {
+        return res.status(409).json(error(ErrorCodes.EMAIL_ALREADY_EXISTS, 'Email already registered'));
+      }
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'Duplicate entry detected'));
+    }
+
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to register walk-in patient'));
   } finally {
     client.release();
   }

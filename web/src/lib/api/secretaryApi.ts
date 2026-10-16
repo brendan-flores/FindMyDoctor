@@ -101,6 +101,29 @@ export interface WalkInRegistrationResponse {
   totalPatients: number;
 }
 
+// Direct walk-in registration request/response (new consolidated endpoint)
+export interface DirectWalkInRegistrationRequest {
+  email: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  dateOfBirth: string;
+  sex: string;
+  phone: string;
+  address: string;
+}
+
+export interface DirectWalkInRegistrationResponse {
+  patientName: string;
+  doctorName: string;
+  queueNumber: number;
+  registrationStatus: string;
+  patientEmail: string;
+  temporaryPassword: string;
+  appointmentId: string;
+  totalPatients: number;
+}
+
 // Update patient request (CORRECTED: 6 required fields per endpoint plan)
 export interface UpdatePatientRequest {
   firstName: string;
@@ -115,6 +138,28 @@ export interface UpdatePatientRequest {
   medicalHistory?: string | null;
   allergies?: string | null;
   currentMedications?: string | null;
+}
+
+// Queue entry interface (from queue_entries table)
+export interface QueueEntry {
+  id: string;
+  patient_id: string;
+  doctor_id: string;
+  appointment_id?: string;
+  queue_date: string;
+  queue_number: number;
+  registration_source: 'ONLINE' | 'WALK_IN';
+  status: 'WAITING' | 'CALLED' | 'NOT_PRESENT' | 'SKIPPED' | 'IN_CHECKUP' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+  called_at?: string;
+  started_at?: string;
+  completed_at?: string;
+  created_at: string;
+  updated_at: string;
+  patient_first_name: string;
+  patient_last_name: string;
+  patient_email?: string;
+  doctor_first_name: string;
+  doctor_last_name: string;
 }
 
 export const secretaryApi = {
@@ -166,5 +211,45 @@ export const secretaryApi = {
   // Walk-in: register walk-in
   registerWalkIn: async (payload: WalkInRegistrationRequest): Promise<{ success: boolean; data?: WalkInRegistrationResponse; error?: string }> => {
     return apiClient.post<WalkInRegistrationResponse>('/walk-ins', payload);
+  },
+
+  // Walk-in: direct registration (consolidated endpoint)
+  directRegisterWalkIn: async (payload: DirectWalkInRegistrationRequest): Promise<{ success: boolean; data?: DirectWalkInRegistrationResponse; error?: string }> => {
+    return apiClient.post<DirectWalkInRegistrationResponse>('/walk-ins/direct-register', payload);
+  },
+
+  // Queue: get queue for a specific date (automatically filtered by assigned doctor for secretaries)
+  getQueue: async (date: string): Promise<{ success: boolean; data?: QueueEntry[]; error?: string }> => {
+    return apiClient.get<QueueEntry[]>(`/queue/${date}`);
+  },
+
+  // Queue: call next patient
+  callNextPatient: async (date: string): Promise<{ success: boolean; data?: QueueEntry; error?: string }> => {
+    return apiClient.post<QueueEntry>(`/queue/${date}/next`, {});
+  },
+
+  // Queue: update queue status
+  updateQueueStatus: async (queueId: string, status: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/queue/${queueId}/status`, { status });
+  },
+
+  // Queue: start checkup
+  startCheckup: async (queueId: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.post<void>(`/queue/${queueId}/start-checkup`, {});
+  },
+
+  // Queue: complete checkup
+  completeCheckup: async (queueId: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.post<void>(`/queue/${queueId}/complete`, {});
+  },
+
+  // Queue: skip patient
+  skipPatient: async (queueId: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.post<void>(`/queue/${queueId}/skip`, {});
+  },
+
+  // Queue: mark as not present
+  markNotPresent: async (queueId: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.post<void>(`/queue/${queueId}/not-present`, {});
   },
 };

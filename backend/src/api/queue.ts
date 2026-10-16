@@ -10,19 +10,39 @@ router.get('/:date', authenticate, requireSecretaryPasswordChange, requireSecret
   try {
     const { date } = req.params;
     const { doctorId } = req.query;
+    const role = req.user!.role;
+    const userId = req.user!.id;
 
     let queryText = `
-      SELECT q.*, 
+      SELECT q.*,
              p.first_name as patient_first_name, p.last_name as patient_last_name,
-             d.first_name as doctor_first_name, d.last_name as doctor_last_name
+             p.email as patient_email,
+             d.first_name as doctor_first_name, d.last_name as doctor_last_name,
+             COALESCE(q.registration_source, 'ONLINE') as registration_source
       FROM queue_entries q
       JOIN patients p ON q.patient_id = p.id
+      JOIN users u ON u.id = p.user_id
       JOIN doctors d ON q.doctor_id = d.id
       WHERE q.queue_date = $1
     `;
     const params = [date];
 
-    if (doctorId) {
+    // Secretary: automatically filter by assigned doctor
+    if (role === 'SECRETARY') {
+      const secretaryResult = await query(
+        'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+        [userId]
+      );
+
+      if (secretaryResult.rows.length === 0) {
+        return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+      }
+
+      const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+      params.push(assignedDoctorId);
+      queryText += ` AND q.doctor_id = $${params.length}`;
+    } else if (doctorId) {
+      // Doctor and Admin: can optionally filter by doctorId
       params.push(String(doctorId));
       queryText += ` AND q.doctor_id = $${params.length}`;
     }
@@ -66,17 +86,43 @@ router.post('/:date/next', authenticate, requireSecretaryPasswordChange, require
   try {
     const { date } = req.params;
     const { doctorId } = req.body;
+    const role = req.user!.role;
+    const userId = req.user!.id;
 
-    if (!doctorId) {
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Doctor ID is required'));
+    let targetDoctorId = doctorId;
+
+    // Secretary: use assigned doctor
+    if (role === 'SECRETARY') {
+      const secretaryResult = await query(
+        'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+        [userId]
+      );
+
+      if (secretaryResult.rows.length === 0) {
+        return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+      }
+
+      const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+      // If secretary provides doctorId, verify it matches their assignment
+      if (doctorId && doctorId !== assignedDoctorId) {
+        return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only manage queue for your assigned doctor'));
+      }
+
+      targetDoctorId = assignedDoctorId;
+    } else {
+      // Doctor: must provide doctorId
+      if (!doctorId) {
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Doctor ID is required'));
+      }
     }
 
     // Find next waiting patient
     const result = await query(
-      `SELECT * FROM queue_entries 
+      `SELECT * FROM queue_entries
        WHERE queue_date = $1 AND doctor_id = $2 AND status = 'WAITING'
        ORDER BY queue_number ASC LIMIT 1`,
-      [date, doctorId]
+      [date, targetDoctorId]
     );
 
     if (result.rows.length === 0) {
@@ -87,8 +133,8 @@ router.post('/:date/next', authenticate, requireSecretaryPasswordChange, require
 
     // Update status to CALLED
     await query(
-      `UPDATE queue_entries 
-       SET status = 'CALLED', called_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+      `UPDATE queue_entries
+       SET status = 'CALLED', called_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
       [queueEntry.id]
     );
@@ -104,6 +150,8 @@ router.patch('/:id/status', authenticate, requireSecretaryPasswordChange, requir
   try {
     const { id } = req.params;
     const { status } = req.body;
+    const role = req.user!.role;
+    const userId = req.user!.id;
 
     if (!status) {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Status is required'));
@@ -114,7 +162,7 @@ router.patch('/:id/status', authenticate, requireSecretaryPasswordChange, requir
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid status'));
     }
 
-    // Update status and appropriate timestamp
+    // Build query with secretary-to-doctor assignment check
     let updateQuery = 'UPDATE queue_entries SET status = $1, updated_at = CURRENT_TIMESTAMP';
     const params = [status];
 
@@ -126,10 +174,20 @@ router.patch('/:id/status', authenticate, requireSecretaryPasswordChange, requir
       updateQuery += ', completed_at = CURRENT_TIMESTAMP';
     }
 
-    updateQuery += ' WHERE id = $2';
-    params.push(id);
+    if (role === 'SECRETARY') {
+      updateQuery += ' WHERE id = $2 AND doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $3)';
+      params.push(id, userId);
+    } else {
+      // DOCTOR
+      updateQuery += ' WHERE id = $2 AND doctor_id = (SELECT id FROM doctors WHERE user_id = $3)';
+      params.push(id, userId);
+    }
 
-    await query(updateQuery, params);
+    const result = await query(updateQuery, params);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Queue entry not found or access denied'));
+    }
 
     res.json(success(null, 'Queue status updated'));
   } catch (err: any) {
@@ -141,13 +199,30 @@ router.patch('/:id/status', authenticate, requireSecretaryPasswordChange, requir
 router.post('/:id/start-checkup', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const role = req.user!.role;
+    const userId = req.user!.id;
 
-    await query(
-      `UPDATE queue_entries 
-       SET status = 'IN_CHECKUP', started_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $1`,
-      [id]
-    );
+    let queryText = '';
+    const params = [];
+
+    if (role === 'SECRETARY') {
+      queryText = `UPDATE queue_entries
+                   SET status = 'IN_CHECKUP', started_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $1 AND doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2)`;
+      params.push(id, userId);
+    } else {
+      // DOCTOR
+      queryText = `UPDATE queue_entries
+                   SET status = 'IN_CHECKUP', started_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $1 AND doctor_id = (SELECT id FROM doctors WHERE user_id = $2)`;
+      params.push(id, userId);
+    }
+
+    const result = await query(queryText, params);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Queue entry not found or access denied'));
+    }
 
     res.json(success(null, 'Checkup started'));
   } catch (err: any) {
@@ -159,13 +234,30 @@ router.post('/:id/start-checkup', authenticate, requireSecretaryPasswordChange, 
 router.post('/:id/complete', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const role = req.user!.role;
+    const userId = req.user!.id;
 
-    await query(
-      `UPDATE queue_entries 
-       SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $1`,
-      [id]
-    );
+    let queryText = '';
+    const params = [];
+
+    if (role === 'SECRETARY') {
+      queryText = `UPDATE queue_entries
+                   SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $1 AND doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2)`;
+      params.push(id, userId);
+    } else {
+      // DOCTOR
+      queryText = `UPDATE queue_entries
+                   SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $1 AND doctor_id = (SELECT id FROM doctors WHERE user_id = $2)`;
+      params.push(id, userId);
+    }
+
+    const result = await query(queryText, params);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Queue entry not found or access denied'));
+    }
 
     res.json(success(null, 'Checkup completed'));
   } catch (err: any) {
@@ -177,13 +269,30 @@ router.post('/:id/complete', authenticate, requireSecretaryPasswordChange, requi
 router.post('/:id/skip', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const role = req.user!.role;
+    const userId = req.user!.id;
 
-    await query(
-      `UPDATE queue_entries 
-       SET status = 'SKIPPED', updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $1`,
-      [id]
-    );
+    let queryText = '';
+    const params = [];
+
+    if (role === 'SECRETARY') {
+      queryText = `UPDATE queue_entries
+                   SET status = 'SKIPPED', updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $1 AND doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2)`;
+      params.push(id, userId);
+    } else {
+      // DOCTOR
+      queryText = `UPDATE queue_entries
+                   SET status = 'SKIPPED', updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $1 AND doctor_id = (SELECT id FROM doctors WHERE user_id = $2)`;
+      params.push(id, userId);
+    }
+
+    const result = await query(queryText, params);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Queue entry not found or access denied'));
+    }
 
     res.json(success(null, 'Patient skipped'));
   } catch (err: any) {
@@ -195,13 +304,30 @@ router.post('/:id/skip', authenticate, requireSecretaryPasswordChange, requireSe
 router.post('/:id/not-present', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const role = req.user!.role;
+    const userId = req.user!.id;
 
-    await query(
-      `UPDATE queue_entries 
-       SET status = 'NOT_PRESENT', updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $1`,
-      [id]
-    );
+    let queryText = '';
+    const params = [];
+
+    if (role === 'SECRETARY') {
+      queryText = `UPDATE queue_entries
+                   SET status = 'NOT_PRESENT', updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $1 AND doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2)`;
+      params.push(id, userId);
+    } else {
+      // DOCTOR
+      queryText = `UPDATE queue_entries
+                   SET status = 'NOT_PRESENT', updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $1 AND doctor_id = (SELECT id FROM doctors WHERE user_id = $2)`;
+      params.push(id, userId);
+    }
+
+    const result = await query(queryText, params);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Queue entry not found or access denied'));
+    }
 
     res.json(success(null, 'Patient marked as not present'));
   } catch (err: any) {

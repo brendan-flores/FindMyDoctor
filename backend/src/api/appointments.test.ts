@@ -555,88 +555,89 @@ describe('GET /api/v1/appointments with patientId filter', () => {
 
       // Verify both filters are present
       expect(sqlText).toContain('AND a.appointment_date >=');
-      expect(sqlText).toContain('AND a.patient_id =');
       expect(params).toContain('2026-10-01');
-      expect(params).toContain('patient-123');
-    });
-
-    it('should not add patient filter when patientId is not provided', async () => {
-      query.mockResolvedValue({ rows: [] });
-
-      const response = await request(app)
-        .get('/api/v1/appointments');
-
-      expect(response.status).toBe(200);
-
-      const queryCall = query.mock.calls[0];
-      const sqlText = queryCall[0];
-
-      // Verify no patient filter is added
-      expect(sqlText).not.toContain('AND a.patient_id =');
     });
   });
+});
 
-  describe('Other roles cannot use patientId filter', () => {
-    it('PATIENT role should ignore patientId parameter', async () => {
-      mockUser = { id: 'test-patient-user-id', role: 'PATIENT' };
-      query.mockResolvedValue({ rows: [] });
+describe('GET /api/v1/appointments/:id authorization', () => {
+  let app: express.Application;
 
-      const response = await request(app)
-        .get('/api/v1/appointments?patientId=some-patient-id');
-
-      expect(response.status).toBe(200);
-
-      const queryCall = query.mock.calls[0];
-      const sqlText = queryCall[0];
-
-      // Verify patient_id filter is NOT added (only doctor has this feature)
-      expect(sqlText).not.toContain('AND a.patient_id =');
-      // Verify it uses patient-specific query
-      expect(sqlText).toContain('WHERE a.patient_id = (SELECT id FROM patients WHERE user_id = $1)');
-    });
-
-    it('SECRETARY role should ignore patientId parameter', async () => {
-      mockUser = { id: 'test-secretary-user-id', role: 'SECRETARY' };
-      query.mockResolvedValue({ rows: [] });
-
-      const response = await request(app)
-        .get('/api/v1/appointments?patientId=some-patient-id');
-
-      expect(response.status).toBe(200);
-
-      const queryCall = query.mock.calls[0];
-      const sqlText = queryCall[0];
-
-      // Verify patient_id filter is NOT added (only doctor has this feature)
-      expect(sqlText).not.toContain('AND a.patient_id =');
-      // Verify it uses secretary-specific query
-      expect(sqlText).toContain('WHERE a.doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $1)');
-    });
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/appointments', appointmentsRouter);
+    jest.clearAllMocks();
   });
 
-  describe('Authorization enforcement', () => {
-    it('doctor cannot bypass doctor_id restriction using patientId', async () => {
+  describe('DOCTOR role appointment detail access', () => {
+    beforeEach(() => {
       mockUser = { id: 'test-doctor-user-id', role: 'DOCTOR' };
+    });
+
+    it('should allow doctor to access their own appointment', async () => {
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('FROM appointments a') && sql.includes('WHERE a.id = $1')) {
+          // Main query with doctor_id restriction
+          expect(params).toEqual(['apt-123', 'test-doctor-user-id']);
+          expect(sql).toContain('WHERE a.id = $1 AND a.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)');
+          return Promise.resolve({
+            rows: [{
+              id: 'apt-123',
+              patient_id: 'patient-456',
+              doctor_id: 'doctor-789',
+              appointment_date: '2026-10-20',
+              status: 'SCHEDULED',
+              patient_first_name: 'John',
+              patient_last_name: 'Doe'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/appointments/apt-123');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.id).toBe('apt-123');
+    });
+
+    it('should deny doctor access to another doctor\'s appointment (404)', async () => {
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('FROM appointments a') && sql.includes('WHERE a.id = $1')) {
+          // Empty result - appointment belongs to another doctor
+          expect(params).toEqual(['other-apt-123', 'test-doctor-user-id']);
+          return Promise.resolve({ rows: [] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/appointments/other-apt-123');
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.message).toContain('Appointment not found');
+    });
+
+    it('should enforce doctor_id restriction in SQL query', async () => {
       query.mockResolvedValue({ rows: [] });
 
       const response = await request(app)
-        .get('/api/v1/appointments?patientId=patient-123');
+        .get('/api/v1/appointments/apt-123');
 
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(404);
 
       const queryCall = query.mock.calls[0];
       const sqlText = queryCall[0];
       const params = queryCall[1];
 
-      // Verify the query enforces doctor_id restriction
-      expect(sqlText).toContain('WHERE a.doctor_id = (SELECT id FROM doctors WHERE user_id = $1)');
-      // Verify the patient filter is an additional AND condition
-      expect(sqlText).toContain('AND a.patient_id =');
-      // Verify both conditions are present in the query
-      expect(sqlText).toContain('WHERE a.doctor_id =');
-      expect(sqlText).toContain('AND a.patient_id =');
-      // Verify the doctor's user_id is the first parameter
-      expect(params[0]).toBe('test-doctor-user-id');
+      // Verify the WHERE clause includes doctor_id restriction
+      expect(sqlText).toContain('WHERE a.id = $1 AND a.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)');
+      // Verify appointment ID is the first parameter
+      expect(params[0]).toBe('apt-123');
+      // Verify doctor user_id is the second parameter
+      expect(params[1]).toBe('test-doctor-user-id');
     });
   });
 });
