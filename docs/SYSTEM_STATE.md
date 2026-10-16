@@ -27,7 +27,7 @@ Current System State (October 2026):
 - Web Doctor signup flow: `/doctor-signup` (basic fields) → OTP verification → `/doctor-profile` (professional fields + schedule) → submit for approval
 - Web Doctor signup redirects to `/doctor-profile` after successful OTP verification, not to dashboard
 - Web Doctor profile page at `/doctor-profile` (no slash) is the profile completion page used after OTP verification during initial registration
-- Web Doctor profile page allows doctors to complete their professional profile with 12 fields: professional photo (PNG upload, max 4MB), specialty, credentials, PRC license, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule
+- Web Doctor profile page allows doctors to complete their professional profile with 13 fields: professional photo (PNG upload, max 4MB), specialty, credentials, PRC license, hospital/clinic, room number, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule
 - Web Doctor profile page includes schedule management UI using existing schedule APIs (GET/POST/PUT/DELETE `/api/v1/doctors/me/schedules`)
 - Web Doctor profile page includes PNG photo upload with client-side validation (PNG only, max 4MB) and server-side validation via `POST /api/v1/doctors/me/photo` endpoint
 - Web Doctor profile page includes photo preview after successful upload and ability to remove photo
@@ -38,15 +38,17 @@ Current System State (October 2026):
 - Active Doctors can view their own personal and professional registration details on the read-only Doctor Portal page at `/doctor/profile` (with slash); it excludes schedule management and uses the authenticated `GET /api/v1/doctors/me` endpoint
 - The authenticated `GET /api/v1/doctors/me` endpoint includes the doctor's account email for display on their own profile page
 - The `/doctor/profile` page (with slash) features an Edit Profile button that toggles inline edit mode for updating profile information
-- Edit Profile feature allows editing of personal information (first name, middle name, last name, contact number) and most professional information (specialty, credentials, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, languages spoken)
+- Edit Profile feature allows editing of personal information (first name, middle name, last name, contact number) and most professional information (specialty, credentials, hospital/clinic, room number, years of experience, areas of expertise, biography, consultation fee, languages spoken)
 - Edit Profile feature uses the same searchable dropdown selectors as registration: SearchableSelect for single-select fields (specialty, credentials, hospital/clinic) and SearchableMultiSelect for multi-select fields (areas of expertise, languages spoken)
+- Room Number field is always visible in the Professional Information section regardless of selected hospital/clinic; doctors can add or update their room number at any time
 - Email address is read-only (requires separate email-change and verification process)
 - PRC License Number is read-only (requires dedicated license-update process with admin review)
 - Professional photo can be uploaded/replaced in edit mode with PNG-only validation and 4MB size limit via dedicated upload endpoint
 - Schedule management is handled entirely through the /doctor/schedule page; the profile page does not display schedule information
 - Edit mode includes Save Changes and Cancel buttons; Cancel discards unsaved changes and restores original values
 - Backend API PUT /api/v1/doctors/me/profile validates PRC license number format (7 digits) and uniqueness when provided
-- Backend API supports dynamic field updates for both personal and professional information fields
+- Backend API supports dynamic field updates for both personal and professional information fields including room_number
+- Database schema includes `room_number` field in `doctors` table (migration 009_add_room_number.sql) with VARCHAR(50) type for storing room or suite information
 
 ## Admin Doctor Review
 - Admin Doctor review interface at `/admin/doctors` displays two clearly separated sections: Basic Information (first name, middle name, last name, email, email verified, contact number) and Professional Information (professional photo, specialty, credentials, PRC license number, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule)
@@ -113,7 +115,8 @@ Current System State (October 2026):
 - Logout invalidates server-side session by clearing accessToken, refreshToken, and trustedBrowser cookies
 - Admin and SuperAdmin authentication behavior remains unchanged (no Remember Me modification)
 - Web apiClient automatically loads token from localStorage on initialization for backward compatibility, but prefers HttpOnly cookies when available
-- Backend API endpoints for authentication: `POST /api/v1/auth/login` (with trusted-browser support), `POST /api/v1/auth/verify-login-otp` (with trusted-browser registration), `POST /api/v1/auth/logout` (clears all cookies), `POST /api/v1/auth/revoke-trusted-browser` (revokes current browser trust)
+- **Automatic Token Refresh:** Web apiClient implements automatic token refresh on 401 responses; when an API request returns 401, the client automatically attempts to refresh the access token using the stored refresh token via `POST /api/v1/auth/refresh`; if refresh succeeds, the original request is retried with the new token; if refresh fails, the session is cleared and user is redirected to login; concurrent 401 responses are coordinated so only one refresh occurs while others wait
+- Backend API endpoints for authentication: `POST /api/v1/auth/login` (with trusted-browser support), `POST /api/v1/auth/verify-login-otp` (with trusted-browser registration), `POST /api/v1/auth/logout` (clears all cookies), `POST /api/v1/auth/revoke-trusted-browser` (revokes current browser trust), `POST /api/v1/auth/refresh` (refreshes access token)
 - Database schema includes `trusted_browsers` table (migration 022_add_trusted_browsers.sql) for Remember Me trusted-browser functionality with columns: id, user_id, token_hash (SHA-256), device_info, expires_at (30 days), created_at, revoked_at, last_used_at
 
 ## Secretary Management
@@ -128,6 +131,9 @@ Current System State (October 2026):
 - Secretary must change password on first login (enforced by `must_change_password` flag)
 - Secretary profile page at `/secretary/profile` allows viewing and editing profile information
 - Migration `015_enforce_secretary_doctor_relationship.sql` enforces the required foreign key and non-null assignment for `secretaries.doctor_id`
+- Secretary queue page at `/secretary/queue` displays the doctor's room number from the assigned doctor's profile
+- Backend `GET /api/v1/secretaries/me` endpoint includes the assigned doctor's `room_number` field
+- Secretary queue page shows the practice name, room number (if set), and doctor name in the header location line
 
 ## Supabase Integration
 - Supabase Storage service (`backend/src/services/storageService.ts`) handles doctor photo operations: upload, delete, replace, and validation
