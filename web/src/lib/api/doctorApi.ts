@@ -12,6 +12,7 @@ export interface DoctorProfile {
   credentials?: string | null;
   prc_license_number?: string | null;
   practice_name?: string | null;
+  room_number?: string | null;
   years_of_experience?: number | null;
   areas_of_expertise?: string | null;
   biography?: string | null;
@@ -33,6 +34,7 @@ export interface UpdateProfileRequest {
   credentials?: string;
   prc_license_number?: string;
   practice_name?: string;
+  room_number?: string;
   years_of_experience?: number;
   areas_of_expertise?: string;
   biography?: string;

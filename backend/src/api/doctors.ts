@@ -1176,6 +1176,7 @@ router.put('/me/profile', authenticate, authorize('DOCTOR'), async (req: AuthReq
       credentials,
       prc_license_number,
       practice_name,
+      room_number,
       years_of_experience,
       areas_of_expertise,
       biography,
@@ -1250,6 +1251,11 @@ router.put('/me/profile', authenticate, authorize('DOCTOR'), async (req: AuthReq
       paramCount++;
       updates.push(`practice_name = $${paramCount}`);
       values.push(practice_name);
+    }
+    if (room_number !== undefined) {
+      paramCount++;
+      updates.push(`room_number = $${paramCount}`);
+      values.push(room_number);
     }
     if (years_of_experience !== undefined) {
       paramCount++;
