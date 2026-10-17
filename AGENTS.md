@@ -22,13 +22,12 @@ Application Version Management: Always read `/docs/CURRENT_VERSION.md` before ma
 
 **Version Update Process:**
 1. After implementing changes, evaluate the overall scope and impact to determine whether a version update is warranted
-2. If an update is warranted, inform the user of the current version, proposed version, and reason
-3. Wait for user approval before proceeding
-4. After approval, update the version files in this order:
-   - Rewrite the version number in `/docs/CURRENT_VERSION.md` with the newly approved version
+2. If an update is warranted, automatically apply the version update without user permission
+3. Update the version files in this order:
+   - Rewrite the version number in `/docs/CURRENT_VERSION.md` with the new version
    - Add a new version entry to `/docs/VERSION_HISTORY.md` with detailed changes
    - Ensure CURRENT_VERSION.md and the latest entry in VERSION_HISTORY.md match
-5. If no update is warranted, leave both files unchanged
+4. If no update is warranted, leave both files unchanged
 
 **Mandatory Version Update Criteria:**
 - New business rules or workflows

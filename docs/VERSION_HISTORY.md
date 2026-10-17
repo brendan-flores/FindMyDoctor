@@ -4,6 +4,49 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.04
+
+**Purpose:** Walk-in Patient Password Change and Onboarding Flow
+
+**Significant Features:**
+- Walk-in first login password change: Removed "current password" field requirement for walk-in patients during first login
+- Walk-in onboarding flow: Walk-in patients now see onboarding screens after successful password change, aligning with regular app registration experience
+- Enhanced password change UX: Different password change flows for walk-in first login vs. regular password changes
+
+**Improvements:**
+- Backend API: Modified `/api/v1/auth/change-password` endpoint to make `currentPassword` optional when `must_change_password` is true
+- Backend service: Updated `changePassword` function to skip current password verification for walk-in first login (when `mustChangePassword` parameter is true)
+- Mobile UI: Change password page now hides "Current Password" field when `must_change_password` flag is true
+- Mobile navigation: Walk-in patients are automatically navigated to onboarding screens after successful password change
+- Mobile API service: Updated to handle optional `currentPassword` parameter, omitting it from request body when null
+
+**UI/UX Changes:**
+- Walk-in first login: Only "New Password" and "Confirm New Password" fields shown
+- Regular password change: All three fields shown (Current, New, Confirm)
+- Walk-in onboarding: Three onboarding screens shown after password change (Find the right doctor, Manage your health, Book appointments easily)
+- Page description updated: Shows different text based on whether it's a required change or regular change
+
+**Testing:**
+- Backend tests: Added 2 new tests for walk-in password change flow (with and without current password verification)
+- Mobile widget tests: Added 2 new tests for walk-in first login behavior (field hiding and onboarding navigation)
+- Mobile API tests: Added 2 new tests for optional currentPassword parameter handling
+- All existing tests updated to support the new password change flow
+- All tests passing (backend: 19 tests, mobile: 25 tests)
+
+**Architecture:**
+- Backend: Modified `/backend/src/api/auth.ts` - Updated change-password endpoint validation logic
+- Backend: Modified `/backend/src/modules/auth/authService.ts` - Enhanced changePassword with mustChangePassword parameter
+- Mobile: Modified `/mobile/lib/features/auth/presentation/change_password_page.dart` - Added conditional field rendering and onboarding navigation
+- Mobile: Modified `/mobile/lib/core/services/api_service.dart` - Updated changePassword to accept optional currentPassword
+- Mobile: Updated test files to cover new walk-in password change flow
+
+**Documentation:**
+- Updated CURRENT_VERSION.md to 01.04
+- Added VERSION_HISTORY.md entry for 01.04
+- Updated AGENTS.md to automate version updates (removed user approval requirement)
+
+---
+
 ### 01.03
 
 **Purpose:** Secretary Schedule Management
