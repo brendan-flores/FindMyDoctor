@@ -1,16 +1,27 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../constants/api_constants.dart';
 
 class ApiService {
   final String baseUrl = ApiConstants.baseUrl;
   String? _accessToken;
+  http.Client? _httpClient;
 
   // Singleton pattern
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
-  ApiService._internal();
+  ApiService._internal() : _httpClient = http.Client();
+
+  // Test seam: create instance with custom HTTP client (for testing only)
+  static ApiService createWithClient(http.Client client) {
+    return ApiService._forTesting(client);
+  }
+
+  // Internal constructor for testing only
+  ApiService._forTesting(this._httpClient);
 
   // Initialize and load token from storage
   Future<void> init() async {
@@ -24,9 +35,7 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('access_token', token);
       _accessToken = token;
-      print('🟢 Token saved successfully');
     } catch (e) {
-      print('🔴 Error saving token: $e');
       rethrow;
     }
   }
@@ -45,15 +54,10 @@ class ApiService {
 
   // Get headers with authorization
   Map<String, String> _getHeaders({bool requireAuth = true}) {
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-    };
+    final headers = <String, String>{'Content-Type': 'application/json'};
 
     if (requireAuth && _accessToken != null) {
       headers['Authorization'] = 'Bearer $_accessToken';
-      print('🟢 Authorization header added: Bearer ${_accessToken?.substring(0, 20)}...');
-    } else if (requireAuth) {
-      print('🔴 requireAuth=true but _accessToken is null!');
     }
 
     return headers;
@@ -70,7 +74,8 @@ class ApiService {
       uri = uri.replace(queryParameters: queryParams);
     }
 
-    final response = await http.get(
+    final client = _httpClient ?? http.Client();
+    final response = await client.get(
       uri,
       headers: _getHeaders(requireAuth: requireAuth),
     );
@@ -85,18 +90,14 @@ class ApiService {
     bool requireAuth = false,
   }) async {
     final url = '$baseUrl$endpoint';
-    print('🟡 POST Request to: $url');
-    print('🟡 Request body: ${body != null ? jsonEncode(body) : "null"}');
-    
-    final response = await http.post(
+
+    final client = _httpClient ?? http.Client();
+    final response = await client.post(
       Uri.parse(url),
       headers: _getHeaders(requireAuth: requireAuth),
       body: body != null ? jsonEncode(body) : null,
     );
 
-    print('🟡 Response status: ${response.statusCode}');
-    print('🟡 Response body: ${response.body}');
-    
     return _handleResponse(response);
   }
 
@@ -106,7 +107,8 @@ class ApiService {
     Map<String, dynamic>? body,
     bool requireAuth = true,
   }) async {
-    final response = await http.put(
+    final client = _httpClient ?? http.Client();
+    final response = await client.put(
       Uri.parse('$baseUrl$endpoint'),
       headers: _getHeaders(requireAuth: requireAuth),
       body: body != null ? jsonEncode(body) : null,
@@ -121,7 +123,8 @@ class ApiService {
     Map<String, dynamic>? body,
     bool requireAuth = true,
   }) async {
-    final response = await http.patch(
+    final client = _httpClient ?? http.Client();
+    final response = await client.patch(
       Uri.parse('$baseUrl$endpoint'),
       headers: _getHeaders(requireAuth: requireAuth),
       body: body != null ? jsonEncode(body) : null,
@@ -135,7 +138,8 @@ class ApiService {
     String endpoint, {
     bool requireAuth = true,
   }) async {
-    final response = await http.delete(
+    final client = _httpClient ?? http.Client();
+    final response = await client.delete(
       Uri.parse('$baseUrl$endpoint'),
       headers: _getHeaders(requireAuth: requireAuth),
     );
@@ -176,11 +180,7 @@ class ApiService {
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await post(
       ApiConstants.login,
-      body: {
-        'email': email,
-        'password': password,
-        'expectedRole': 'PATIENT',
-      },
+      body: {'email': email, 'password': password, 'expectedRole': 'PATIENT'},
       requireAuth: false,
     );
 
@@ -224,10 +224,13 @@ class ApiService {
       // Call backend logout endpoint
       await post('/auth/logout', requireAuth: true);
     } catch (e) {
-      print('🔴 Backend logout failed (continuing with local logout): $e');
+      // Backend logout failed, but continue with local logout
+      print('Backend logout failed (continuing with local logout)');
     } finally {
-      // Always clear local token
+      // Always clear local token and must_change_password flag
       await _clearToken();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('must_change_password');
     }
   }
 
@@ -261,22 +264,15 @@ class ApiService {
   }) async {
     return await post(
       ApiConstants.patientOtpVerify,
-      body: {
-        'email': email,
-        'otp': otp,
-      },
+      body: {'email': email, 'otp': otp},
       requireAuth: false,
     );
   }
 
-  Future<Map<String, dynamic>> resendPatientOtp({
-    required String email,
-  }) async {
+  Future<Map<String, dynamic>> resendPatientOtp({required String email}) async {
     return await post(
       ApiConstants.patientOtpResend,
-      body: {
-        'email': email,
-      },
+      body: {'email': email},
       requireAuth: false,
     );
   }
@@ -285,14 +281,21 @@ class ApiService {
     String currentPassword,
     String newPassword,
   ) async {
-    return await post(
+    final response = await post(
       ApiConstants.changePassword,
-      body: {
-        'currentPassword': currentPassword,
-        'newPassword': newPassword,
-      },
+      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
       requireAuth: true,
     );
+
+    // If password change was successful, save the new access token
+    if (response['success'] == true && response['data'] != null) {
+      final newAccessToken = response['data']['accessToken'];
+      if (newAccessToken != null) {
+        await _saveToken(newAccessToken);
+      }
+    }
+
+    return response;
   }
 
   // ===========================
@@ -313,7 +316,9 @@ class ApiService {
   }
 
   // Check if authenticated patient has an existing record with a specific doctor
-  Future<Map<String, dynamic>> checkPatientRecord({required String doctorId}) async {
+  Future<Map<String, dynamic>> checkPatientRecord({
+    required String doctorId,
+  }) async {
     return await get(
       '/patients/check-record',
       queryParams: {'doctorId': doctorId},
@@ -347,11 +352,14 @@ class ApiService {
         'sex': sex,
         'phone': phone,
         'address': address,
-        if (emergencyContactName != null) 'emergencyContactName': emergencyContactName,
-        if (emergencyContactPhone != null) 'emergencyContactPhone': emergencyContactPhone,
+        if (emergencyContactName != null)
+          'emergencyContactName': emergencyContactName,
+        if (emergencyContactPhone != null)
+          'emergencyContactPhone': emergencyContactPhone,
         if (medicalHistory != null) 'medicalHistory': medicalHistory,
         if (allergies != null) 'allergies': allergies,
-        if (currentMedications != null) 'currentMedications': currentMedications,
+        if (currentMedications != null)
+          'currentMedications': currentMedications,
       },
     );
   }
@@ -433,7 +441,9 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> cancelAppointment(String id) async {
-    return await patch('${ApiConstants.appointments}/$id${ApiConstants.appointmentCancel}');
+    return await patch(
+      '${ApiConstants.appointments}/$id${ApiConstants.appointmentCancel}',
+    );
   }
 
   // ===========================
@@ -445,20 +455,29 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getMessages(String conversationId) async {
-    return await get('${ApiConstants.conversations}/$conversationId${ApiConstants.conversationMessages}');
+    return await get(
+      '${ApiConstants.conversations}/$conversationId${ApiConstants.conversationMessages}',
+    );
   }
 
-  Future<Map<String, dynamic>> sendMessage(String conversationId, String message) async {
-    return await post('${ApiConstants.conversations}/$conversationId${ApiConstants.conversationMessages}', body: {
-      'message': message,
-    });
+  Future<Map<String, dynamic>> sendMessage(
+    String conversationId,
+    String message,
+  ) async {
+    return await post(
+      '${ApiConstants.conversations}/$conversationId${ApiConstants.conversationMessages}',
+      body: {'message': message},
+    );
   }
 
   // ===========================
   // AI CHAT METHODS
   // ===========================
 
-  Future<Map<String, dynamic>> sendAiMessage(String message, {String? conversationId}) async {
+  Future<Map<String, dynamic>> sendAiMessage(
+    String message, {
+    String? conversationId,
+  }) async {
     return await post(
       ApiConstants.aiChat,
       body: {
@@ -477,7 +496,9 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> markNotificationRead(String id) async {
-    return await patch('${ApiConstants.notifications}/$id${ApiConstants.notificationRead}');
+    return await patch(
+      '${ApiConstants.notifications}/$id${ApiConstants.notificationRead}',
+    );
   }
 }
 
@@ -494,5 +515,6 @@ class ApiException implements Exception {
   });
 
   @override
-  String toString() => 'ApiException: $message (Code: $code, Status: $statusCode)';
+  String toString() =>
+      'ApiException: $message (Code: $code, Status: $statusCode)';
 }

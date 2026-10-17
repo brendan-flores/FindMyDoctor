@@ -13,7 +13,7 @@ jest.mock('../database/connection', () => ({
   getClient: jest.fn(),
 }));
 
-let mockUser = { id: 'test-user-id', role: 'PATIENT' };
+let mockUser: any = { id: 'test-user-id', role: 'PATIENT', mustChangePassword: false };
 
 jest.mock('../middleware/auth', () => ({
   authenticate: (req: any, res: any, next: any) => {
@@ -27,7 +27,17 @@ jest.mock('../middleware/auth', () => ({
       res.status(403).json({ error: 'Forbidden' });
     }
   },
-  requirePasswordChange: (req: any, res: any, next: any) => next(),
+  requirePasswordChange: (req: any, res: any, next: any) => {
+    if (req.user?.mustChangePassword) {
+      return res.status(403).json({
+        error: {
+          code: 'MUST_CHANGE_PASSWORD',
+          message: 'Password change required'
+        }
+      });
+    }
+    next();
+  },
 }));
 
 jest.mock('../modules/availability/availabilityService', () => ({
@@ -556,6 +566,78 @@ describe('GET /api/v1/appointments with patientId filter', () => {
       // Verify both filters are present
       expect(sqlText).toContain('AND a.appointment_date >=');
       expect(params).toContain('2026-10-01');
+    });
+  });
+});
+
+describe('Password Change Enforcement on Appointments', () => {
+  let app: express.Application;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/appointments', appointmentsRouter);
+    jest.clearAllMocks();
+  });
+
+  describe('GET /api/v1/appointments', () => {
+    it('should block access when mustChangePassword is true', async () => {
+      mockUser = { id: 'test-user-id', role: 'PATIENT', mustChangePassword: true };
+
+      const response = await request(app)
+        .get('/api/v1/appointments');
+
+      expect(response.status).toBe(403);
+      expect(response.body.error.code).toBe('MUST_CHANGE_PASSWORD');
+      expect(response.body.error.message).toBe('Password change required');
+    });
+
+    it('should allow access when mustChangePassword is false', async () => {
+      mockUser = { id: 'test-user-id', role: 'PATIENT', mustChangePassword: false };
+
+      query.mockResolvedValue({
+        rows: [
+          { id: 'apt-1', patient_id: 'patient-123', doctor_id: 'doctor-456', status: 'SCHEDULED' }
+        ]
+      });
+
+      const response = await request(app)
+        .get('/api/v1/appointments');
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+  });
+
+  describe('POST /api/v1/appointments', () => {
+    it('should block booking when mustChangePassword is true', async () => {
+      mockUser = { id: 'test-user-id', role: 'PATIENT', mustChangePassword: true };
+
+      const response = await request(app)
+        .post('/api/v1/appointments')
+        .send({
+          doctorId: 'doctor-123',
+          appointmentDate: '2026-10-20'
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.error.code).toBe('MUST_CHANGE_PASSWORD');
+      expect(response.body.error.message).toBe('Password change required');
+    });
+
+    it('should allow booking when mustChangePassword is false', async () => {
+      mockUser = { id: 'test-user-id', role: 'PATIENT', mustChangePassword: false };
+
+      const response = await request(app)
+        .post('/api/v1/appointments')
+        .send({
+          doctorId: 'doctor-123',
+          appointmentDate: '2026-10-20'
+        });
+
+      // Verify it's NOT blocked by password change guard (would be 403 if blocked)
+      expect(response.status).not.toBe(403);
+      expect(response.status).not.toBe(403);
     });
   });
 });

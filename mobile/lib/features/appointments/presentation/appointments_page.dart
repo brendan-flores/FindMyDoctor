@@ -7,7 +7,9 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/services/api_service.dart';
 
 class AppointmentsPage extends StatefulWidget {
-  const AppointmentsPage({super.key});
+  final ApiService? apiService;
+
+  const AppointmentsPage({super.key, this.apiService});
 
   @override
   State<AppointmentsPage> createState() => _AppointmentsPageState();
@@ -15,7 +17,7 @@ class AppointmentsPage extends StatefulWidget {
 
 class _AppointmentsPageState extends State<AppointmentsPage> {
   String _selectedFilter = 'upcoming';
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   List<dynamic> _appointments = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -23,6 +25,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
     _fetchAppointments();
   }
 

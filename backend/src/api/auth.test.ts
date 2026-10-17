@@ -644,4 +644,111 @@ describe('Auth API - Patient Login Validation', () => {
       expect(response.body.error.message).toContain('Invalid credentials or account role');
     });
   });
+
+  describe('POST /api/v1/auth/change-password', () => {
+    it('should return new access token after successful password change', async () => {
+      let selectCount = 0;
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT * FROM users WHERE id = $1')) {
+          selectCount++;
+          // First SELECT: before password change (must_change_password: true)
+          if (selectCount === 1) {
+            return Promise.resolve({
+              rows: [{
+                id: 'user-id',
+                email: 'user@example.com',
+                password_hash: '$2a$10$oldpassword',
+                role: 'PATIENT',
+                is_active: true,
+                must_change_password: true
+              }]
+            });
+          }
+          // Second SELECT: after password change (must_change_password: false)
+          return Promise.resolve({
+            rows: [{
+              id: 'user-id',
+              email: 'user@example.com',
+              password_hash: '$2a$10$newpassword',
+              role: 'PATIENT',
+              is_active: true,
+              must_change_password: false
+            }]
+          });
+        }
+        if (sql.includes('UPDATE users SET password_hash')) {
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.includes('UPDATE trusted_browsers')) {
+          return Promise.resolve({ rows: [] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const bcrypt = require('bcryptjs');
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
+      jest.spyOn(bcrypt, 'hash').mockResolvedValue('$2a$10$newpassword');
+
+      // Mock JWT verification in authenticate middleware
+      const jwt = require('jsonwebtoken');
+      jest.spyOn(jwt, 'verify').mockReturnValue({
+        id: 'user-id',
+        email: 'user@example.com',
+        role: 'PATIENT',
+        mustChangePassword: true
+      });
+
+      const response = await request(app)
+        .post('/api/v1/auth/change-password')
+        .set('Authorization', 'Bearer test-token')
+        .send({
+          currentPassword: 'oldpassword',
+          newPassword: 'newpassword123'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.accessToken).toBeDefined();
+    });
+
+    it('should reject password change with incorrect current password', async () => {
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT * FROM users WHERE id = $1')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'user-id',
+              email: 'user@example.com',
+              password_hash: '$2a$10$oldpassword',
+              role: 'PATIENT',
+              is_active: true,
+              must_change_password: true
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const bcrypt = require('bcryptjs');
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false);
+
+      const jwt = require('jsonwebtoken');
+      jest.spyOn(jwt, 'verify').mockReturnValue({
+        id: 'user-id',
+        email: 'user@example.com',
+        role: 'PATIENT',
+        mustChangePassword: true
+      });
+
+      const response = await request(app)
+        .post('/api/v1/auth/change-password')
+        .set('Authorization', 'Bearer test-token')
+        .send({
+          currentPassword: 'wrongpassword',
+          newPassword: 'newpassword123'
+        });
+
+      expect(response.status).toBe(401);
+      expect(response.body.error.code).toBe('INVALID_CREDENTIALS');
+    });
+  });
 });

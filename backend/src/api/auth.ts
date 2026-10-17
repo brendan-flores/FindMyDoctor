@@ -418,10 +418,12 @@ router.post('/change-password', authenticate, async (req: AuthRequest, res: Resp
       );
     }
 
-    await changePassword(userId, currentPassword, newPassword);
+    const result = await changePassword(userId, currentPassword, newPassword);
 
     res.json(
-      success(null, 'Password changed successfully')
+      success({
+        accessToken: result.accessToken,
+      }, 'Password changed successfully')
     );
   } catch (err: any) {
     const errorCode = err.code || ErrorCodes.SERVER_ERROR;

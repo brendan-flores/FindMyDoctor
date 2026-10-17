@@ -1,13 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/models/user.dart';
+import '../../../app/app.dart' show MyApp;
+
+// Interface for dependency injection (test seam)
+// Exported for use in widget tests
+abstract class LoginService {
+  Future<Map<String, dynamic>> login(String email, String password);
+}
+
+// Adapter to make ApiService compatible with LoginService
+class _ApiServiceLoginAdapter implements LoginService {
+  final ApiService _apiService = ApiService();
+
+  @override
+  Future<Map<String, dynamic>> login(String email, String password) {
+    return _apiService.login(email, password);
+  }
+}
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final LoginService? loginService;
+
+  const LoginPage({super.key, this.loginService});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -18,7 +40,9 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  final _apiService = ApiService();
+
+  LoginService get _loginService =>
+      widget.loginService ?? _ApiServiceLoginAdapter();
 
   @override
   void dispose() {
@@ -37,7 +61,7 @@ class _LoginPageState extends State<LoginPage> {
         final email = _emailController.text.trim();
         final password = _passwordController.text;
 
-        final response = await _apiService.login(email, password);
+        final response = await _loginService.login(email, password);
 
         if (mounted) {
           setState(() {
@@ -45,8 +69,37 @@ class _LoginPageState extends State<LoginPage> {
           });
 
           if (response['success'] == true) {
-            // Navigate to home screen on successful login
-            Navigator.of(context).pushReplacementNamed('/home');
+            // Parse user data from response
+            final userData = response['data']['user'];
+            final user = User.fromJson(userData);
+
+            // Persist mustChangePassword flag
+            final prefs = await SharedPreferences.getInstance();
+            if (user.mustChangePassword) {
+              await prefs.setBool('must_change_password', true);
+            } else {
+              // Explicitly clear any stale persisted requirement
+              await prefs.remove('must_change_password');
+            }
+
+            // Update cached app state for route guards
+            MyApp.appStateKey.currentState?.updateAuthState(
+              true, // authenticated
+              user.mustChangePassword,
+            );
+
+            // Check if user must change password
+            if (user.mustChangePassword) {
+              // Navigate to change password page
+              if (mounted) {
+                Navigator.of(context).pushReplacementNamed('/change-password');
+              }
+            } else {
+              // Navigate to home screen for normal login
+              if (mounted) {
+                Navigator.of(context).pushReplacementNamed('/home');
+              }
+            }
           } else {
             // Show error message from backend
             ScaffoldMessenger.of(context).showSnackBar(
@@ -67,7 +120,9 @@ class _LoginPageState extends State<LoginPage> {
           // Show error message for network/error
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Login failed. Please check your connection and try again.'),
+              content: Text(
+                'Login failed. Please check your connection and try again.',
+              ),
               backgroundColor: AppColors.error,
               duration: Duration(seconds: 3),
             ),
@@ -147,10 +202,7 @@ class _LoginPageState extends State<LoginPage> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                AppColors.brandAccentBlue,
-                AppColors.brandPrimary,
-              ],
+              colors: [AppColors.brandAccentBlue, AppColors.brandPrimary],
             ),
             borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
             boxShadow: [
@@ -206,9 +258,7 @@ class _LoginPageState extends State<LoginPage> {
         const SizedBox(height: AppSpacing.gutterXs),
         Text(
           'Log in to continue to your account.',
-          style: AppTextStyles.bodyMd.copyWith(
-            color: AppColors.slate500,
-          ),
+          style: AppTextStyles.bodyMd.copyWith(color: AppColors.slate500),
         ),
       ],
     );
@@ -282,9 +332,7 @@ class _LoginPageState extends State<LoginPage> {
         children: [
           Text(
             "Don't have an account? ",
-            style: AppTextStyles.bodyMd.copyWith(
-              color: AppColors.slate500,
-            ),
+            style: AppTextStyles.bodyMd.copyWith(color: AppColors.slate500),
           ),
           TextButton(
             onPressed: () {

@@ -6,6 +6,19 @@
 
 import { login, changePassword } from './authService';
 import { ErrorCodes } from '../../utils/response';
+import jwt from 'jsonwebtoken';
+import { config } from '../../config';
+
+// Mock JWT module
+jest.mock('jsonwebtoken', () => ({
+  sign: jest.fn().mockReturnValue('mock-jwt-token'),
+  verify: jest.fn().mockReturnValue({
+    id: 'user-id',
+    email: 'user@example.com',
+    role: 'PATIENT',
+    mustChangePassword: false
+  }),
+}));
 
 // Mock dependencies
 jest.mock('../../database/connection', () => ({
@@ -366,16 +379,32 @@ describe('AuthService - Change Password Behavior', () => {
   });
 
   it('should successfully change password with valid current password', async () => {
+    let selectCount = 0;
     query.mockImplementation((sql: string, params: any[]) => {
       if (sql.includes('SELECT * FROM users WHERE id = $1')) {
+        selectCount++;
+        // First SELECT: before password change (must_change_password: true)
+        if (selectCount === 1) {
+          return Promise.resolve({
+            rows: [{
+              id: 'user-id',
+              email: 'user@example.com',
+              password_hash: '$2a$10$oldpassword',
+              role: 'PATIENT',
+              is_active: true,
+              must_change_password: true
+            }]
+          });
+        }
+        // Second SELECT: after password change (must_change_password: false)
         return Promise.resolve({
           rows: [{
             id: 'user-id',
             email: 'user@example.com',
-            password_hash: '$2a$10$oldpassword',
+            password_hash: '$2a$10$newpassword',
             role: 'PATIENT',
             is_active: true,
-            must_change_password: true
+            must_change_password: false
           }]
         });
       }
@@ -394,6 +423,7 @@ describe('AuthService - Change Password Behavior', () => {
     const result = await changePassword('user-id', 'oldpassword', 'newpassword123');
 
     expect(result.success).toBe(true);
+    expect(result.accessToken).toBeDefined();
     expect(bcrypt.compare).toHaveBeenCalledWith('oldpassword', '$2a$10$oldpassword');
     expect(bcrypt.hash).toHaveBeenCalledWith('newpassword123', 10);
   });
@@ -432,8 +462,10 @@ describe('AuthService - Change Password Behavior', () => {
   });
 
   it('should revoke all trusted browsers on password change', async () => {
+    let selectCount = 0;
     query.mockImplementation((sql: string, params: any[]) => {
       if (sql.includes('SELECT * FROM users WHERE id = $1')) {
+        selectCount++;
         return Promise.resolve({
           rows: [{
             id: 'user-id',
@@ -463,6 +495,63 @@ describe('AuthService - Change Password Behavior', () => {
     expect(query).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE trusted_browsers'),
       expect.any(Array)
+    );
+  });
+
+  it('should return new access token with mustChangePassword false after successful password change', async () => {
+    let selectCount = 0;
+    query.mockImplementation((sql: string, params: any[]) => {
+      if (sql.includes('SELECT * FROM users WHERE id = $1')) {
+        selectCount++;
+        // First SELECT: before password change (must_change_password: true)
+        if (selectCount === 1) {
+          return Promise.resolve({
+            rows: [{
+              id: 'user-id',
+              email: 'user@example.com',
+              password_hash: '$2a$10$oldpassword',
+              role: 'PATIENT',
+              is_active: true,
+              must_change_password: true
+            }]
+          });
+        }
+        // Second SELECT: after password change (must_change_password: false)
+        return Promise.resolve({
+          rows: [{
+            id: 'user-id',
+            email: 'user@example.com',
+            password_hash: '$2a$10$newpassword',
+            role: 'PATIENT',
+            is_active: true,
+            must_change_password: false
+          }]
+        });
+      }
+      if (sql.includes('UPDATE users SET password_hash')) {
+        return Promise.resolve({ rows: [] });
+      }
+      if (sql.includes('UPDATE trusted_browsers')) {
+        return Promise.resolve({ rows: [] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    bcrypt.compare.mockResolvedValue(true);
+    bcrypt.hash.mockResolvedValue('$2a$10$newpassword');
+
+    const result = await changePassword('user-id', 'oldpassword', 'newpassword123');
+
+    expect(result.success).toBe(true);
+    expect(result.accessToken).toBeDefined();
+
+    // Verify jwt.sign was called with mustChangePassword: false
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mustChangePassword: false
+      }),
+      config.jwt.secret,
+      expect.any(Object)
     );
   });
 });
