@@ -676,7 +676,9 @@ Patients can register accounts through email OTP verification:
 ```text
 Patient Registration Form
         ↓
-Collect Information (name, email, username, password)
+Collect Information (first/middle/last name, date of birth, sex, mobile number, address, email, username, password)
+        ↓
+Validate Email and Username Availability (409 Conflict stops the flow; nothing staged, no OTP sent)
         ↓
 Send OTP via Supabase
         ↓
@@ -684,10 +686,16 @@ Patient Enters OTP
         ↓
 Verify OTP with Supabase
         ↓
-Create Patient Account in PostgreSQL
+Create Patient Account and Patient Profile in PostgreSQL
         ↓
 Patient Can Login
 ```
+
+**Registration Requirements:**
+- Names are captured as separate `firstName`, `middleName` (optional) and `lastName`; the legacy `fullName` field is still accepted and split into first/last name for backward compatibility
+- Required patient details: date of birth (valid date), sex (one of `MALE`, `FEMALE`, `OTHER`, `NOT_SPECIFIED`), mobile number (maximum 20 characters), and address
+- Emergency contact details, medical history, allergies, and current medications are not collected during patient sign-up
+- Every patient field captured at sign-up is staged in `pending_patient_signups` and written to the `patients` table in the same PostgreSQL transaction that creates the account after OTP verification
 
 **OTP Verification Requirements:**
 - 6-digit OTP code sent to patient's email
@@ -698,7 +706,7 @@ Patient Can Login
 - Supabase is used only for OTP delivery and verification
 
 **Backend API Endpoints:**
-- `POST /api/v1/auth/patient/otp/send` - Send OTP to patient email
+- `POST /api/v1/auth/patient/otp/send` - Validate the sign-up form, stage it and send the OTP to the patient email; a taken email or username returns `409 Conflict` and no OTP is sent
 - `POST /api/v1/auth/patient/otp/verify` - Verify OTP and create patient account
 - `POST /api/v1/auth/patient/otp/resend` - Resend OTP for existing staged signup
 
@@ -707,14 +715,15 @@ Patient Can Login
 - Email verified through OTP before account activation
 - Temporary patient data staged during OTP process
 - Single PostgreSQL transaction for account creation after OTP verification
+- Email and username uniqueness are checked up-front in `/send` - after the email existence check and before the sign-up is staged or any OTP is sent - so a taken username is reported on the sign-up form instead of after OTP verification; both checks are repeated inside the account-creation transaction in `/verify`, which returns `409 Conflict` with `Email is already registered` or `Username already taken` (the `users` unique constraints are the final backstop against concurrent sign-ups)
 - 15-minute expiration for staged sign-up data
 - Automatic cleanup of expired staged sign-ups
 
 **Backend Implementation:**
 - Service: `patientOtpService.ts` handles Supabase OTP operations
 - Router: `patientOtp.ts` provides API endpoints
-- Database: `pending_patient_signups` table stages registration data
-- Migration: `008_patient_signup_otp_flow.sql` creates staging table
+- Database: `pending_patient_signups` table stages registration data (including the detailed patient fields)
+- Migration: `008_patient_signup_otp_flow.sql` creates staging table; `026_add_pending_patient_signup_details.sql` adds `middle_name`, `date_of_birth`, `sex`, `phone` and `address` to the staging table
 
 **Database Migrations for Login OTP and 2FA:**
 - `013_add_two_factor_settings.sql` - Adds `two_factor_enabled` column to `doctors` and `secretaries` tables for optional 2FA
@@ -726,7 +735,7 @@ Patient Can Login
 - Page: `successful_registration_page.dart` displays registration success message
 - Page: `onboarding_page.dart` provides 3-screen onboarding flow (Find doctor, Manage health, Book appointments)
 - API Service: `api_service.dart` includes patient OTP methods and token management
-- Integration: `signup_page.dart` calls backend to send OTP and navigate to verification
+- Integration: `signup_page.dart` calls backend to send OTP and navigate to verification; a `409 Conflict` from `/send` is shown on the form (using the backend message, e.g. `Username already taken`) and the user stays on the form, so an unavailable username never reaches OTP verification
 - Features: Auto-focus, paste support, resend timer, error handling
 - Flow: OTP verification → Successful registration → Onboarding → Home dashboard (authenticated)
 - Authentication: After successful OTP verification, user is automatically authenticated and can access the app directly

@@ -91,10 +91,16 @@ Current System State (October 2026):
 
 ## Patient Registration & Authentication
 - Patient registration uses email OTP verification via Supabase for account creation
+- Mobile patient sign-up collects separate first name, middle name (optional), last name, date of birth, sex, mobile number, address, email, username, and password
 - Patient registration requires username (minimum 3 characters, alphanumeric + underscores only)
+- Patient sex accepts `MALE`, `FEMALE`, `OTHER`, or `NOT_SPECIFIED`; the mobile sign-up form shows user-friendly labels mapped to these backend values
+- Mobile sign-up does not collect emergency contact details, medical history, allergies, or current medications
+- All patient details captured at sign-up are staged in `pending_patient_signups` and written to the `patients` table when the account is created after OTP verification
 - User login accepts either email or username for authentication
 - Users table includes username field (unique) for patient identification
-- Patients table does not include phone field (removed in favor of username)
+- The patient OTP `/send` endpoint checks email and username availability up-front (after the email existence check, before the sign-up is staged or the OTP is sent) and returns `409 Conflict` with `Email is already registered` or `Username already taken`, so the error is shown on the sign-up form without sending an OTP
+- The patient OTP `/verify` endpoint re-checks email and username uniqueness inside the single account-creation transaction and returns `409 Conflict` with a clear `Username already taken` (or `Email already registered`) message instead of a misleading verification error; the `users` unique constraints remain the backstop against concurrent sign-ups
+- Patients table includes phone (restored in migration `025_restore_phone_column.sql`), `middle_name`, and `sex` (migration `023_add_patient_required_fields.sql`)
 - Backend API endpoints for patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
 - Backend doctor OTP API accepts only basic fields (`firstName`, `middleName`, `lastName`, `email`, `contactNumber`, `password`) in the signup payload
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
@@ -385,7 +391,8 @@ Current System State (October 2026):
 - Supabase Storage service role key is required for backend photo operations and must not be exposed to frontend applications
 
 ## Database Schema
-- Database schema includes approval status fields, pending doctor signups staging table (basic fields only), and pending patient signups staging table (with username)
+- Database schema includes approval status fields, pending doctor signups staging table (basic fields only), and pending patient signups staging table (username plus detailed patient fields: middle_name, date_of_birth, sex, phone, address)
+- Migration `026_add_pending_patient_signup_details.sql` adds middle_name, date_of_birth, sex, phone and address to pending_patient_signups so patient details captured during sign-up are persisted on OTP verification
 - Database schema includes `middle_name` field in `doctors` and `pending_doctor_signups` tables (migration 010_add_middle_name.sql)
 - Database schema includes extended doctor profile fields (migration 016_doctor_profile_fields.sql): contact_number, professional_photo_url, years_of_experience, areas_of_expertise (comma-separated text), consultation_type, languages_spoken (comma-separated text), profile_completion_status, profile_submitted_at
 - Migration `017_modify_pending_doctor_signup_for_basic_flow.sql` adds contact_number field to pending_doctor_signups for basic registration flow (professional fields remain in table for compatibility)
@@ -467,6 +474,17 @@ Current System State (October 2026):
 ## Mobile Application
 - Mobile application includes OTP verification page for patient registration with full backend integration
 - Mobile application authentication persists across hot restarts using SharedPreferences for token storage
+- Mobile patient login page UI redesigned with a modern, card-based layout: gradient brand mark with PH badge, elevated login card with rounded corners and subtle shadows, focus-aware email/password fields (icon and border accent plus show/hide password toggle), and a prominent login button with distinct loading, success, and error feedback (inline error banner plus snackbar)
+- Mobile login page uses a responsive, keyboard-aware scrollable layout (max content width constrained on larger screens) and subtle decorative background accents; authentication logic, validation rules, API integration, navigation, and session handling are unchanged
+- Mobile patient sign-up page UI redesigned to match the login page design: soft gradient background, gradient brand mark with PH badge, elevated white form card with sectioned "Personal Information" and "Account Credentials" groups, focus-aware fields, and a prominent Create Account button with loading and error feedback
+- Mobile sign-up collects separate First Name, Middle Name (Optional), and Last Name fields plus date of birth (date picker), sex (dropdown), mobile number, and address; emergency contact details, medical history, allergies, and current medications are excluded
+- Mobile patient details are submitted with the sign-up OTP request and persisted to the `patients` table when the account is created after OTP verification
+- Mobile sign-up form surfaces the backend's `409 Conflict` message from `/send` (e.g. `Username already taken`) in its inline error banner and snackbar, and stays on the form so no OTP is sent and no navigation to OTP verification occurs for a taken email or username
+- Mobile `PrimaryButton` label is now overflow-safe (single line with ellipsis) so long button labels do not overflow on narrow screens or with enlarged system text
+- Mobile screens tolerate the zero-sized first layout frame (Android reports a 0x0 viewport before the surface is ready): the login, sign-up, and OTP pages clamp their scrollable `minHeight` and the home page only reserves its empty-state filler when there is real vertical space, so no invalid negative constraints are produced
+- Fixing the invalid constraints removes the `Each child must be laid out exactly once.` Scaffold layout crash (a failed body build was replaced by an `ErrorWidget`, leaving the Scaffold's multi-child layout inconsistent) and the frozen loading screen that required a manual refresh or hot restart
+- Mobile home page data (specialties, recommended doctors, clinics) loads from `initState` and clears its loading flags on both success and failure; the resulting `setState` calls are guarded with a `mounted` check
+- Mobile app startup authentication check always resolves initialization (falling back to the login screen if token/storage reads fail) so the startup progress indicator cannot hang
 
 ## Setup Progress Tracker
 - Web Doctor Sidebar includes a Setup Progress Tracker component that tracks 4 setup steps: Account Registration & Email Verification, Complete Professional Profile, Admin Approval, and Set Availability & Schedule
