@@ -65,16 +65,26 @@ class MyAppState extends State<MyApp> {
   }
 
   Future<void> _initializeApp() async {
-    // Initialize ApiService to load token from storage
-    await _apiService.init();
+    var isAuthenticated = false;
+    var mustChangePassword = false;
 
-    // Check if user is logged in
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    final mustChangePassword = prefs.getBool('must_change_password') ?? false;
+    try {
+      // Initialize ApiService to load token from storage
+      await _apiService.init();
 
+      // Check if user is logged in
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      isAuthenticated = token != null && token.isNotEmpty;
+      mustChangePassword = prefs.getBool('must_change_password') ?? false;
+    } catch (_) {
+      // Fall through to an unauthenticated state rather than leaving the
+      // startup progress indicator spinning forever.
+    }
+
+    if (!mounted) return;
     setState(() {
-      _isAuthenticated = token != null && token.isNotEmpty;
+      _isAuthenticated = isAuthenticated;
       _mustChangePassword = mustChangePassword;
       _isInitialized = true;
     });

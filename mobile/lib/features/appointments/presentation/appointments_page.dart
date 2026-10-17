@@ -71,13 +71,6 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
   }
 
   @override
-  void didUpdateWidget(AppointmentsPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Refresh when returning to this page
-    _fetchAppointments();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
