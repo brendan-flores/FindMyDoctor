@@ -278,12 +278,18 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> changePassword(
-    String currentPassword,
+    String? currentPassword,
     String newPassword,
   ) async {
+    final body = <String, dynamic>{'newPassword': newPassword};
+    // Only include currentPassword if it's provided (not null)
+    if (currentPassword != null) {
+      body['currentPassword'] = currentPassword;
+    }
+
     final response = await post(
       ApiConstants.changePassword,
-      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+      body: body,
       requireAuth: true,
     );
 

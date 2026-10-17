@@ -84,10 +84,41 @@ void main() {
       // Assert - Verify endpoint and body
       expect(capturedPath, equals('/api/v1/auth/change-password'));
       expect(capturedBody, isNotNull);
-      
+
       // Parse JSON body to verify password fields
       final bodyMap = jsonDecode(capturedBody!) as Map<String, dynamic>;
       expect(bodyMap['currentPassword'], equals('oldPassword123'));
+      expect(bodyMap['newPassword'], equals('newPassword456'));
+    });
+
+    test('changePassword with null currentPassword omits it from request body (walk-in first login)', () async {
+      // Arrange - Mock HTTP client to capture endpoint and body
+      String capturedPath = '';
+      String? capturedBody;
+
+      final mockClient = MockClient((request) async {
+        capturedPath = request.url.path;
+        capturedBody = request.body;
+        return http.Response(
+          '{"success": true, "message": "Password changed successfully"}',
+          200,
+        );
+      });
+
+      // Act - Create ApiService with injected mock client and call changePassword with null currentPassword
+      final testApiService = ApiService.createWithClient(mockClient);
+      await testApiService.init();
+
+      final newPassword = 'newPassword456';
+      await testApiService.changePassword(null, newPassword);
+
+      // Assert - Verify endpoint and body
+      expect(capturedPath, equals('/api/v1/auth/change-password'));
+      expect(capturedBody, isNotNull);
+
+      // Parse JSON body to verify currentPassword is NOT included
+      final bodyMap = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      expect(bodyMap.containsKey('currentPassword'), isFalse);
       expect(bodyMap['newPassword'], equals('newPassword456'));
     });
 
@@ -130,6 +161,19 @@ void main() {
       // Act & Assert - Method signature verification
       expect(
         () => apiService.changePassword(currentPassword, newPassword),
+        returnsNormally,
+      );
+    });
+
+    test('changePassword can be called with null currentPassword', () async {
+      // This test verifies the method accepts null currentPassword for walk-in first login
+
+      // Arrange
+      final newPassword = 'newPassword456';
+
+      // Act & Assert - Method signature verification
+      expect(
+        () => apiService.changePassword(null, newPassword),
         returnsNormally,
       );
     });

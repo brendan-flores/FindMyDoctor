@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/auth/presentation/change_password_page.dart';
 import 'package:mobile/features/auth/presentation/login_page.dart';
+import 'package:mobile/features/auth/presentation/onboarding_page.dart';
 import 'package:mobile/features/home/presentation/home_page.dart';
 import 'package:mobile/app/app.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,7 +20,7 @@ class MockPasswordChangeService implements PasswordChangeService {
 
   @override
   Future<Map<String, dynamic>> changePassword(
-    String currentPassword,
+    String? currentPassword,
     String newPassword,
   ) async {
     callCount++;
@@ -742,10 +743,10 @@ void main() {
         final mockService = MockPasswordChangeService();
         mockService.shouldSucceed = true;
 
-        // Set up initial state with password change requirement
+        // Set up initial state WITHOUT password change requirement (regular password change)
         SharedPreferences.setMockInitialValues({
           'access_token': 'valid_token',
-          'must_change_password': true,
+          'must_change_password': false,
         });
 
         await tester.pumpWidget(
@@ -863,6 +864,107 @@ void main() {
 
         expect(token, isNull);
         expect(mustChangePassword, isNull);
+      },
+    );
+
+    testWidgets(
+      'Walk-in first login (must_change_password = true) hides current password field',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'must_change_password': true,
+        });
+
+        await tester.pumpWidget(MaterialApp(home: ChangePasswordPage()));
+        await tester.pumpAndSettle();
+
+        // Verify current password field is NOT shown
+        expect(find.text('Current Password'), findsNothing);
+        expect(find.text('Enter your current password'), findsNothing);
+
+        // Verify new password and confirm fields are still shown
+        expect(find.text('New Password'), findsOneWidget);
+        expect(find.text('Confirm New Password'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Walk-in first login sends null currentPassword to service',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'must_change_password': true,
+        });
+
+        final mockService = MockPasswordChangeService();
+        mockService.shouldSucceed = true;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ChangePasswordPage(passwordChangeService: mockService),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Fill new password and confirm
+        final newPasswordField = find.ancestor(
+          of: find.text('Enter your new password (min. 8 characters)'),
+          matching: find.byType(TextField),
+        );
+        await tester.enterText(newPasswordField, 'newpassword123');
+
+        final confirmPasswordField = find.ancestor(
+          of: find.text('Confirm your new password'),
+          matching: find.byType(TextField),
+        );
+        await tester.enterText(confirmPasswordField, 'newpassword123');
+
+        // Tap button
+        final changePasswordButton = find.byType(ElevatedButton);
+        await tester.tap(changePasswordButton);
+        await tester.pumpAndSettle();
+
+        // Verify currentPassword was null
+        expect(mockService.capturedCurrentPassword, isNull);
+        expect(mockService.capturedNewPassword, 'newpassword123');
+      },
+    );
+
+    testWidgets(
+      'Walk-in first login navigates to onboarding after successful password change',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'must_change_password': true,
+        });
+
+        final mockService = MockPasswordChangeService();
+        mockService.shouldSucceed = true;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ChangePasswordPage(passwordChangeService: mockService),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Fill new password and confirm
+        final newPasswordField = find.ancestor(
+          of: find.text('Enter your new password (min. 8 characters)'),
+          matching: find.byType(TextField),
+        );
+        await tester.enterText(newPasswordField, 'newpassword123');
+
+        final confirmPasswordField = find.ancestor(
+          of: find.text('Confirm your new password'),
+          matching: find.byType(TextField),
+        );
+        await tester.enterText(confirmPasswordField, 'newpassword123');
+
+        // Tap button
+        final changePasswordButton = find.byType(ElevatedButton);
+        await tester.tap(changePasswordButton);
+        await tester.pumpAndSettle();
+
+        // Verify navigation to OnboardingPage
+        expect(find.byType(OnboardingPage), findsOneWidget);
       },
     );
   });

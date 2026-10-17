@@ -8,11 +8,12 @@ import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/api_service.dart';
 import '../../../app/app.dart' show MyApp;
+import 'onboarding_page.dart';
 
 // Interface for dependency injection
 abstract class PasswordChangeService {
   Future<Map<String, dynamic>> changePassword(
-    String currentPassword,
+    String? currentPassword,
     String newPassword,
   );
 }
@@ -23,7 +24,7 @@ class _ApiServiceAdapter implements PasswordChangeService {
 
   @override
   Future<Map<String, dynamic>> changePassword(
-    String currentPassword,
+    String? currentPassword,
     String newPassword,
   ) {
     return _apiService.changePassword(currentPassword, newPassword);
@@ -93,7 +94,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       });
 
       try {
-        final currentPassword = _currentPasswordController.text;
+        // Only send currentPassword if this is not a required change (walk-in first login)
+        final currentPassword = _isRequiredChange ? null : _currentPasswordController.text;
         final newPassword = _newPasswordController.text;
 
         final response = await _passwordChangeService.changePassword(
@@ -124,12 +126,24 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 ),
               );
 
-              // Call success callback for navigation integration
-              if (widget.onSuccess != null) {
-                widget.onSuccess!();
+              // For walk-in patients (first login), show onboarding before home
+              // For regular password changes, go directly to home or use callback
+              if (_isRequiredChange) {
+                // Walk-in first login - show onboarding
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const OnboardingPage(forceShow: true),
+                  ),
+                  (route) => false,
+                );
               } else {
-                // Default navigation to home screen
-                Navigator.of(context).pushReplacementNamed('/home');
+                // Regular password change - use callback or go to home
+                if (widget.onSuccess != null) {
+                  widget.onSuccess!();
+                } else {
+                  // Default navigation to home screen
+                  Navigator.of(context).pushReplacementNamed('/home');
+                }
               }
             }
           } else {
@@ -309,7 +323,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         ),
         const SizedBox(height: AppSpacing.gutterXs),
         Text(
-          'Enter your current password and create a new one.',
+          _isRequiredChange
+              ? 'Create your new password to continue.'
+              : 'Enter your current password and create a new one.',
           style: AppTextStyles.bodyMd.copyWith(color: AppColors.slate500),
         ),
       ],
@@ -319,21 +335,24 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   Widget _buildChangePasswordForm() {
     return Column(
       children: [
-        CustomTextField(
-          label: 'Current Password',
-          hint: 'Enter your current password',
-          controller: _currentPasswordController,
-          obscureText: true,
-          enablePasswordToggle: true,
-          prefixIcon: Icons.lock_outlined,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter your current password';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: AppSpacing.gutterMd),
+        // Only show current password field if this is not a required change (walk-in first login)
+        if (!_isRequiredChange) ...[
+          CustomTextField(
+            label: 'Current Password',
+            hint: 'Enter your current password',
+            controller: _currentPasswordController,
+            obscureText: true,
+            enablePasswordToggle: true,
+            prefixIcon: Icons.lock_outlined,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your current password';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: AppSpacing.gutterMd),
+        ],
         CustomTextField(
           label: 'New Password',
           hint: 'Enter your new password (min. 8 characters)',
