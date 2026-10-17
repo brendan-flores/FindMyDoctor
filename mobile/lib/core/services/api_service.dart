@@ -240,20 +240,39 @@ class ApiService {
 
   Future<Map<String, dynamic>> sendPatientOtp({
     required String email,
-    required String fullName,
+    required String firstName,
+    String? middleName,
+    required String lastName,
+    required String dateOfBirth,
+    required String sex,
+    required String phone,
+    required String address,
     required String username,
     required String password,
     required String confirmPassword,
   }) async {
+    final body = <String, dynamic>{
+      'email': email,
+      'firstName': firstName,
+      'lastName': lastName,
+      'dateOfBirth': dateOfBirth,
+      'sex': sex,
+      'phone': phone,
+      'address': address,
+      'username': username,
+      'password': password,
+      'confirmPassword': confirmPassword,
+    };
+
+    // Middle name is optional - omit when empty so the backend stores NULL
+    final trimmedMiddleName = middleName?.trim();
+    if (trimmedMiddleName != null && trimmedMiddleName.isNotEmpty) {
+      body['middleName'] = trimmedMiddleName;
+    }
+
     return await post(
       ApiConstants.patientOtpSend,
-      body: {
-        'email': email,
-        'fullName': fullName,
-        'username': username,
-        'password': password,
-        'confirmPassword': confirmPassword,
-      },
+      body: body,
       requireAuth: false,
     );
   }
