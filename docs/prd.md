@@ -471,6 +471,7 @@ When a walk-in patient does not have an account:
 5. The account is marked as requiring a password change.
 6. At first login, the patient must change the generated password.
 7. The patient cannot access normal application features until the password is changed.
+8. After successful password change, the patient views onboarding screens before accessing the application (same as regular app registration).
 
 The generated patient account becomes the permanent identity used for:
 

@@ -485,8 +485,9 @@ If the patient has no account:
 3. Generate random temporary password.
 4. Mark account as `must_change_password`.
 5. Provide credentials through the designated process.
-6. Require password change during first login.
+6. Require password change during first login (current password field not required).
 7. Block normal application access until the password is changed.
+8. After successful password change, show onboarding screens before accessing the application.
 
 ---
 

@@ -23,6 +23,16 @@ Current System State (October 2026):
 - All operations use transactions to ensure consistency between patient records, appointments, queue entries, capacity updates, and patient-doctor associations
 - The unique constraint on (patient_id, doctor_id) in patient_doctor_associations prevents duplicate associations with conflict-safe writes
 
+## Walk-in Patient Password Change and Onboarding
+- Walk-in patients are created with `must_change_password = true` and a temporary generated password
+- During first login, walk-in patients are redirected to the password change page
+- Walk-in password change page hides the "Current Password" field (only shows "New Password" and "Confirm New Password")
+- Backend `/api/v1/auth/change-password` endpoint accepts optional `currentPassword` parameter
+- When `must_change_password` is true, the backend skips current password verification
+- After successful password change, walk-in patients view onboarding screens (Find the right doctor, Manage your health, Book appointments easily) before accessing the application
+- This onboarding flow aligns walk-in patient experience with regular app registration
+- Regular password changes (when `must_change_password` is false) still require current password verification and navigate directly to home without onboarding
+
 ## Doctor Registration & Approval Workflow
 - Doctor self-registration creates accounts with `approval_status = 'PENDING'` requiring admin approval
 - Doctor self-registration uses a two-step flow: basic registration → OTP verification → profile completion → submission for approval
