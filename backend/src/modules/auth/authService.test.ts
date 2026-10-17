@@ -554,4 +554,88 @@ describe('AuthService - Change Password Behavior', () => {
       expect.any(Object)
     );
   });
+
+  it('should allow password change without current password when mustChangePassword is true (walk-in first login)', async () => {
+    let selectCount = 0;
+    query.mockImplementation((sql: string, params: any[]) => {
+      if (sql.includes('SELECT * FROM users WHERE id = $1')) {
+        selectCount++;
+        // First SELECT: before password change (must_change_password: true)
+        if (selectCount === 1) {
+          return Promise.resolve({
+            rows: [{
+              id: 'user-id',
+              email: 'user@example.com',
+              password_hash: '$2a$10$temppassword',
+              role: 'PATIENT',
+              is_active: true,
+              must_change_password: true
+            }]
+          });
+        }
+        // Second SELECT: after password change (must_change_password: false)
+        return Promise.resolve({
+          rows: [{
+            id: 'user-id',
+            email: 'user@example.com',
+            password_hash: '$2a$10$newpassword',
+            role: 'PATIENT',
+            is_active: true,
+            must_change_password: false
+          }]
+        });
+      }
+      if (sql.includes('UPDATE users SET password_hash')) {
+        return Promise.resolve({ rows: [] });
+      }
+      if (sql.includes('UPDATE trusted_browsers')) {
+        return Promise.resolve({ rows: [] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    bcrypt.hash.mockResolvedValue('$2a$10$newpassword');
+
+    // Call changePassword with undefined currentPassword and mustChangePassword = true
+    const result = await changePassword('user-id', undefined, 'newpassword123', true);
+
+    expect(result.success).toBe(true);
+    expect(result.accessToken).toBeDefined();
+
+    // Verify bcrypt.compare was NOT called (current password verification skipped)
+    expect(bcrypt.compare).not.toHaveBeenCalled();
+
+    // Verify password was still hashed and updated
+    expect(bcrypt.hash).toHaveBeenCalledWith('newpassword123', 10);
+
+    // Verify jwt.sign was called with mustChangePassword: false
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mustChangePassword: false
+      }),
+      config.jwt.secret,
+      expect.any(Object)
+    );
+  });
+
+  it('should require current password when mustChangePassword is false', async () => {
+    query.mockResolvedValue({
+      rows: [{
+        id: 'user-id',
+        email: 'user@example.com',
+        password_hash: '$2a$10$oldpassword',
+        role: 'PATIENT',
+        is_active: true,
+        must_change_password: false
+      }]
+    });
+
+    // Call changePassword with undefined currentPassword and mustChangePassword = false
+    await expect(
+      changePassword('user-id', undefined, 'newpassword123', false)
+    ).rejects.toMatchObject({
+      code: ErrorCodes.VALIDATION_ERROR,
+      message: 'Current password is required'
+    });
+  });
 });

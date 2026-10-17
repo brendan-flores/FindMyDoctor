@@ -405,10 +405,18 @@ router.post('/change-password', authenticate, async (req: AuthRequest, res: Resp
   try {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user!.id;
+    const mustChangePassword = req.user!.mustChangePassword || false;
 
-    if (!currentPassword || !newPassword) {
+    // currentPassword is required only if must_change_password is false
+    if (!mustChangePassword && !currentPassword) {
       return res.status(400).json(
-        error(ErrorCodes.VALIDATION_ERROR, 'Current password and new password are required')
+        error(ErrorCodes.VALIDATION_ERROR, 'Current password is required')
+      );
+    }
+
+    if (!newPassword) {
+      return res.status(400).json(
+        error(ErrorCodes.VALIDATION_ERROR, 'New password is required')
       );
     }
 
@@ -418,7 +426,7 @@ router.post('/change-password', authenticate, async (req: AuthRequest, res: Resp
       );
     }
 
-    const result = await changePassword(userId, currentPassword, newPassword);
+    const result = await changePassword(userId, currentPassword, newPassword, mustChangePassword);
 
     res.json(
       success({

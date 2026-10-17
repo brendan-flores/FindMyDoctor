@@ -238,7 +238,7 @@ export async function login(data: LoginData) {
   };
 }
 
-export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
+export async function changePassword(userId: string, currentPassword: string | undefined, newPassword: string, mustChangePassword: boolean = false) {
   // Get user
   const userResult = await query(
     'SELECT * FROM users WHERE id = $1',
@@ -251,11 +251,17 @@ export async function changePassword(userId: string, currentPassword: string, ne
 
   const user = userResult.rows[0];
 
-  // Verify current password
-  const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
+  // Verify current password only if not a forced password change (walk-in first login)
+  if (!mustChangePassword) {
+    if (!currentPassword) {
+      throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Current password is required' };
+    }
 
-  if (!isValidPassword) {
-    throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Current password is incorrect' };
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
+
+    if (!isValidPassword) {
+      throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Current password is incorrect' };
+    }
   }
 
   // Hash new password
