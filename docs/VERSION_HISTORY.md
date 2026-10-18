@@ -4,6 +4,44 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.11 (October 18, 2026)
+
+**Purpose:** Replace FindMyDoctor branding logos across mobile and web applications and implement platform-aware API base URL configuration
+
+**Significant Features:**
+- Replaced FindMyDoctor logo across mobile application with new branding
+- Replaced FindMyDoctor logo across web application with new branding
+- Implemented sticky logo headers across mobile app pages for consistent branding visibility
+
+**Improvements:**
+- Mobile: Added sticky logo headers to maintain branding visibility while scrolling through pages
+- Web: Improved logo sizing in web portal sidebars for better visual consistency
+- Backend: Added platform-aware base URL configuration for cross-platform API connectivity
+- Backend: Configured uploads rewrite to use dynamic API base URL for proper file serving across platforms
+
+**Bug Fixes:**
+- Fixed API connectivity issues across different platforms by implementing dynamic base URL resolution
+- Fixed logo sizing inconsistencies in web portal sidebars
+
+**Removed/Modified Functionality:**
+- No authentication, registration, OTP, appointment booking, doctor search, queue logic, or business rules were changed; only branding and platform connectivity were updated
+
+**Architecture:**
+- Mobile: Modified `/mobile/lib/` (logo assets and page layouts for sticky headers)
+- Web: Modified `/web/src/` (logo assets and sidebar components)
+- Backend: Modified `/backend/src/` (base URL configuration and uploads rewrite)
+
+**Testing:**
+- Verified logo rendering across mobile and web applications
+- Verified API connectivity with platform-aware base URL configuration
+- Verified file upload/download functionality with dynamic URL rewriting
+
+**Documentation:**
+- Updated CURRENT_VERSION.md to 01.11
+- Added VERSION_HISTORY.md entry for 01.11
+
+---
+
 ### 01.10 (October 18, 2026)
 
 **Purpose:** Report a taken username on the patient sign-up form before any OTP is sent, instead of only after OTP verification
