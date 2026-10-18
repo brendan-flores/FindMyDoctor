@@ -27,7 +27,8 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
           a.*,
           d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.specialty,
           d.practice_name, d.practice_address, d.practice_latitude, d.practice_longitude,
-          q.queue_number, q.status as queue_status
+          q.queue_number, q.status as queue_status,
+          COALESCE(q.registration_source, 'ONLINE') as registration_source
         FROM appointments a
         JOIN doctors d ON a.doctor_id = d.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
@@ -387,7 +388,8 @@ router.get('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
       queryText = `
         SELECT a.*, d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.specialty,
                d.practice_name, d.practice_address, d.practice_latitude, d.practice_longitude, d.practice_phone,
-               q.queue_number, q.status as queue_status
+               q.queue_number, q.status as queue_status,
+               COALESCE(q.registration_source, 'ONLINE') as registration_source
         FROM appointments a
         JOIN doctors d ON a.doctor_id = d.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
