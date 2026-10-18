@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/api_service.dart';
 
@@ -98,33 +99,35 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: spacing.AppSpacing.gutterMd),
-                      _buildHeader(context),
-                      const SizedBox(height: spacing.AppSpacing.gutterLg),
-                      if (_isSubmitting)
-                        _buildLoadingState()
-                      else if (_errorMessage != null)
-                        _buildErrorState()
-                      else if (_isSuccess)
-                        _buildSuccessContent(),
-                    ],
-                  ),
+      body: Column(
+        children: [
+          AppHeader(
+            showBackButton: true,
+            onBackPressed: () => Navigator.of(context).pop(),
+            showNotifications: false,
+            showProfile: false,
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    if (_isSubmitting)
+                      _buildLoadingState()
+                    else if (_errorMessage != null)
+                      _buildErrorState()
+                    else if (_isSuccess)
+                      _buildSuccessContent(),
+                  ],
                 ),
               ),
             ),
-            if (_isSuccess) _buildBottomButton(context),
-          ],
-        ),
+          ),
+          if (_isSuccess) _buildBottomButton(context),
+        ],
       ),
     );
   }
@@ -187,21 +190,6 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
         const SizedBox(height: spacing.AppSpacing.gutterLg),
         _buildLocationCard(),
         const SizedBox(height: spacing.AppSpacing.gutter3xl),
-      ],
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back),
-          constraints: const BoxConstraints(),
-          padding: EdgeInsets.zero,
-        ),
-        const SizedBox(width: 40), // Spacer for balance
       ],
     );
   }

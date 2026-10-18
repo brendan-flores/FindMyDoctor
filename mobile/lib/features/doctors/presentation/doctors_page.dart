@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_header.dart';
 import '../../../core/models/doctor.dart';
 import '../../../core/services/doctor_service.dart';
 
@@ -188,7 +189,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildHeader(),
+        _buildStickyHeader(),
         Expanded(
           child: _showAllHospitals
               ? _buildAllHospitalsView()
@@ -209,6 +210,13 @@ class _DoctorsPageState extends State<DoctorsPage> {
         ),
       ],
     );
+  }
+
+  Widget _buildStickyHeader() {
+    if (_isFilteredListView) {
+      return _buildHeader();
+    }
+    return const AppHeader(showNotifications: true, showProfile: true);
   }
 
   Widget _buildFilteredDoctorListView() {

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/api_service.dart';
@@ -180,55 +181,36 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: spacing.AppSpacing.gutterMd),
-                      _buildHeader(),
-                      const SizedBox(height: spacing.AppSpacing.gutterLg),
-                      if (_isLoading)
-                        _buildLoadingState()
-                      else if (_errorMessage != null && _isSubmitting == false)
-                        _buildErrorState()
-                      else
-                        _buildForm(),
-                    ],
-                  ),
+      body: Column(
+        children: [
+          AppHeader(
+            showBackButton: true,
+            onBackPressed: () => Navigator.of(context).pop(),
+            showNotifications: false,
+            showProfile: false,
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    if (_isLoading)
+                      _buildLoadingState()
+                    else if (_errorMessage != null && _isSubmitting == false)
+                      _buildErrorState()
+                    else
+                      _buildForm(),
+                  ],
                 ),
               ),
             ),
-            if (!_isLoading) _buildBottomButton(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back_ios_new),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-        ),
-        const SizedBox(width: spacing.AppSpacing.gutterSm),
-        Text(
-          'Patient Details',
-          style: AppTextStyles.headlineSm.copyWith(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
           ),
-        ),
-      ],
+          if (!_isLoading) _buildBottomButton(),
+        ],
+      ),
     );
   }
 

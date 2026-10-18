@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_header.dart';
 import '../../../core/services/api_service.dart';
 
 class AppointmentsPage extends StatefulWidget {
@@ -74,26 +75,31 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: spacing.AppSpacing.gutterLg),
-                _buildHeader(),
-                const SizedBox(height: spacing.AppSpacing.gutterMd),
-                _buildSearchBar(),
-                const SizedBox(height: spacing.AppSpacing.gutterLg),
-                _buildFilterTabs(),
-                const SizedBox(height: spacing.AppSpacing.gutterLg),
-                _buildAppointmentsList(),
-                const SizedBox(height: spacing.AppSpacing.gutter3xl),
-              ],
+      body: Column(
+        children: [
+          const AppHeader(showNotifications: true, showProfile: true),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildHeader(),
+                    const SizedBox(height: spacing.AppSpacing.gutterMd),
+                    _buildSearchBar(),
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildFilterTabs(),
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildAppointmentsList(),
+                    const SizedBox(height: spacing.AppSpacing.gutter3xl),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -131,19 +137,6 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                   ),
                 ),
               ],
-            ),
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceLow,
-                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
-              ),
-              child: Icon(
-                Icons.history_edu,
-                color: AppColors.primary,
-                size: spacing.AppSpacing.iconMd,
-              ),
             ),
           ],
         ),
