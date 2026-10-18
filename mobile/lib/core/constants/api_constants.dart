@@ -1,8 +1,18 @@
+import 'dart:io' show Platform;
+
 class ApiConstants {
   // For development on emulator, use localhost
   // For real device testing, use your computer's IP address
   // Example: static const String baseUrl = 'http://192.168.1.100:3000/api/v1';
-  static const String baseUrl = 'http://10.0.2.2:3000/api/v1'; // Android emulator default
+  static String get baseUrl {
+    if (Platform.isAndroid) {
+      return 'http://10.0.2.2:3000/api/v1'; // Android emulator
+    } else if (Platform.isIOS) {
+      return 'http://localhost:3000/api/v1'; // iOS simulator
+    } else {
+      return 'http://localhost:3000/api/v1'; // Web and others
+    }
+  }
   
   // Auth endpoints
   static const String login = '/auth/login';
