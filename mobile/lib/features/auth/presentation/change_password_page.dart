@@ -259,54 +259,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   }
 
   Widget _buildBrandHeader() {
-    return Row(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.brandAccentBlue, AppColors.brandPrimary],
-            ),
-            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.15),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.location_on,
-            color: AppColors.onPrimary,
-            size: 24,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.gutterMd),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'FindMyDoctor',
-              style: AppTextStyles.headlineMd.copyWith(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: AppColors.brandNavy,
-              ),
-            ),
-            Text(
-              'PHILIPPINES',
-              style: AppTextStyles.labelSm.copyWith(
-                color: AppColors.brandTealBadge,
-                letterSpacing: 0.16,
-              ),
-            ),
-          ],
-        ),
-      ],
+    return Image.asset(
+      'assets/images/findmydoctor_logo.png',
+      height: 60,
+      fit: BoxFit.contain,
     );
   }
 

@@ -322,87 +322,11 @@ class _LoginPageState extends State<LoginPage> {
       width: double.infinity,
       child: FittedBox(
         fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.skyBlue, AppColors.brandPrimary],
-                ),
-                borderRadius: BorderRadius.circular(AppSpacing.radiusXl + 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.brandPrimary.withValues(alpha: 0.28),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.location_on,
-                color: AppColors.onPrimary,
-                size: 28,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.gutterLg),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'FindMyDoctor',
-                  style: AppTextStyles.headlineMd.copyWith(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.brandNavy,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.gutterXs + 2),
-                _buildPhilippinesBadge(),
-              ],
-            ),
-          ],
+        child: Image.asset(
+          'assets/images/findmydoctor_logo.png',
+          height: 80,
+          fit: BoxFit.contain,
         ),
-      ),
-    );
-  }
-
-  Widget _buildPhilippinesBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.gutterMd,
-        vertical: 5,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.brandTealBadge.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
-        border: Border.all(
-          color: AppColors.brandTealBadge.withValues(alpha: 0.24),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.verified_outlined,
-            size: 13,
-            color: AppColors.brandTealBadge,
-          ),
-          const SizedBox(width: AppSpacing.gutterXs + 1),
-          Text(
-            'PHILIPPINES',
-            style: AppTextStyles.labelSm.copyWith(
-              color: AppColors.brandTealBadge,
-              letterSpacing: 1.4,
-            ),
-          ),
-        ],
       ),
     );
   }
