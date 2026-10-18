@@ -78,7 +78,16 @@ class PrimaryButton extends StatelessWidget {
                   icon!,
                   const SizedBox(width: AppSpacing.gutterSm),
                 ],
-                Text(text),
+                // Allow the label to shrink instead of overflowing on narrow
+                // screens or when the user has enlarged system text.
+                Flexible(
+                  child: Text(
+                    text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               ],
             ),
     );

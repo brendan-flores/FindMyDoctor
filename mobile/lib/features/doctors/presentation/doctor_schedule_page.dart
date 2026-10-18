@@ -6,6 +6,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/doctor_service.dart';
+import '../../../core/services/api_service.dart';
 
 class DoctorSchedulePage extends StatefulWidget {
   final String doctorId;
@@ -29,19 +30,19 @@ class DoctorSchedulePage extends StatefulWidget {
 
 class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   final DoctorService _doctorService = DoctorService();
-  
-  DateTime _currentMonth = DateTime.now();
+  final ApiService _apiService = ApiService();
+
   DateTime? _selectedDate;
-  String? _selectedTimeSlot;
-  
+
   Map<String, dynamic>? _availabilityData;
   bool _isLoading = true;
+  bool _isCheckingRecord = false;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now();
+    _selectedDate = null;
     _fetchAvailability();
   }
 
@@ -52,9 +53,12 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     });
 
     try {
-      final startDate = DateTime(_currentMonth.year, _currentMonth.month, 1);
-      final endDate = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
-      
+      // Backend handles week filtering for patients automatically
+      // Just send current month as placeholder
+      final now = DateTime.now();
+      final startDate = DateTime(now.year, now.month, 1);
+      final endDate = DateTime(now.year, now.month + 1, 0);
+
       final availability = await _doctorService.getDoctorAvailability(
         doctorId: widget.doctorId,
         startDate: DateFormat('yyyy-MM-dd').format(startDate),
@@ -80,20 +84,6 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     }
   }
 
-  void _previousMonth() {
-    setState(() {
-      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
-    });
-    _fetchAvailability();
-  }
-
-  void _nextMonth() {
-    setState(() {
-      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
-    });
-    _fetchAvailability();
-  }
-
   Map<String, dynamic>? _getDateAvailability(DateTime date) {
     if (_availabilityData == null || _availabilityData!['dates'] == null) {
       return null;
@@ -101,7 +91,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
 
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
     final dates = _availabilityData!['dates'] as List;
-    
+
     try {
       return dates.firstWhere((d) => d['date'] == dateStr);
     } catch (e) {
@@ -130,7 +120,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                       const SizedBox(height: spacing.AppSpacing.gutterLg),
                       _buildCalendarSection(),
                       const SizedBox(height: spacing.AppSpacing.gutterLg),
-                      if (_selectedDate != null) _buildTimeSlotsSection(),
+                      if (_selectedDate != null) _buildDateInfoSection(),
                       const SizedBox(height: spacing.AppSpacing.gutterLg),
                       _buildQueueSummary(),
                       const SizedBox(height: spacing.AppSpacing.gutter3xl),
@@ -343,50 +333,34 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              IconButton(
-                onPressed: _previousMonth,
-                icon: const Icon(Icons.chevron_left),
-                constraints: const BoxConstraints(),
-                padding: EdgeInsets.zero,
+              Text(
+                _getWeekRangeText(),
+                style: AppTextStyles.bodyMdMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
               ),
-              Row(
-                children: [
-                  Text(
-                    DateFormat('MMMM yyyy').format(_currentMonth),
-                    style: AppTextStyles.bodyMdMedium.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
+              const SizedBox(width: spacing.AppSpacing.gutterSm),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: spacing.AppSpacing.gutterSm,
+                  vertical: spacing.AppSpacing.gutterXs,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainer,
+                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                  border: Border.all(color: AppColors.surfaceContainerHighest),
+                ),
+                child: Text(
+                  'Regular Clinic',
+                  style: AppTextStyles.labelSm.copyWith(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
                   ),
-                  const SizedBox(width: spacing.AppSpacing.gutterSm),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: spacing.AppSpacing.gutterSm,
-                      vertical: spacing.AppSpacing.gutterXs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainer,
-                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
-                      border: Border.all(color: AppColors.surfaceContainerHighest),
-                    ),
-                    child: Text(
-                      'Regular Clinic',
-                      style: AppTextStyles.labelSm.copyWith(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              IconButton(
-                onPressed: _nextMonth,
-                icon: const Icon(Icons.chevron_right),
-                constraints: const BoxConstraints(),
-                padding: EdgeInsets.zero,
+                ),
               ),
             ],
           ),
@@ -429,11 +403,33 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     return '${first['start']} – ${last['end']}';
   }
 
+  String _getWeekRangeText() {
+    final now = DateTime.now();
+    final dayOfWeek = now.weekday; // 1 = Monday, 7 = Sunday
+    final startOfWeek = now.subtract(Duration(days: dayOfWeek % 7));
+    final endOfWeek = startOfWeek.add(const Duration(days: 6));
+
+    final startFormat = DateFormat('MMM d');
+    final endFormat = DateFormat('MMM d, yyyy');
+
+    return '${startFormat.format(startOfWeek)} - ${endFormat.format(endOfWeek)}';
+  }
+
   Widget _buildCalendarGrid() {
-    final firstDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month, 1);
-    final lastDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
-    final startWeekday = firstDayOfMonth.weekday % 7; // 0 = Sunday
-    final totalDays = lastDayOfMonth.day;
+    if (_availabilityData == null || _availabilityData!['dates'] == null) {
+      return const SizedBox();
+    }
+
+    final dates = _availabilityData!['dates'] as List;
+    final availabilityMap = <String, dynamic>{};
+    for (final dateData in dates) {
+      availabilityMap[dateData['date'] as String] = dateData;
+    }
+
+    // Calculate current week (Sunday to Saturday)
+    final now = DateTime.now();
+    final dayOfWeek = now.weekday; // 1 = Monday, 7 = Sunday
+    final startOfWeek = now.subtract(Duration(days: dayOfWeek % 7));
 
     return Column(
       children: [
@@ -441,48 +437,40 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
-              .map((day) => Text(
-                    day,
-                    style: AppTextStyles.labelSm.copyWith(
-                      color: AppColors.slate400,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11,
+              .map((day) => Expanded(
+                    child: Center(
+                      child: Text(
+                        day,
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.slate400,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
                     ),
                   ))
               .toList(),
         ),
         const SizedBox(height: spacing.AppSpacing.gutterSm),
-        // Calendar days
-        ...List.generate(6, (weekIndex) {
-          final weekDays = <Widget>[];
-          
-          for (int dayIndex = 0; dayIndex < 7; dayIndex++) {
-            final dayNumber = weekIndex * 7 + dayIndex - startWeekday + 1;
-            
-            if (dayNumber > 0 && dayNumber <= totalDays) {
-              final date = DateTime(_currentMonth.year, _currentMonth.month, dayNumber);
-              final availability = _getDateAvailability(date);
-              final status = availability?['status'] ?? 'NON_WORKING';
-              final isSelected = _selectedDate != null && 
-                  date.year == _selectedDate!.year &&
-                  date.month == _selectedDate!.month &&
-                  date.day == _selectedDate!.day;
-              
-              weekDays.add(
-                Expanded(
-                  child: _buildCalendarDay(dayNumber, status, isSelected, date),
-                ),
-              );
-            } else {
-              weekDays.add(const Expanded(child: SizedBox()));
-            }
-          }
-          
-          return Padding(
-            padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterXs),
-            child: Row(children: weekDays),
-          );
-        }),
+        // Calendar days - display as a single row of 7 days (this week)
+        Row(
+          children: List.generate(7, (index) {
+            final date = startOfWeek.add(Duration(days: index));
+            final dateStr = DateFormat('yyyy-MM-dd').format(date);
+            final availability = availabilityMap[dateStr];
+            final status = availability?['status'] as String? ?? 'NON_WORKING';
+            final isSelected = _selectedDate != null &&
+                date.year == _selectedDate!.year &&
+                date.month == _selectedDate!.month &&
+                date.day == _selectedDate!.day;
+
+            return Expanded(
+              child: Center(
+                child: _buildCalendarDay(date.day, status, isSelected, date),
+              ),
+            );
+          }),
+        ),
       ],
     );
   }
@@ -493,10 +481,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     final isUnavailable = status == 'UNAVAILABLE';
     final isPast = status == 'PAST';
     final isNonWorking = status == 'NON_WORKING';
+    final isAlreadyBooked = status == 'ALREADY_BOOKED';
 
     Color? backgroundColor;
     Color? textColor;
-    
+
     if (isSelected) {
       backgroundColor = AppColors.primary;
       textColor = AppColors.onPrimary;
@@ -506,6 +495,9 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     } else if (isUnavailable) {
       backgroundColor = AppColors.errorContainer.withValues(alpha: 0.3);
       textColor = AppColors.error;
+    } else if (isAlreadyBooked) {
+      backgroundColor = AppColors.secondaryContainer.withValues(alpha: 0.5);
+      textColor = AppColors.secondary;
     } else if (isFull) {
       backgroundColor = AppColors.surfaceContainerHighest;
       textColor = AppColors.slate400;
@@ -522,13 +514,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
           ? () {
               setState(() {
                 _selectedDate = date;
-                _selectedTimeSlot = null;
               });
             }
           : null,
       child: Container(
         margin: EdgeInsets.symmetric(horizontal: 2),
-        width: 36,
         height: 36,
         decoration: BoxDecoration(
           color: backgroundColor,
@@ -551,7 +541,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     );
   }
 
-  Widget _buildTimeSlotsSection() {
+  Widget _buildDateInfoSection() {
     if (_selectedDate == null) return const SizedBox();
 
     final availability = _getDateAvailability(_selectedDate!);
@@ -565,8 +555,44 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
       );
     }
 
-    final timeSlots = availability['timeSlots'] as List?;
+    final status = availability['status'] as String?;
     final capacity = availability['capacity'] as Map?;
+
+    // Show message if patient already has an appointment on this date
+    if (status == 'ALREADY_BOOKED') {
+      return AppCard(
+        padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.event_busy,
+                  color: AppColors.secondary,
+                  size: spacing.AppSpacing.iconMd,
+                ),
+                const SizedBox(width: spacing.AppSpacing.gutterSm),
+                Text(
+                  'Already Booked',
+                  style: AppTextStyles.headlineSm.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.secondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: spacing.AppSpacing.gutterSm),
+            Text(
+              'You already have an appointment with this doctor on this date.',
+              style: AppTextStyles.bodyMd.copyWith(
+                color: AppColors.secondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
@@ -582,7 +608,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               ),
               const SizedBox(width: spacing.AppSpacing.gutterSm),
               Text(
-                'Available Time Slots',
+                'Date Information',
                 style: AppTextStyles.headlineSm.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -674,119 +700,6 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
           const SizedBox(height: spacing.AppSpacing.gutterMd),
           Divider(color: AppColors.slate200),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
-          if (timeSlots == null || timeSlots.isEmpty)
-            Text(
-              'No available time slots',
-              style: AppTextStyles.bodyMd.copyWith(color: AppColors.secondary),
-            )
-          else
-            Wrap(
-              spacing: spacing.AppSpacing.gutterSm,
-              runSpacing: spacing.AppSpacing.gutterSm,
-              children: timeSlots.map<Widget>((slot) {
-                final start = slot['start'];
-                final end = slot['end'];
-                final isAvailable = slot['isAvailable'];
-                final slotStatus = slot['status'];
-                final isSelected = _selectedTimeSlot == start;
-
-                Color? backgroundColor;
-                Color? textColor;
-                String? labelText;
-
-                if (isSelected) {
-                  backgroundColor = AppColors.primary;
-                  textColor = AppColors.onPrimary;
-                } else if (slotStatus == 'BREAK') {
-                  backgroundColor = AppColors.errorContainer.withValues(alpha: 0.3);
-                  textColor = AppColors.error;
-                  labelText = 'Break';
-                } else if (slotStatus == 'PAST') {
-                  backgroundColor = AppColors.surfaceContainerHighest;
-                  textColor = AppColors.slate400;
-                } else if (slotStatus == 'BOOKED') {
-                  backgroundColor = AppColors.surfaceContainerHighest;
-                  textColor = AppColors.slate400;
-                  labelText = 'Booked';
-                } else if (slotStatus == 'FULL') {
-                  backgroundColor = AppColors.surfaceContainerHighest;
-                  textColor = AppColors.slate400;
-                  labelText = 'Full';
-                } else if (isAvailable) {
-                  backgroundColor = AppColors.surfaceContainer;
-                  textColor = AppColors.onSurface;
-                } else {
-                  backgroundColor = AppColors.surfaceContainerHighest;
-                  textColor = AppColors.slate400;
-                }
-
-                return GestureDetector(
-                  onTap: isAvailable
-                      ? () {
-                          setState(() {
-                            _selectedTimeSlot = start;
-                          });
-                        }
-                      : null,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: spacing.AppSpacing.gutterMd,
-                      vertical: spacing.AppSpacing.gutterSm,
-                    ),
-                    decoration: BoxDecoration(
-                      color: backgroundColor,
-                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.primary
-                            : isAvailable
-                                ? AppColors.primary.withValues(alpha: 0.3)
-                                : AppColors.slate300,
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '$start - $end',
-                          style: AppTextStyles.labelSm.copyWith(
-                            color: textColor,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                        if (labelText != null) ...[
-                          const SizedBox(width: 4),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: slotStatus == 'BREAK'
-                                  ? AppColors.error.withValues(alpha: 0.1)
-                                  : AppColors.slate300.withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              labelText,
-                              style: AppTextStyles.labelSm.copyWith(
-                                fontSize: 9,
-                                color: slotStatus == 'BREAK'
-                                    ? AppColors.error
-                                    : AppColors.slate600,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          const SizedBox(height: spacing.AppSpacing.gutterMd),
           _buildInfoRow(
             Icons.payments,
             'Consultation Fee',
@@ -860,9 +773,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
           ),
           const SizedBox(height: spacing.AppSpacing.gutterXs),
           Text(
-            _selectedTimeSlot != null
-                ? '$_selectedTimeSlot - ${_getEndTime(_selectedTimeSlot!)}'
-                : _getWorkingHoursText(_selectedDate!),
+            _getWorkingHoursText(_selectedDate!),
             style: AppTextStyles.labelSm.copyWith(
               color: AppColors.secondary,
             ),
@@ -870,16 +781,6 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
         ],
       ),
     );
-  }
-
-  String _getEndTime(String startTime) {
-    final parts = startTime.split(':');
-    final hours = int.parse(parts[0]);
-    final minutes = int.parse(parts[1]);
-    final totalMinutes = hours * 60 + minutes + 30;
-    final endHours = totalMinutes ~/ 60;
-    final endMinutes = totalMinutes % 60;
-    return '${endHours.toString().padLeft(2, '0')}:${endMinutes.toString().padLeft(2, '0')}';
   }
 
   Widget _buildCalendarLegend() {
@@ -897,6 +798,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
           _buildLegendItem(AppColors.slate400, 'Past'),
           _buildLegendItem(AppColors.error.withValues(alpha: 0.3), 'Unavailable'),
           _buildLegendItem(AppColors.surfaceContainerHighest, 'Full'),
+          _buildLegendItem(AppColors.secondary, 'Already Booked'),
           _buildLegendItem(AppColors.slate400, 'Non-working'),
         ],
       ),
@@ -927,7 +829,91 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     );
   }
 
+  Future<void> _handleBookingConfirmation() async {
+    if (_selectedDate == null) return;
+
+    setState(() {
+      _isCheckingRecord = true;
+    });
+
+    try {
+      // Check if patient has an existing record with this doctor
+      final response = await _apiService.checkPatientRecord(
+        doctorId: widget.doctorId,
+      );
+
+      setState(() {
+        _isCheckingRecord = false;
+      });
+
+      if (response['success'] == true) {
+        final hasRecord = response['data']?['hasRecord'] as bool? ?? false;
+
+        if (hasRecord) {
+          // Patient has complete record - proceed directly to booking
+          if (mounted) {
+            Navigator.of(context).pushNamed(
+              '/booking-confirmation',
+              arguments: {
+                'doctorId': widget.doctorId,
+                'doctorName': widget.doctorName,
+                'specialty': widget.specialty,
+                'clinic': widget.clinic,
+                'consultationFee': widget.consultationFee,
+                'selectedDate': _selectedDate,
+              },
+            );
+          }
+        } else {
+          // Patient needs to submit details first
+          if (mounted) {
+            Navigator.of(context).pushNamed(
+              '/patient-details',
+              arguments: {
+                'doctorId': widget.doctorId,
+                'doctorName': widget.doctorName,
+                'specialty': widget.specialty,
+                'clinic': widget.clinic,
+                'consultationFee': widget.consultationFee,
+                'selectedDate': _selectedDate,
+              },
+            );
+          }
+        }
+      } else {
+        // API error - show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                response['error']?['message'] ?? 'Failed to check patient record',
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isCheckingRecord = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to check patient record: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildBottomConfirmationBar() {
+    final availability = _selectedDate != null ? _getDateAvailability(_selectedDate!) : null;
+    final status = availability?['status'] as String?;
+    final isAlreadyBooked = status == 'ALREADY_BOOKED';
+
     return Container(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       decoration: BoxDecoration(
@@ -994,11 +980,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             ),
             const SizedBox(height: spacing.AppSpacing.gutterMd),
             PrimaryButton(
-              text: 'Confirm Clinic Date & Reserve Queue',
-              onPressed: _selectedDate != null && _selectedTimeSlot != null
-                  ? () {
-                      Navigator.of(context).pushNamed('/booking-confirmation');
-                    }
+              text: _isCheckingRecord
+                  ? 'Checking...'
+                  : (isAlreadyBooked ? 'Already Booked' : 'Confirm Clinic Date & Reserve Queue'),
+              onPressed: _selectedDate != null && !isAlreadyBooked && !_isCheckingRecord
+                  ? _handleBookingConfirmation
                   : null,
               icon: const Icon(Icons.arrow_forward, size: 20),
             ),

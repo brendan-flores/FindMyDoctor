@@ -17,7 +17,7 @@ export interface RegisterData {
 export interface LoginData {
   email: string;
   password: string;
-  expectedRole: 'DOCTOR' | 'SECRETARY' | 'ADMIN';
+  expectedRole: 'PATIENT' | 'DOCTOR' | 'SECRETARY' | 'ADMIN';
   rememberMe?: boolean;
   trustedBrowserToken?: string;
 }
@@ -238,7 +238,7 @@ export async function login(data: LoginData) {
   };
 }
 
-export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
+export async function changePassword(userId: string, currentPassword: string | undefined, newPassword: string, mustChangePassword: boolean = false) {
   // Get user
   const userResult = await query(
     'SELECT * FROM users WHERE id = $1',
@@ -251,17 +251,23 @@ export async function changePassword(userId: string, currentPassword: string, ne
 
   const user = userResult.rows[0];
 
-  // Verify current password
-  const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
+  // Verify current password only if not a forced password change (walk-in first login)
+  if (!mustChangePassword) {
+    if (!currentPassword) {
+      throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Current password is required' };
+    }
 
-  if (!isValidPassword) {
-    throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Current password is incorrect' };
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
+
+    if (!isValidPassword) {
+      throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Current password is incorrect' };
+    }
   }
 
   // Hash new password
   const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
-  // Update password
+  // Update password and clear must_change_password flag
   await query(
     'UPDATE users SET password_hash = $1, must_change_password = false WHERE id = $2',
     [newPasswordHash, userId]
@@ -270,7 +276,25 @@ export async function changePassword(userId: string, currentPassword: string, ne
   // Revoke all trusted browsers for this user (security best practice)
   await revokeAllTrustedBrowsers(userId);
 
-  return { success: true };
+  // Fetch updated user record to generate new token with current state
+  const updatedUserResult = await query(
+    'SELECT * FROM users WHERE id = $1',
+    [userId]
+  );
+
+  if (updatedUserResult.rows.length === 0) {
+    throw { code: ErrorCodes.NOT_FOUND, message: 'User not found after update' };
+  }
+
+  const updatedUser = updatedUserResult.rows[0];
+
+  // Generate new access token with updated mustChangePassword state
+  const newAccessToken = generateAccessToken(updatedUser);
+
+  return {
+    success: true,
+    accessToken: newAccessToken,
+  };
 }
 
 /**

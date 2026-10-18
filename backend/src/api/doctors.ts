@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import path from 'path';
 import { config } from '../config';
+import { toClinicDateString } from '../utils/date';
 import { uploadDoctorPhoto, deleteDoctorPhoto, replaceDoctorPhoto, validateImageFile } from '../services/storageService';
 
 const router = Router();
@@ -111,9 +112,8 @@ router.get('/', async (req: any, res: Response) => {
     }
 
     if (search) {
-      paramCount++;
-      queryText += ` AND (d.first_name ILIKE $${paramCount} OR d.middle_name ILIKE $${paramCount} OR d.last_name ILIKE $${paramCount} OR d.specialty ILIKE $${paramCount} OR d.practice_name ILIKE $${paramCount})`;
-      params.push(`%${search}%`);
+      queryText += ` AND (d.first_name ILIKE $${paramCount + 1} OR d.middle_name ILIKE $${paramCount + 2} OR d.last_name ILIKE $${paramCount + 3} OR d.specialty ILIKE $${paramCount + 4} OR d.practice_name ILIKE $${paramCount + 5})`;
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     queryText += ' ORDER BY d.last_name';
@@ -505,18 +505,61 @@ router.patch('/me/schedules/:id/reactivate', authenticate, authorize('DOCTOR'), 
 });
 
 // Get doctor availability for a date range
-router.get('/:id/availability', async (req: any, res: Response) => {
+router.get('/:id/availability', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { startDate, endDate, date } = req.query;
+    const userId = req.user!.id;
+    const role = req.user!.role;
+
+    // Get patient ID if user is a patient
+    let patientId: string | null = null;
+    if (role === 'PATIENT') {
+      const patientResult = await query(
+        'SELECT id FROM patients WHERE user_id = $1',
+        [userId]
+      );
+      if (patientResult.rows.length > 0) {
+        patientId = patientResult.rows[0].id;
+      }
+
+      // Restrict patients to current week only
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
+
+      // Override request parameters to this week
+      req.query.startDate = toClinicDateString(startOfWeek);
+      req.query.endDate = toClinicDateString(endOfWeek);
+    }
 
     if (date) {
       // Get availability for a specific date
-      const availability = await calculateAvailability(id, String(date));
+      const availability = await calculateAvailability(id, String(date), patientId);
       res.json(success(availability));
     } else if (startDate && endDate) {
       // Get availability for a date range
-      const availabilityRange = await calculateAvailabilityRange(id, String(startDate), String(endDate));
+      const availabilityRange = await calculateAvailabilityRange(id, String(startDate), String(endDate), patientId);
+
+      // For patients, filter to only show 7 days (this week)
+      if (role === 'PATIENT' && availabilityRange.dates) {
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
+
+        // Filter dates to only include this week
+        availabilityRange.dates = availabilityRange.dates.filter((d: any) => {
+          const date = new Date(d.date);
+          return date >= startOfWeek && date <= endOfWeek;
+        });
+      }
+
       res.json(success(availabilityRange));
     } else {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date or date range (startDate and endDate) is required'));
@@ -1134,6 +1177,7 @@ router.put('/me/profile', authenticate, authorize('DOCTOR'), async (req: AuthReq
       credentials,
       prc_license_number,
       practice_name,
+      room_number,
       years_of_experience,
       areas_of_expertise,
       biography,
@@ -1208,6 +1252,11 @@ router.put('/me/profile', authenticate, authorize('DOCTOR'), async (req: AuthReq
       paramCount++;
       updates.push(`practice_name = $${paramCount}`);
       values.push(practice_name);
+    }
+    if (room_number !== undefined) {
+      paramCount++;
+      updates.push(`room_number = $${paramCount}`);
+      values.push(room_number);
     }
     if (years_of_experience !== undefined) {
       paramCount++;

@@ -6,6 +6,7 @@ interface ApiResponse<T> {
   error?: string;
   errorCode?: string;
   message?: string;
+  httpStatus?: number;
 }
 
 /**
@@ -29,7 +30,7 @@ function parseErrorResponse<T>(status: number, text: string): ApiResponse<T> {
     const json = JSON.parse(text);
     const normalized = normalizeApiResponse<T>(json);
     if (normalized && normalized.error) {
-      return normalized;
+      return { ...normalized, httpStatus: status };
     }
   } catch {
     // not valid JSON
@@ -37,23 +38,31 @@ function parseErrorResponse<T>(status: number, text: string): ApiResponse<T> {
   return {
     success: false,
     error: `Server error (${status}): ${text}`,
+    httpStatus: status,
   };
 }
 
 class ApiClient {
   private token: string | null = null;
+  private refreshToken: string | null = null;
+  private isRefreshing: boolean = false;
+  private refreshSubscribers: Array<(token: string) => void> = [];
 
   constructor() {
-    // Load token from localStorage on initialization (for backward compatibility)
+    // Load tokens from localStorage on initialization
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('token');
+      const storedRefresh = localStorage.getItem('refreshToken');
       if (stored && stored !== 'undefined' && stored !== 'null') {
         this.token = stored;
+      }
+      if (storedRefresh && storedRefresh !== 'undefined' && storedRefresh !== 'null') {
+        this.refreshToken = storedRefresh;
       }
     }
   }
 
-  setToken(token: string) {
+  setToken(token: string, refreshToken?: string) {
     if (!token || token === 'undefined' || token === 'null') {
       this.clearToken();
       return;
@@ -61,15 +70,77 @@ class ApiClient {
     this.token = token;
     if (typeof window !== 'undefined') {
       localStorage.setItem('token', token);
+      if (refreshToken) {
+        this.refreshToken = refreshToken;
+        localStorage.setItem('refreshToken', refreshToken);
+      }
     }
   }
 
   clearToken() {
     this.token = null;
+    this.refreshToken = null;
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
+    }
+  }
+
+  private subscribeTokenRefresh(callback: (token: string) => void) {
+    this.refreshSubscribers.push(callback);
+  }
+
+  private onTokenRefreshed(token: string) {
+    this.refreshSubscribers.forEach(callback => callback(token));
+    this.refreshSubscribers = [];
+  }
+
+  private async refreshAccessToken(): Promise<string | null> {
+    if (this.isRefreshing) {
+      return new Promise((resolve) => {
+        this.subscribeTokenRefresh((token) => resolve(token));
+      });
+    }
+
+    this.isRefreshing = true;
+
+    try {
+      if (!this.refreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken: this.refreshToken }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
+
+      const data = await response.json();
+      if (data.success && data.data && data.data.accessToken) {
+        const newToken = data.data.accessToken;
+        const newRefreshToken = data.data.refreshToken;
+        
+        this.setToken(newToken, newRefreshToken);
+        this.onTokenRefreshed(newToken);
+        
+        return newToken;
+      }
+
+      throw new Error('Invalid refresh response');
+    } catch (error) {
+      this.clearToken();
+      this.handleSessionExpired();
+      return null;
+    } finally {
+      this.isRefreshing = false;
     }
   }
 
@@ -126,10 +197,27 @@ class ApiClient {
       });
 
       if (response.status === 401) {
-        this.handleSessionExpired();
+        const newToken = await this.refreshAccessToken();
+        if (newToken) {
+          // Retry the request with new token
+          const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+            method: 'GET',
+            headers: this.getHeaders(),
+            credentials: 'include',
+          });
+
+          if (!retryResponse.ok) {
+            const errorText = await retryResponse.text();
+            return parseErrorResponse<T>(retryResponse.status, errorText);
+          }
+
+          const data = await retryResponse.json();
+          return normalizeApiResponse<T>(data);
+        }
         return {
           success: false,
           error: 'Session expired',
+          httpStatus: 401,
         };
       }
 
@@ -158,10 +246,28 @@ class ApiClient {
       });
 
       if (response.status === 401) {
-        this.handleSessionExpired();
+        const newToken = await this.refreshAccessToken();
+        if (newToken) {
+          // Retry the request with new token
+          const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+            method: 'POST',
+            headers: this.getHeaders(),
+            body: JSON.stringify(body),
+            credentials: 'include',
+          });
+
+          if (!retryResponse.ok) {
+            const errorText = await retryResponse.text();
+            return parseErrorResponse<T>(retryResponse.status, errorText);
+          }
+
+          const data = await retryResponse.json();
+          return normalizeApiResponse<T>(data);
+        }
         return {
           success: false,
           error: 'Session expired',
+          httpStatus: 401,
         };
       }
 
@@ -190,10 +296,28 @@ class ApiClient {
       });
 
       if (response.status === 401) {
-        this.handleSessionExpired();
+        const newToken = await this.refreshAccessToken();
+        if (newToken) {
+          // Retry the request with new token
+          const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+            method: 'PUT',
+            headers: this.getHeaders(),
+            body: JSON.stringify(body),
+            credentials: 'include',
+          });
+
+          if (!retryResponse.ok) {
+            const errorText = await retryResponse.text();
+            return parseErrorResponse<T>(retryResponse.status, errorText);
+          }
+
+          const data = await retryResponse.json();
+          return normalizeApiResponse<T>(data);
+        }
         return {
           success: false,
           error: 'Session expired',
+          httpStatus: 401,
         };
       }
 
@@ -222,10 +346,28 @@ class ApiClient {
       });
 
       if (response.status === 401) {
-        this.handleSessionExpired();
+        const newToken = await this.refreshAccessToken();
+        if (newToken) {
+          // Retry the request with new token
+          const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+            method: 'PATCH',
+            headers: this.getHeaders(),
+            body: JSON.stringify(body),
+            credentials: 'include',
+          });
+
+          if (!retryResponse.ok) {
+            const errorText = await retryResponse.text();
+            return parseErrorResponse<T>(retryResponse.status, errorText);
+          }
+
+          const data = await retryResponse.json();
+          return normalizeApiResponse<T>(data);
+        }
         return {
           success: false,
           error: 'Session expired',
+          httpStatus: 401,
         };
       }
 
@@ -253,10 +395,27 @@ class ApiClient {
       });
 
       if (response.status === 401) {
-        this.handleSessionExpired();
+        const newToken = await this.refreshAccessToken();
+        if (newToken) {
+          // Retry the request with new token
+          const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+            method: 'DELETE',
+            headers: this.getHeaders(),
+            credentials: 'include',
+          });
+
+          if (!retryResponse.ok) {
+            const errorText = await retryResponse.text();
+            return parseErrorResponse<T>(retryResponse.status, errorText);
+          }
+
+          const data = await retryResponse.json();
+          return normalizeApiResponse<T>(data);
+        }
         return {
           success: false,
           error: 'Session expired',
+          httpStatus: 401,
         };
       }
 

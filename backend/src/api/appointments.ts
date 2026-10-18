@@ -3,15 +3,19 @@ import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requirePasswordChange } from '../middleware/auth';
 import { calculateAvailability } from '../modules/availability/availabilityService';
+import { toClinicDateString } from '../utils/date';
 
 const router = Router();
+
+// Valid sex values
+const VALID_SEX_VALUES = ['MALE', 'FEMALE', 'OTHER', 'NOT_SPECIFIED'];
 
 // Get appointments for current user
 router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const role = req.user!.role;
-    const { status, startDate, endDate } = req.query;
+    const { status, startDate, endDate, patientId } = req.query;
 
     let queryText = '';
     const params: any[] = [];
@@ -37,12 +41,28 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
           a.*,
           p.first_name as patient_first_name, p.last_name as patient_last_name,
           d.practice_name,
-          q.queue_number, q.status as queue_status
+          q.queue_number, q.status as queue_status,
+          COALESCE(q.registration_source, 'ONLINE') as registration_source
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         JOIN doctors d ON a.doctor_id = d.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
         WHERE a.doctor_id = (SELECT id FROM doctors WHERE user_id = $1)
+      `;
+      params.push(userId);
+    } else if (role === 'SECRETARY') {
+      // Get appointments for the doctor the secretary is assigned to
+      queryText = `
+        SELECT 
+          a.*,
+          p.first_name as patient_first_name, p.last_name as patient_last_name,
+          d.practice_name,
+          q.queue_number, q.status as queue_status
+        FROM appointments a
+        JOIN patients p ON a.patient_id = p.id
+        JOIN doctors d ON a.doctor_id = d.id
+        LEFT JOIN queue_entries q ON a.id = q.appointment_id
+        WHERE a.doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $1)
       `;
       params.push(userId);
     } else {
@@ -65,6 +85,12 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
       queryText += ` AND a.appointment_date <= $${params.length}`;
     }
 
+    // Add patientId filter for DOCTOR role (safe because query already filters by doctor_id)
+    if (role === 'DOCTOR' && patientId) {
+      params.push(patientId);
+      queryText += ` AND a.patient_id = $${params.length}`;
+    }
+
     queryText += ' ORDER BY a.appointment_date DESC';
 
     const result = await query(queryText, params);
@@ -75,10 +101,10 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
   }
 });
 
-// Create appointment (atomic transaction)
+// Create appointment (atomic transaction with concurrency-safe queue assignment)
 router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
   const client = await getClient();
-  
+
   try {
     await client.query('BEGIN');
 
@@ -104,6 +130,77 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
 
     const patientId = patientResult.rows[0].id;
 
+    // Check if patient has an association with this doctor (doctor-specific check)
+    // An explicit PENDING association must be respected - it overrides the appointment-history fallback
+    const associationResult = await client.query(
+      `SELECT details_completion_status
+       FROM patient_doctor_associations
+       WHERE patient_id = $1 AND doctor_id = $2`,
+      [patientId, doctorId]
+    );
+
+    if (associationResult.rows.length > 0) {
+      // Explicit association exists - respect its status
+      const status = associationResult.rows[0].details_completion_status;
+
+      if (status !== 'COMPLETE') {
+        await client.query('ROLLBACK');
+        return res.status(400).json(error(
+          ErrorCodes.VALIDATION_ERROR,
+          'Patient record is incomplete. Please submit required details for this doctor before booking. Use POST /api/v1/patients/submit-details first.'
+        ));
+      }
+      // COMPLETE association - proceed with booking
+    } else {
+      // No association exists - check appointments table for backward compatibility with legacy records
+      const appointmentRecordResult = await client.query(
+        `SELECT COUNT(*) as count
+         FROM appointments
+         WHERE patient_id = $1 AND doctor_id = $2`,
+        [patientId, doctorId]
+      );
+
+      const hasAppointments = parseInt(appointmentRecordResult.rows[0].count) > 0;
+
+      if (!hasAppointments) {
+        await client.query('ROLLBACK');
+        return res.status(400).json(error(
+          ErrorCodes.VALIDATION_ERROR,
+          'Patient must submit required details for this doctor before booking. Use POST /api/v1/patients/submit-details first.'
+        ));
+      }
+
+      // Legacy appointment history exists - verify patient profile is complete before allowing booking
+      const patientProfileResult = await client.query(
+        'SELECT first_name, last_name, date_of_birth, sex, phone, address FROM patients WHERE id = $1',
+        [patientId]
+      );
+
+      if (patientProfileResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Patient profile not found'));
+      }
+
+      const patient = patientProfileResult.rows[0];
+      const isProfileComplete =
+        patient.first_name && patient.first_name.trim() !== '' &&
+        patient.last_name && patient.last_name.trim() !== '' &&
+        patient.date_of_birth !== null &&
+        patient.sex !== null && VALID_SEX_VALUES.includes(patient.sex) &&
+        patient.phone && patient.phone.trim() !== '' &&
+        patient.address && patient.address.trim() !== '';
+
+      if (!isProfileComplete) {
+        await client.query('ROLLBACK');
+        return res.status(400).json(error(
+          ErrorCodes.VALIDATION_ERROR,
+          'Patient record is incomplete. Please submit required details for this doctor before booking. Use POST /api/v1/patients/submit-details first.'
+        ));
+      }
+
+      // Legacy patient has complete profile - proceed with booking
+    }
+
     // Get doctor info
     const doctorResult = await client.query(
       'SELECT * FROM doctors WHERE id = $1 AND is_approved = true',
@@ -117,14 +214,14 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
 
     const doctor = doctorResult.rows[0];
 
-    // Get appointment date and time
-    const appointmentDateTime = new Date(appointmentDate);
-    const appointmentDateOnly = appointmentDateTime.toISOString().split('T')[0];
-    const appointmentTime = appointmentDateTime.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
+    // Get appointment date (date-only format expected: yyyy-MM-dd)
+    const appointmentDateOnly = appointmentDate; // Already in yyyy-MM-dd format from frontend
 
     // Validate appointment is not in the past
     const now = new Date();
-    if (appointmentDateTime < now) {
+    now.setHours(0, 0, 0, 0);
+    const appointmentDateObj = new Date(appointmentDateOnly);
+    if (appointmentDateObj < now) {
       await client.query('ROLLBACK');
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot book appointments in the past'));
     }
@@ -144,28 +241,22 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
       return res.status(400).json(error(ErrorCodes.APPOINTMENT_SLOT_UNAVAILABLE, statusMessage));
     }
 
-    // Check if the specific time slot is available
-    const appointmentStartMinutes = parseInt(appointmentTime.split(':')[0]) * 60 + parseInt(appointmentTime.split(':')[1]);
-    const appointmentEndMinutes = appointmentStartMinutes + 30; // 30-minute consultation
+    // Acquire advisory lock for queue assignment (based on doctor_id and date hash)
+    // This ensures concurrent requests for the same doctor/date are serialized
+    const lockHash = `md5(${doctorId}::text || ${appointmentDateOnly}::text)`;
+    const lockResult = await client.query(
+      `SELECT pg_try_advisory_xact_lock(hashtext($1)) as lock_acquired`,
+      [lockHash]
+    );
 
-    const slotAvailable = availability.timeSlots.find(slot => {
-      const slotStartMinutes = parseInt(slot.start.split(':')[0]) * 60 + parseInt(slot.start.split(':')[1]);
-      const slotEndMinutes = parseInt(slot.end.split(':')[0]) * 60 + parseInt(slot.end.split(':')[1]);
-      
-      // Check if appointment time matches or overlaps with this slot
-      const timeMatches = appointmentStartMinutes >= slotStartMinutes && appointmentEndMinutes <= slotEndMinutes;
-      
-      return timeMatches && slot.isAvailable;
-    });
-
-    if (!slotAvailable) {
+    if (!lockResult.rows[0].lock_acquired) {
       await client.query('ROLLBACK');
-      return res.status(400).json(error(ErrorCodes.APPOINTMENT_SLOT_UNAVAILABLE, 'Selected time slot is not available'));
+      return res.status(429).json(error(ErrorCodes.SERVER_ERROR, 'System is busy, please try again'));
     }
 
-    // Check capacity
+    // Check capacity (re-check after acquiring lock to ensure capacity hasn't been filled)
     const capacityResult = await client.query(
-      'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
+      'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2 FOR UPDATE',
       [doctorId, appointmentDateOnly]
     );
 
@@ -181,40 +272,34 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
       return res.status(400).json(error(ErrorCodes.CAPACITY_FULL, 'No available slots for this date'));
     }
 
-    // Check for conflicting appointment (overlapping time intervals)
-    const consultationDuration = 30; // 30 minutes
+    // Check for existing appointment on the same date (no specific time slot - first-come-first-served)
     const conflictResult = await client.query(
-      `SELECT * FROM appointments 
-       WHERE patient_id = $1 AND doctor_id = $2 
-       AND appointment_date BETWEEN $3 AND $4
+      `SELECT * FROM appointments
+       WHERE patient_id = $1 AND doctor_id = $2
+       AND DATE(appointment_date) = $3
        AND status NOT IN ('CANCELLED', 'NO_SHOW')`,
-      [
-        patientId, 
-        doctorId, 
-        appointmentDate, 
-        new Date(appointmentDateTime.getTime() + consultationDuration * 60000).toISOString()
-      ]
+      [patientId, doctorId, appointmentDateOnly]
     );
 
     if (conflictResult.rows.length > 0) {
       await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, 'You already have an overlapping appointment with this doctor'));
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'You already have an appointment with this doctor on this date'));
     }
 
-    // Create appointment
+    // Create appointment (store as date at start of day)
     const appointmentResult = await client.query(
       `INSERT INTO appointments (patient_id, doctor_id, appointment_date, reason_for_visit, status)
        VALUES ($1, $2, $3, $4, 'SCHEDULED')
        RETURNING id`,
-      [patientId, doctorId, appointmentDate, reasonForVisit]
+      [patientId, doctorId, appointmentDateOnly, reasonForVisit]
     );
 
     const appointmentId = appointmentResult.rows[0].id;
 
-    // Get next queue number (concurrency-safe)
+    // Get next queue number (now safe due to advisory lock)
     const queueResult = await client.query(
-      `SELECT COALESCE(MAX(queue_number), 0) + 1 as next_queue 
-       FROM queue_entries 
+      `SELECT COALESCE(MAX(queue_number), 0) + 1 as next_queue
+       FROM queue_entries
        WHERE queue_date = $1 AND doctor_id = $2`,
       [appointmentDateOnly, doctorId]
     );
@@ -234,6 +319,34 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
       [doctorId, appointmentDateOnly]
     );
 
+    // Get total configured capacity for that day
+    const totalCapacityResult = await client.query(
+      `SELECT final_capacity as total_capacity
+       FROM daily_capacities
+       WHERE doctor_id = $1 AND date = $2`,
+      [doctorId, appointmentDateOnly]
+    );
+
+    let totalPatients = 0;
+    if (totalCapacityResult.rows.length > 0) {
+      totalPatients = totalCapacityResult.rows[0].total_capacity;
+    } else {
+      // If no capacity record exists, calculate from working hours (30 min per consultation)
+      const scheduleResult = await client.query(
+        `SELECT start_time, end_time FROM doctor_schedules
+         WHERE doctor_id = $1 AND day_of_week = EXTRACT(DOW FROM DATE($2))
+         AND is_active = true`,
+        [doctorId, appointmentDateOnly]
+      );
+
+      if (scheduleResult.rows.length > 0) {
+        const schedule = scheduleResult.rows[0];
+        const startMinutes = parseInt(schedule.start_time.split(':')[0]) * 60 + parseInt(schedule.start_time.split(':')[1]);
+        const endMinutes = parseInt(schedule.end_time.split(':')[0]) * 60 + parseInt(schedule.end_time.split(':')[1]);
+        totalPatients = Math.floor((endMinutes - startMinutes) / 30); // 30 min per consultation
+      }
+    }
+
     // Create notification
     await client.query(
       `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
@@ -242,11 +355,13 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
     );
 
     await client.query('COMMIT');
+    // Advisory lock is automatically released when transaction ends
 
     res.status(201).json(
       success({
         appointmentId,
         queueNumber,
+        totalPatients,
       }, 'Appointment booked successfully')
     );
   } catch (err: any) {
@@ -307,51 +422,120 @@ router.get('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
   }
 });
 
-// Cancel appointment
+// Cancel appointment with queue reassignment
 router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
     const userId = req.user!.id;
 
-    // Verify ownership
-    const appointmentResult = await query(
-      `SELECT * FROM appointments 
-       WHERE id = $1 AND patient_id = (SELECT id FROM patients WHERE user_id = $2)`,
+    // Verify ownership and get appointment details
+    const appointmentResult = await client.query(
+      `SELECT a.*, q.queue_number, q.queue_date
+       FROM appointments a
+       LEFT JOIN queue_entries q ON a.id = q.appointment_id
+       WHERE a.id = $1 AND a.patient_id = (SELECT id FROM patients WHERE user_id = $2)`,
       [id, userId]
     );
 
     if (appointmentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Appointment not found'));
     }
 
     const appointment = appointmentResult.rows[0];
 
     if (appointment.status === 'CANCELLED' || appointment.status === 'COMPLETED') {
+      await client.query('ROLLBACK');
       return res.status(400).json(error(ErrorCodes.INVALID_APPOINTMENT_STATUS, 'Cannot cancel this appointment'));
     }
 
+    const appointmentDate = toClinicDateString(new Date(appointment.appointment_date));
+    const cancelledQueueNumber = appointment.queue_number;
+    const queueDate = appointment.queue_date;
+
+    // Acquire advisory lock for queue reassignment
+    const lockHash = `md5(${appointment.doctor_id}::text || ${queueDate}::text)`;
+    const lockResult = await client.query(
+      `SELECT pg_try_advisory_xact_lock(hashtext($1)) as lock_acquired`,
+      [lockHash]
+    );
+
+    if (!lockResult.rows[0].lock_acquired) {
+      await client.query('ROLLBACK');
+      return res.status(429).json(error(ErrorCodes.SERVER_ERROR, 'System is busy, please try again'));
+    }
+
     // Update appointment status
-    await query(
+    await client.query(
       "UPDATE appointments SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
       [id]
     );
 
     // Update queue entry
-    await query(
+    await client.query(
       "UPDATE queue_entries SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE appointment_id = $1",
       [id]
     );
 
+    // Reassign queue numbers for patients with higher queue numbers
+    if (cancelledQueueNumber) {
+      // Get all affected queue entries (those with higher queue numbers)
+      const affectedEntriesResult = await client.query(
+        `SELECT q.id, q.patient_id, q.queue_number as old_queue_number
+         FROM queue_entries q
+         WHERE q.queue_date = $1
+         AND q.doctor_id = $2
+         AND q.queue_number > $3
+         AND q.status NOT IN ('CANCELLED', 'NO_SHOW')
+         ORDER BY q.queue_number ASC`,
+        [queueDate, appointment.doctor_id, cancelledQueueNumber]
+      );
+
+      // Update queue numbers for affected entries
+      for (const entry of affectedEntriesResult.rows) {
+        const newQueueNumber = entry.old_queue_number - 1;
+        await client.query(
+          `UPDATE queue_entries
+           SET queue_number = $1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [newQueueNumber, entry.id]
+        );
+
+        // Send notification to affected user
+        await client.query(
+          `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
+           VALUES (
+             (SELECT user_id FROM patients WHERE id = $1),
+             'QUEUE_UPDATED',
+             'Queue Number Updated',
+             'Your queue number has been updated from ${entry.old_queue_number} to ${newQueueNumber}',
+             'queue',
+             $2
+           )`,
+          [entry.patient_id, entry.id]
+        );
+      }
+    }
+
     // Update capacity
-    const appointmentDate = new Date(appointment.appointment_date).toISOString().split('T')[0];
-    await query(
+    await client.query(
       'UPDATE daily_capacities SET registered_count = registered_count - 1 WHERE doctor_id = $1 AND date = $2',
       [appointment.doctor_id, appointmentDate]
     );
 
+    await client.query('COMMIT');
+
     res.json(success(null, 'Appointment cancelled successfully'));
   } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Appointment cancellation error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to cancel appointment'));
+  } finally {
+    client.release();
   }
 });
 
@@ -380,7 +564,7 @@ router.patch('/:id/reschedule', authenticate, requirePasswordChange, authorize('
     const appointment = appointmentResult.rows[0];
 
     // Check capacity for new date
-    const newDateOnly = new Date(newAppointmentDate).toISOString().split('T')[0];
+    const newDateOnly = toClinicDateString(new Date(newAppointmentDate));
     const capacityResult = await query(
       'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
       [appointment.doctor_id, newDateOnly]

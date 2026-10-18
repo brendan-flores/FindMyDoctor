@@ -150,6 +150,7 @@ Handles:
 - Payment workflows.
 - Messaging.
 - AI workflows.
+- Patient information validation.
 
 ### Domain Layer
 
@@ -226,14 +227,19 @@ web/
 │   │   ├── doctor/            # Doctor dashboard namespace
 │   │   │   ├── dashboard/     # Doctor dashboard
 │   │   │   ├── appointments/
-│   │   │   ├── schedule/
+│   │   │   ├── schedule/      # Working Hours, Exceptions, Break Periods, Capacity
 │   │   │   ├── patients/
+│   │   │   ├── secretaries/
 │   │   │   ├── prescriptions/
+│   │   │   ├── profile/
 │   │   │   └── settings/      # Doctor settings (2FA toggle)
 │   │   └── secretary/         # Secretary dashboard namespace
 │   │       ├── dashboard/     # Secretary dashboard
 │   │       ├── queue/
 │   │       ├── walk-ins/
+│   │       ├── patients/
+│   │       ├── appointments/
+│   │       ├── schedule/      # Working Hours, Exceptions, Break Periods, Capacity
 │   │       ├── payments/
 │   │       ├── conversations/
 │   │       ├── profile/       # Secretary profile (view/edit)
@@ -670,7 +676,9 @@ Patients can register accounts through email OTP verification:
 ```text
 Patient Registration Form
         ↓
-Collect Information (name, email, username, password)
+Collect Information (first/middle/last name, date of birth, sex, mobile number, address, email, username, password)
+        ↓
+Validate Email and Username Availability (409 Conflict stops the flow; nothing staged, no OTP sent)
         ↓
 Send OTP via Supabase
         ↓
@@ -678,10 +686,16 @@ Patient Enters OTP
         ↓
 Verify OTP with Supabase
         ↓
-Create Patient Account in PostgreSQL
+Create Patient Account and Patient Profile in PostgreSQL
         ↓
 Patient Can Login
 ```
+
+**Registration Requirements:**
+- Names are captured as separate `firstName`, `middleName` (optional) and `lastName`; the legacy `fullName` field is still accepted and split into first/last name for backward compatibility
+- Required patient details: date of birth (valid date), sex (one of `MALE`, `FEMALE`, `OTHER`, `NOT_SPECIFIED`), mobile number (maximum 20 characters), and address
+- Emergency contact details, medical history, allergies, and current medications are not collected during patient sign-up
+- Every patient field captured at sign-up is staged in `pending_patient_signups` and written to the `patients` table in the same PostgreSQL transaction that creates the account after OTP verification
 
 **OTP Verification Requirements:**
 - 6-digit OTP code sent to patient's email
@@ -692,7 +706,7 @@ Patient Can Login
 - Supabase is used only for OTP delivery and verification
 
 **Backend API Endpoints:**
-- `POST /api/v1/auth/patient/otp/send` - Send OTP to patient email
+- `POST /api/v1/auth/patient/otp/send` - Validate the sign-up form, stage it and send the OTP to the patient email; a taken email or username returns `409 Conflict` and no OTP is sent
 - `POST /api/v1/auth/patient/otp/verify` - Verify OTP and create patient account
 - `POST /api/v1/auth/patient/otp/resend` - Resend OTP for existing staged signup
 
@@ -701,14 +715,15 @@ Patient Can Login
 - Email verified through OTP before account activation
 - Temporary patient data staged during OTP process
 - Single PostgreSQL transaction for account creation after OTP verification
+- Email and username uniqueness are checked up-front in `/send` - after the email existence check and before the sign-up is staged or any OTP is sent - so a taken username is reported on the sign-up form instead of after OTP verification; both checks are repeated inside the account-creation transaction in `/verify`, which returns `409 Conflict` with `Email is already registered` or `Username already taken` (the `users` unique constraints are the final backstop against concurrent sign-ups)
 - 15-minute expiration for staged sign-up data
 - Automatic cleanup of expired staged sign-ups
 
 **Backend Implementation:**
 - Service: `patientOtpService.ts` handles Supabase OTP operations
 - Router: `patientOtp.ts` provides API endpoints
-- Database: `pending_patient_signups` table stages registration data
-- Migration: `008_patient_signup_otp_flow.sql` creates staging table
+- Database: `pending_patient_signups` table stages registration data (including the detailed patient fields)
+- Migration: `008_patient_signup_otp_flow.sql` creates staging table; `026_add_pending_patient_signup_details.sql` adds `middle_name`, `date_of_birth`, `sex`, `phone` and `address` to the staging table
 
 **Database Migrations for Login OTP and 2FA:**
 - `013_add_two_factor_settings.sql` - Adds `two_factor_enabled` column to `doctors` and `secretaries` tables for optional 2FA
@@ -720,7 +735,7 @@ Patient Can Login
 - Page: `successful_registration_page.dart` displays registration success message
 - Page: `onboarding_page.dart` provides 3-screen onboarding flow (Find doctor, Manage health, Book appointments)
 - API Service: `api_service.dart` includes patient OTP methods and token management
-- Integration: `signup_page.dart` calls backend to send OTP and navigate to verification
+- Integration: `signup_page.dart` calls backend to send OTP and navigate to verification; a `409 Conflict` from `/send` is shown on the form (using the backend message, e.g. `Username already taken`) and the user stays on the form, so an unavailable username never reaches OTP verification
 - Features: Auto-focus, paste support, resend timer, error handling
 - Flow: OTP verification → Successful registration → Onboarding → Home dashboard (authenticated)
 - Authentication: After successful OTP verification, user is automatically authenticated and can access the app directly
@@ -740,10 +755,13 @@ Appointments
 
 Schedule
  ├── Working Hours
- ├── Availability
- └── Daily Capacity
+ ├── Exceptions
+ ├── Break Periods
+ └── Capacity
 
 Patients
+
+Secretary
 
 Prescriptions
 
@@ -761,11 +779,15 @@ Dashboard
 
 Daily Queue
 
+Walk-ins
+
+Patients
+
 Appointments
 
-Conversations
+Schedule
 
-Walk-in Registration
+Conversations
 
 Payments
 
@@ -774,7 +796,7 @@ Profile
 Settings
 ```
 
-The secretary is the primary operational user for daily queue and payment verification.
+The Secretary Schedule page is at `/secretary/schedule`, replacing `/secretary/capacity`; its tabs are Working Hours (read-only), Exceptions, Break Periods, and Capacity. The secretary is the primary operational user for daily queue and payment verification.
 
 ---
 
@@ -835,6 +857,10 @@ The schedule module manages:
 - Unavailable periods.
 - Doctor availability.
 
+Doctors may create, edit, and delete weekly working hours. Authorized secretaries may view, but not create, edit, or delete, their assigned doctor's weekly working hours; they may add, edit, and delete the assigned doctor's exceptions and break periods. Schedule writes are restricted to the authenticated doctor's own records or the secretary's assigned doctor (`secretaries.doctor_id`); unauthorized access returns 404. Validate start <= end, require breaks to fall within working hours, and prevent overlapping breaks.
+
+Before saving an exception or break-period change that affects dates with active appointments, warn the doctor or secretary with the number of affected appointments and require explicit confirmation. After confirmation, save the change and notify affected patients through the notification module. Do not automatically cancel affected appointments; the secretary handles them through the existing cancellation and rescheduling flows.
+
 The default consultation duration is:
 
 **30 minutes**
@@ -873,13 +899,13 @@ Example:
 
 ### Final Capacity
 
-If the doctor/secretary has configured a lower maximum:
+If the doctor or an authorized secretary has configured a lower maximum for the date:
 
 ```text
 Final Capacity = MIN(Calculated Capacity, Configured Capacity)
 ```
 
-If there is no configured lower limit, the calculated capacity can be used.
+If there is no configured lower limit, the calculated capacity can be used. A secretary may configure capacity only for their assigned doctor.
 
 ---
 
@@ -931,14 +957,58 @@ One successfully registered patient consumes one capacity unit.
 
 Responsibilities:
 
-- Create reservations.
+- Create reservations (date-only, no specific time slot).
 - View appointments.
 - Cancel appointments.
 - Reschedule appointments.
 - Update appointment states.
-- Prevent booking conflicts.
+- Prevent booking conflicts (same date only).
+- Validate doctor-specific patient record before reservation.
 
 Payment is intentionally separate from basic reservation creation.
+
+Patients select a date for their appointment (no specific time slot). Queue numbers are assigned based on first-come-first-served order for the selected date.
+
+### Doctor-Specific Patient Record Validation
+
+Before confirming an appointment, the system must validate whether the patient has an existing record with the selected doctor.
+
+**Backend API Endpoints:**
+- `GET /api/v1/patients/check-record?doctorId={id}` - Patient-only endpoint to check if they have an existing record with the selected doctor
+- `POST /api/v1/patients/submit-details` - Patient-only endpoint to submit required details for a specific doctor before first booking
+- `GET /api/v1/patients/me` - Patient-only endpoint to view their own profile
+- `PUT /api/v1/patients/me` - Patient-only endpoint to update their own profile (requires authentication)
+- `GET /api/v1/patients/doctor/:doctorId` - Doctor-only endpoint to list all patients who have associations or appointments with them
+- `GET /api/v1/patients/search` - Secretary-only endpoint to search patients by email, phone, or name for walk-in registration (restricted to assigned doctor's patients)
+- `GET /api/v1/patients/:id` - Doctor and Secretary endpoint to view specific patient details (with role-based authorization)
+
+**Record Check Workflow:**
+1. Mobile application calls `GET /api/v1/patients/check-record?doctorId={id}` before appointment confirmation
+2. Backend queries the `patient_doctor_associations` table to check if the authenticated patient has a persistent association with the selected doctor
+3. If no association exists, backend checks the `appointments` table as a fallback for backward compatibility
+4. If an existing record is found, backend returns `{ hasRecord: true }` and the patient can proceed directly with booking
+5. If no existing record is found, backend returns `{ hasRecord: false }` and the patient must provide required details
+6. Mobile application displays form to collect required personal details (first name, middle name, last name, date of birth, sex, mobile number, address, and optional fields)
+7. Patient submits form through `POST /api/v1/patients/submit-details` to update their profile and create a persistent doctor association
+8. Backend validates all required fields, updates the `patients` table, and creates an entry in `patient_doctor_associations` table
+9. After successful save, patient continues with appointment booking
+10. Appointment is associated with the patient's existing account (no duplicate accounts created)
+
+**Important Distinction:**
+- The check is specific to the selected doctor
+- Having an account or a record with another doctor does not automatically count as having an existing record with the selected doctor
+- The backend performs a doctor-specific lookup in the `patient_doctor_associations` table (primary) and `appointments` table (fallback)
+- Patient-doctor relationship is tracked through the `patient_doctor_associations` table (for persistent records before booking) and the `appointments` table (for actual consultations)
+- The `patient_doctor_associations` table has a unique constraint on (patient_id, doctor_id) to prevent duplicate associations
+
+**Patient Details UI Pages:**
+- Doctor Dashboard: `/doctor/patients/` - View all patients, search, add/edit patient details
+- Doctor Dashboard: `/doctor/appointments/:id` - View patient details within appointment context
+- Secretary Dashboard: `/secretary/walk-ins/` - Save patient details during walk-in registration
+- Secretary Dashboard: `/secretary/patients/` - View and search patient details (restricted to assigned doctor's patients)
+- Secretary Dashboard: `/secretary/queue/` - View patient details in queue context
+
+The mobile application must never connect directly to PostgreSQL. All record checks and updates must go through the backend REST API.
 
 ---
 
@@ -949,12 +1019,14 @@ A regular reservation does not require payment.
 A successful reservation results in:
 
 ```text
-Appointment
+Appointment (date-only)
     +
 Queue Entry
     +
 Capacity Consumption
 ```
+
+Patients select a date for their appointment. Queue numbers are assigned sequentially based on the time of registration for that date. The secretary manages the actual order of patient service.
 
 Optional:
 
@@ -1597,6 +1669,7 @@ Notifications may be generated when:
 - Payment is verified.
 - Prescription is created.
 - Appointment changes.
+- A confirmed exception or break-period change affects dates with active appointments.
 - Waitlist status changes.
 
 ---
@@ -1615,7 +1688,29 @@ Base:
 GET  /doctors/:id/capacity
 PUT  /doctors/:id/capacity
 POST /doctors/:id/capacity/:date
+
+GET  /secretaries/managed-doctors/capacity
+PUT  /secretaries/managed-doctors/capacity
+POST /secretaries/managed-doctors/capacity/:date
 ```
+
+### Secretary Schedule
+
+```text
+GET    /secretaries/managed-doctors/schedules
+
+GET    /secretaries/managed-doctors/unavailability
+POST   /secretaries/managed-doctors/unavailability
+PUT    /secretaries/managed-doctors/unavailability/:id
+DELETE /secretaries/managed-doctors/unavailability/:id
+
+GET    /secretaries/managed-doctors/break-periods
+POST   /secretaries/managed-doctors/break-periods
+PUT    /secretaries/managed-doctors/break-periods/:id
+DELETE /secretaries/managed-doctors/break-periods/:id
+```
+
+Secretary schedule endpoints use the `secretaries.doctor_id` ownership check. Weekly schedules are read-only for secretaries. Exception and break-period writes that affect active appointments require the warning and explicit confirmation before saving.
 
 ### Queue
 

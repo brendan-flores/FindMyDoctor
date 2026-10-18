@@ -4,6 +4,35 @@ This document contains the current system state for the FindMyDoctor project. It
 
 Current System State (October 2026):
 
+## Clinic Date Handling and Timezone
+- Clinic date calculations use the configured timezone (Asia/Manila by default) via the TIMEZONE environment variable
+- Backend date utility functions (`getClinicDate`, `toClinicDateString`, `getClinicDateTime`) use Intl.DateTimeFormat with the configured timezone to ensure correct clinic dates
+- Secretary queue UI uses Intl.DateTimeFormat with Asia/Manila timezone for the initial selected date
+- Walk-in registration uses `getClinicDate()` and `getClinicDateTime()` to get the current clinic date and datetime in the configured timezone
+- Appointment date processing uses `toClinicDateString()` to extract the date portion in the configured timezone
+- This ensures that walk-in registrations and queue listings use the same correct clinic date regardless of server timezone
+
+## Walk-in Registration Legacy Patient Compatibility
+- Walk-in registration endpoint `POST /api/v1/walk-ins` preserves backward compatibility for legacy patients with appointment history but no association
+- When no association exists, the endpoint checks the appointments table as a fallback for legacy records
+- Legacy patients with complete profiles (all required fields populated) can register for walk-ins, and a COMPLETE association is created during registration
+- Legacy patients with incomplete profiles are rejected and must complete details via `POST /api/v1/walk-ins/submit-patient-details` first
+- Patient details submission endpoint `POST /api/v1/walk-ins/submit-patient-details` allows legacy patients with appointment history but no association to complete details
+- Explicit PENDING associations are authoritative and cannot be bypassed by appointment-history fallback
+- Patient profile completeness is verified before allowing registration: first name, last name, date of birth, valid sex, mobile number, and non-empty address
+- All operations use transactions to ensure consistency between patient records, appointments, queue entries, capacity updates, and patient-doctor associations
+- The unique constraint on (patient_id, doctor_id) in patient_doctor_associations prevents duplicate associations with conflict-safe writes
+
+## Walk-in Patient Password Change and Onboarding
+- Walk-in patients are created with `must_change_password = true` and a temporary generated password
+- During first login, walk-in patients are redirected to the password change page
+- Walk-in password change page hides the "Current Password" field (only shows "New Password" and "Confirm New Password")
+- Backend `/api/v1/auth/change-password` endpoint accepts optional `currentPassword` parameter
+- When `must_change_password` is true, the backend skips current password verification
+- After successful password change, walk-in patients view onboarding screens (Find the right doctor, Manage your health, Book appointments easily) before accessing the application
+- This onboarding flow aligns walk-in patient experience with regular app registration
+- Regular password changes (when `must_change_password` is false) still require current password verification and navigate directly to home without onboarding
+
 ## Doctor Registration & Approval Workflow
 - Doctor self-registration creates accounts with `approval_status = 'PENDING'` requiring admin approval
 - Doctor self-registration uses a two-step flow: basic registration → OTP verification → profile completion → submission for approval
@@ -27,7 +56,7 @@ Current System State (October 2026):
 - Web Doctor signup flow: `/doctor-signup` (basic fields) → OTP verification → `/doctor-profile` (professional fields + schedule) → submit for approval
 - Web Doctor signup redirects to `/doctor-profile` after successful OTP verification, not to dashboard
 - Web Doctor profile page at `/doctor-profile` (no slash) is the profile completion page used after OTP verification during initial registration
-- Web Doctor profile page allows doctors to complete their professional profile with 12 fields: professional photo (PNG upload, max 4MB), specialty, credentials, PRC license, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule
+- Web Doctor profile page allows doctors to complete their professional profile with 13 fields: professional photo (PNG upload, max 4MB), specialty, credentials, PRC license, hospital/clinic, room number, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule
 - Web Doctor profile page includes schedule management UI using existing schedule APIs (GET/POST/PUT/DELETE `/api/v1/doctors/me/schedules`)
 - Web Doctor profile page includes PNG photo upload with client-side validation (PNG only, max 4MB) and server-side validation via `POST /api/v1/doctors/me/photo` endpoint
 - Web Doctor profile page includes photo preview after successful upload and ability to remove photo
@@ -38,15 +67,17 @@ Current System State (October 2026):
 - Active Doctors can view their own personal and professional registration details on the read-only Doctor Portal page at `/doctor/profile` (with slash); it excludes schedule management and uses the authenticated `GET /api/v1/doctors/me` endpoint
 - The authenticated `GET /api/v1/doctors/me` endpoint includes the doctor's account email for display on their own profile page
 - The `/doctor/profile` page (with slash) features an Edit Profile button that toggles inline edit mode for updating profile information
-- Edit Profile feature allows editing of personal information (first name, middle name, last name, contact number) and most professional information (specialty, credentials, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, languages spoken)
+- Edit Profile feature allows editing of personal information (first name, middle name, last name, contact number) and most professional information (specialty, credentials, hospital/clinic, room number, years of experience, areas of expertise, biography, consultation fee, languages spoken)
 - Edit Profile feature uses the same searchable dropdown selectors as registration: SearchableSelect for single-select fields (specialty, credentials, hospital/clinic) and SearchableMultiSelect for multi-select fields (areas of expertise, languages spoken)
+- Room Number field is always visible in the Professional Information section regardless of selected hospital/clinic; doctors can add or update their room number at any time
 - Email address is read-only (requires separate email-change and verification process)
 - PRC License Number is read-only (requires dedicated license-update process with admin review)
 - Professional photo can be uploaded/replaced in edit mode with PNG-only validation and 4MB size limit via dedicated upload endpoint
 - Schedule management is handled entirely through the /doctor/schedule page; the profile page does not display schedule information
 - Edit mode includes Save Changes and Cancel buttons; Cancel discards unsaved changes and restores original values
 - Backend API PUT /api/v1/doctors/me/profile validates PRC license number format (7 digits) and uniqueness when provided
-- Backend API supports dynamic field updates for both personal and professional information fields
+- Backend API supports dynamic field updates for both personal and professional information fields including room_number
+- Database schema includes `room_number` field in `doctors` table (migration 009_add_room_number.sql) with VARCHAR(50) type for storing room or suite information
 
 ## Admin Doctor Review
 - Admin Doctor review interface at `/admin/doctors` displays two clearly separated sections: Basic Information (first name, middle name, last name, email, email verified, contact number) and Professional Information (professional photo, specialty, credentials, PRC license number, hospital/clinic, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule)
@@ -60,10 +91,16 @@ Current System State (October 2026):
 
 ## Patient Registration & Authentication
 - Patient registration uses email OTP verification via Supabase for account creation
+- Mobile patient sign-up collects separate first name, middle name (optional), last name, date of birth, sex, mobile number, address, email, username, and password
 - Patient registration requires username (minimum 3 characters, alphanumeric + underscores only)
+- Patient sex accepts `MALE`, `FEMALE`, `OTHER`, or `NOT_SPECIFIED`; the mobile sign-up form shows user-friendly labels mapped to these backend values
+- Mobile sign-up does not collect emergency contact details, medical history, allergies, or current medications
+- All patient details captured at sign-up are staged in `pending_patient_signups` and written to the `patients` table when the account is created after OTP verification
 - User login accepts either email or username for authentication
 - Users table includes username field (unique) for patient identification
-- Patients table does not include phone field (removed in favor of username)
+- The patient OTP `/send` endpoint checks email and username availability up-front (after the email existence check, before the sign-up is staged or the OTP is sent) and returns `409 Conflict` with `Email is already registered` or `Username already taken`, so the error is shown on the sign-up form without sending an OTP
+- The patient OTP `/verify` endpoint re-checks email and username uniqueness inside the single account-creation transaction and returns `409 Conflict` with a clear `Username already taken` (or `Email already registered`) message instead of a misleading verification error; the `users` unique constraints remain the backstop against concurrent sign-ups
+- Patients table includes phone (restored in migration `025_restore_phone_column.sql`), `middle_name`, and `sex` (migration `023_add_patient_required_fields.sql`)
 - Backend API endpoints for patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
 - Backend doctor OTP API accepts only basic fields (`firstName`, `middleName`, `lastName`, `email`, `contactNumber`, `password`) in the signup payload
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
@@ -113,7 +150,8 @@ Current System State (October 2026):
 - Logout invalidates server-side session by clearing accessToken, refreshToken, and trustedBrowser cookies
 - Admin and SuperAdmin authentication behavior remains unchanged (no Remember Me modification)
 - Web apiClient automatically loads token from localStorage on initialization for backward compatibility, but prefers HttpOnly cookies when available
-- Backend API endpoints for authentication: `POST /api/v1/auth/login` (with trusted-browser support), `POST /api/v1/auth/verify-login-otp` (with trusted-browser registration), `POST /api/v1/auth/logout` (clears all cookies), `POST /api/v1/auth/revoke-trusted-browser` (revokes current browser trust)
+- **Automatic Token Refresh:** Web apiClient implements automatic token refresh on 401 responses; when an API request returns 401, the client automatically attempts to refresh the access token using the stored refresh token via `POST /api/v1/auth/refresh`; if refresh succeeds, the original request is retried with the new token; if refresh fails, the session is cleared and user is redirected to login; concurrent 401 responses are coordinated so only one refresh occurs while others wait
+- Backend API endpoints for authentication: `POST /api/v1/auth/login` (with trusted-browser support), `POST /api/v1/auth/verify-login-otp` (with trusted-browser registration), `POST /api/v1/auth/logout` (clears all cookies), `POST /api/v1/auth/revoke-trusted-browser` (revokes current browser trust), `POST /api/v1/auth/refresh` (refreshes access token)
 - Database schema includes `trusted_browsers` table (migration 022_add_trusted_browsers.sql) for Remember Me trusted-browser functionality with columns: id, user_id, token_hash (SHA-256), device_info, expires_at (30 days), created_at, revoked_at, last_used_at
 
 ## Secretary Management
@@ -128,6 +166,173 @@ Current System State (October 2026):
 - Secretary must change password on first login (enforced by `must_change_password` flag)
 - Secretary profile page at `/secretary/profile` allows viewing and editing profile information
 - Migration `015_enforce_secretary_doctor_relationship.sql` enforces the required foreign key and non-null assignment for `secretaries.doctor_id`
+- Secretary queue page at `/secretary/queue` displays the doctor's room number from the assigned doctor's profile
+- Backend `GET /api/v1/secretaries/me` endpoint includes the assigned doctor's `room_number` field
+- Secretary queue page shows the practice name, room number (if set), and doctor name in the header location line
+
+## Patient Record Management
+- Patient records are managed through the unified `/api/v1/patients` API router with role-based access control
+- Patient endpoints: `GET /api/v1/patients/me` (view own profile), `PUT /api/v1/patients/me` (update own profile) - requires PATIENT authentication
+- Patient details submission: `POST /api/v1/patients/submit-details` - Patient-only endpoint to submit required details for a specific doctor before first booking
+- Doctor-specific patient record check: `GET /api/v1/patients/check-record?doctorId={id}` - checks if authenticated patient has existing record with selected doctor
+- Patient record check queries the `patient_doctor_associations` table for any association, respecting the explicit status (PENDING or COMPLETE), with fallback to `appointments` table for backward compatibility with legacy records
+- Patient-doctor associations are tracked in the `patient_doctor_associations` table to support persistent records before the first appointment
+- Patient-doctor associations have a `details_completion_status` field with values: 'PENDING' (incomplete walk-in account with only email, first name, last name) or 'COMPLETE' (full required details submitted including date of birth, sex, phone, address)
+- An explicit PENDING association is authoritative - it cannot be bypassed by appointment-history fallback
+- If no existing record exists with the selected doctor, the patient must submit required details via `POST /api/v1/patients/submit-details` before booking
+- Patient details are stored in the `patients` table and associated with the authenticated user account via `user_id` foreign key
+- Doctor patient access: `GET /api/v1/patients/doctor/:doctorId` - returns all patients who have associations or appointments with the authenticated doctor
+- Secretary patient search: `GET /api/v1/patients/search` - allows secretaries to search patients by email, phone, first name, or last name for walk-in registration, restricted to their assigned doctor's patients
+- Secretary patient access: `GET /api/v1/patients/:id` - allows secretaries to view patient details only if the patient has associations or appointments with their assigned doctor
+- Doctor patient access: `GET /api/v1/patients/:id` - allows doctors to view patient details only if the patient has associations or appointments with them
+- Patient profile fields: first_name (required), middle_name (optional), last_name (required), date_of_birth (required), sex (required: MALE, FEMALE, OTHER, NOT_SPECIFIED), phone (required, mobile number), address (required for new submissions via API, historical NULL values preserved in database), emergency_contact_name, emergency_contact_phone, medical_history, allergies, current_medications
+- Patient profile updates use server-side validation for required fields (first name, last name, date of birth, sex, phone, address) and optional field formatting
+- Mobile number validation: Must contain only digits, spaces, hyphens, plus sign, or parentheses; 1-20 characters
+- Date of birth validation: Must be a valid date and cannot be in the future
+- Patient-doctor relationship is tracked through the `patient_doctor_associations` table (for persistent records before booking) and the `appointments` table (for actual consultations)
+- The patient record check ensures that patients don't need to re-enter details for doctors they've already submitted details for or seen in consultation
+- All patient operations require authentication and proper role-based authorization to prevent unauthorized access
+- Migration `023_add_patient_required_fields.sql` adds middle_name, sex (with NOT NULL DEFAULT 'NOT_SPECIFIED'), and creates patient_doctor_associations table
+- Migration `023_add_patient_required_fields.sql` does NOT make address NOT NULL; it preserves historical NULL addresses for existing patients, but new API submissions validate address as a required field
+- Migration `024_add_walk_in_completion_status.sql` adds `details_completion_status` column to patient_doctor_associations to distinguish between pending preliminary accounts and completed patient records
+- Migration `024_add_walk_in_completion_status.sql` determines completion status from actual patient data: COMPLETE only when all required details are valid and populated (first name, last name, date of birth, valid sex, mobile number, non-empty address); otherwise PENDING
+
+## Secretary Patient Record Management
+- Secretary can update patient records via `PUT /api/v1/patients/:id` (requires SECRETARY authentication, restricted to patients of their assigned doctor)
+- Doctor can update patient records via `PUT /api/v1/patients/:id` (requires DOCTOR authentication, restricted to patients they have associations or appointments with)
+- Authorization for patient updates uses unambiguous SQL with EXISTS subqueries to verify patient-doctor relationship before allowing updates
+- DOCTOR authorization SQL: `WHERE patients.id = $1 AND (EXISTS association with authenticated doctor OR EXISTS appointment with authenticated doctor)`
+- SECRETARY authorization SQL: `WHERE patients.id = $1 AND (EXISTS association with secretary's assigned doctor OR EXISTS appointment with secretary's assigned doctor)`
+- Authorization subqueries include `patient_id = $1` in each EXISTS clause to prevent bypass attacks
+- Unauthorized patient update attempts return unified 404 response (non-disclosing, no information leakage)
+- Patient update endpoint requires six required fields on every update: firstName, lastName, dateOfBirth, sex, phone, address
+- Optional fields (middleName, emergencyContactName, emergencyContactPhone, medicalHistory, allergies, currentMedications) support explicit clearing via null or empty string
+- Optional field presence is tracked using boolean flags derived from request field presence (using 'in' operator), not from validated values
+- Date validation order: string type check → exact YYYY-MM-DD syntax validation → calendar date validation (impossible dates like February 30) → year range validation (1900-2100) → future date check (timezone-independent using UTC)
+- UUID validation uses existing `uuid` package dependency (v9.0.1) to validate patient ID format before database operations
+- Optional field validation uses `unknown` type with narrowing before error message extraction (type-safe error handling)
+- TypeScript interface `UpdatePatientRequest` in secretaryApi.ts reflects the required field contract (six required fields, optional fields with null support)
+- Web Secretary patient list page at `/secretary/patients` displays patients of the secretary's assigned doctor via `GET /api/v1/patients/search`
+- Secretary patient search endpoint allows empty parameters for initial listing (loads all patients of assigned doctor) and filters by email, phone, firstName, or lastName when provided
+- All patient search results are server-side filtered to include only patients with associations or appointments to the secretary's assigned doctor
+- Web Secretary patient detail/edit page at `/secretary/patients/[id]` allows viewing and editing patient information with edit mode toggle
+- Web Secretary patient detail page includes help text below optional fields: "Leave empty to clear this field"
+- Web Secretary API client (`secretaryApi.ts`) provides TypeScript interfaces and methods for secretary-specific operations
+- Web Secretary walk-ins page at `/secretary/walk-ins` provides direct walk-in registration workflow without mandatory email search
+- Direct walk-ins workflow: Single-step form with required patient information (email, first name, middle name optional, last name, date of birth, sex, mobile number, address, appointment date) → Register with queue assignment
+- Walk-ins page displays assigned doctor only (no doctor selection dropdown per user decision)
+- Walk-ins page does not request medical history, allergies, or current medications on the registration form
+- Walk-ins page shows temporary password to secretary after successful registration for patient credential delivery
+- Direct walk-in registration endpoint `POST /api/v1/walk-ins/direct-register` handles the entire flow in one transaction
+- Direct registration always creates a new account for valid, genuinely new walk-in registrations using email as username/login identifier
+- Direct registration generates cryptographically secure random temporary password containing letters and numbers using Node.js crypto module
+- Direct registration stores only the appropriate password hash and sets `must_change_password = true`
+- Direct registration saves patient details and associates the patient with the secretary's assigned doctor
+- Direct registration registers the walk-in in the existing queue and assigns the next available queue number
+- Direct registration enforces queue capacity and prevents duplicate queue entries using advisory locks and transactions
+- Direct registration enforces email/account uniqueness on the backend and returns clear conflict response if email already exists
+- Direct registration uses transaction-safe operations to ensure partial failures do not leave inconsistent records
+- Legacy multi-step walk-in workflow (search → create account → submit details → appointment → confirm) remains available through existing endpoints
+- All backend patient update operations use transactions and proper parameter mapping to ensure data consistency
+- Backend tests verify SQL structure, parameter mapping, validation logic, role rejection, and error responses for PUT /api/v1/patients/:id endpoint and direct walk-in registration
+
+## Secretary Queue Management
+- Web Secretary queue management page at `/secretary/queue` displays the daily patient queue for the secretary's assigned doctor
+- Queue page shows queue entries with patient name, queue number, status, registration source (ONLINE/WALK_IN), and doctor information
+- Queue page includes KPI cards: Total Patients, Waiting, Completed, and Assigned Doctor
+- Queue page includes date selector to view queue for different dates
+- Queue page includes "Call Next Patient" button to advance the queue by calling the next waiting patient
+- Queue entry actions are status-dependent: WAITING (Call, Not Present), CALLED (Start Checkup, Skip), IN_CHECKUP (Complete), SKIPPED/NOT_PRESENT (Re-queue)
+- Backend queue API endpoints enforce secretary-to-doctor assignment on all operations
+- Backend `GET /api/v1/queue/:date` automatically filters by secretary's assigned doctor for SECRETARY role; DOCTOR and ADMIN can optionally filter by doctorId
+- Backend `GET /api/v1/queue/:date` response includes patient_email field for queue display
+- Backend `POST /api/v1/queue/:date/next` uses secretary's assigned doctor for SECRETARY role; if secretary provides doctorId, it must match their assignment
+- Backend queue status-update endpoints (`PATCH /api/v1/queue/:id/status`, `POST /api/v1/queue/:id/start-checkup`, `POST /api/v1/queue/:id/complete`, `POST /api/v1/queue/:id/skip`, `POST /api/v1/queue/:id/not-present`) enforce secretary-to-doctor assignment via SQL WHERE clauses
+- Secretary authorization SQL for queue operations: `WHERE queue_entry.id = $1 AND doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2)`
+- Doctor authorization SQL for queue operations: `WHERE queue_entry.id = $1 AND doctor_id = (SELECT id FROM doctors WHERE user_id = $2)`
+- Unauthorized queue operation attempts return 404 response (non-disclosing, no information leakage)
+- Valid queue status values: WAITING, CALLED, NOT_PRESENT, SKIPPED, IN_CHECKUP, COMPLETED, CANCELLED, NO_SHOW
+- Status updates automatically set appropriate timestamps: called_at (CALLED), started_at (IN_CHECKUP), completed_at (COMPLETED)
+- Queue status transitions are validated on the backend; invalid status values return 400 error
+- Direct walk-in registrations via `POST /api/v1/walk-ins/direct-register` create queue entries with registration_source = 'WALK_IN' and are visible in the secretary queue
+- Web Secretary API client (`secretaryApi.ts`) provides TypeScript interfaces and methods for queue operations: getQueue, callNextPatient, updateQueueStatus, startCheckup, completeCheckup, skipPatient, markNotPresent
+- TypeScript interface `QueueEntry` in secretaryApi.ts includes all queue entry fields including patient_email
+- Backend queue tests verify secretary-to-doctor assignment enforcement, status validation, and correct SQL structure
+
+## Doctor Dashboard Patient Records
+- Web Doctor Dashboard includes patient management functionality at `/doctor/patients` for viewing, adding, and editing patient records
+- Doctor patient list page displays all patients who have associations or appointments with the authenticated doctor via `GET /api/v1/patients/doctor/:doctorId`
+- Doctor patient list page includes client-side search by name, email, and phone (server-side authorization is authoritative; client-side filtering is for convenience only)
+- Doctor patient list page displays statistics: Total Patients, Active Patients, Filtered Results, Search Active status
+- Doctor patient list page includes "Add Patient" button to open a modal for associating existing patients with the doctor
+- Doctor patient list page includes visibility icon button to navigate to patient detail page
+- Doctor patient addition allows doctors to associate existing patient accounts with their practice
+- Doctor patient addition endpoint: `POST /api/v1/patients/associate` (requires DOCTOR authentication)
+- Doctor patient addition requires the patient to have an existing user account (created through mobile registration)
+- Doctor patient addition cannot create new user accounts directly due to password generation and email verification requirements
+- Doctor patient addition validates required fields: email, firstName, lastName, dateOfBirth, sex, phone, address
+- Doctor patient addition creates or updates patient record and creates COMPLETE patient-doctor association
+- Doctor patient addition prevents duplicate associations via unique constraint on (patient_id, doctor_id)
+- Doctor patient addition returns 404 if patient account does not exist with message directing patient to register via mobile app
+- Doctor patient addition is authorized using backend-verified doctor identity (doctor derived from authenticated user ID)
+- Doctor patient detail page at `/doctor/patients/[id]` displays patient information including demographics, contact information, medical information, emergency contact, and consultation history
+- Doctor patient detail page includes edit mode that allows doctors to update patient information (all fields except email, which is read-only)
+- Doctor patient edit mode reuses the same validation logic as secretary patient editing (six required fields: firstName, lastName, dateOfBirth, sex, phone, address)
+- Doctor patient edit mode enforces client-side validation for required fields before submission
+- Doctor patient detail page fetches patient details via `GET /api/v1/patients/:id` with proper authorization
+- Doctor patient detail page fetches appointment history via `GET /api/v1/appointments?patientId=X` (DOCTOR-only endpoint with patientId filter)
+- Doctor patient detail page fetches prescription history via `GET /api/v1/prescriptions/patients/:id` (DOCTOR-authorized endpoint)
+- Doctor patient detail page fetches visit history via `GET /api/v1/visits/patient/:patientId` (DOCTOR-only endpoint with patient-doctor authorization)
+- Backend `GET /api/v1/appointments` endpoint now supports optional `patientId` query parameter for DOCTOR role to filter appointments by patient
+- Backend patientId filter for appointments is safe because the query already filters by doctor_id (authenticated doctor), preventing cross-patient access
+- Backend `GET /api/v1/visits/patient/:patientId` endpoint returns visit history for a specific patient, with doctor authorization enforced via patient-doctor associations or appointments
+- Backend visit history endpoint includes appointment_date (when available), doctor name, and clinical vitals (blood pressure, weight, height, temperature)
+- Backend visit history orders visits by visit_date DESC (most recent first)
+- Backend `PUT /api/v1/patients/:id` endpoint allows doctors to update patient records for patients they have associations or appointments with
+- Backend doctor patient update authorization uses EXISTS subqueries to verify patient-doctor relationship (via association or appointment) before allowing updates
+- Backend doctor patient update requires all six required fields on every update (firstName, lastName, dateOfBirth, sex, phone, address)
+- Backend doctor patient update supports optional fields with explicit clearing (null or empty string) and preserves current values when fields are omitted
+- Backend doctor patient update enforces the same validation as secretary updates (date format, sex enum, phone format, etc.)
+- Doctors cannot create, view, or edit another doctor's patient records without authorization (server-side enforcement)
+- Doctor consultation history includes visits, appointments, and prescriptions
+- All authorization is enforced on the backend; client-side filtering is NOT an authorization boundary
+- Web API client includes patient methods in `doctorApi.ts`: `getPatients()`, `getPatientById()`, `getPatientPrescriptions()`, `updatePatient()`, `getPatientVisits()`, `associatePatient()`
+- TypeScript interfaces for Patient, Prescription, UpdatePatientRequest, AssociatePatientRequest, and Visit are defined in `doctorApi.ts`
+
+## Doctor Dashboard Appointment Details
+- Web Doctor Dashboard includes appointment detail page at `/doctor/appointments/[id]` for viewing appointment information
+- Doctor appointment detail page displays selected appointment's patient information, appointment details, and prescription history
+- Doctor appointment detail page fetches appointment details via `GET /api/v1/appointments/:id` with proper authorization (DOCTOR-only with doctor_id restriction)
+- Doctor appointment detail page fetches patient details via `GET /api/v1/patients/:id` with proper authorization
+- Doctor appointment detail page fetches patient prescription history via `GET /api/v1/prescriptions/patients/:id` (DOCTOR-authorized endpoint)
+- Backend `GET /api/v1/appointments/:id` endpoint enforces doctor_id restriction via SQL WHERE clause: appointment must belong to authenticated doctor
+- Backend authorization prevents doctors from accessing another doctor's appointments (returns 404 for unauthorized access)
+- Doctor appointment list page at `/doctor/appointments` includes visibility icon button to navigate to appointment detail page
+- Doctor appointment detail page includes navigation back to appointment list
+- Backend tests verify doctor appointment detail authorization: allow access to own appointments, deny access to other doctors' appointments, enforce doctor_id restriction in SQL query
+
+## Walk-in Registration Security
+- Walk-in registration endpoints enforce secretary-to-doctor assignment verification before allowing any operation
+- Secretary search endpoint `GET /api/v1/walk-ins/search` is restricted to patients associated with the secretary's assigned doctor only
+- Secretary account creation endpoint `POST /api/v1/walk-ins/create-account` requires doctorId and verifies the secretary is assigned to that doctor
+- Walk-in account creation creates a PENDING patient-doctor association with only email, first name, and last name; full required details must be submitted later
+- Walk-in registration endpoint `POST /api/v1/walk-ins` verifies the secretary is assigned to the requested doctor before creating appointments or queue entries
+- Walk-in registration requires the patient to have a COMPLETE patient-doctor association before booking; PENDING associations are rejected with an error message
+- Walk-in registration preserves backward compatibility for legacy patients with appointment history but no association: checks appointments table as fallback, verifies profile completeness, and creates COMPLETE association during registration
+- Patient-doctor associations are automatically created or updated during walk-in registration within the same transaction as appointment and queue creation
+- New endpoint `POST /api/v1/walk-ins/submit-patient-details` allows secretaries to submit complete patient details (first name, middle name, last name, date of birth, sex, phone, address, emergency contacts, medical history, allergies, medications) during walk-in registration
+- Patient details submission allows legacy patients with appointment history but no association to complete details, enabling subsequent walk-in registration
+- Patient details submission validates that the patient is associated with the secretary's assigned doctor before allowing profile updates (via association or appointment history)
+- Patient details submission validates all required fields server-side (first name, last name, date of birth, sex, phone, address) and optional fields (middle name, emergency contacts, medical history, allergies, medications)
+- Patient details submission updates the patient-doctor association to COMPLETE status, allowing subsequent bookings
+- Patient details submission uses INSERT with ON CONFLICT UPDATE to prevent duplicate associations and safely handle legacy patients
+- All walk-in operations use transactions to ensure consistency between patient records, appointments, queue entries, capacity updates, and patient-doctor associations
+- Unauthorized secretary requests (secretary not assigned to the requested doctor) are rejected with 403 Forbidden before any database modifications
+- Explicit PENDING associations are authoritative and cannot be bypassed by appointment-history fallback
+- Migration `023_add_patient_required_fields.sql` adds middle_name, sex (with NOT NULL DEFAULT 'NOT_SPECIFIED'), and creates patient_doctor_associations table
+- Migration `023_add_patient_required_fields.sql` does NOT make address NOT NULL; it preserves historical NULL addresses for existing patients, but new API submissions validate address as a required field
+- Migration `024_add_walk_in_completion_status.sql` adds `details_completion_status` column to patient_doctor_associations to distinguish between pending preliminary accounts and completed patient records
+- Migration `024_add_walk_in_completion_status.sql` determines completion status from actual patient data: COMPLETE only when all required details are valid and populated (first name, last name, date of birth, valid sex, mobile number, non-empty address); otherwise PENDING
 
 ## Supabase Integration
 - Supabase Storage service (`backend/src/services/storageService.ts`) handles doctor photo operations: upload, delete, replace, and validation
@@ -155,10 +360,39 @@ Current System State (October 2026):
 - Admin seed script creates Admin accounts without immediate Supabase identity provisioning; identities are provisioned on-demand during API calls or via reconciliation endpoint
 - PostgreSQL remains the single source of truth for all application account data (users, doctors, secretaries, patients)
 - Supabase Auth is used only for OTP delivery and verification, not for storing application accounts or credentials
+
+## Patient Reservation Flow
+- Mobile patient app includes a complete reservation flow from date selection to appointment confirmation
+- Reservation flow: Doctor Schedule & Date page (`/doctor-schedule`) → patient record check → if no record: Patient Details page (`/patient-details`) → Booking Confirmation page (`/booking-confirmation`) → automatic submission to backend → queue number assignment → display confirmation
+- Mobile Doctor Schedule page displays doctor availability via `GET /api/v1/doctors/:doctorId/availability` endpoint and allows patients to select available dates
+- When patient confirms a date, the app checks if they have an existing record with the selected doctor via `GET /api/v1/patients/check-record?doctorId={id}`
+- If patient has a complete record (hasRecord: true), they proceed directly to booking confirmation
+- If patient has no record or incomplete record (hasRecord: false), they are redirected to the Patient Details page to submit required information
+- Mobile Patient Details page loads the authenticated patient's profile via `GET /api/v1/patients/me` and pre-fills existing data
+- Patient Details page requires: First Name, Last Name, Date of Birth, Sex (MALE, FEMALE, OTHER, NOT_SPECIFIED), Mobile Number, Address; optional: Middle Name
+- Email is loaded from the authenticated account and displayed as non-editable
+- Patient Details page validates all required fields on the client before submission
+- Patient Details page submits details via `POST /api/v1/patients/submit-details` with doctorId, firstName, middleName (optional), lastName, dateOfBirth, sex, phone, address
+- After successful details submission, the patient is redirected to Booking Confirmation with all booking state preserved (doctorId, doctorName, specialty, clinic, consultationFee, selectedDate)
+- Mobile Booking Confirmation page automatically submits the reservation to `POST /api/v1/appointments` when loaded, passing doctorId, appointmentDate (date-only format: yyyy-MM-dd), and reasonForVisit
+- Backend `POST /api/v1/appointments` performs comprehensive server-side validation including: patient authentication, doctor approval status, date validity, availability check (working hours, breaks, exceptions/unavailability), capacity check, conflict detection (same date only), patient record check, queue number assignment, and notification creation
+- Backend validation rechecks all scheduling constraints at submission time to prevent race conditions and double-booking
+- Patients are assigned queue numbers based on first-come-first-served order for the selected date (no specific time slot assignment)
+- Mobile patient Appointments page (`/appointments` tab in HomePage) connects to `GET /api/v1/appointments` and displays real appointment records with filters (Upcoming, Completed, Cancelled)
+- Mobile patient record workflow tests verify: complete record navigation, missing/incomplete record routing, API error handling, authenticated email display, required field validation, optional middle name, submission success/failure behavior, back navigation state preservation, and loading/submit protection
+- Mobile Appointments page removes all hardcoded data and uses dynamic data from backend with loading, empty, and error states
+- Web Doctor Appointments page at `/doctor/appointments` connects to `GET /api/v1/appointments` and displays real appointment records for the authenticated doctor with status filters and statistics
+- Web Secretary Appointments page at `/secretary/appointments` connects to `GET /api/v1/appointments` and displays real appointment records for the doctor the secretary is assigned to, with status filters and statistics
+- Backend `GET /api/v1/appointments` supports role-based filtering: PATIENT returns their own appointments, DOCTOR returns their appointments, SECRETARY returns appointments for their assigned doctor
+- Backend appointment creation includes queue number assignment via `queue_entries` table, capacity consumption via `daily_capacities` table, and notification creation
+- Queue number assignment is concurrency-safe using `SELECT COALESCE(MAX(queue_number), 0) + 1` pattern
+- After successful booking, the appointment is immediately visible on patient, doctor, and secretary Appointments pages without requiring app restart or manual refresh
+- Mobile Appointments page uses `didUpdateWidget` to refresh data when returning to the tab
 - Supabase Storage service role key is required for backend photo operations and must not be exposed to frontend applications
 
 ## Database Schema
-- Database schema includes approval status fields, pending doctor signups staging table (basic fields only), and pending patient signups staging table (with username)
+- Database schema includes approval status fields, pending doctor signups staging table (basic fields only), and pending patient signups staging table (username plus detailed patient fields: middle_name, date_of_birth, sex, phone, address)
+- Migration `026_add_pending_patient_signup_details.sql` adds middle_name, date_of_birth, sex, phone and address to pending_patient_signups so patient details captured during sign-up are persisted on OTP verification
 - Database schema includes `middle_name` field in `doctors` and `pending_doctor_signups` tables (migration 010_add_middle_name.sql)
 - Database schema includes extended doctor profile fields (migration 016_doctor_profile_fields.sql): contact_number, professional_photo_url, years_of_experience, areas_of_expertise (comma-separated text), consultation_type, languages_spoken (comma-separated text), profile_completion_status, profile_submitted_at
 - Migration `017_modify_pending_doctor_signup_for_basic_flow.sql` adds contact_number field to pending_doctor_signups for basic registration flow (professional fields remain in table for compatibility)
@@ -189,28 +423,25 @@ Current System State (October 2026):
 
 ## Availability & Capacity
 - Extended `GET /api/v1/doctors/:id/availability` endpoint to include active unavailability periods (exceptions) and active break periods in the response
-- Availability service (backend/src/modules/availability/availabilityService.ts) calculates available time slots considering: working hours, schedule exceptions, break periods, 30-minute consultation duration, daily capacity, existing reservations, and current date/time
-- Availability service detects overlapping appointment intervals (not just exact time matches) to correctly mark slots as booked
-- Availability service limits individual slot availability based on remaining daily capacity (slots marked as FULL when capacity exhausted)
-- Availability service returns time slots with status: AVAILABLE, BOOKED, BREAK, PAST, or FULL
+- Availability service (backend/src/modules/availability/availabilityService.ts) calculates available dates considering: working hours, schedule exceptions, break periods, 30-minute consultation duration, daily capacity, existing reservations, and current date/time
+- Availability service limits date availability based on remaining daily capacity (dates marked as FULL when capacity exhausted)
 - Availability service returns date status: AVAILABLE, FULL, UNAVAILABLE, PAST, or NON_WORKING
-- Availability service includes break periods as visible but non-selectable slots in the response (not removed from slot list)
+- Availability service includes break periods information for display purposes
 - Mobile doctor schedule page at /doctor-schedule displays calendar with visual status indicators and legend for all date states
-- Mobile doctor schedule page displays time slots with status-specific visual treatment: available slots are selectable, break slots shown with red tint and "Break" label, booked/past/full slots are non-selectable
-- Mobile doctor schedule page confirmation button enables only after selecting both a valid date and a valid time slot
-- Backend appointment creation endpoint POST /api/v1/appointments validates: appointment is not in the past, date is AVAILABLE, specific time slot is available (within working hours, not during break, not booked), daily capacity is not exceeded, and no overlapping appointments exist
+- Mobile doctor schedule page confirmation button enables only after selecting a valid date with available capacity
+- Backend appointment creation endpoint POST /api/v1/appointments validates: appointment is not in the past, date is AVAILABLE, daily capacity is not exceeded, and no existing appointment on the same date
 - Capacity calculation service uses centralized 30-minute consultation duration to calculate maximum appointment slots based on available working time after excluding breaks and schedule exceptions
 - Capacity system provides: Calculated Capacity (maximum slots based on available time), Configured Capacity (lower limit set by doctor/secretary), Final Capacity (actual allowed appointments), Remaining Capacity (final capacity minus existing reservations)
 - Capacity calculation accounts for: working hours for the day of week, break periods on the specific date, full-day exceptions (unavailability) for the specific date
 - Capacity calculation service at backend/src/modules/capacity/capacityService.ts handles time range merging, break period subtraction, and minute-based slot calculation
 - Backend capacity endpoints updated to use real calculation: GET /api/v1/doctors/:id/capacity (supports date or date range query params), PUT /api/v1/doctors/:id/capacity (with ownership validation and capacity limit enforcement), POST /api/v1/doctors/:id/capacity/:date (with real calculation and validation)
 - Backend adds authenticated doctor capacity endpoints: GET /api/v1/doctors/me/capacity, PUT /api/v1/doctors/me/capacity, POST /api/v1/doctors/me/capacity/:date (registered before parameterized /:id/capacity routes to prevent route shadowing, and returning updated capacity objects on save)
-- Backend adds secretary capacity endpoints: GET /api/v1/secretaries/managed-doctors/capacity, PUT /api/v1/secretaries/managed-doctors/capacity, POST /api/v1/secretaries/managed-doctors/capacity/:date
+- Backend adds secretary capacity endpoints: GET /api/v1/secretaries/managed-doctors/capacity, PUT /api/v1/secretaries/managed-doctors/capacity, POST /api/v1/secretaries/managed-doctors/capacity/:date (integrated into Secretary Schedule page Capacity tab)
 - Backend enforces ownership validation: doctors can only manage their own capacity, secretaries can only manage capacity for doctors they are assigned to
 - Backend validates configured capacity cannot exceed calculated capacity on both frontend and backend
-- Web doctor schedule page at /doctor/schedule and web secretary capacity page at /secretary/capacity feature a unified 5-metric responsive grid (Calculated, Configured, Final Limit, Registered, Remaining) with fixed-width input controls
-- Web secretary capacity page at /secretary/capacity allows secretaries to manage capacity for their assigned doctor with the exact same UI as the doctor schedule page
-- Secretary sidebar includes "Capacity" navigation item linking to /secretary/capacity
+- Web doctor schedule page at /doctor/schedule and web secretary schedule page at /secretary/schedule feature a unified 5-metric responsive grid (Calculated, Configured, Final Limit, Registered, Remaining) with fixed-width input controls
+- Web secretary schedule page at /secretary/schedule allows secretaries to manage capacity for their assigned doctor in the Capacity tab with the exact same UI as the doctor schedule page
+- Secretary sidebar includes "Schedule" navigation item linking to /secretary/schedule; old `/secretary/capacity` route redirects to `/secretary/schedule` for backward compatibility
 
 ## Mobile Doctors Page
 - Mobile Doctors page main design matches UI prototype from `UI-Prototypes/users-mobile-ui/doctors_page`
@@ -243,6 +474,17 @@ Current System State (October 2026):
 ## Mobile Application
 - Mobile application includes OTP verification page for patient registration with full backend integration
 - Mobile application authentication persists across hot restarts using SharedPreferences for token storage
+- Mobile patient login page UI redesigned with a modern, card-based layout: gradient brand mark with PH badge, elevated login card with rounded corners and subtle shadows, focus-aware email/password fields (icon and border accent plus show/hide password toggle), and a prominent login button with distinct loading, success, and error feedback (inline error banner plus snackbar)
+- Mobile login page uses a responsive, keyboard-aware scrollable layout (max content width constrained on larger screens) and subtle decorative background accents; authentication logic, validation rules, API integration, navigation, and session handling are unchanged
+- Mobile patient sign-up page UI redesigned to match the login page design: soft gradient background, gradient brand mark with PH badge, elevated white form card with sectioned "Personal Information" and "Account Credentials" groups, focus-aware fields, and a prominent Create Account button with loading and error feedback
+- Mobile sign-up collects separate First Name, Middle Name (Optional), and Last Name fields plus date of birth (date picker), sex (dropdown), mobile number, and address; emergency contact details, medical history, allergies, and current medications are excluded
+- Mobile patient details are submitted with the sign-up OTP request and persisted to the `patients` table when the account is created after OTP verification
+- Mobile sign-up form surfaces the backend's `409 Conflict` message from `/send` (e.g. `Username already taken`) in its inline error banner and snackbar, and stays on the form so no OTP is sent and no navigation to OTP verification occurs for a taken email or username
+- Mobile `PrimaryButton` label is now overflow-safe (single line with ellipsis) so long button labels do not overflow on narrow screens or with enlarged system text
+- Mobile screens tolerate the zero-sized first layout frame (Android reports a 0x0 viewport before the surface is ready): the login, sign-up, and OTP pages clamp their scrollable `minHeight` and the home page only reserves its empty-state filler when there is real vertical space, so no invalid negative constraints are produced
+- Fixing the invalid constraints removes the `Each child must be laid out exactly once.` Scaffold layout crash (a failed body build was replaced by an `ErrorWidget`, leaving the Scaffold's multi-child layout inconsistent) and the frozen loading screen that required a manual refresh or hot restart
+- Mobile home page data (specialties, recommended doctors, clinics) loads from `initState` and clears its loading flags on both success and failure; the resulting `setState` calls are guarded with a `mounted` check
+- Mobile app startup authentication check always resolves initialization (falling back to the login screen if token/storage reads fail) so the startup progress indicator cannot hang
 
 ## Setup Progress Tracker
 - Web Doctor Sidebar includes a Setup Progress Tracker component that tracks 4 setup steps: Account Registration & Email Verification, Complete Professional Profile, Admin Approval, and Set Availability & Schedule
@@ -268,3 +510,21 @@ Current System State (October 2026):
 - Backend doctors API returns all profile fields including `profile_completion_status` and `profile_submitted_at`
 - Patient-facing doctor search endpoint `GET /api/v1/doctors` does not expose PRC license number, personal contact number, or email address
 - Patient-facing doctor by ID endpoint `GET /api/v1/doctors/:id` does not expose PRC license number, personal contact number, or email address
+
+## Secretary Schedule Management
+- Secretary Portal navigation updated: "Capacity" replaced with "Schedule" linking to `/secretary/schedule`
+- Doctor Portal navigation updated: "My Profile" label changed to "Profile"
+- Redirect from `/secretary/capacity` to `/secretary/schedule` for backward compatibility
+- Secretary Schedule page at `/secretary/schedule` provides four tabs: Working Hours (read-only), Exceptions (add/edit/delete), Break Periods (add/edit/delete), and Capacity
+- Working Hours tab displays the assigned doctor's weekly working hours with no write controls for secretaries
+- Exceptions tab allows secretaries to add, edit, and delete date-specific exceptions for their assigned doctor
+- Break Periods tab allows secretaries to add, edit, and delete break periods for their assigned doctor
+- Capacity tab preserves the existing Secretary Capacity page behavior and UI
+- Backend secretary schedule endpoints: `GET /api/v1/secretaries/managed-doctors/schedules` (read-only), `GET/POST/PUT/DELETE /api/v1/secretaries/managed-doctors/unavailability`, `GET/POST/PUT/DELETE /api/v1/secretaries/managed-doctors/break-periods`
+- Secretary schedule endpoints use ownership check: `SELECT doctor_id FROM secretaries WHERE user_id = $1` to derive the target doctor from the authenticated secretary
+- Unauthorized access to another doctor's records returns 404 (non-disclosing, no information leakage)
+- Secretary schedule endpoints are SECRETARY-only; other roles receive 403 Forbidden
+- Weekly working hours remain doctor-only to create, edit, and delete; secretaries have read-only access
+- Schedule validation for exceptions: start date <= end date, valid date format
+- Schedule validation for break periods: start time < end time, valid time format (HH:MM)
+- Backend tests verify secretary schedule access is restricted to assigned doctor, ownership enforcement, and validation rules

@@ -3,13 +3,17 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/doctor_service.dart';
+import '../../../core/services/api_service.dart';
 import '../../../core/models/doctor.dart';
 import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final int? initialTab;
+
+  const HomePage({super.key, this.initialTab});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -19,6 +23,7 @@ class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
   String? _selectedSpecialtyFromHome;
   final DoctorService _doctorService = DoctorService();
+  final ApiService _apiService = ApiService();
   List<String> _specialties = [];
   List<Doctor> _recommendedDoctors = [];
   List<String> _hospitals = [];
@@ -28,6 +33,9 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialTab != null) {
+      _currentIndex = widget.initialTab!;
+    }
     _loadData();
   }
 
@@ -55,6 +63,7 @@ class _HomePageState extends State<HomePage> {
       // Take first 2 doctors as recommended
       final recommended = allDoctors.take(2).toList();
 
+      if (!mounted) return;
       setState(() {
         _specialties = uniqueSpecialties;
         _hospitals = uniqueHospitals;
@@ -63,11 +72,17 @@ class _HomePageState extends State<HomePage> {
         _isLoadingDoctors = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoadingSpecialties = false;
         _isLoadingDoctors = false;
       });
     }
+  }
+
+  Future<void> _logout() async {
+    await _apiService.logout();
+    Navigator.of(context).pushReplacementNamed('/login');
   }
 
   @override
@@ -141,6 +156,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildChatContent() {
+    // The viewport is zero-sized on the very first layout pass (Android reports
+    // a 0x0 surface before it is ready). Subtracting a fixed offset there would
+    // create an invalid negative height, so only reserve the filler space when
+    // there is actually room for it.
+    final double emptyStateHeight =
+        MediaQuery.of(context).size.height - 200;
+
     return SingleChildScrollView(
       child: Padding(
         padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
@@ -153,35 +175,36 @@ class _HomePageState extends State<HomePage> {
               style: AppTextStyles.headlineLg,
             ),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
-            SizedBox(
-              height: MediaQuery.of(context).size.height - 200,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.chat_bubble,
-                      size: 64,
-                      color: AppColors.secondary,
-                    ),
-                    const SizedBox(height: spacing.AppSpacing.gutterMd),
-                    Text(
-                      'No conversations yet',
-                      style: AppTextStyles.bodyMd.copyWith(
+            if (emptyStateHeight > 0)
+              SizedBox(
+                height: emptyStateHeight,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.chat_bubble,
+                        size: 64,
                         color: AppColors.secondary,
                       ),
-                    ),
-                    const SizedBox(height: spacing.AppSpacing.gutterSm),
-                    Text(
-                      'Start a conversation with a clinic secretary',
-                      style: AppTextStyles.labelSm.copyWith(
-                        color: AppColors.outline,
+                      const SizedBox(height: spacing.AppSpacing.gutterMd),
+                      Text(
+                        'No conversations yet',
+                        style: AppTextStyles.bodyMd.copyWith(
+                          color: AppColors.secondary,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: spacing.AppSpacing.gutterSm),
+                      Text(
+                        'Start a conversation with a clinic secretary',
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.outline,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -189,6 +212,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildProfileContent() {
+    // See _buildChatContent: keep the filler valid on the zero-sized first
+    // layout pass instead of subtracting from a zero height.
+    final double emptyStateHeight =
+        MediaQuery.of(context).size.height - 350;
+
     return SingleChildScrollView(
       child: Padding(
         padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
@@ -201,35 +229,43 @@ class _HomePageState extends State<HomePage> {
               style: AppTextStyles.headlineLg,
             ),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
-            SizedBox(
-              height: MediaQuery.of(context).size.height - 200,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.account_circle,
-                      size: 64,
-                      color: AppColors.secondary,
-                    ),
-                    const SizedBox(height: spacing.AppSpacing.gutterMd),
-                    Text(
-                      'Juan Reyes',
-                      style: AppTextStyles.bodyMdMedium.copyWith(
+            if (emptyStateHeight > 0)
+              SizedBox(
+                height: emptyStateHeight,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.account_circle,
+                        size: 64,
                         color: AppColors.secondary,
                       ),
-                    ),
-                    const SizedBox(height: spacing.AppSpacing.gutterXs),
-                    Text(
-                      'user@gmail.com',
-                      style: AppTextStyles.labelSm.copyWith(
-                        color: AppColors.outline,
+                      const SizedBox(height: spacing.AppSpacing.gutterMd),
+                      Text(
+                        'Juan Reyes',
+                        style: AppTextStyles.bodyMdMedium.copyWith(
+                          color: AppColors.secondary,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: spacing.AppSpacing.gutterXs),
+                      Text(
+                        'user@gmail.com',
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.outline,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
+            PrimaryButton(
+              text: 'Log Out',
+              onPressed: _logout,
+              icon: const Icon(Icons.logout, size: 20),
             ),
+            const SizedBox(height: spacing.AppSpacing.gutter3xl),
           ],
         ),
       ),

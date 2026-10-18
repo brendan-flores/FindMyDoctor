@@ -38,8 +38,7 @@ export default function AdminLogin() {
         const authData = response.data as { user: any; accessToken: string; refreshToken: string };
 
         // Set token in API client (automatically stores in localStorage)
-        apiClient.setToken(authData.accessToken);
-        localStorage.setItem('refreshToken', authData.refreshToken);
+        apiClient.setToken(authData.accessToken, authData.refreshToken);
         localStorage.setItem('user', JSON.stringify(authData.user));
 
         // Verify backend-returned role is ADMIN or SUPERADMIN
@@ -65,8 +64,7 @@ export default function AdminLogin() {
   const handleOtpVerifySuccess = (data: any) => {
     // Verify backend-returned role is ADMIN or SUPERADMIN
     if (data.user.role === 'ADMIN' || data.user.role === 'SUPERADMIN') {
-      apiClient.setToken(data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
+      apiClient.setToken(data.accessToken, data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
       router.push('/admin/dashboard');
     } else {

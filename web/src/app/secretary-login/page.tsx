@@ -58,8 +58,7 @@ export default function SecretaryLogin() {
         // Type guard: this is now AuthResponse (not LoginOtpRequiredResponse)
         const authData = response.data as { user: any; accessToken: string; refreshToken: string };
 
-        apiClient.setToken(authData.accessToken);
-        localStorage.setItem('refreshToken', authData.refreshToken);
+        apiClient.setToken(authData.accessToken, authData.refreshToken);
         localStorage.setItem('user', JSON.stringify(authData.user));
 
         if (authData.user.role === 'SECRETARY') {
@@ -86,8 +85,7 @@ export default function SecretaryLogin() {
 
   const handleOtpVerifySuccess = (data: any) => {
     if (data.user.role === 'SECRETARY') {
-      apiClient.setToken(data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
+      apiClient.setToken(data.accessToken, data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
       if (data.user.mustChangePassword === true) {
         router.push('/secretary/change-password');

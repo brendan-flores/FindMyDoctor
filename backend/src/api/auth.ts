@@ -99,7 +99,7 @@ router.post('/login', async (req: Request, res: Response) => {
   try {
     const { email, password, expectedRole, rememberMe, trustedBrowserToken } = req.body;
 
-    if (!email || !password || !['DOCTOR', 'SECRETARY', 'ADMIN'].includes(expectedRole)) {
+    if (!email || !password || !['PATIENT', 'DOCTOR', 'SECRETARY', 'ADMIN'].includes(expectedRole)) {
       return res.status(400).json(
         error(ErrorCodes.INVALID_CREDENTIALS, 'Invalid credentials or account role.')
       );
@@ -181,6 +181,9 @@ router.post('/login', async (req: Request, res: Response) => {
     const errorMessage = err.message || 'Login failed';
 
     if (errorCode === ErrorCodes.INVALID_CREDENTIALS) {
+      return res.status(401).json(error(errorCode, errorMessage));
+    }
+    if (errorCode === ErrorCodes.DOCTOR_PENDING_APPROVAL) {
       return res.status(401).json(error(errorCode, errorMessage));
     }
     if (errorCode === ErrorCodes.RATE_LIMIT) {
@@ -402,10 +405,18 @@ router.post('/change-password', authenticate, async (req: AuthRequest, res: Resp
   try {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user!.id;
+    const mustChangePassword = req.user!.mustChangePassword || false;
 
-    if (!currentPassword || !newPassword) {
+    // currentPassword is required only if must_change_password is false
+    if (!mustChangePassword && !currentPassword) {
       return res.status(400).json(
-        error(ErrorCodes.VALIDATION_ERROR, 'Current password and new password are required')
+        error(ErrorCodes.VALIDATION_ERROR, 'Current password is required')
+      );
+    }
+
+    if (!newPassword) {
+      return res.status(400).json(
+        error(ErrorCodes.VALIDATION_ERROR, 'New password is required')
       );
     }
 
@@ -415,10 +426,12 @@ router.post('/change-password', authenticate, async (req: AuthRequest, res: Resp
       );
     }
 
-    await changePassword(userId, currentPassword, newPassword);
+    const result = await changePassword(userId, currentPassword, newPassword, mustChangePassword);
 
     res.json(
-      success(null, 'Password changed successfully')
+      success({
+        accessToken: result.accessToken,
+      }, 'Password changed successfully')
     );
   } catch (err: any) {
     const errorCode = err.code || ErrorCodes.SERVER_ERROR;

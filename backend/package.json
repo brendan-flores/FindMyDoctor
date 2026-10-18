@@ -19,6 +19,8 @@
     "migrate:remove-consultation-type": "tsx src/database/applyRemoveConsultationType.ts",
     "migrate:break-periods": "tsx src/database/applyBreakPeriods.ts",
     "migrate:daily-capacities": "tsx src/database/applyDailyCapacities.ts",
+    "migrate:patient-required-fields": "tsx src/database/applyPatientRequiredFields.ts",
+    "migrate:pending-patient-signup-details": "tsx src/database/applyPendingPatientSignupDetails.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",
@@ -59,8 +61,11 @@
     "@types/multer": "^1.4.11",
     "@types/node": "^20.10.5",
     "@types/pg": "^8.10.9",
+    "@types/supertest": "^6.0.3",
     "@types/uuid": "^9.0.7",
     "jest": "^29.7.0",
+    "supertest": "^6.3.4",
+    "ts-jest": "^29.4.14",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }

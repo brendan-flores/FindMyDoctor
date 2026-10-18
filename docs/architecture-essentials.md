@@ -57,7 +57,7 @@ Do not invent roles without changing the project requirements.
 
 ### Clinic and Consultation Operations Boundary
 
-Clinic and consultation operations belong to doctors and authorized secretaries. `ADMIN` and `SUPERADMIN` roles are limited to platform, account, and approval oversight and must not receive permissions to manage working hours, availability, break periods, daily capacity, reservations, queues, payment verification, or consultation records.
+Clinic and consultation operations belong to doctors and authorized secretaries. Doctors alone may create, edit, or delete weekly working hours. Secretaries may view weekly working hours and may manage exceptions, break periods, and daily capacity only for their assigned doctor. `ADMIN` and `SUPERADMIN` roles are limited to platform, account, and approval oversight and must not receive permissions to manage schedules, availability, break periods, daily capacity, reservations, queues, payment verification, or consultation records.
 
 ---
 
@@ -485,8 +485,9 @@ If the patient has no account:
 3. Generate random temporary password.
 4. Mark account as `must_change_password`.
 5. Provide credentials through the designated process.
-6. Require password change during first login.
+6. Require password change during first login (current password field not required).
 7. Block normal application access until the password is changed.
+8. After successful password change, show onboarding screens before accessing the application.
 
 ---
 
@@ -560,9 +561,20 @@ Available Capacity
 Available Consultation
 +
 No Conflict
++
+Doctor-Specific Patient Record
 ```
 
 before creating a reservation.
+
+### Doctor-Specific Patient Record Check
+
+Before confirming an appointment, the system must verify whether the patient has an existing record with the selected doctor (such as a previous appointment or completed consultation). If no record exists with that specific doctor, the system must prompt the patient to provide required details through the backend API before proceeding with reservation. The mobile application must never connect directly to PostgreSQL for record checks or updates.
+
+**Patient Details Access:**
+- Doctors access patient details through `/doctor/patients/` for patient management and `/doctor/appointments/:id` for appointment context
+- Secretaries access patient details through `/secretary/walk-ins/` for registration, `/secretary/patients/` for lookup, and `/secretary/queue/` for queue context
+- All patient detail operations must go through the backend API; web dashboards must not connect directly to PostgreSQL
 
 ---
 
@@ -662,6 +674,7 @@ login_otp_challenges (for login OTP challenge state)
 - `006_doctor_signup_otp_flow.sql` - Doctor OTP staging table
 - `007_doctor_approval_states.sql` - Doctor approval workflow
 - `008_patient_signup_otp_flow.sql` - Patient OTP staging table
+- `026_add_pending_patient_signup_details.sql` - Adds `middle_name`, `date_of_birth`, `sex`, `phone` and `address` to the patient OTP staging table so sign-up patient details are persisted on verification
 - `013_add_two_factor_settings.sql` - Adds `two_factor_enabled` column to `doctors` and `secretaries` tables
 - `014_add_login_otp_challenges.sql` - Creates `login_otp_challenges` table for server-side OTP challenge state
 - `015_enforce_secretary_doctor_relationship.sql` - Enforces required foreign key and non-null assignment for `secretaries.doctor_id`
@@ -812,7 +825,9 @@ Patients can register accounts through email OTP verification:
 ```text
 Patient Registration Form
         ↓
-Collect Information (name, email, username, password)
+Collect Information (first/middle/last name, date of birth, sex, mobile number, address, email, username, password)
+        ↓
+Validate Email and Username Availability (409 Conflict stops the flow; nothing staged, no OTP sent)
         ↓
 Send OTP via Supabase
         ↓
@@ -820,10 +835,16 @@ Patient Enters OTP
         ↓
 Verify OTP with Supabase
         ↓
-Create Patient Account in PostgreSQL
+Create Patient Account and Patient Profile in PostgreSQL
         ↓
 Patient Can Login
 ```
+
+**Registration Requirements:**
+- Names are captured as separate `firstName`, `middleName` (optional) and `lastName`; the legacy `fullName` field is still accepted and split into first/last name for backward compatibility
+- Required patient details: date of birth (valid date), sex (one of `MALE`, `FEMALE`, `OTHER`, `NOT_SPECIFIED`), mobile number (maximum 20 characters), and address
+- Emergency contact details, medical history, allergies, and current medications are not collected during patient sign-up
+- Every patient field captured at sign-up is staged in `pending_patient_signups` and written to the `patients` table in the same PostgreSQL transaction that creates the account after OTP verification
 
 **OTP Verification Requirements:**
 - 6-digit OTP code sent to patient's email
@@ -834,7 +855,7 @@ Patient Can Login
 - Supabase is used only for OTP delivery and verification
 
 **Backend API Endpoints:**
-- `POST /api/v1/auth/patient/otp/send` - Send OTP to patient email
+- `POST /api/v1/auth/patient/otp/send` - Validate the sign-up form, stage it and send the OTP to the patient email; a taken email or username returns `409 Conflict` and no OTP is sent
 - `POST /api/v1/auth/patient/otp/verify` - Verify OTP and create patient account
 - `POST /api/v1/auth/patient/otp/resend` - Resend OTP for existing staged signup
 
@@ -843,21 +864,22 @@ Patient Can Login
 - Email verified through OTP before account activation
 - Temporary patient data staged during OTP process
 - Single PostgreSQL transaction for account creation after OTP verification
+- Email and username uniqueness are checked up-front in `/send` - after the email existence check and before the sign-up is staged or any OTP is sent - so a taken username is reported on the sign-up form instead of after OTP verification; both checks are repeated inside the account-creation transaction in `/verify`, which returns `409 Conflict` with `Email is already registered` or `Username already taken` (the `users` unique constraints are the final backstop against concurrent sign-ups)
 - 15-minute expiration for staged sign-up data
 - Automatic cleanup of expired staged sign-ups
 
 **Backend Implementation:**
 - Service: `patientOtpService.ts` handles Supabase OTP operations
 - Router: `patientOtp.ts` provides API endpoints
-- Database: `pending_patient_signups` table stages registration data
-- Migration: `008_patient_signup_otp_flow.sql` creates staging table
+- Database: `pending_patient_signups` table stages registration data (including the detailed patient fields)
+- Migration: `008_patient_signup_otp_flow.sql` creates staging table; `026_add_pending_patient_signup_details.sql` adds `middle_name`, `date_of_birth`, `sex`, `phone` and `address` to the staging table
 
 **Mobile Implementation:**
 - Page: `otp_verification_page.dart` provides 6-digit OTP input interface
 - Page: `successful_registration_page.dart` displays registration success message
 - Page: `onboarding_page.dart` provides 3-screen onboarding flow (Find doctor, Manage health, Book appointments)
 - API Service: `api_service.dart` includes patient OTP methods and token management
-- Integration: `signup_page.dart` calls backend to send OTP and navigate to verification
+- Integration: `signup_page.dart` calls backend to send OTP and navigate to verification; a `409 Conflict` from `/send` is shown on the form (using the backend message, e.g. `Username already taken`) and the user stays on the form, so an unavailable username never reaches OTP verification
 - Features: Auto-focus, paste support, resend timer, error handling
 - Flow: OTP verification → Successful registration → Onboarding → Home dashboard (authenticated)
 - Authentication: After successful OTP verification, user is automatically authenticated and can access the app directly
@@ -884,6 +906,27 @@ Patient Can Login
 - The Doctor Secretary list endpoint `GET /api/v1/doctors/secretaries` filters by that authenticated user's Doctor profile; it must never return a global Secretary list to Doctors.
 - Secretary password/profile setup does not modify the stored Doctor assignment.
 - App data is accessed through the backend PostgreSQL connection, not directly through Supabase; enforce this access boundary in backend authorization and queries.
+
+### Secretary Schedule Management
+
+Secretaries may view weekly working hours but cannot create, edit, or delete them. They may add, edit, and delete exceptions and break periods, and configure capacity, only for their assigned doctor using `secretaries.doctor_id`. Follow the existing secretary capacity ownership check; unauthorized access returns 404.
+
+Use the `/api/v1/secretaries/managed-doctors/...` API convention:
+
+- `GET /schedules` for read-only weekly working hours.
+- `GET`, `POST`, `PUT`, and `DELETE` for `/unavailability` and `/break-periods`.
+
+Apply the doctor schedule validation rules: start <= end, breaks must fall within working hours, and breaks must not overlap.
+
+When an exception or break-period change affects dates with active appointments, warn the doctor or secretary with the number of affected appointments and require explicit confirmation before saving. After confirmation, save the change and notify affected patients through the notification module. Do not automatically cancel affected appointments; the secretary handles them through existing cancellation and rescheduling flows.
+
+Do not:
+- Allow a Secretary to create, edit, or delete weekly working hours
+- Allow a Secretary to manage a schedule, exception, break period, or capacity outside their assigned Doctor
+- Return a successful response for unauthorized schedule access; return 404
+- Save an appointment-impacting exception or break-period change without explicit confirmation
+- Automatically cancel appointments affected by a confirmed schedule change
+- Allow ADMIN or SUPERADMIN to manage schedules, availability, breaks, or capacity
 
 ### Backend Integration
 

@@ -98,6 +98,7 @@ export default function DoctorProfilePage() {
             biography: response.data.biography || undefined,
             consultation_fee: response.data.consultation_fee || undefined,
             languages_spoken: response.data.languages_spoken || undefined,
+            room_number: response.data.room_number || undefined,
           });
           if (response.data.professional_photo_url) {
             setPhotoPreview(
@@ -141,6 +142,7 @@ export default function DoctorProfilePage() {
         biography: profile.biography || undefined,
         consultation_fee: profile.consultation_fee || undefined,
         languages_spoken: profile.languages_spoken || undefined,
+        room_number: profile.room_number || undefined,
       });
     }
   };
@@ -449,6 +451,17 @@ export default function DoctorProfilePage() {
                   value={editForm.practice_name || ''}
                   onChange={(value) => setEditForm({ ...editForm, practice_name: value })}
                   placeholder="Select hospital/clinic"
+                />
+              )}
+            </Detail>
+            <Detail label="Room Number" value={profile.room_number}>
+              {isEditing && (
+                <input
+                  type="text"
+                  value={editForm.room_number || ''}
+                  onChange={(e) => setEditForm({ ...editForm, room_number: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 transition-all"
+                  placeholder="e.g., Room 406, Suite 302"
                 />
               )}
             </Detail>

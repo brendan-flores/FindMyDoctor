@@ -18,7 +18,7 @@ Patients can search for doctors, view doctor profiles and availability, reserve 
 
 Doctors can manage their availability, daily patient capacity, appointments, patient information, visit history, and digital prescriptions.
 
-Secretaries are responsible for operational tasks such as walk-in registration, daily queue management, patient communication, payment verification, daily capacity management, and appointment-related assistance.
+Secretaries are responsible for operational tasks such as walk-in registration, daily queue management, patient communication, payment verification, daily capacity management, day-to-day exception and break-period changes, and appointment-related assistance.
 
 Administrators manage users, doctors, secretaries, and approvals.
 
@@ -170,6 +170,7 @@ Doctors can:
 - Manage their profile.
 - Manage working hours.
 - Manage availability.
+- Manage date-specific exceptions and break periods.
 - Configure daily patient capacity.
 - View appointments.
 - View queue information where authorized.
@@ -189,7 +190,9 @@ Secretaries can:
 - Register walk-in patients.
 - Locate existing patient accounts.
 - Create patient accounts.
-- Manage daily patient capacity where authorized.
+- View their assigned doctor's weekly working hours without changing them.
+- Add, edit, and delete date-specific exceptions and break periods for their assigned doctor.
+- Configure daily patient capacity for their assigned doctor.
 - Manage the unified queue.
 - Call patients.
 - Skip or mark patients as not present.
@@ -291,13 +294,19 @@ The system may calculate this as the estimated daily capacity.
 
 ### Configured Capacity
 
-The doctor and authorized secretary may configure a lower maximum patient capacity for a particular date.
+The doctor and an authorized secretary may configure a lower maximum patient capacity for a particular date. A secretary may configure capacity only for their assigned doctor.
 
 The configured limit shall override the calculated capacity when it is lower.
 
 ### Final Daily Capacity
 
 The final allowed capacity is the effective maximum used for the daily queue.
+
+### Schedule Management Permissions
+
+Doctors may create, edit, and delete weekly working hours, exceptions, and break periods. Secretaries may view weekly working hours but may not create, edit, or delete them. A secretary may add, edit, and delete date-specific exceptions and break periods only for their assigned doctor, and may configure capacity for that doctor.
+
+Schedule changes must follow the doctor schedule validation rules: start <= end, breaks must fall within working hours, and breaks must not overlap. Before saving an exception or break-period change that affects dates with active appointments, the system must show the secretary or doctor the number of affected appointments and require explicit confirmation. After confirmation, the change is saved and affected patients are notified through the notification module. Appointments are not automatically cancelled; the secretary handles them through the existing cancel and reschedule flows.
 
 ---
 
@@ -307,18 +316,59 @@ Patients may reserve regular consultation schedules without advance payment.
 
 Payment is **not required** for a successful regular reservation.
 
+### Doctor-Specific Patient Record Check
+
+When a patient selects a doctor and proceeds with appointment booking, the system must check whether that patient already has an existing record associated with the selected doctor.
+
+**Backend API Endpoints:**
+- `GET /api/v1/patients/check-record?doctorId={id}` - Patient-only endpoint to check if they have an existing record with the selected doctor
+- `POST /api/v1/patients/submit-details` - Patient-only endpoint to submit required details for a specific doctor before first booking
+- `GET /api/v1/patients/me` - Patient-only endpoint to view their own profile
+- `PUT /api/v1/patients/me` - Patient-only endpoint to update their own profile (requires authentication)
+- `GET /api/v1/patients/doctor/:doctorId` - Doctor-only endpoint to list all patients who have associations or appointments with them
+- `GET /api/v1/patients/search` - Secretary-only endpoint to search patients by email, phone, or name for walk-in registration (restricted to assigned doctor's patients)
+- `GET /api/v1/patients/:id` - Doctor and Secretary endpoint to view specific patient details (with role-based authorization)
+
+**Check Criteria:**
+- The system must verify if the patient has a prior relationship with the selected doctor (such as a previous appointment, completed consultation, or submitted patient details).
+- Having an account or a record with another doctor must not automatically count as having an existing record with the selected doctor.
+- The check must use the patient's authenticated account and the selected doctor's identity.
+- The backend queries the `patient_doctor_associations` table for persistent associations, with fallback to the `appointments` table for backward compatibility.
+
+**If No Existing Record:**
+- The system must prompt the patient to fill out the required personal details before proceeding with the booking.
+- Required fields: first name (required), middle name (optional), last name (required), date of birth (required), sex (required: MALE, FEMALE, OTHER, NOT_SPECIFIED), mobile number (required), address (required)
+- Optional fields: emergency contact name, emergency contact phone, medical history, allergies, current medications
+- After the patient submits the required details via `POST /api/v1/patients/submit-details`, the system saves them in the `patients` table and creates a persistent association in the `patient_doctor_associations` table.
+- The patient must be allowed to continue booking without restarting the process after successful save.
+
+**If Existing Record Exists:**
+- The patient may proceed directly with booking without filling out the same details again.
+- The system must not create duplicate patient accounts or duplicate doctor-patient records unnecessarily.
+
+**Patient Details Storage and Access:**
+- Doctors view and manage patient details on the Doctor Dashboard at `/doctor/patients/`
+- Doctors can also view patient details within appointment records at `/doctor/appointments/:id`
+- Secretaries save patient details during walk-in registration at `/secretary/walk-ins/`
+- Secretaries view and search patient details at `/secretary/patients/` (restricted to their assigned doctor's patients)
+- Patient details are also shown contextually in the queue view at `/secretary/queue/`
+- All patient details operations must go through the backend REST API; mobile and web applications must not connect directly to PostgreSQL
+
+### Reservation Success Criteria
+
 A reservation is successful when the system:
 
 1. Validates the doctor.
 2. Validates the schedule.
 3. Validates capacity.
-4. Validates the selected consultation period.
-5. Confirms no conflicting reservation exists.
-6. Creates the reservation.
-7. Assigns the patient a queue number.
-8. Adds the patient to the unified daily queue.
-9. Updates the remaining daily capacity.
-10. Displays the queue confirmation.
+4. Validates the selected date.
+5. Confirms no conflicting reservation exists for the same date.
+6. Validates that the patient has an existing record with the selected doctor or collects required details if none exists.
+7. Creates the reservation.
+8. Assigns the patient a queue number.
+9. Adds the patient to the unified daily queue.
+10. Updates the remaining daily capacity.
+11. Displays the queue confirmation.
 
 Example:
 
@@ -421,6 +471,7 @@ When a walk-in patient does not have an account:
 5. The account is marked as requiring a password change.
 6. At first login, the patient must change the generated password.
 7. The patient cannot access normal application features until the password is changed.
+8. After successful password change, the patient views onboarding screens before accessing the application (same as regular app registration).
 
 The generated patient account becomes the permanent identity used for:
 
@@ -682,29 +733,38 @@ The system shall allow users to register accounts.
 
 Patients shall be able to register accounts through email OTP verification. The registration flow shall:
 
-1. Collect patient information (full name, email, username, password)
-2. Send a 6-digit OTP code to the patient's email via Supabase
+1. Collect patient information: first name, middle name (optional), last name, date of birth, sex, mobile number, address, email, username, and password
+2. Check the email and username availability, then send a 6-digit OTP code to the patient's email via Supabase (no OTP is sent when either is already taken)
 3. Verify the OTP code before creating the patient account
 4. Create the patient account in PostgreSQL upon successful OTP verification
 5. PostgreSQL remains the single source of truth for patient account data
 6. Supabase is used only for OTP email delivery and verification, not for storing patient data
 
+**Patient Information Requirements:**
+- Names are collected as separate first name, middle name (optional), and last name components (persisted as `first_name`, `middle_name`, `last_name`)
+- Required fields: first name (1–100 characters), last name (1–100 characters), date of birth (valid date), sex, mobile number (maximum 20 characters), address
+- Sex must be one of `MALE`, `FEMALE`, `OTHER`, or `NOT_SPECIFIED`
+- Email, username, password (minimum 8 characters), and confirm password are also required
+- Emergency contact details, medical history, allergies, and current medications are NOT collected during patient sign-up
+- All patient details collected at sign-up are staged and then persisted to the `patients` table when the account is created after OTP verification
+
 **Backend API Endpoints:**
-- `POST /api/v1/auth/patient/otp/send` - Send OTP to patient email
+- `POST /api/v1/auth/patient/otp/send` - Validate the sign-up form, stage it and send the OTP to the patient email; a taken email or username returns `409 Conflict` and no OTP is sent
 - `POST /api/v1/auth/patient/otp/verify` - Verify OTP and create patient account
 - `POST /api/v1/auth/patient/otp/resend` - Resend OTP for existing staged signup
 
 **Backend Implementation:**
 - Service: `patientOtpService.ts` handles Supabase OTP operations
 - Router: `patientOtp.ts` provides API endpoints
-- Database: `pending_patient_signups` table stages registration data
-- Migration: `008_patient_signup_otp_flow.sql` creates staging table
+- Database: `pending_patient_signups` table stages registration data (including the detailed patient fields)
+- Migration: `008_patient_signup_otp_flow.sql` creates the staging table; `026_add_pending_patient_signup_details.sql` adds `middle_name`, `date_of_birth`, `sex`, `phone` and `address`
 
 **Security Requirements:**
 - Password hashed with bcrypt before storage
 - Email verified through OTP before account activation
 - Temporary patient data staged during OTP process
 - Single PostgreSQL transaction for account creation after OTP verification
+- Email and username uniqueness are checked up-front in `/send` - after the email existence check and before the sign-up is staged or any OTP is sent - so a taken username is reported on the sign-up form instead of after OTP verification; both checks are repeated inside the account-creation transaction in `/verify`, which returns `409 Conflict` with `Email is already registered` or `Username already taken` (the `users` unique constraints are the final backstop against concurrent sign-ups)
 - 15-minute expiration for staged sign-up data
 - Automatic cleanup of expired staged sign-ups
 
@@ -713,7 +773,7 @@ Patients shall be able to register accounts through email OTP verification. The 
 - Page: `successful_registration_page.dart` displays registration success message
 - Page: `onboarding_page.dart` provides 3-screen onboarding flow (Find doctor, Manage health, Book appointments)
 - API Service: `api_service.dart` includes patient OTP methods and token management
-- Integration: `signup_page.dart` calls backend to send OTP and navigate to verification
+- Integration: `signup_page.dart` calls backend to send OTP and navigate to verification; a `409 Conflict` from `/send` is shown on the form (using the backend message, e.g. `Username already taken`) and the user stays on the form, so an unavailable username never reaches OTP verification
 - Features: Auto-focus, paste support, resend timer, error handling
 - Flow: OTP verification → Successful registration → Onboarding → Home dashboard (authenticated)
 - Authentication: After successful OTP verification, user is automatically authenticated and can access the app directly
@@ -786,11 +846,11 @@ The system shall calculate estimated daily capacity from available consultation 
 
 ## FR-009 — Configured Capacity
 
-The doctor and authorized secretary shall be able to configure a daily maximum.
+The doctor and an authorized secretary shall be able to configure a daily maximum for a particular date. A secretary may configure capacity only for their assigned doctor.
 
 ## FR-010 — Capacity Override
 
-The configured lower maximum shall override calculated capacity.
+The configured lower maximum shall override calculated capacity. A secretary may configure this limit only for their assigned doctor.
 
 ## FR-011 — Reservation Without Payment
 
@@ -906,7 +966,7 @@ The system shall generate prescription PDFs.
 
 ## FR-039 — Notification System
 
-The system shall provide relevant application notifications.
+The system shall provide relevant application notifications, including notifications to affected patients after a confirmed doctor or secretary exception or break-period change affects dates with active appointments.
 
 ## FR-040 — Doctor Approval
 
@@ -963,6 +1023,10 @@ The Doctor's Secretary/Team page shall show only Secretaries assigned to that Do
 ### Secretary — Capacity
 
 **As a secretary,** I want to configure the daily patient limit so that the system does not exceed its capacity.
+
+### Secretary — Schedule Changes
+
+**As a secretary,** I want to view my assigned doctor's weekly working hours and manage date-specific exceptions and break periods, with confirmation when active appointments are affected, so that I can help with day-to-day schedule changes without changing the doctor's weekly commitment.
 
 ### Doctor — Capacity
 
@@ -1161,6 +1225,8 @@ Patient Views Professional Details
 - Patient chat.
 - Walk-in registration.
 - Account creation.
+- Weekly working hours view (read-only).
+- Exception and break-period management for the assigned doctor.
 - Daily capacity management.
 - Queue management.
 - Patient calling.
@@ -1215,6 +1281,7 @@ The web application provides role-specific dashboards for doctors, secretaries, 
 **Secretary Web Dashboard:**
 - Daily queue management
 - Walk-in registration
+- Schedule management (weekly working hours view only, exceptions, break periods, and capacity)
 - Payment verification
 - Patient communication
 
@@ -1375,7 +1442,7 @@ Doctors can manage their available schedules through authenticated endpoints tha
   - Verifies ownership - only allows deletion of schedules belonging to the authenticated doctor
   - Returns success confirmation
 
-This reuses the existing `doctor_schedules` table and does not create a new schedule representation. The schedule infrastructure supports both doctor self-management and administrative configuration.
+This reuses the existing `doctor_schedules` table and does not create a new schedule representation. Weekly working hours are managed by doctors only; secretaries may view their assigned doctor's weekly hours and manage date-specific exceptions and break periods. This does not grant schedule-management permissions to ADMIN or SUPERADMIN.
 
 Administrator-provisioned doctor accounts remain available for accounts created on a doctor's behalf.
 

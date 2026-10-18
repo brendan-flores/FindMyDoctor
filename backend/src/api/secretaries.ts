@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { query } from '../database/connection';
+import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 import { calculateCapacity, calculateCapacityRange } from '../modules/capacity/capacityService';
@@ -16,7 +16,7 @@ router.get('/me', authenticate, authorize('SECRETARY'), async (req: AuthRequest,
         s.id, s.user_id, s.doctor_id, s.first_name, s.middle_name, s.last_name, s.contact_number,
         s.two_factor_enabled, s.is_approved,
         u.email, u.role, u.must_change_password,
-        d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.practice_name
+        d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.practice_name, d.room_number
        FROM secretaries s
        INNER JOIN users u ON s.user_id = u.id
        INNER JOIN doctors d ON s.doctor_id = d.id
@@ -317,6 +317,471 @@ router.post('/managed-doctors/capacity/:date', authenticate, authorize('SECRETAR
     res.json(success(updatedCapacity, 'Capacity set successfully'));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to set capacity'));
+  }
+});
+
+// ============================================
+// SECRETARY SCHEDULE ENDPOINTS
+// ============================================
+
+// Get managed doctor's schedules (read-only)
+router.get('/managed-doctors/schedules', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [userId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+    const { includeInactive } = req.query;
+
+    let queryText = 'SELECT * FROM doctor_schedules WHERE doctor_id = $1';
+    const params = [doctorId];
+
+    if (includeInactive !== 'true') {
+      queryText += ' AND is_active = true';
+    }
+
+    queryText += ' ORDER BY day_of_week, start_time';
+
+    const result = await query(queryText, params);
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor schedules'));
+  }
+});
+
+// Get managed doctor's unavailability periods (exceptions)
+router.get('/managed-doctors/unavailability', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [userId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+    const { includeInactive } = req.query;
+
+    let queryText = 'SELECT * FROM doctor_unavailability WHERE doctor_id = $1';
+    const params = [doctorId];
+
+    if (includeInactive !== 'true') {
+      queryText += ' AND is_active = true';
+    }
+
+    queryText += ' ORDER BY start_date';
+
+    const result = await query(queryText, params);
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor unavailability periods'));
+  }
+});
+
+// Create unavailability period (exception) for managed doctor
+router.post('/managed-doctors/unavailability', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { startDate, endDate, reason } = req.body;
+
+    // Validation
+    if (!startDate || !endDate) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'startDate and endDate are required'));
+    }
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await client.query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+
+    // Validate date format
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+
+    if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid date format'));
+    }
+
+    // Validate start date <= end date
+    if (startDateObj > endDateObj) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start date must be before or equal to end date'));
+    }
+
+    // Create unavailability period
+    const result = await client.query(
+      `INSERT INTO doctor_unavailability (doctor_id, start_date, end_date, reason, is_active)
+       VALUES ($1, $2, $3, $4, true)
+       RETURNING *`,
+      [doctorId, startDate, endDate, reason || null]
+    );
+
+    await client.query('COMMIT');
+
+    res.status(201).json(success(result.rows[0], 'Unavailability period created successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Unavailability creation error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create unavailability period'));
+  } finally {
+    client.release();
+  }
+});
+
+// Update unavailability period for managed doctor
+router.put('/managed-doctors/unavailability/:id', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const { startDate, endDate, reason } = req.body;
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await client.query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+
+    // Verify the unavailability period belongs to the managed doctor
+    const unavailabilityResult = await client.query(
+      'SELECT * FROM doctor_unavailability WHERE id = $1 AND doctor_id = $2',
+      [id, doctorId]
+    );
+
+    if (unavailabilityResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Unavailability period not found or access denied'));
+    }
+
+    // Validate date format
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+
+    if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid date format'));
+    }
+
+    // Validate start date <= end date
+    if (startDateObj > endDateObj) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start date must be before or equal to end date'));
+    }
+
+    // Update unavailability period
+    const result = await client.query(
+      `UPDATE doctor_unavailability
+       SET start_date = $1, end_date = $2, reason = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 AND doctor_id = $5
+       RETURNING *`,
+      [startDate, endDate, reason || null, id, doctorId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json(success(result.rows[0], 'Unavailability period updated successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Unavailability update error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update unavailability period'));
+  } finally {
+    client.release();
+  }
+});
+
+// Delete unavailability period for managed doctor
+router.delete('/managed-doctors/unavailability/:id', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+
+    // Verify the unavailability period belongs to the managed doctor
+    const unavailabilityResult = await query(
+      'SELECT * FROM doctor_unavailability WHERE id = $1 AND doctor_id = $2',
+      [id, doctorId]
+    );
+
+    if (unavailabilityResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Unavailability period not found or access denied'));
+    }
+
+    // Delete unavailability period
+    const result = await query(
+      'DELETE FROM doctor_unavailability WHERE id = $1 AND doctor_id = $2 RETURNING *',
+      [id, doctorId]
+    );
+
+    res.json(success(result.rows[0], 'Unavailability period deleted successfully'));
+  } catch (err: any) {
+    console.error('Unavailability deletion error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete unavailability period'));
+  }
+});
+
+// Get managed doctor's break periods
+router.get('/managed-doctors/break-periods', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [userId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+    const { includeInactive, startDate, endDate } = req.query;
+
+    let queryText = 'SELECT * FROM doctor_break_periods WHERE doctor_id = $1';
+    const params = [doctorId];
+
+    if (includeInactive !== 'true') {
+      queryText += ' AND is_active = true';
+    }
+
+    if (startDate) {
+      queryText += ' AND break_date >= $2';
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      queryText += ' AND break_date <= $' + (params.length + 1);
+      params.push(endDate);
+    }
+
+    queryText += ' ORDER BY break_date, start_time';
+
+    const result = await query(queryText, params);
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor break periods'));
+  }
+});
+
+// Create break period for managed doctor
+router.post('/managed-doctors/break-periods', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { breakDate, startTime, endTime, reason } = req.body;
+
+    // Validation
+    if (!breakDate || !startTime || !endTime) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'breakDate, startTime, and endTime are required'));
+    }
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await client.query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+
+    // Validate time format
+    const startTimeDate = new Date(`2000-01-01T${startTime}`);
+    const endTimeDate = new Date(`2000-01-01T${endTime}`);
+
+    if (isNaN(startTimeDate.getTime()) || isNaN(endTimeDate.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid time format. Use HH:MM format'));
+    }
+
+    // Validate start time < end time
+    if (startTimeDate >= endTimeDate) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start time must be before end time'));
+    }
+
+    // Create break period
+    const result = await client.query(
+      `INSERT INTO doctor_break_periods (doctor_id, break_date, start_time, end_time, reason, is_active)
+       VALUES ($1, $2, $3, $4, $5, true)
+       RETURNING *`,
+      [doctorId, breakDate, startTime, endTime, reason || null]
+    );
+
+    await client.query('COMMIT');
+
+    res.status(201).json(success(result.rows[0], 'Break period created successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Break period creation error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create break period'));
+  } finally {
+    client.release();
+  }
+});
+
+// Update break period for managed doctor
+router.put('/managed-doctors/break-periods/:id', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const { breakDate, startTime, endTime, reason } = req.body;
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await client.query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+
+    // Verify the break period belongs to the managed doctor
+    const breakResult = await client.query(
+      'SELECT * FROM doctor_break_periods WHERE id = $1 AND doctor_id = $2',
+      [id, doctorId]
+    );
+
+    if (breakResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Break period not found or access denied'));
+    }
+
+    // Validate time format
+    const startTimeDate = new Date(`2000-01-01T${startTime}`);
+    const endTimeDate = new Date(`2000-01-01T${endTime}`);
+
+    if (isNaN(startTimeDate.getTime()) || isNaN(endTimeDate.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid time format. Use HH:MM format'));
+    }
+
+    // Validate start time < end time
+    if (startTimeDate >= endTimeDate) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start time must be before end time'));
+    }
+
+    // Update break period
+    const result = await client.query(
+      `UPDATE doctor_break_periods
+       SET break_date = $1, start_time = $2, end_time = $3, reason = $4, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5 AND doctor_id = $6
+       RETURNING *`,
+      [breakDate, startTime, endTime, reason || null, id, doctorId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json(success(result.rows[0], 'Break period updated successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Break period update error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update break period'));
+  } finally {
+    client.release();
+  }
+});
+
+// Delete break period for managed doctor
+router.delete('/managed-doctors/break-periods/:id', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [req.user!.id]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+
+    // Verify the break period belongs to the managed doctor
+    const breakResult = await query(
+      'SELECT * FROM doctor_break_periods WHERE id = $1 AND doctor_id = $2',
+      [id, doctorId]
+    );
+
+    if (breakResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Break period not found or access denied'));
+    }
+
+    // Delete break period
+    const result = await query(
+      'DELETE FROM doctor_break_periods WHERE id = $1 AND doctor_id = $2 RETURNING *',
+      [id, doctorId]
+    );
+
+    res.json(success(result.rows[0], 'Break period deleted successfully'));
+  } catch (err: any) {
+    console.error('Break period deletion error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete break period'));
   }
 });
 
