@@ -51,11 +51,11 @@ export default function AdminSidebar({ userName = 'Eleanor Vance', userRole = 'S
       {/* Top & Navigation Region */}
       <div className="flex flex-col min-h-0">
         {/* Brand Logo Header */}
-        <div className="h-16 px-6 border-b border-slate-100 flex items-center">
+        <div className="h-16 px-6 border-b border-slate-100 flex items-center justify-center">
           <img
             src="/images/findmydoctor_logo.png"
             alt="FindMyDoctor Logo"
-            className="h-10 w-auto"
+            className="h-14 w-auto max-w-full object-contain"
           />
         </div>
 
