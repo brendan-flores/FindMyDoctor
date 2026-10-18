@@ -723,3 +723,190 @@ describe('GET /api/v1/appointments/:id authorization', () => {
     });
   });
 });
+
+describe('Appointment Cancellation with Queue Renumbering', () => {
+  let app: express.Application;
+  let mockClient: any;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/appointments', appointmentsRouter);
+    mockUser = { id: 'test-patient-user-id', role: 'PATIENT', mustChangePassword: false };
+    mockClient = {
+      query: jest.fn(),
+      release: jest.fn(),
+    };
+    getClient.mockResolvedValue(mockClient);
+    jest.clearAllMocks();
+  });
+
+  it('should delete queue entry and renumber queue on cancellation', async () => {
+    mockClient.query.mockImplementation((sql: string, params: any[]) => {
+      if (sql.includes('BEGIN')) {
+        return Promise.resolve();
+      }
+      if (sql.includes('SELECT') && sql.includes('appointments a')) {
+        // Get appointment with queue info
+        return Promise.resolve({
+          rows: [{
+            id: 'apt-1',
+            patient_id: 'patient-123',
+            doctor_id: 'doctor-456',
+            appointment_date: '2026-10-20',
+            status: 'SCHEDULED',
+            queue_number: 1,
+            queue_date: '2026-10-20'
+          }]
+        });
+      }
+      if (sql.includes('pg_try_advisory_xact_lock')) {
+        return Promise.resolve({ rows: [{ lock_acquired: true }] });
+      }
+      if (sql.includes("UPDATE appointments SET status = 'CANCELLED'")) {
+        return Promise.resolve();
+      }
+      if (sql.includes('DELETE FROM queue_entries')) {
+        // Verify queue entry is deleted (not just status-updated)
+        expect(sql).toContain('DELETE FROM queue_entries WHERE appointment_id = $1');
+        expect(params).toEqual(['apt-1']);
+        return Promise.resolve();
+      }
+      if (sql.includes('SELECT') && sql.includes('queue_entries q') && sql.includes('queue_number >')) {
+        // Get affected entries for renumbering
+        // The query uses: q.queue_number as old_queue_number
+        return Promise.resolve({
+          rows: [{
+            id: 'queue-2',
+            patient_id: 'patient-456',
+            old_queue_number: 2
+          }]
+        });
+      }
+      if (sql.includes('UPDATE queue_entries') && sql.includes('SET queue_number')) {
+        // Verify queue renumbering
+        // The code calculates: newQueueNumber = entry.old_queue_number - 1
+        // With old_queue_number = 2, new should be 1
+        expect(params[0]).toBe(1);
+        expect(params[1]).toBe('queue-2');
+        return Promise.resolve();
+      }
+      if (sql.includes('INSERT INTO notifications')) {
+        return Promise.resolve();
+      }
+      if (sql.includes('UPDATE daily_capacities')) {
+        return Promise.resolve();
+      }
+      if (sql.includes('COMMIT')) {
+        return Promise.resolve();
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .patch('/api/v1/appointments/apt-1/cancel');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.message).toBe('Appointment cancelled successfully');
+
+    // Verify DELETE was called (not UPDATE status)
+    const deleteCalls = mockClient.query.mock.calls.filter((call: any[]) => 
+      call[0].includes('DELETE FROM queue_entries')
+    );
+    expect(deleteCalls.length).toBe(1);
+
+    // Verify queue renumbering was called
+    const renumberCalls = mockClient.query.mock.calls.filter((call: any[]) => 
+      call[0].includes('UPDATE queue_entries') && call[0].includes('SET queue_number')
+    );
+    expect(renumberCalls.length).toBe(1);
+
+    // Verify notification was sent
+    const notificationCalls = mockClient.query.mock.calls.filter((call: any[]) => 
+      call[0].includes('INSERT INTO notifications') && call[0].includes('QUEUE_UPDATED')
+    );
+    expect(notificationCalls.length).toBe(1);
+  });
+
+  it('should handle cancellation when no patients behind in queue', async () => {
+    mockClient.query.mockImplementation((sql: string, params: any[]) => {
+      if (sql.includes('BEGIN')) {
+        return Promise.resolve();
+      }
+      if (sql.includes('SELECT') && sql.includes('appointments a')) {
+        return Promise.resolve({
+          rows: [{
+            id: 'apt-1',
+            patient_id: 'patient-123',
+            doctor_id: 'doctor-456',
+            appointment_date: '2026-10-20',
+            status: 'SCHEDULED',
+            queue_number: 1,
+            queue_date: '2026-10-20'
+          }]
+        });
+      }
+      if (sql.includes('pg_try_advisory_xact_lock')) {
+        return Promise.resolve({ rows: [{ lock_acquired: true }] });
+      }
+      if (sql.includes("UPDATE appointments SET status = 'CANCELLED'")) {
+        return Promise.resolve();
+      }
+      if (sql.includes('DELETE FROM queue_entries')) {
+        return Promise.resolve();
+      }
+      if (sql.includes('SELECT') && sql.includes('queue_entries q') && sql.includes('queue_number >')) {
+        // No affected entries (no patients behind)
+        return Promise.resolve({ rows: [] });
+      }
+      if (sql.includes('UPDATE daily_capacities')) {
+        return Promise.resolve();
+      }
+      if (sql.includes('COMMIT')) {
+        return Promise.resolve();
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .patch('/api/v1/appointments/apt-1/cancel');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+
+    // Verify no renumbering occurred (no UPDATE queue_number calls)
+    const renumberCalls = mockClient.query.mock.calls.filter((call: any[]) => 
+      call[0].includes('UPDATE queue_entries') && call[0].includes('SET queue_number')
+    );
+    expect(renumberCalls.length).toBe(0);
+  });
+
+  it('should reject cancellation for already cancelled or completed appointments', async () => {
+    mockClient.query.mockImplementation((sql: string, params: any[]) => {
+      if (sql.includes('BEGIN')) {
+        return Promise.resolve();
+      }
+      if (sql.includes('SELECT') && sql.includes('appointments a')) {
+        return Promise.resolve({
+          rows: [{
+            id: 'apt-1',
+            patient_id: 'patient-123',
+            doctor_id: 'doctor-456',
+            appointment_date: '2026-10-20',
+            status: 'CANCELLED', // Already cancelled
+            queue_number: 1,
+            queue_date: '2026-10-20'
+          }]
+        });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .patch('/api/v1/appointments/apt-1/cancel');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('INVALID_APPOINTMENT_STATUS');
+  });
+});

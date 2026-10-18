@@ -477,9 +477,10 @@ router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATI
       [id]
     );
 
-    // Update queue entry
+    // Delete the queue entry to free the queue slot (prevents unique constraint violation during renumbering)
+    // The appointment record remains for audit purposes
     await client.query(
-      "UPDATE queue_entries SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE appointment_id = $1",
+      "DELETE FROM queue_entries WHERE appointment_id = $1",
       [id]
     );
 
