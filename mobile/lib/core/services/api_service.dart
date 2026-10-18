@@ -450,6 +450,10 @@ class ApiService {
     );
   }
 
+  Future<Map<String, dynamic>> getAppointmentById(String id) async {
+    return await get('${ApiConstants.appointments}/$id');
+  }
+
   Future<Map<String, dynamic>> bookAppointment({
     required String doctorId,
     required String appointmentDate,

@@ -6,6 +6,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/services/api_service.dart';
+import 'appointment_detail_page.dart';
 
 class AppointmentsPage extends StatefulWidget {
   final ApiService? apiService;
@@ -68,6 +69,23 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
         _errorMessage = 'Failed to load appointments: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _navigateToDetail(String appointmentId) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AppointmentDetailPage(
+          appointmentId: appointmentId,
+          apiService: _apiService,
+        ),
+      ),
+    );
+
+    // Refresh the list if returning from detail page after cancellation
+    if (result == true) {
+      _fetchAppointments();
     }
   }
 
@@ -435,9 +453,11 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     final appointmentDate = DateTime.parse(appointment['appointment_date']);
     final queueNumber = appointment['queue_number'];
     final status = appointment['status'];
+    final appointmentId = appointment['id']?.toString() ?? '';
 
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
+      onTap: () => _navigateToDetail(appointmentId),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
