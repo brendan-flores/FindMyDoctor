@@ -365,11 +365,9 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
             controller: _dateOfBirthController,
             keyboardType: TextInputType.datetime,
             prefixIcon: Icons.calendar_today,
-            enabled: false,
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.calendar_month),
-              onPressed: _selectDateOfBirth,
-            ),
+            readOnly: true,
+            onTap: _selectDateOfBirth,
+            suffixIcon: const Icon(Icons.calendar_month),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
                 return 'Date of birth is required';
