@@ -386,6 +386,7 @@ class ApiService {
         if (currentMedications != null)
           'currentMedications': currentMedications,
       },
+      requireAuth: true,
     );
   }
 
