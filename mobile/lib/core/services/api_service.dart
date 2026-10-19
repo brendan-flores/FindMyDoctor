@@ -178,18 +178,55 @@ class ApiService {
   // ===========================
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    final response = await post(
-      ApiConstants.login,
-      body: {'email': email, 'password': password, 'expectedRole': 'PATIENT'},
-      requireAuth: false,
-    );
+    // The mobile application is shared by patients and secretaries. There is
+    // no role selector, so the backend is asked to verify the account as a
+    // patient first and then as a secretary. The User record's role field
+    // remains the single source of truth; the backend still rejects any
+    // account that does not match the attempted role.
+    Map<String, dynamic>? lastFailure;
 
-    if (response['success'] == true) {
-      final accessToken = response['data']['accessToken'];
-      await _saveToken(accessToken);
+    for (final expectedRole in const ['PATIENT', 'SECRETARY']) {
+      try {
+        final response = await post(
+          ApiConstants.login,
+          body: {
+            'email': email,
+            'password': password,
+            'expectedRole': expectedRole,
+          },
+          requireAuth: false,
+        );
+
+        if (response['success'] == true) {
+          final data = response['data'];
+          final accessToken = data is Map ? data['accessToken'] : null;
+          if (accessToken is String && accessToken.isNotEmpty) {
+            await _saveToken(accessToken);
+          }
+          return response;
+        }
+
+        lastFailure = response;
+      } on ApiException catch (e) {
+        lastFailure = {
+          'success': false,
+          'error': {'message': e.message, 'code': e.code},
+        };
+
+        // Only an invalid role/credential response is worth retrying with the
+        // other supported mobile role. Network and server errors surface
+        // immediately.
+        if (e.code != 'INVALID_CREDENTIALS') {
+          rethrow;
+        }
+      }
     }
 
-    return response;
+    return lastFailure ??
+        {
+          'success': false,
+          'error': {'message': 'Login failed', 'code': 'UNKNOWN_ERROR'},
+        };
   }
 
   Future<Map<String, dynamic>> register({
@@ -221,16 +258,34 @@ class ApiService {
 
   Future<void> logout() async {
     try {
+      // Remove the registered push device token before clearing the session so
+      // the device stops receiving notifications for the prior user.
+      final prefs = await SharedPreferences.getInstance();
+      final deviceTokenId = prefs.getString('device_token_id');
+      if (deviceTokenId != null && deviceTokenId.isNotEmpty) {
+        try {
+          await delete(
+            '${ApiConstants.notificationsDeviceTokens}/$deviceTokenId',
+            requireAuth: true,
+          );
+        } catch (_) {
+          // Continue with logout even if token removal fails.
+        }
+      }
+
       // Call backend logout endpoint
       await post('/auth/logout', requireAuth: true);
     } catch (e) {
       // Backend logout failed, but continue with local logout
       print('Backend logout failed (continuing with local logout)');
     } finally {
-      // Always clear local token and must_change_password flag
+      // Always clear local token, role, device token, and password-change flag
       await _clearToken();
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('must_change_password');
+      await prefs.remove('user_role');
+      await prefs.remove('device_token_id');
+      await prefs.remove('device_token');
     }
   }
 
@@ -509,6 +564,16 @@ class ApiService {
     );
   }
 
+  // Read-only appointment summary for the secretary patient-info sheet
+  Future<Map<String, dynamic>> getAppointmentSummary(
+    String conversationId,
+  ) async {
+    return await get(
+      '${ApiConstants.conversations}/$conversationId${ApiConstants.conversationAppointmentSummary}',
+      requireAuth: true,
+    );
+  }
+
   // ===========================
   // AI CHAT METHODS
   // ===========================
@@ -537,6 +602,35 @@ class ApiService {
   Future<Map<String, dynamic>> markNotificationRead(String id) async {
     return await patch(
       '${ApiConstants.notifications}/$id${ApiConstants.notificationRead}',
+    );
+  }
+
+  // ===========================
+  // PUSH DEVICE TOKEN METHODS
+  // ===========================
+
+  Future<Map<String, dynamic>> registerDeviceToken({
+    required String token,
+    String provider = 'FCM',
+    String platform = 'ANDROID',
+    String? deviceInfo,
+  }) async {
+    return await post(
+      ApiConstants.notificationsDeviceTokens,
+      body: {
+        'token': token,
+        'provider': provider,
+        'platform': platform,
+        if (deviceInfo != null) 'deviceInfo': deviceInfo,
+      },
+      requireAuth: true,
+    );
+  }
+
+  Future<Map<String, dynamic>> removeDeviceToken(String id) async {
+    return await delete(
+      '${ApiConstants.notificationsDeviceTokens}/$id',
+      requireAuth: true,
     );
   }
 }
