@@ -190,6 +190,10 @@ mobile/
 │   ├── patients/
 │   ├── prescriptions/
 │   ├── payments/
+│   ├── conversations/
+│   ├── secretary/
+│   │   ├── models/            # Read-only patient appointment-summary model
+│   │   └── presentation/      # Secretary home list + patient-info sheet
 │   ├── secretary-chat/
 │   ├── ai-chat/
 │   ├── waitlist/
@@ -204,6 +208,8 @@ mobile/
 ├── types/
 └── assets/
 ```
+
+The mobile application is shared by patients and secretaries. The `auth` feature performs the shared login and exposes role-based redirects; the `conversations` feature holds the shared conversation thread reused by both roles; the `secretary` feature adds the secretary conversation list, the read-only patient-info sheet, and the minimal secretary menu. The `core/services/push_notification_service.dart` bridge registers the device token with the backend after authentication, removes it on logout, and opens authorized conversation threads from `NEW_PATIENT_MESSAGE` / `NEW_SECRETARY_MESSAGE` notification taps.
 
 ---
 
@@ -630,6 +636,16 @@ The web application implements a Remember Me feature for Doctor and Secretary ac
 - `npm run seed:admin` - Create initial Admin account only
 - `npm run seed` - Run all seed scripts including Admin provisioning
 
+## Mobile Authentication and Routing
+
+The mobile application is shared by patients and secretaries and reuses the same backend authentication endpoint and credentials as the web dashboards.
+
+- Login is performed through `POST /api/v1/auth/login`; the backend-returned `User.role` is the single source of truth, and the role is persisted with the session so restored sessions route to the correct home.
+- Patients are routed to the existing patient home with Home, Doctors, Appointments, and Chat tabs.
+- Secretaries are routed to the chat-first secretary home at `/secretary-home`. The mobile route guards redirect unauthenticated users to login, enforce the mandatory password-change requirement, and prevent secretaries from opening patient-only routes.
+- Secretaries cannot access queue, payment, walk-in, or schedule management through mobile navigation; appointment management remains on the secretary web dashboard.
+- Logout clears the session and removes or invalidates the registered push device token.
+
 ---
 
 # 6. Patient Navigation
@@ -797,6 +813,23 @@ Settings
 ```
 
 The Secretary Schedule page is at `/secretary/schedule`, replacing `/secretary/capacity`; its tabs are Working Hours (read-only), Exceptions, Break Periods, and Capacity. The secretary is the primary operational user for daily queue and payment verification.
+
+### Secretary Mobile Navigation
+
+The shared mobile application exposes a chat-first secretary experience only:
+
+```text
+Conversation List (`/secretary-home`)
+ └── Conversation Thread (shared) → Read-only Patient-Info Sheet
+
+Menu
+ ├── Notifications
+ ├── Profile
+ ├── Settings
+ └── Logout
+```
+
+The shared conversation thread is titled with the patient's name when opened from the secretary side. Queue management, walk-in registration, payment verification, and schedule management are not available in the mobile application; secretaries use the web dashboard for those operations.
 
 ---
 
@@ -1345,7 +1378,9 @@ The same authorization model applies when the secretary replies. Notification ti
 
 Push delivery targets only the intended recipients' device tokens stored in the `device_tokens` table; FCM/APNs credentials are configurable on the backend only.
 
-The Secretary web chat replaces the placeholder page with a functional three-column interface (conversation list, message thread with distinct sender/recipient styling, composer) and adds an unread badge to the sidebar. It calls the same conversations API through the existing web API client, with the backend and PostgreSQL as the single source of truth — no separate conversation or message storage is added. A secretary mobile chat experience is planned follow-up work.
+The Secretary web chat replaces the placeholder page with a functional three-column interface (conversation list, message thread with distinct sender/recipient styling, composer) and adds an unread badge to the sidebar. It calls the same conversations API through the existing web API client, with the backend and PostgreSQL as the single source of truth — no separate conversation or message storage is added.
+
+The shared mobile application adds a secretary chat-first home (`/secretary-home`) with a conversation list (patient information, last-message previews, unread counts), the same conversation thread used by patients, a read-only patient-info sheet, and a minimal Notifications/Profile/Settings/Logout menu. Both the secretary web chat and the secretary mobile chat read and write the same `conversations` and `messages` records, so read status, unread counts, and last-message previews stay synchronized. A chat notification tap opens the conversation thread only when the authenticated user's role matches the notification type and the backend confirms access to the conversation.
 
 ---
 

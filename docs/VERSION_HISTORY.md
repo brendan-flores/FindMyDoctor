@@ -4,6 +4,53 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.13 (October 20, 2026)
+
+**Purpose:** Extend the shared mobile application to secretaries so they can sign in with their existing credentials and manage patient conversations from a chat-first home, with role-based routing, push notification deep links, and a read-only patient-info sheet
+
+**Significant Features:**
+- Shared patient/secretary mobile application: secretaries log in with the same username/password as the secretary web dashboard through the existing `POST /api/v1/auth/login`; there is no separate app or credential system
+- Role-based routing driven by the backend-returned `User.role`: patients land on the existing patient home (Home, Doctors, Appointments, Chat), secretaries land on the chat-first home at `/secretary-home`
+- Secretary mobile home at `/secretary-home`: conversation list with patient information, last-message previews, unread counts/badges, pull-to-refresh, and periodic refresh, scoped by the backend to the secretary's assigned doctor
+- Read-only patient-info sheet in the mobile app backed by `GET /api/v1/conversations/:id/appointment-summary`, with no appointment mutations
+- Minimal secretary mobile menu containing only Notifications, Profile, Settings, and Logout
+- Push notification handling: the mobile app registers its device token after authentication and removes/invalidates it on logout, then opens the correct conversation thread from `NEW_PATIENT_MESSAGE` (secretaries) or `NEW_SECRETARY_MESSAGE` (patients) notification taps
+
+**Improvements:**
+- Mobile: `api_service.dart` `login()` verifies a shared account as a patient and then as a secretary, retrying only on `INVALID_CREDENTIALS` and keeping the backend `User.role` as the source of truth
+- Mobile: added `getAppointmentSummary`, `registerDeviceToken`, and `removeDeviceToken` API methods plus `conversationAppointmentSummary` and `notificationsDeviceTokens` constants
+- Mobile: `logout()` now removes the registered push device token and clears the persisted `user_role`, `device_token_id`, and `device_token`
+- Mobile: restored sessions re-register the device token and route from the persisted role
+- Mobile: `ChangePasswordPage` sends secretaries to `/secretary-home` after a password change while preserving the patient onboarding/home flow
+- Mobile: route guards redirect unauthenticated users to login, enforce the mandatory password-change requirement, and keep secretaries away from patient-only routes
+- Mobile: the shared conversation thread shows the patient's name in the header when a secretary opens it (from the secretary conversation list or a chat notification deep link), while patients keep the existing doctor/secretary header
+
+**Removed/Modified Functionality:**
+- Secretary mobile chat is no longer planned follow-up work; it is implemented in the shared mobile application
+- Secretary mobile access deliberately excludes queue management, payment verification, walk-in registration, and schedule management screens; all appointment management remains on the secretary web dashboard
+- Direct patient–doctor chat remains prohibited; no patient↔doctor messaging was added
+- Backend, web, and database behavior are unchanged; the mobile app reuses existing endpoints, the `Conversation` model, and the shared conversation thread
+
+**Architecture:**
+- Mobile: added `/mobile/lib/core/navigation/app_navigator.dart`, `/mobile/lib/core/services/push_notification_service.dart`, `/mobile/lib/features/secretary/models/patient_summary.dart`, `/mobile/lib/features/secretary/presentation/secretary_home_page.dart`, and `/mobile/lib/features/secretary/presentation/patient_info_sheet.dart`
+- Mobile: modified `/mobile/lib/app/app.dart`, `/mobile/lib/core/constants/api_constants.dart`, `/mobile/lib/core/services/api_service.dart`, `/mobile/lib/features/auth/presentation/login_page.dart`, and `/mobile/lib/features/auth/presentation/change_password_page.dart`
+- Mobile: push uses a native `MethodChannel('findmydoctor/push')` bridge for FCM/APNs token and tap delivery (no new client dependency added; provider credentials stay on the backend)
+- Backend: unchanged; reuses `/api/v1/auth/login`, the conversations endpoints, `/api/v1/conversations/:id/appointment-summary`, and the device-token endpoints
+
+**Testing:**
+- Mobile: `flutter analyze --no-pub` reports no errors (only pre-existing infos/warnings)
+- Mobile: `flutter test test/login_page_navigation_test.dart test/api_service_login_test.dart` passed 14/14
+- Mobile: fixed a compile-blocking nullable type mismatch in `test/password_change_enforcement_test.dart`; four pre-existing failures remain because those tests expect a Current Password field that the page hides during a mandatory change (out of scope for this release)
+
+**Documentation:**
+- Updated `docs/prd.md` (shared patient/secretary mobile application, Secretary Mobile Experience, patient-info sheet, communication restriction, FR-031, FR-039, secretary views and scope lists, new section 28.2 Mobile Authentication and Routing)
+- Updated `docs/architecture.md` (mobile application tree and shared-app note, Mobile Authentication and Routing, Secretary Mobile Navigation, communication/chat architecture)
+- Updated `docs/architecture-essentials.md` (new Shared Mobile Application Access subsection under Secretary Chat Rules and additional chat implementation checklist items)
+- Updated `docs/SYSTEM_STATE.md` (shared mobile login/routing and secretary mobile messaging/push state, replacing the planned-follow-up note)
+- Updated CURRENT_VERSION.md to 01.13 and added this VERSION_HISTORY.md entry
+
+---
+
 ### 01.12 (October 19, 2026)
 
 **Purpose:** Implement the secretary–patient chat feature across the backend and the secretary web application, with role-based conversation access, read-status unread counts, chat notifications with FCM/APNs push delivery, device-token management, and a read-only appointment-summary endpoint

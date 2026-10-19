@@ -111,6 +111,7 @@ Current System State (October 2026):
 - Secretary accounts require login OTP only if `two_factor_enabled = true` (optional 2FA, must be turned on)
 - Role-based login OTP/2FA is implemented with server-side challenge state in PostgreSQL
 - Doctor, Secretary, and Admin web login pages submit their expected role; the backend rejects cross-role login attempts before OTP challenge creation or delivery with `Invalid credentials or account role.` Admin login continues to accept SUPERADMIN accounts
+- The shared mobile patient/secretary application logs in through the same `/api/v1/auth/login` endpoint and credentials; the mobile login verifies the account as a patient and then as a secretary, and the backend-returned `User.role` determines routing (patients → `/home`, secretaries → `/secretary-home`); the persisted role guides restored sessions and mobile route guards; secretary mobile login with 2FA enabled requires completing the OTP step on the web dashboard
 - Admin/SuperAdmin login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
 - Doctor login requires OTP only if `two_factor_enabled = true` - enforced by backend role check
 - Secretary login requires OTP only if `two_factor_enabled = true` - enforced by backend role check
@@ -524,7 +525,10 @@ Current System State (October 2026):
 - The mobile patient conversation thread loads the full message history and scrolls to the latest message when opened; after sending, it refreshes the history and scrolls to the new latest message, while background polling does not interrupt the patient's scroll position
 - On the mobile patient home page, conversation names and latest-message previews are bolded while the conversation has unread messages
 - `GET /api/v1/conversations/:id/appointment-summary` is a read-only, SECRETARY-only patient-info sheet endpoint enforcing conversation access rules; returns only appointment fields the interface needs (date, status, reason for visit, queue number) plus the patient's name/DOB/phone/email and doctor/practice names; exposes no appointment mutations
-- Secretary mobile chat experience is planned follow-up work and is not implemented yet
+- The shared patient/secretary mobile application supports secretary login with the same username/password as the secretary web dashboard, routes secretaries to `/secretary-home` (conversation list with patient information, last-message previews, and unread counts) and patients to the existing tabbed patient home, and reuses the same conversation, message, read-status, unread-count, and last-message-preview records as the web chat
+- Secretary mobile users can open the shared conversation thread, titled with the patient's name, view patient message histories, send and receive messages, mark conversations read on open, and view the read-only patient-info sheet; the secretary mobile menu contains only Notifications, Profile, Settings, and Logout
+- Secretaries cannot access queue management, payment verification, walk-in registration, or schedule management screens in the mobile application; all appointment management remains on the secretary web dashboard
+- The mobile application registers its push device token after successful authentication and removes or invalidates it during logout; `NEW_PATIENT_MESSAGE` (secretaries) and `NEW_SECRETARY_MESSAGE` (patients) notification taps open the correct conversation thread only after the authenticated user's authorization to that conversation is verified; notification titles, bodies, and push previews remain generic and never contain message content
 
 ## Secretary Web Chat
 - Secretary web page at `/secretary/conversations` replaced the placeholder with a functional three-column chat: conversation list (patient details, unread badges/counts, latest-message previews), message thread with distinct sender/recipient styling and read/delivered indicators, and a message composer with Enter-to-send and disable-while-sending

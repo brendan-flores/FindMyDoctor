@@ -559,7 +559,17 @@ Secretaries can:
 - Reply to patients.
 - View relevant appointment information.
 - Assist patients.
-- Answer patients through the Secretary Web Dashboard chat at `/secretary/conversations`.
+- Answer patients through the Secretary Web Dashboard chat at `/secretary/conversations` or the shared patient/secretary mobile application.
+
+### Shared Patient and Secretary Mobile Application
+
+Patients and secretaries use the same mobile application and the same credentials as the web dashboards. After authentication the backend-returned `User.role` determines the experience:
+
+- The authenticated `role` field is the single source of truth; secretaries sign in with the same username and password as the secretary web dashboard.
+- Secretaries are routed to a chat-first secretary home (`/secretary-home`) containing the conversation list, last-message previews, and unread counts, while patients continue to the existing patient home with Home, Doctors, Appointments, and Chat tabs.
+- The mobile secretary experience reuses the shared conversation thread and the same backend conversations, messages, read status, unread counts, and latest-message previews as the secretary web chat, so both interfaces stay synchronized.
+- Secretaries assigned to the same doctor share access to the same authorized conversations and message history.
+- The mobile application adds no separate credential system; authentication, authorization, and role checks remain enforced on the backend as well as through mobile navigation.
 
 ### Shared Conversation Access
 
@@ -576,9 +586,15 @@ A conversation belongs to one patient and one doctor:
 - Conversation-list results include an unread count computed from `read_at` and excluding the current user's own sent messages, plus a latest-message preview consistent with the most recently saved message.
 - `PATCH /api/v1/conversations/:id/read` marks incoming messages as read for the authorized caller.
 
+### Secretary Mobile Experience
+
+The secretary mobile home screen at `/secretary-home` displays a conversation list containing patient information, last-message previews, and unread counts, limited by the backend to the secretary's assigned doctor. Tapping a conversation opens the shared conversation thread titled with the patient's name, where the secretary can view the patient's message history, send and receive messages, and mark the conversation as read on open. A read-only patient-info sheet exposes the authorized appointment summary.
+
+The secretary mobile menu is intentionally minimal and contains only Notifications, Profile, Settings, and Logout. Secretaries must not have queue management, payment verification, walk-in registration, or schedule management screens in the mobile application; all appointment management remains on the secretary web dashboard. On logout, the authenticated session is cleared and the registered push device token is removed or invalidated.
+
 ### Patient-Info Sheet
 
-The secretary web chat includes a read-only patient-info sheet backed by `GET /api/v1/conversations/:id/appointment-summary`. The endpoint returns only the read-only appointment fields the interface needs (appointment date, status, reason for visit, queue number, and the patient's basic contact details), enforces the same role-based access rules as the conversation it belongs to (secretary-only, assigned-doctor scope, doctor-association), and exposes no appointment mutations.
+The secretary web chat and the secretary mobile chat include a read-only patient-info sheet backed by `GET /api/v1/conversations/:id/appointment-summary`. The endpoint returns only the read-only appointment fields the interface needs (appointment date, status, reason for visit, queue number, and the patient's basic contact details), enforces the same role-based access rules as the conversation it belongs to (secretary-only, assigned-doctor scope, doctor-association), and exposes no appointment mutations.
 
 ### Communication Restriction
 
@@ -586,7 +602,7 @@ Patients cannot directly communicate with doctors through chat.
 
 The platform must not provide a patient-doctor chat workflow.
 
-The secretary web chat delivers conversation notifications and push reminders to patients through the notification module; the patient mobile experience remains the mobile chat. A secretary mobile chat experience is planned follow-up work and is not implemented yet.
+The secretary web chat and the secretary mobile chat deliver conversation notifications and push reminders to patients through the notification module. Push notifications use generic titles and bodies, never include message content, and open the correct conversation thread only after the authenticated user's authorization is verified. The patient mobile experience remains the mobile chat.
 
 ---
 
@@ -965,7 +981,9 @@ Patients and authorized secretaries shall be able to exchange messages through t
 - A patient accesses only their own conversations and only for doctors with a matching `patient_doctor_associations` record; a secretary accesses only conversations for patients associated with their assigned doctor.
 - Conversation listing returns an unread count computed from `messages.read_at` (excluding the caller's own messages) and a latest-message preview.
 - The Secretary Web Dashboard chat at `/secretary/conversations` provides a three-column interface (conversation list, message thread, composer) with a read-only patient-info sheet from `GET /api/v1/conversations/:id/appointment-summary`.
-- Patient↔Doctor direct chat remains prohibited (FR-032); Secretary mobile chat is planned follow-up work.
+- The shared patient/secretary mobile application provides a secretary conversation list at `/secretary-home`, the shared conversation thread, a read-only patient-info sheet, and a minimal menu (Notifications, Profile, Settings, Logout) using the same conversations, messages, read status, unread counts, and latest-message previews as the web chat.
+- Secretary mobile users cannot manage appointments or access queue, payment, walk-in, or schedule screens; all appointment management remains on the secretary web dashboard.
+- Patient↔Doctor direct chat remains prohibited (FR-032).
 
 ## FR-032 — Doctor Chat Restriction
 
@@ -1000,6 +1018,8 @@ The system shall generate prescription PDFs.
 The system shall provide relevant application notifications, including notifications to affected patients after a confirmed doctor or secretary exception or break-period change affects dates with active appointments.
 
 Chat message notifications use two types: `NEW_PATIENT_MESSAGE` (sent to the secretaries assigned to the conversation's doctor when a patient sends a message) and `NEW_SECRETARY_MESSAGE` (sent to the patient when a secretary sends a message). Notifications go only to recipients (never the sender), use generic titles and bodies, and never include message content. Users may register and remove push device tokens through `POST /api/v1/notifications/device-tokens` and `DELETE /api/v1/notifications/device-tokens/:id`; registered users' devices receive FCM/APNs pushes with the same generic payloads, and provider credentials remain on the backend.
+
+The mobile application registers the device token after successful authentication and removes or invalidates it during logout. A tapped `NEW_PATIENT_MESSAGE` or `NEW_SECRETARY_MESSAGE` notification opens the conversation thread only for the role that owns that notification type, and only after the authenticated user's access to the conversation is verified.
 
 ## FR-040 — Doctor Approval
 
@@ -1255,8 +1275,9 @@ Patient Views Professional Details
 
 ### Secretary
 
-- Patient chat.
-- Walk-in registration.
+- Patient chat (secretary web dashboard and the shared patient/secretary mobile application).
+- Mobile secretary conversation list, shared conversation thread, read-only patient-info sheet, and minimal Notifications/Profile/Settings/Logout menu.
+- Walk-in registration (web).
 - Account creation.
 - Weekly working hours view (read-only).
 - Exception and break-period management for the assigned doctor.
@@ -1266,6 +1287,8 @@ Patient Views Professional Details
 - Payment verification.
 - Additional charges.
 - Cancellation/no-show management.
+
+Secretaries cannot manage appointments, queue, payments, walk-ins, or schedules through the mobile application; those operations remain on the secretary web dashboard.
 
 ### Administrator
 
@@ -1316,7 +1339,7 @@ The web application provides role-specific dashboards for doctors, secretaries, 
 - Walk-in registration
 - Schedule management (weekly working hours view only, exceptions, break periods, and capacity)
 - Payment verification
-- Patient communication (three-column chat with conversation list, message thread, composer, and read-only patient-info sheet at `/secretary/conversations`; secretary mobile chat is planned follow-up work)
+- Patient communication (three-column chat with conversation list, message thread, composer, and read-only patient-info sheet at `/secretary/conversations`; the shared mobile application also provides the secretary conversation list, thread, read-only patient-info sheet, and a minimal Notifications/Profile/Settings/Logout menu, while appointment management stays on the web dashboard)
 
 **Admin Web Dashboard:**
 - User management
@@ -1493,6 +1516,34 @@ Administrator-provisioned doctor accounts remain available for accounts created 
 - Token stored in localStorage
 - Role verification on protected routes
 - API client includes Authorization header for authenticated requests
+
+---
+
+# 28.2 Mobile Authentication and Routing
+
+The mobile application is shared by patients and secretaries and reuses the existing backend authentication system and the same credentials as the web dashboards.
+
+### Shared Login
+
+- The login page at `/mobile/lib/features/auth/presentation/login_page.dart` accepts a username or email and password for both patients and secretaries.
+- The backend verifies the account and returns its `User.role`, which is the single source of truth for the experience. Secretaries sign in with the same credentials as the secretary web dashboard.
+- If two-factor authentication is enabled for a secretary, the login OTP step is completed on the web dashboard and the mobile app informs the user.
+
+### Role-Based Navigation
+
+- After a successful login the role is stored with the session so restored sessions route correctly.
+- Patients land on the existing patient home with Home, Doctors, Appointments, and Chat tabs.
+- Secretaries land on the secretary chat-first home at `/secretary-home`.
+- Users with an outstanding mandatory password change are redirected to the change-password page first; after changing the password, secretaries continue to `/secretary-home` and patients continue to their existing flow.
+- Route guards redirect unauthenticated users to login, enforce the password-change requirement, and keep secretaries away from patient-only routes (and vice versa).
+- Secretaries cannot reach queue, payment, walk-in, or schedule screens through mobile navigation; all appointment management remains on the web dashboard.
+- Logout clears the authenticated session and removes or invalidates the registered push device token.
+
+### Push Notifications and Deep Linking
+
+- After successful authentication the mobile application registers its device token with `POST /api/v1/notifications/device-tokens`; logout removes the token through `DELETE /api/v1/notifications/device-tokens/:id`.
+- `NEW_PATIENT_MESSAGE` notifications target secretaries and `NEW_SECRETARY_MESSAGE` notifications target patients; notification titles, bodies, and push previews are generic and never contain message content.
+- Tapping a chat notification opens `/conversation-thread` for the correct conversation, but only after the authenticated user's authorization to that conversation is verified.
 
 ---
 

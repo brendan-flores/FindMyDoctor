@@ -131,6 +131,14 @@ Secretaries cannot access unrelated conversations without authorization.
 - `POST /api/v1/notifications/device-tokens` and `DELETE /api/v1/notifications/device-tokens/:id` let an authenticated user register and remove only their own device tokens (stored in the `device_tokens` table, one active owner per token).
 - FCM/APNs delivery runs after a message is saved and targets only the intended recipients; provider credentials remain on the backend and are never exposed to the mobile application.
 
+### Shared Mobile Application Access
+
+- The mobile application is shared by patients and secretaries; it uses the same backend authentication endpoint and credentials as the web dashboards, with no separate app or credential system.
+- `User.role` from `POST /api/v1/auth/login` is the single source of truth for routing: patients reach the existing patient home, secretaries reach the chat-first secretary home.
+- Removing an account's access on the backend must also deny its mobile access; the mobile client never decides authorization on its own, and unauthorized access must not return data.
+- Secretary mobile access is limited to the conversation list, the shared conversation thread, the read-only patient-info sheet, and a minimal Notifications/Profile/Settings/Logout menu; queue, payment, walk-in, and schedule management stay on the web dashboard.
+- Logout clears the session and removes or invalidates the registered device token.
+
 ---
 
 # 6. AI Chatbot Rules
@@ -1398,6 +1406,9 @@ For chat:
 [ ] Message notifications go only to recipients (NEW_PATIENT_MESSAGE / NEW_SECRETARY_MESSAGE) with generic, content-free payloads
 [ ] Device tokens belong to their owning user; only the owner can register or remove them
 [ ] Appointment-summary endpoint is read-only, secretary-only, and returns only the fields the patient-info sheet needs
+[ ] Shared mobile app routes patients and secretaries from the backend-returned role, never a client-side role selector
+[ ] Secretary mobile access excludes queue, payment, walk-in, and schedule screens
+[ ] Notification taps open a conversation thread only for the matching role and an authorized conversation
 ```
 
 ---
