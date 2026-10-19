@@ -26,7 +26,10 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
       try {
         const response = await conversationApi.getConversations();
         if (response.success && response.data) {
-          const total = response.data.reduce((sum, c) => sum + (c.unread_count || 0), 0);
+          const total = response.data.reduce((sum, conversation) => {
+            const unreadCount = Number(conversation.unread_count);
+            return sum + (Number.isFinite(unreadCount) ? unreadCount : 0);
+          }, 0);
           setTotalUnread(total);
         }
       } catch {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   conversationApi,
   Conversation,
@@ -24,6 +25,12 @@ export default function SecretaryConversations() {
   const [threadError, setThreadError] = useState<string | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [hoveredMessage, setHoveredMessage] = useState<{
+    id: string;
+    top: number;
+    left: number;
+    isOwn: boolean;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -45,7 +52,15 @@ export default function SecretaryConversations() {
   const fetchConversations = useCallback(async () => {
     const response = await conversationApi.getConversations();
     if (response.success && response.data) {
-      setConversations(response.data);
+      const getActivityTime = (conversation: Conversation) => {
+        const timestamp = conversation.last_message_sent_at ?? conversation.updated_at;
+        if (!timestamp) return Number.NEGATIVE_INFINITY;
+        const activityTime = Date.parse(timestamp);
+        return Number.isNaN(activityTime) ? Number.NEGATIVE_INFINITY : activityTime;
+      };
+      setConversations(
+        [...response.data].sort((a, b) => getActivityTime(b) - getActivityTime(a))
+      );
       setListError(null);
     } else {
       setListError(response.error || 'Failed to fetch conversations');
@@ -201,13 +216,28 @@ export default function SecretaryConversations() {
   const formatTime = (dateString?: string | null) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    // Check if message was sent on a previous day
+    if (messageDate < today) {
+      // Format as "Monday 11:38 PM"
+      const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const weekday = weekdays[date.getDay()];
+      const hours = date.getHours();
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      return `${weekday} ${displayHours}:${minutes} ${ampm}`;
+    } else {
+      // Same day - format as time only (e.g., "11:38 PM")
+      const hours = date.getHours();
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      return `${displayHours}:${minutes} ${ampm}`;
+    }
   };
 
   const formatListTime = (dateString?: string | null) => {
@@ -243,8 +273,6 @@ export default function SecretaryConversations() {
     });
   };
 
-  const totalUnread = conversations.reduce((sum, c) => sum + c.unread_count, 0);
-
   return (
     <div className="space-y-4">
       {/* Errors */}
@@ -268,46 +296,51 @@ export default function SecretaryConversations() {
             ) : conversations.length === 0 ? (
               <div className="p-4 text-xs text-slate-500">No conversations yet.</div>
             ) : (
-              conversations.map((conversation) => (
-                <button
-                  key={conversation.patient_id}
-                  onClick={() => handleSelectConversation(conversation)}
-                  className={`w-full text-left px-4 py-3 border-b border-slate-100 transition-all duration-200 cursor-pointer bg-white hover:bg-slate-100 ${
-                    selectedConversation?.patient_id === conversation.patient_id ? 'bg-blue-50' : ''
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900 truncate">
-                        {getPatientName(conversation)}
-                      </p>
-                      {conversation.last_message_preview ? (
-                        <p className={`text-xs mt-1 truncate ${conversation.unread_count > 0 ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
-                          {conversation.last_message_preview}
+              conversations.map((conversation) => {
+                const unreadCountValue = Number(conversation.unread_count);
+                const unreadCount = Number.isFinite(unreadCountValue) ? unreadCountValue : 0;
+                return (
+                  <button
+                    key={conversation.patient_id}
+                    onClick={() => handleSelectConversation(conversation)}
+                    className={`w-full text-left px-4 py-3 border-b border-slate-100 transition-all duration-200 cursor-pointer bg-white hover:bg-slate-100 ${
+                      selectedConversation?.patient_id === conversation.patient_id ? 'bg-blue-50' : ''
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate">
+                          {getPatientName(conversation)}
                         </p>
-                      ) : (
-                        <p className="text-xs mt-1 text-slate-400 italic">No messages yet</p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <span className="text-[11px] text-slate-400">
-                        {formatListTime(conversation.last_message_sent_at)}
-                      </span>
-                      {conversation.unread_count > 0 && (
-                        <span className="bg-[#1b5eb8] text-white text-[11px] font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center">
-                          {conversation.unread_count}
+                        {conversation.last_message_preview ? (
+                          <p className={`text-xs mt-1 truncate ${unreadCount > 0 ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
+                            {conversation.last_message_sender_user_id === currentUserId ? 'You: ' : ''}
+                            {conversation.last_message_preview}
+                          </p>
+                        ) : (
+                          <p className="text-xs mt-1 text-slate-400 italic">No messages yet</p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="text-[11px] text-slate-400">
+                          {formatListTime(conversation.last_message_sent_at)}
                         </span>
-                      )}
+                        {unreadCount > 0 && (
+                          <span className="bg-[#1b5eb8] text-white text-[11px] font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center">
+                            {unreadCount}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
 
         {/* Column 2: Conversation thread */}
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
+        <div className="min-w-0 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
           {selectedConversation ? (
             <>
               <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
@@ -323,7 +356,10 @@ export default function SecretaryConversations() {
                 </div>
               )}
 
-              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+              <div
+                className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-3"
+                onScroll={() => setHoveredMessage(null)}
+              >
                 {isLoadingThread && messages.length === 0 ? (
                   <p className="text-xs text-slate-500 text-center">Loading messages…</p>
                 ) : messages.length === 0 ? (
@@ -331,25 +367,49 @@ export default function SecretaryConversations() {
                 ) : (
                   messages.map((message) => {
                     const isOwn = message.sender_user_id === currentUserId;
+                    const isHovered = hoveredMessage?.id === message.id;
                     return (
-                      <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                        <div
-                          className={`rounded-2xl px-4 py-2 max-w-[75%] ${
-                            isOwn
-                              ? 'bg-[#1b5eb8] text-white rounded-br-md'
-                              : 'bg-slate-100 text-slate-900 rounded-bl-md'
-                          }`}
-                        >
-                          {!isOwn && (
-                            <p className="text-[11px] font-semibold text-slate-600 mb-0.5">
-                              {message.sender_email}
-                            </p>
+                      <div key={message.id} className={`flex w-full min-w-0 items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                        {!isOwn && (
+                          <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-slate-500 text-[20px]">person</span>
+                          </div>
+                        )}
+                        <div className={`relative flex min-w-0 flex-1 flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                          <div
+                            className={`w-fit min-w-0 max-w-[75%] rounded-2xl px-4 py-2 ${
+                              isOwn
+                                ? 'bg-[#1b5eb8] text-white rounded-br-md'
+                                : 'bg-slate-100 text-slate-900 rounded-bl-md'
+                            }`}
+                            onMouseEnter={(event) => {
+                              const bounds = event.currentTarget.getBoundingClientRect();
+                              setHoveredMessage({
+                                id: message.id,
+                                top: bounds.top + bounds.height / 2,
+                                left: isOwn ? bounds.right + 8 : bounds.left - 8,
+                                isOwn,
+                              });
+                            }}
+                            onMouseLeave={() => setHoveredMessage(null)}
+                          >
+                            <p className="text-sm text-justify whitespace-pre-wrap break-words">{message.message}</p>
+                          </div>
+                          {isHovered && typeof document !== 'undefined' && createPortal(
+                            <div
+                              className="fixed z-[1000] flex -translate-y-1/2 items-center rounded-lg bg-slate-800 px-3 py-1.5 text-[11px] text-white shadow-lg whitespace-nowrap"
+                              style={{
+                                top: hoveredMessage?.top ?? 0,
+                                left: hoveredMessage?.left ?? 0,
+                                transform: `translate(${hoveredMessage?.isOwn ? '0' : '-100%'}, -50%)`,
+                                pointerEvents: 'none',
+                              }}
+                            >
+                              {formatTime(message.sent_at)}
+                              {isOwn && (message.read_at ? ' • Read' : ' • Delivered')}
+                            </div>,
+                            document.body
                           )}
-                          <p className="text-sm whitespace-pre-wrap break-words">{message.message}</p>
-                          <p className={`text-[10px] mt-1 ${isOwn ? 'text-blue-100' : 'text-slate-400'}`}>
-                            {formatTime(message.sent_at)}
-                            {isOwn && (message.read_at ? ' • Read' : ' • Delivered')}
-                          </p>
                         </div>
                       </div>
                     );

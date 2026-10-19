@@ -266,7 +266,8 @@ export interface Conversation {
   updated_at: string | null; // null for patients without conversations
   last_message_preview: string | null;
   last_message_sent_at: string | null;
-  unread_count: number;
+  last_message_sender_user_id: string | null;
+  unread_count: number | string;
   secretary_first_name?: string;
   secretary_last_name?: string;
   patient_first_name?: string;
