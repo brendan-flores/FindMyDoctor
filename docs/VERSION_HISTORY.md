@@ -4,6 +4,67 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.12 (October 19, 2026)
+
+**Purpose:** Implement GCash and Cash payment options for clinic appointments
+
+**Significant Features:**
+- Patients can now choose between GCash (with QR code scan and receipt upload) or Cash at Clinic payment methods
+- Added payment screen accessible from booking confirmation and appointments pages
+- Payment status (UNPAID, PENDING_VERIFICATION, PAID, REJECTED) displayed in appointments list
+- Backend API endpoint to serve GCash QR code as static file
+
+**Improvements:**
+- Mobile: Changed booking button label from "Confirm Clinic Date & Reserve Queue" to "Continue Booking" for clearer UX
+- Mobile: Added "Pay Now" option on booking confirmation page for immediate payment access
+- Mobile: Added payment icon button on appointment cards for quick payment access
+- Mobile: Added "Manage Payment" button on appointment detail page
+- Mobile: Created comprehensive payment screen with GCash QR display, receipt upload (up to 5MB), and Cash at Clinic information
+- Mobile: Added image_picker dependency for receipt upload functionality
+- Mobile: Payment status badges displayed on appointment cards (Paid, Pending, Unpaid)
+- Backend: Added GET /api/v1/payments/gcash-qr public endpoint to return QR code URL
+- Backend: Configured static file serving for /public directory to serve GCash QR image
+- Backend: Updated appointments API to include payment_status in query results
+- Backend: Added publicPaymentsRouter for unauthenticated GCash QR endpoint
+
+**UI/UX Changes:**
+- Payment method selection with visual feedback (GCash vs Cash at Clinic)
+- GCash QR code display with loading and error states
+- Receipt upload with file size validation (5MB limit)
+- Payment status indicators with color-coded badges
+
+**Removed/Modified Functionality:**
+- No existing payment, booking, or queue functionality was removed
+- Booking flow unchanged - patients can still complete reservations without advance payment
+- Payment remains optional per architecture requirements
+
+**Architecture:**
+- Mobile: Created `/mobile/lib/features/payments/presentation/payment_screen.dart`
+- Mobile: Modified `/mobile/lib/features/doctors/presentation/doctor_schedule_page.dart` (button label)
+- Mobile: Modified `/mobile/lib/features/appointments/presentation/booking_confirmation_page.dart` (Pay Now action)
+- Mobile: Modified `/mobile/lib/features/appointments/presentation/appointments_page.dart` (payment access and status)
+- Mobile: Modified `/mobile/lib/features/appointments/presentation/appointment_detail_page.dart` (payment button)
+- Mobile: Modified `/mobile/lib/core/services/api_service.dart` (payment methods)
+- Mobile: Modified `/mobile/lib/core/constants/api_constants.dart` (payment constants)
+- Mobile: Updated `/mobile/pubspec.yaml` (added image_picker dependency)
+- Backend: Modified `/backend/src/api/payments.ts` (GCash QR endpoint)
+- Backend: Modified `/backend/src/index.ts` (static file serving and payment routes)
+- Backend: Modified `/backend/src/api/appointments.ts` (payment_status in queries)
+- Backend: Created `/backend/public/` directory with README for GCash QR placeholder
+
+**Testing:**
+- Mobile: Flutter analyze completed with only pre-existing warnings (no new errors)
+- Mobile: Added image_picker dependency successfully
+- Backend: Static file serving configured for /public directory
+- Backend: Payment endpoints structured for public/authenticated split
+
+**Documentation:**
+- Updated CURRENT_VERSION.md to 01.12
+- Added VERSION_HISTORY.md entry for 01.12
+- Created `/backend/public/README.md` with GCash QR setup instructions
+
+---
+
 ### 01.11 (October 18, 2026)
 
 **Purpose:** Replace FindMyDoctor branding logos across mobile and web applications and implement platform-aware API base URL configuration
