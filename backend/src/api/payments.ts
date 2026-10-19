@@ -5,6 +5,20 @@ import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, r
 
 const router = Router();
 
+// Get GCash QR code (public endpoint, no authentication required)
+// This route must be registered before the authenticate middleware in index.ts
+export const publicPaymentsRouter = Router();
+publicPaymentsRouter.get('/gcash-qr', async (req: AuthRequest, res: Response) => {
+  try {
+    // Return the URL to the static GCash QR image
+    // The QR image is served from /public/gcash-qr.jpg
+    const qrUrl = '/public/gcash-qr.jpg';
+    res.json(success({ qrUrl }, 'GCash QR code URL retrieved'));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to retrieve GCash QR code'));
+  }
+});
+
 // Get payment for appointment
 router.get('/:appointmentId', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, async (req: AuthRequest, res: Response) => {
   try {

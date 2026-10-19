@@ -22,7 +22,7 @@ import queueRouter from './api/queue';
 import walkInsRouter from './api/walk-ins';
 import conversationsRouter from './api/conversations';
 import aiChatRouter from './api/ai-chat';
-import paymentsRouter from './api/payments';
+import paymentsRouter, { publicPaymentsRouter } from './api/payments';
 import visitsRouter from './api/visits';
 import prescriptionsRouter from './api/prescriptions';
 import notificationsRouter from './api/notifications';
@@ -58,6 +58,11 @@ app.use(cookieParser());
 const uploadsDir = path.resolve(process.cwd(), config.upload.dir);
 app.use('/uploads', cors(config.cors));
 app.use('/uploads', express.static(uploadsDir));
+
+// Serve static files from public directory (GCash QR, etc.)
+const publicDir = path.resolve(process.cwd(), 'public');
+app.use('/public', cors(config.cors));
+app.use('/public', express.static(publicDir));
 
 // Request logging
 // Passwords and tokens are never logged (see ARCHITECTURE-ESSENTIALS.md section 41)
@@ -108,6 +113,9 @@ app.use(`/api/${apiVersion}/queue`, authenticate, queueRouter);
 app.use(`/api/${apiVersion}/walk-ins`, authenticate, walkInsRouter);
 app.use(`/api/${apiVersion}/conversations`, authenticate, conversationsRouter);
 app.use(`/api/${apiVersion}/ai`, authenticate, aiChatRouter);
+// Public payment routes (GCash QR - no authentication)
+app.use(`/api/${apiVersion}/payments`, publicPaymentsRouter);
+// Authenticated payment routes
 app.use(`/api/${apiVersion}/payments`, authenticate, paymentsRouter);
 app.use(`/api/${apiVersion}/visits`, authenticate, visitsRouter);
 app.use(`/api/${apiVersion}/prescriptions`, authenticate, prescriptionsRouter);
