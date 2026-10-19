@@ -52,6 +52,7 @@ class ApiConstants {
   static const String conversations = '/conversations';
   static const String conversationMessages = '/messages';
   static const String conversationRead = '/read';
+  static const String conversationAppointmentSummary = '/appointment-summary';
   
   // AI Chat endpoints
   static const String aiChat = '/ai/chat';
@@ -75,6 +76,7 @@ class ApiConstants {
   // Notifications endpoints
   static const String notifications = '/notifications';
   static const String notificationRead = '/read';
+  static const String notificationsDeviceTokens = '/notifications/device-tokens';
 
   // Patient OTP endpoints
   static const String patientOtpSend = '/auth/patient/otp/send';
