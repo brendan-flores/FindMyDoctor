@@ -11,6 +11,7 @@ import '../features/doctors/presentation/doctor_schedule_page.dart';
 import '../features/doctors/presentation/doctors_page.dart';
 import '../features/appointments/presentation/booking_confirmation_page.dart';
 import '../features/patients/presentation/patient_details_page.dart';
+import '../features/conversations/presentation/conversation_thread_page.dart';
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -126,6 +127,7 @@ class MyAppState extends State<MyApp> {
           case '/doctor-schedule':
           case '/booking-confirmation':
           case '/patient-details':
+          case '/conversation-thread':
             // Protect all authenticated routes - enforce password change requirement
             if (!_isAuthenticated) {
               return MaterialPageRoute(builder: (context) => const LoginPage());
@@ -181,6 +183,13 @@ class MyAppState extends State<MyApp> {
                     clinic: args?['clinic'],
                     consultationFee: args?['consultationFee'],
                     selectedDate: args?['selectedDate'],
+                  ),
+                );
+              case '/conversation-thread':
+                final args = settings.arguments as Map<String, dynamic>?;
+                return MaterialPageRoute(
+                  builder: (context) => ConversationThreadPage(
+                    conversationId: args?['conversationId'] ?? '',
                   ),
                 );
               default:

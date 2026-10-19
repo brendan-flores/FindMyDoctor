@@ -481,12 +481,13 @@ class ApiService {
   // ===========================
 
   Future<Map<String, dynamic>> getConversations() async {
-    return await get(ApiConstants.conversations);
+    return await get(ApiConstants.conversations, requireAuth: true);
   }
 
   Future<Map<String, dynamic>> getMessages(String conversationId) async {
     return await get(
       '${ApiConstants.conversations}/$conversationId${ApiConstants.conversationMessages}',
+      requireAuth: true,
     );
   }
 
@@ -497,6 +498,14 @@ class ApiService {
     return await post(
       '${ApiConstants.conversations}/$conversationId${ApiConstants.conversationMessages}',
       body: {'message': message},
+      requireAuth: true,
+    );
+  }
+
+  Future<Map<String, dynamic>> markAsRead(String conversationId) async {
+    return await patch(
+      '${ApiConstants.conversations}/$conversationId${ApiConstants.conversationRead}',
+      requireAuth: true,
     );
   }
 
