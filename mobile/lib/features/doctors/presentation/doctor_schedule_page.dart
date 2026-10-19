@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -8,7 +12,6 @@ import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/doctor_service.dart';
 import '../../../core/services/api_service.dart';
-import '../../../core/constants/api_constants.dart';
 
 class DoctorSchedulePage extends StatefulWidget {
   final String doctorId;
@@ -33,10 +36,12 @@ class DoctorSchedulePage extends StatefulWidget {
 class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   final DoctorService _doctorService = DoctorService();
   final ApiService _apiService = ApiService();
+  final ImagePicker _imagePicker = ImagePicker();
 
   DateTime? _selectedDate;
   String _selectedPaymentMethod = 'CASH'; // 'GCASH' or 'CASH'
-  String? _gcashQrUrl;
+  File? _receiptImage;
+  bool _isDownloading = false;
 
   Map<String, dynamic>? _availabilityData;
   bool _isLoading = true;
@@ -48,27 +53,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     super.initState();
     _selectedDate = null;
     _fetchAvailability();
-    _fetchGcashQr();
-  }
-
-  Future<void> _fetchGcashQr() async {
-    try {
-      final response = await _apiService.getGcashQr();
-      if (response['success'] == true) {
-        final qrPath = response['data']?['qrUrl'];
-        if (qrPath != null) {
-          // Construct full URL for static file (remove /api/v1 prefix)
-          final baseUrl = ApiConstants.baseUrl.replaceAll('/api/v1', '');
-          if (mounted) {
-            setState(() {
-              _gcashQrUrl = '$baseUrl$qrPath';
-            });
-          }
-        }
-      }
-    } catch (e) {
-      print('Failed to load GCash QR: $e');
-    }
+    // No need to fetch GCash QR since we're using local image
   }
 
   Future<void> _fetchAvailability() async {
@@ -121,6 +106,89 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
       return dates.firstWhere((d) => d['date'] == dateStr);
     } catch (e) {
       return null;
+    }
+  }
+
+  Future<void> _downloadQrCode() async {
+    setState(() {
+      _isDownloading = true;
+    });
+
+    try {
+      // Use application documents directory (no permission required on Android 10+)
+      final directory = await getApplicationDocumentsDirectory();
+      final fileName = 'gcash_qr_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final filePath = '${directory.path}/$fileName';
+
+      // Copy the local QR image to app storage
+      final assetImage = await rootBundle.load('assets/images/gcash_qr_placeholder.jpg');
+      final byteData = assetImage.buffer.asUint8List();
+      await File(filePath).writeAsBytes(byteData);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('QR code saved to app storage'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save QR code: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isDownloading = false;
+      });
+    }
+  }
+
+  Future<void> _pickReceiptImage() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        // Check file size (5MB limit)
+        final file = File(image.path);
+        final fileSize = await file.length();
+        const maxSize = 5 * 1024 * 1024; // 5MB
+
+        if (fileSize > maxSize) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Image size must be less than 5MB'),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+          return;
+        }
+
+        setState(() {
+          _receiptImage = file;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to pick image: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -810,7 +878,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
           _buildPaymentOption('GCash', 'Pay online with GCash'),
           const SizedBox(height: spacing.AppSpacing.gutterSm),
           _buildPaymentOption('Cash at Clinic', 'Pay when you arrive'),
-          if (_selectedPaymentMethod == 'GCASH' && _gcashQrUrl != null) ...[
+          if (_selectedPaymentMethod == 'GCASH') ...[
             const SizedBox(height: spacing.AppSpacing.gutterLg),
             Center(
               child: Container(
@@ -823,8 +891,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                  child: Image.network(
-                    _gcashQrUrl!,
+                  child: Image.asset(
+                    'assets/images/gcash_qr_placeholder.jpg',
                     width: 200,
                     height: 200,
                     fit: BoxFit.contain,
@@ -849,29 +917,116 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                         ),
                       );
                     },
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
-                      );
-                    },
                   ),
                 ),
               ),
             ),
             const SizedBox(height: spacing.AppSpacing.gutterMd),
-            Text(
-              'Scan the QR code with GCash to pay',
-              style: AppTextStyles.bodyMd.copyWith(
-                color: AppColors.secondary,
+            Center(
+              child: Text(
+                'Scan the QR code with GCash to pay',
+                style: AppTextStyles.bodyMd.copyWith(
+                  color: AppColors.secondary,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
             ),
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
+            // Download QR and Upload Receipt buttons
+            Row(
+              children: [
+                Expanded(
+                  child: PrimaryButton(
+                    text: _isDownloading ? 'Downloading...' : 'Download QR',
+                    onPressed: _isDownloading ? null : _downloadQrCode,
+                    icon: const Icon(Icons.download, size: 20),
+                    maxLines: 2,
+                    height: 56,
+                  ),
+                ),
+                const SizedBox(width: spacing.AppSpacing.gutterMd),
+                Expanded(
+                  child: PrimaryButton(
+                    text: 'Upload Receipt',
+                    onPressed: _pickReceiptImage,
+                    icon: const Icon(Icons.upload, size: 20),
+                    maxLines: 2,
+                    height: 56,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
+            // Show receipt preview after image is selected
+            if (_receiptImage != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Image.asset(
+                        'assets/images/gcash_logo.png',
+                        width: 20,
+                        height: 20,
+                      ),
+                      const SizedBox(width: spacing.AppSpacing.gutterSm),
+                      Text(
+                        'Receipt Preview',
+                        style: AppTextStyles.labelSm.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: spacing.AppSpacing.gutterSm),
+                  Container(
+                    width: double.infinity,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLow,
+                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+                      border: Border.all(color: AppColors.surfaceContainerHighest),
+                    ),
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+                          child: Image.file(
+                            _receiptImage!,
+                            width: double.infinity,
+                            height: 150,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        Positioned(
+                          top: spacing.AppSpacing.gutterSm,
+                          right: spacing.AppSpacing.gutterSm,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _receiptImage = null;
+                              });
+                            },
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: AppColors.error,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.close,
+                                color: AppColors.onError,
+                                size: spacing.AppSpacing.iconSm,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
           ],
         ],
       ),
@@ -1032,6 +1187,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 'clinic': widget.clinic,
                 'consultationFee': widget.consultationFee,
                 'selectedDate': _selectedDate,
+                'paymentMethod': _selectedPaymentMethod,
+                'receiptImage': _receiptImage,
               },
             );
           }
@@ -1047,6 +1204,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 'clinic': widget.clinic,
                 'consultationFee': widget.consultationFee,
                 'selectedDate': _selectedDate,
+                'paymentMethod': _selectedPaymentMethod,
+                'receiptImage': _receiptImage,
               },
             );
           }

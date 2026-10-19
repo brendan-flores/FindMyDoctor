@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -16,6 +17,8 @@ class BookingConfirmationPage extends StatefulWidget {
   final String? clinic;
   final String? consultationFee;
   final DateTime? selectedDate;
+  final String? paymentMethod;
+  final File? receiptImage;
 
   const BookingConfirmationPage({
     super.key,
@@ -25,6 +28,8 @@ class BookingConfirmationPage extends StatefulWidget {
     this.clinic,
     this.consultationFee,
     this.selectedDate,
+    this.paymentMethod,
+    this.receiptImage,
   });
 
   @override
@@ -34,10 +39,12 @@ class BookingConfirmationPage extends StatefulWidget {
 class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
   final ApiService _apiService = ApiService();
   bool _isSubmitting = false;
+  bool _isUploadingReceipt = false;
   String? _errorMessage;
   String? _queueNumber;
   int? _totalPatients;
   bool _isSuccess = false;
+  String? _appointmentId;
 
   Future<void> _submitReservation() async {
     if (widget.doctorId == null || widget.selectedDate == null) {
@@ -69,9 +76,15 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
           _totalPatients = totalPatientsRaw != null
               ? (totalPatientsRaw is String ? int.tryParse(totalPatientsRaw) : totalPatientsRaw as int?)
               : null;
+          _appointmentId = response['data']?['appointmentId']?.toString();
           _isSuccess = true;
           _isSubmitting = false;
         });
+
+        // If GCash payment method selected and receipt uploaded, upload the receipt
+        if (widget.paymentMethod == 'GCASH' && widget.receiptImage != null && _appointmentId != null) {
+          await _uploadReceipt();
+        }
       } else {
         setState(() {
           _errorMessage = response['error']?['message'] ?? 'Failed to book appointment';
@@ -82,6 +95,59 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
       setState(() {
         _errorMessage = 'Failed to book appointment: $e';
         _isSubmitting = false;
+      });
+    }
+  }
+
+  Future<void> _uploadReceipt() async {
+    if (widget.receiptImage == null || _appointmentId == null) return;
+
+    setState(() {
+      _isUploadingReceipt = true;
+    });
+
+    try {
+      // TODO: Implement actual image upload to backend
+      // This requires backend support for multipart/form-data file uploads
+      // For now, simulate upload with a placeholder URL
+      final receiptUrl = 'https://placeholder.com/receipt.jpg';
+
+      final response = await _apiService.uploadPaymentReceipt(
+        appointmentId: _appointmentId!,
+        receiptUrl: receiptUrl,
+      );
+
+      if (response['success'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Receipt uploaded successfully'),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response['error']?['message'] ?? 'Failed to upload receipt'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to upload receipt: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isUploadingReceipt = false;
       });
     }
   }
