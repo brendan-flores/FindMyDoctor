@@ -57,7 +57,7 @@ class MockPasswordChangeService implements PasswordChangeService {
 
   @override
   Future<Map<String, dynamic>> changePassword(
-    String currentPassword,
+    String? currentPassword,
     String newPassword,
   ) async {
     callCount++;
