@@ -98,6 +98,7 @@ describe('Conversations Router', () => {
               unread_count: 2,
               last_message_preview: 'Hello',
               last_message_sent_at: new Date(),
+              last_message_sender_user_id: 'patient-user-id',
             },
           ],
         })
@@ -109,12 +110,14 @@ describe('Conversations Router', () => {
       expect(response.body.data).toHaveLength(1);
       expect(response.body.data[0].unread_count).toBe(2);
       expect(response.body.data[0].last_message_preview).toBe('Hello');
+      expect(response.body.data[0].last_message_sender_user_id).toBe('patient-user-id');
 
       const sql = mockedQuery.mock.calls[0][0];
       // Patient listing is restricted to doctors with an association record
       expect(sql).toContain('patient_doctor_associations');
       // Unread excludes messages sent by the current user
       expect(sql).toContain('sender_user_id <> $2');
+      expect(sql).toContain('AS last_message_sender_user_id');
       expect(mockedQuery.mock.calls[0][1]).toEqual(['patient-user-id']);
     });
 

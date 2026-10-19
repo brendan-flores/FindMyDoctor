@@ -31,7 +31,12 @@ function listExtras(userIdIndex: number): string {
       (SELECT m.sent_at FROM messages m
         WHERE m.conversation_id = c.id
         ORDER BY m.sent_at DESC LIMIT 1)
-    END AS last_message_sent_at
+    END AS last_message_sent_at,
+    CASE WHEN c.id IS NULL THEN NULL ELSE
+      (SELECT m.sender_user_id FROM messages m
+        WHERE m.conversation_id = c.id
+        ORDER BY m.sent_at DESC LIMIT 1)
+    END AS last_message_sender_user_id
   `;
 }
 
@@ -229,6 +234,23 @@ router.post('/', authenticate, requireSecretaryPasswordChange, async (req: AuthR
         return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Patient has no appointment with this doctor'));
       }
 
+      // Ensure patient_doctor_associations record exists (required for patient to see conversation)
+      const associationResult = await query(
+        `SELECT 1 FROM patient_doctor_associations
+         WHERE patient_id = $1 AND doctor_id = $2
+         LIMIT 1`,
+        [patientId, doctorId]
+      );
+
+      if (associationResult.rows.length === 0) {
+        // Create the association record so the patient can access the conversation
+        await query(
+          `INSERT INTO patient_doctor_associations (patient_id, doctor_id, details_completion_status)
+           VALUES ($1, $2, 'PENDING')`,
+          [patientId, doctorId]
+        );
+      }
+
       // Reuse the existing conversation record for this patient + doctor
       const existingResult = await query(
         `SELECT * FROM conversations WHERE patient_id = $1 AND doctor_id = $2 LIMIT 1`,
@@ -297,7 +319,7 @@ router.get('/:id', authenticate, requireSecretaryPasswordChange, requireSecretar
 });
 
 // Get messages for conversation (authorized callers only)
-router.get('/:id/messages', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, async (req: AuthRequest, res: Response) => {
+router.get('/:id/messages', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;
@@ -327,7 +349,7 @@ router.get('/:id/messages', authenticate, requireSecretaryPasswordChange, requir
 });
 
 // Send message (authorized callers only)
-router.post('/:id/messages', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, async (req: AuthRequest, res: Response) => {
+router.post('/:id/messages', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { message } = req.body;
@@ -370,7 +392,7 @@ router.post('/:id/messages', authenticate, requireSecretaryPasswordChange, requi
 });
 
 // Mark incoming messages as read (authorized callers only)
-router.patch('/:id/read', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, async (req: AuthRequest, res: Response) => {
+router.patch('/:id/read', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;
