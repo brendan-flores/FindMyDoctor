@@ -8,6 +8,7 @@ import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/doctor_service.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/constants/api_constants.dart';
 
 class DoctorSchedulePage extends StatefulWidget {
   final String doctorId;
@@ -34,6 +35,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   final ApiService _apiService = ApiService();
 
   DateTime? _selectedDate;
+  String _selectedPaymentMethod = 'CASH'; // 'GCASH' or 'CASH'
+  String? _gcashQrUrl;
 
   Map<String, dynamic>? _availabilityData;
   bool _isLoading = true;
@@ -45,6 +48,27 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     super.initState();
     _selectedDate = null;
     _fetchAvailability();
+    _fetchGcashQr();
+  }
+
+  Future<void> _fetchGcashQr() async {
+    try {
+      final response = await _apiService.getGcashQr();
+      if (response['success'] == true) {
+        final qrPath = response['data']?['qrUrl'];
+        if (qrPath != null) {
+          // Construct full URL for static file (remove /api/v1 prefix)
+          final baseUrl = ApiConstants.baseUrl.replaceAll('/api/v1', '');
+          if (mounted) {
+            setState(() {
+              _gcashQrUrl = '$baseUrl$qrPath';
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Failed to load GCash QR: $e');
+    }
   }
 
   Future<void> _fetchAvailability() async {
@@ -127,6 +151,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                     if (_selectedDate != null) _buildDateInfoSection(),
                     const SizedBox(height: spacing.AppSpacing.gutterLg),
                     _buildQueueSummary(),
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildPaymentMethodSelection(),
                     const SizedBox(height: spacing.AppSpacing.gutter3xl),
                   ],
                 ),
@@ -765,6 +791,169 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     );
   }
 
+  Widget _buildPaymentMethodSelection() {
+    if (_selectedDate == null) return const SizedBox();
+
+    return AppCard(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Payment Method',
+            style: AppTextStyles.labelSm.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          _buildPaymentOption('GCash', 'Pay online with GCash'),
+          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          _buildPaymentOption('Cash at Clinic', 'Pay when you arrive'),
+          if (_selectedPaymentMethod == 'GCASH' && _gcashQrUrl != null) ...[
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
+            Center(
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLow,
+                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                  border: Border.all(color: AppColors.surfaceContainerHighest),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                  child: Image.network(
+                    _gcashQrUrl!,
+                    width: 200,
+                    height: 200,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.qr_code_2,
+                              size: 80,
+                              color: AppColors.secondary,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'QR code not available',
+                              style: AppTextStyles.labelSm.copyWith(
+                                color: AppColors.secondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: spacing.AppSpacing.gutterMd),
+            Text(
+              'Scan the QR code with GCash to pay',
+              style: AppTextStyles.bodyMd.copyWith(
+                color: AppColors.secondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentOption(String title, String subtitle) {
+    final isSelected = _selectedPaymentMethod == (title == 'GCash' ? 'GCASH' : 'CASH');
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedPaymentMethod = title == 'GCash' ? 'GCASH' : 'CASH';
+        });
+      },
+      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+      child: Container(
+        padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primaryFixed.withValues(alpha: 0.1)
+              : AppColors.surfaceLow,
+          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.surfaceContainerHighest,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primary
+                    : AppColors.surfaceContainer,
+                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+              ),
+              child: title == 'GCash'
+                  ? Image.asset(
+                      'assets/images/gcash_logo.png',
+                      width: 24,
+                      height: 24,
+                    )
+                  : Icon(
+                      Icons.local_atm,
+                      color: isSelected ? AppColors.onPrimary : AppColors.secondary,
+                      size: spacing.AppSpacing.iconMd,
+                    ),
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppTextStyles.bodyMdMedium.copyWith(
+                      color: isSelected ? AppColors.primary : AppColors.onSurface,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                color: AppColors.primary,
+                size: spacing.AppSpacing.iconLg,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCalendarLegend() {
     return Container(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterSm),
@@ -964,7 +1153,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             PrimaryButton(
               text: _isCheckingRecord
                   ? 'Checking...'
-                  : (isAlreadyBooked ? 'Already Booked' : 'Confirm Clinic Date & Reserve Queue'),
+                  : (isAlreadyBooked ? 'Already Booked' : 'Continue Booking'),
               onPressed: _selectedDate != null && !isAlreadyBooked && !_isCheckingRecord
                   ? _handleBookingConfirmation
                   : null,

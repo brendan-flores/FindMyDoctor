@@ -517,22 +517,6 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                   ],
                 ),
               ),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: spacing.AppSpacing.gutterSm,
-                  vertical: spacing.AppSpacing.gutterXs,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLow,
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                ),
-                child: Text(
-                  'In-Person',
-                  style: AppTextStyles.labelSm.copyWith(
-                    color: AppColors.secondary,
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
