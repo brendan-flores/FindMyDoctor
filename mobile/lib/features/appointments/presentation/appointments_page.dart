@@ -20,7 +20,8 @@ class AppointmentsPage extends StatefulWidget {
 class _AppointmentsPageState extends State<AppointmentsPage> {
   String _selectedFilter = 'upcoming';
   late final ApiService _apiService;
-  List<dynamic> _appointments = [];
+  List<dynamic> _allAppointments = []; // Store all appointments
+  List<dynamic> _appointments = []; // Filtered appointments for display
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -38,24 +39,13 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     });
 
     try {
-      String? statusFilter;
-      switch (_selectedFilter) {
-        case 'upcoming':
-          statusFilter = 'SCHEDULED';
-          break;
-        case 'completed':
-          statusFilter = 'COMPLETED';
-          break;
-        case 'cancelled':
-          statusFilter = 'CANCELLED';
-          break;
-      }
-
-      final response = await _apiService.getAppointments(status: statusFilter);
+      // Fetch all appointments without status filter
+      final response = await _apiService.getAppointments(status: null);
 
       if (response['success'] == true) {
         setState(() {
-          _appointments = response['data'] ?? [];
+          _allAppointments = response['data'] ?? [];
+          _filterAppointments();
           _isLoading = false;
         });
       } else {
@@ -69,6 +59,20 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
         _errorMessage = 'Failed to load appointments: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  void _filterAppointments() {
+    switch (_selectedFilter) {
+      case 'upcoming':
+        _appointments = _allAppointments.where((a) => a['status'] == 'SCHEDULED').toList();
+        break;
+      case 'completed':
+        _appointments = _allAppointments.where((a) => a['status'] == 'COMPLETED').toList();
+        break;
+      case 'cancelled':
+        _appointments = _allAppointments.where((a) => a['status'] == 'CANCELLED').toList();
+        break;
     }
   }
 
@@ -123,7 +127,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
   }
 
   Widget _buildHeader() {
-    final upcomingCount = _appointments.where((a) => a['status'] == 'SCHEDULED').length;
+    final upcomingCount = _allAppointments.where((a) => a['status'] == 'SCHEDULED').length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,7 +257,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
 
   Widget _buildFilterTab(String label, String filter) {
     final isSelected = _selectedFilter == filter;
-    final count = _appointments.where((a) {
+    final count = _allAppointments.where((a) {
       switch (filter) {
         case 'upcoming':
           return a['status'] == 'SCHEDULED';
@@ -270,8 +274,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
       onTap: () {
         setState(() {
           _selectedFilter = filter;
+          _filterAppointments();
         });
-        _fetchAppointments();
       },
       borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
       child: Container(
