@@ -64,6 +64,7 @@ class ApiConstants {
   static const String paymentVerify = '/verify';
   static const String paymentReject = '/reject';
   static const String paymentCharges = '/charges';
+  static const String paymentGcashQr = '/gcash-qr';
   
   // Visits endpoints
   static const String visits = '/visits';
