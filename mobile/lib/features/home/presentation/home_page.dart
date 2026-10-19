@@ -10,6 +10,7 @@ import '../../../core/services/api_service.dart';
 import '../../../core/models/doctor.dart';
 import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
+import '../../conversations/models/conversation.dart';
 
 class HomePage extends StatefulWidget {
   final int? initialTab;
@@ -30,6 +31,11 @@ class _HomePageState extends State<HomePage> {
   List<String> _hospitals = [];
   bool _isLoadingSpecialties = true;
   bool _isLoadingDoctors = true;
+  List<Conversation> _conversations = [];
+  bool _isLoadingConversations = true;
+  int _totalUnreadCount = 0;
+  String? _userName;
+  String? _userEmail;
 
   @override
   void initState() {
@@ -38,6 +44,26 @@ class _HomePageState extends State<HomePage> {
       _currentIndex = widget.initialTab!;
     }
     _loadData();
+    _loadUserInfo();
+    // Load conversations in background to show unread badge
+    _loadConversations();
+  }
+
+  Future<void> _loadUserInfo() async {
+    try {
+      final response = await _apiService.getCurrentUser();
+      if (response['success'] == true && response['data'] != null) {
+        if (!mounted) return;
+        setState(() {
+          _userName = response['data']['firstName'] != null && response['data']['lastName'] != null
+              ? '${response['data']['firstName']} ${response['data']['lastName']}'
+              : response['data']['email'];
+          _userEmail = response['data']['email'];
+        });
+      }
+    } catch (e) {
+      // Silently fail - keep default profile info
+    }
   }
 
   Future<void> _loadData() async {
@@ -77,6 +103,37 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _isLoadingSpecialties = false;
         _isLoadingDoctors = false;
+      });
+    }
+  }
+
+  Future<void> _loadConversations() async {
+    try {
+      final response = await _apiService.getConversations();
+      if (response['success'] == true && response['data'] != null) {
+        final List<dynamic> data = response['data'];
+        final conversations = data.map((json) => Conversation.fromJson(json)).toList();
+        final totalUnread = conversations.fold<int>(0, (sum, conv) => sum + conv.unreadCount);
+        if (!mounted) return;
+        setState(() {
+          _conversations = conversations;
+          _totalUnreadCount = totalUnread;
+          _isLoadingConversations = false;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _conversations = [];
+          _totalUnreadCount = 0;
+          _isLoadingConversations = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _conversations = [];
+        _totalUnreadCount = 0;
+        _isLoadingConversations = false;
       });
     }
   }
@@ -160,12 +217,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildChatContent() {
-    // The viewport is zero-sized on the very first layout pass (Android reports
-    // a 0x0 surface before it is ready). Subtracting a fixed offset there would
-    // create an invalid negative height, so only reserve the filler space when
-    // there is actually room for it.
-    final double emptyStateHeight =
-        MediaQuery.of(context).size.height - 200;
+    // Load conversations when this tab is accessed
+    if (_isLoadingConversations) {
+      _loadConversations();
+    }
 
     return Column(
       children: [
@@ -183,9 +238,16 @@ class _HomePageState extends State<HomePage> {
                     style: AppTextStyles.headlineLg,
                   ),
                   const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  if (emptyStateHeight > 0)
+                  if (_isLoadingConversations)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (_conversations.isEmpty)
                     SizedBox(
-                      height: emptyStateHeight,
+                      height: MediaQuery.of(context).size.height - 300,
                       child: Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -204,7 +266,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                             const SizedBox(height: spacing.AppSpacing.gutterSm),
                             Text(
-                              'Start a conversation with a clinic secretary',
+                              'Secretaries will start conversations with you',
                               style: AppTextStyles.labelSm.copyWith(
                                 color: AppColors.outline,
                               ),
@@ -212,7 +274,9 @@ class _HomePageState extends State<HomePage> {
                           ],
                         ),
                       ),
-                    ),
+                    )
+                  else
+                    ..._conversations.map((conversation) => _buildConversationCard(conversation)),
                 ],
               ),
             ),
@@ -220,6 +284,143 @@ class _HomePageState extends State<HomePage> {
         ),
       ],
     );
+  }
+
+  Widget _buildConversationCard(Conversation conversation) {
+    return AppCard(
+      onTap: () async {
+        await Navigator.of(context).pushNamed(
+          '/conversation-thread',
+          arguments: {'conversationId': conversation.id},
+        );
+        // Reload conversations when returning to update unread count
+        if (mounted) {
+          _loadConversations();
+        }
+      },
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainer,
+              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+            ),
+            child: Icon(
+              Icons.person,
+              color: AppColors.outline,
+              size: spacing.AppSpacing.iconLg,
+            ),
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      conversation.secretaryName,
+                      style: AppTextStyles.bodyMdMedium.copyWith(
+                        fontWeight: conversation.unreadCount > 0
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                    if (conversation.practiceName != null) ...[
+                      const SizedBox(width: spacing.AppSpacing.gutterXs),
+                      Text(
+                        '•',
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.outline,
+                        ),
+                      ),
+                      const SizedBox(width: spacing.AppSpacing.gutterXs),
+                      Expanded(
+                        child: Text(
+                          conversation.practiceName!,
+                          style: AppTextStyles.labelSm,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
+                Text(
+                  conversation.lastMessagePreview ?? 'No messages yet',
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.secondary,
+                    fontWeight: conversation.unreadCount > 0
+                        ? FontWeight.w700
+                        : FontWeight.w400,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterSm),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (conversation.lastMessageSentAt != null)
+                Text(
+                  _formatTimestamp(conversation.lastMessageSentAt!),
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.outline,
+                  ),
+                ),
+              if (conversation.unreadCount > 0) ...[
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.AppSpacing.gutterSm,
+                    vertical: spacing.AppSpacing.gutterXs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 20,
+                    minHeight: 20,
+                  ),
+                  child: Text(
+                    conversation.unreadCount > 99 ? '99+' : conversation.unreadCount.toString(),
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.onError,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    }
   }
 
   Widget _buildProfileContent() {
@@ -258,15 +459,15 @@ class _HomePageState extends State<HomePage> {
                             ),
                             const SizedBox(height: spacing.AppSpacing.gutterMd),
                             Text(
-                              'Juan Reyes',
-                              style: AppTextStyles.bodyMdMedium.copyWith(
+                              _userName ?? 'Loading...',
+                              style: AppTextStyles.headlineSm.copyWith(
                                 color: AppColors.secondary,
                               ),
                             ),
-                            const SizedBox(height: spacing.AppSpacing.gutterXs),
+                            const SizedBox(height: spacing.AppSpacing.gutterSm),
                             Text(
-                              'user@gmail.com',
-                              style: AppTextStyles.labelSm.copyWith(
+                              _userEmail ?? 'Loading...',
+                              style: AppTextStyles.bodyMd.copyWith(
                                 color: AppColors.outline,
                               ),
                             ),
@@ -849,7 +1050,7 @@ class _HomePageState extends State<HomePage> {
               _buildNavItem(Icons.home, 'Home', 0),
               _buildNavItem(Icons.local_hospital, 'Doctors', 1),
               _buildNavItem(Icons.calendar_month, 'Appointments', 2),
-              _buildNavItem(Icons.chat_bubble, 'Chat', 3),
+              _buildNavItem(Icons.chat_bubble, 'Chat', 3, unreadCount: _totalUnreadCount),
               _buildNavItem(Icons.account_circle, 'Profile', 4),
             ],
           ),
@@ -858,7 +1059,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
+  Widget _buildNavItem(IconData icon, String label, int index, {int? unreadCount}) {
     final isActive = _currentIndex == index;
     return InkWell(
       onTap: () {
@@ -867,6 +1068,10 @@ class _HomePageState extends State<HomePage> {
           // Clear specialty when switching tabs
           if (index != 1) {
             _selectedSpecialtyFromHome = null;
+          }
+          // Reload conversations when switching to chat tab
+          if (index == 3) {
+            _loadConversations();
           }
         });
       },
@@ -878,10 +1083,43 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: isActive ? AppColors.primaryContainer : AppColors.secondary,
-              size: spacing.AppSpacing.iconLg,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  icon,
+                  color: isActive ? AppColors.primaryContainer : AppColors.secondary,
+                  size: spacing.AppSpacing.iconLg,
+                ),
+                if (unreadCount != null && unreadCount > 0)
+                  Positioned(
+                    right: -6,
+                    top: -6,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: spacing.AppSpacing.gutterXs,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        unreadCount > 99 ? '99+' : unreadCount.toString(),
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.onError,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: spacing.AppSpacing.gutterXs),
             Text(
