@@ -4,6 +4,52 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.12 (October 19, 2026)
+
+**Purpose:** Implement the secretary–patient chat feature across the backend and the secretary web application, with role-based conversation access, read-status unread counts, chat notifications with FCM/APNs push delivery, device-token management, and a read-only appointment-summary endpoint
+
+**Significant Features:**
+- Secretary Web Dashboard chat at `/secretary/conversations` replaces the placeholder with a functional three-column interface: conversation list (patient details, unread badges/counts, latest-message previews), message thread with distinct sender/recipient styling, and a composer; the sidebar adds an unread badge on the Conversations item without changing its layout
+- Read-only appointment-summary endpoint `GET /api/v1/conversations/:id/appointment-summary` backs the secretary chat patient-info sheet (secretary-only, assigned-doctor scope, doctor-association access rules; appointment fields only, no mutations)
+- Device-token management: `POST /api/v1/notifications/device-tokens` and `DELETE /api/v1/notifications/device-tokens/:id` let an authenticated user register and remove only their own push tokens (`device_tokens` table, migration `028_add_device_tokens.sql`, applied via `npm run migrate:device-tokens`)
+- Push delivery integrated after a message is saved via `backend/src/services/pushService.ts` (FCM HTTP v1 with legacy server-key fallback, APNs token-based over HTTP/2); provider credentials remain backend-only and delivery is best-effort, targeting only intended recipients
+
+**Improvements:**
+- Backend: `GET /conversations` returns unread counts computed from `messages.read_at` excluding the caller's own messages, plus a latest-message preview consistent with the newest saved message, for both patient and secretary listings
+- Backend: `POST /conversations` reuses the patient's single conversation per doctor (no per-secretary duplicate histories); secretaries assigned to the same doctor (`secretaries.doctor_id`) share the same message history
+- Backend: role-based access enforced consistently across listing, creation, retrieval, message retrieval, sending, and read-status updates (patient: own conversations for doctors with `patient_doctor_associations` records; secretary: patients associated with the assigned doctor)
+- Backend: after a message is saved, recipients receive generic notifications with titles and bodies that never contain message content: patient-sent → `NEW_PATIENT_MESSAGE` to the assigned secretaries; secretary-sent → `NEW_SECRETARY_MESSAGE` to the patient; recipients only, never the sender
+- Backend: added `conversationService` (`backend/src/modules/conversations/conversationService.ts`) centralizing authorized-conversation access checks and recipient notifications; added push backend configuration (`FCM_*`, `APNS_*`) in `backend/src/config/index.ts`
+- Web: `secretaryApi.ts` adds `conversationApi` (list, get, messages, send, mark-as-read, appointment summary) and `Conversation`/`ConversationMessage`/`AppointmentSummary` types using relative API paths against the existing base URL
+
+**Bug Fixes:**
+- Fixed patient conversation unread counts including the patient's own sent messages
+
+**Removed/Modified Functionality:**
+- `POST /conversations` no longer requires both `secretaryId` and `doctorId`; it now requires `doctorId` (with optional `secretaryId`) and validates the patient's doctor association plus the secretary's doctor assignment; responses are enriched with secretary/doctor names
+- `PATCH /conversations/:id/read` and message retrieval now enforce conversation authorization (previously unauthenticated-body verification only); unauthorized attempts return `403 CONVERSATION_ACCESS_DENIED` or `404`
+- Direct patient–doctor chat remains prohibited; no patient↔doctor messaging endpoints were added
+- Secretary mobile chat is planned follow-up work and is not implemented
+
+**Architecture:**
+- Backend: modified `/backend/src/api/conversations.ts`, `/backend/src/api/notifications.ts`, `/backend/src/config/index.ts`; added `/backend/src/modules/conversations/conversationService.ts`, `/backend/src/services/pushService.ts`
+- Database: added `/backend/database/028_add_device_tokens.sql` and `/backend/src/database/applyDeviceTokens.ts` (`device_tokens` table, indexes, provider+token uniqueness)
+- Web: modified `/web/src/app/secretary/conversations/page.tsx`, `/web/src/lib/api/secretaryApi.ts`, `/web/src/components/layout/SecretarySidebar.tsx`
+- Mobile: unchanged; existing patient conversation list/messages/send responses remain compatible
+
+**Testing:**
+- Backend: added `src/api/conversations.test.ts` (16 tests) covering role-based listing, secretary doctor-scope, association-gated creation, conversation reuse, unauthorized message/read access denial, recipient notifications with generic push payloads (never the sender), read-status updates, and device-token register/remove ownership
+- Backend: conversations test suite 16/16 passed; `tsc --noEmit` clean
+- Web: `next build` succeeded (40 routes including `/secretary/conversations`); `tsc --noEmit` clean; lint shows only pre-existing errors in unrelated pages
+
+**Documentation:**
+- Updated `docs/prd.md` (section 16 Secretary–Patient Chat, section 24 Notifications, FR-031, FR-039, Secretary Web Dashboard scope) and `docs/architecture.md` (communication module, chat architecture, secretary chat and device-token endpoints, notification module, database tables)
+- Updated `docs/architecture-essentials.md` (Secretary Chat Rules access/sharing/unread/patient-info sheet/push rules, database tables and migration list, chat implementation checklist)
+- Updated `docs/SYSTEM_STATE.md` (Database Schema, Patient-Secretary Messaging and Push Notifications, Secretary Web Chat)
+- Updated CURRENT_VERSION.md to 01.12 and added this VERSION_HISTORY.md entry
+
+---
+
 ### 01.11 (October 18, 2026)
 
 **Purpose:** Replace FindMyDoctor branding logos across mobile and web applications and implement platform-aware API base URL configuration

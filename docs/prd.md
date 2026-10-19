@@ -555,16 +555,38 @@ Patients can communicate with secretaries regarding:
 
 Secretaries can:
 
-- View authorized patient conversations.
+- Review authorized patient conversations.
 - Reply to patients.
 - View relevant appointment information.
 - Assist patients.
+- Answer patients through the Secretary Web Dashboard chat at `/secretary/conversations`.
+
+### Shared Conversation Access
+
+A conversation belongs to one patient and one doctor:
+
+- Each patient has a single conversation per doctor. Creating or retrieving a conversation reuses the existing conversation and message records; per-secretary duplicate histories are never created.
+- All secretaries assigned to the same doctor (`secretaries.doctor_id`) share access to the relevant patient conversations of that doctor and write to the same message history.
+- A patient may access only their own conversations and only for a doctor with whom they have a matching `patient_doctor_associations` record.
+- A secretary may access conversations only for patients associated with their assigned doctor; access checks are enforced on listing, creation, retrieval, message retrieval, sending, and read-status updates.
+
+### Read Status and Previews
+
+- Message read status is tracked by `messages.read_at`.
+- Conversation-list results include an unread count computed from `read_at` and excluding the current user's own sent messages, plus a latest-message preview consistent with the most recently saved message.
+- `PATCH /api/v1/conversations/:id/read` marks incoming messages as read for the authorized caller.
+
+### Patient-Info Sheet
+
+The secretary web chat includes a read-only patient-info sheet backed by `GET /api/v1/conversations/:id/appointment-summary`. The endpoint returns only the read-only appointment fields the interface needs (appointment date, status, reason for visit, queue number, and the patient's basic contact details), enforces the same role-based access rules as the conversation it belongs to (secretary-only, assigned-doctor scope, doctor-association), and exposes no appointment mutations.
 
 ### Communication Restriction
 
 Patients cannot directly communicate with doctors through chat.
 
 The platform must not provide a patient-doctor chat workflow.
+
+The secretary web chat delivers conversation notifications and push reminders to patients through the notification module; the patient mobile experience remains the mobile chat. A secretary mobile chat experience is planned follow-up work and is not implemented yet.
 
 ---
 
@@ -716,10 +738,13 @@ Notifications may be generated for:
 - Queue information.
 - Reservation cancellation.
 - Rescheduling.
-- New secretary message.
+- New patient chat message (NEW_PATIENT_MESSAGE).
+- New secretary chat message (NEW_SECRETARY_MESSAGE).
 - Prescription availability.
 - Payment verification.
 - Waitlist updates.
+
+Chat notifications are sent only to the message recipient (never the sender), use generic titles and bodies, and never include message content. Patient-sent messages notify the secretaries assigned to the conversation's doctor; secretary-sent messages notify the patient. Registered device tokens may receive an additional FCM/APNs push with the same generic payload; provider credentials remain on the backend.
 
 ---
 
@@ -934,7 +959,13 @@ Skipped patients shall remain recorded in the queue.
 
 ## FR-031 — Patient-Secretary Chat
 
-Patients and authorized secretaries shall be able to exchange messages.
+Patients and authorized secretaries shall be able to exchange messages through the shared conversation model:
+
+- Each patient has one conversation per doctor; secretaries of the same doctor (`secretaries.doctor_id`) share access to the same conversation and message history without duplicate histories.
+- A patient accesses only their own conversations and only for doctors with a matching `patient_doctor_associations` record; a secretary accesses only conversations for patients associated with their assigned doctor.
+- Conversation listing returns an unread count computed from `messages.read_at` (excluding the caller's own messages) and a latest-message preview.
+- The Secretary Web Dashboard chat at `/secretary/conversations` provides a three-column interface (conversation list, message thread, composer) with a read-only patient-info sheet from `GET /api/v1/conversations/:id/appointment-summary`.
+- Patient↔Doctor direct chat remains prohibited (FR-032); Secretary mobile chat is planned follow-up work.
 
 ## FR-032 — Doctor Chat Restriction
 
@@ -967,6 +998,8 @@ The system shall generate prescription PDFs.
 ## FR-039 — Notification System
 
 The system shall provide relevant application notifications, including notifications to affected patients after a confirmed doctor or secretary exception or break-period change affects dates with active appointments.
+
+Chat message notifications use two types: `NEW_PATIENT_MESSAGE` (sent to the secretaries assigned to the conversation's doctor when a patient sends a message) and `NEW_SECRETARY_MESSAGE` (sent to the patient when a secretary sends a message). Notifications go only to recipients (never the sender), use generic titles and bodies, and never include message content. Users may register and remove push device tokens through `POST /api/v1/notifications/device-tokens` and `DELETE /api/v1/notifications/device-tokens/:id`; registered users' devices receive FCM/APNs pushes with the same generic payloads, and provider credentials remain on the backend.
 
 ## FR-040 — Doctor Approval
 
@@ -1283,7 +1316,7 @@ The web application provides role-specific dashboards for doctors, secretaries, 
 - Walk-in registration
 - Schedule management (weekly working hours view only, exceptions, break periods, and capacity)
 - Payment verification
-- Patient communication
+- Patient communication (three-column chat with conversation list, message thread, composer, and read-only patient-info sheet at `/secretary/conversations`; secretary mobile chat is planned follow-up work)
 
 **Admin Web Dashboard:**
 - User management

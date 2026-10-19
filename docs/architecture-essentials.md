@@ -109,6 +109,28 @@ Patients cannot access another patient's conversation.
 
 Secretaries cannot access unrelated conversations without authorization.
 
+### Conversation Access and Sharing
+
+- A patient may access only their own conversations and only for a doctor with whom they have a matching `patient_doctor_associations` record; conversation creation must verify both the patient's association with the doctor and the requested secretary's assignment to that doctor (`secretaries.doctor_id`).
+- A secretary accesses conversations only for patients associated with their assigned doctor; secretaries assigned to the same doctor share access to the same patient conversations and message history, reusing existing conversation and message records without per-secretary duplicate histories.
+- These access rules apply consistently to conversation listing, creation, retrieval, message retrieval, sending, and read-status updates. Unauthorized access must not return data.
+
+### Unread Counts, Previews, and Read Status
+
+- Unread counts use `messages.read_at` and exclude messages sent by the current user.
+- Conversation-list results include the unread count and a latest-message preview consistent with the most recent saved message.
+- `PATCH /api/v1/conversations/:id/read` marks incoming messages as read only for authorized callers.
+
+### Patient-Info Sheet Endpoint
+
+- `GET /api/v1/conversations/:id/appointment-summary` is a read-only secretary endpoint. It returns only the appointment fields the patient-info sheet needs (appointment date, status, reason for visit, queue number plus the patient's basic contact details), applies the same role-based access rules as the conversation (SECRETARY role, assigned-doctor scope, doctor association), and exposes no appointment mutations.
+
+### Chat Notifications and Push Delivery
+
+- After a message is saved: patient-sent → `NEW_PATIENT_MESSAGE` to the secretaries assigned to the conversation's doctor; secretary-sent → `NEW_SECRETARY_MESSAGE` to the patient. Recipients only, never the sender; titles, bodies, and push payloads are generic and never contain message content.
+- `POST /api/v1/notifications/device-tokens` and `DELETE /api/v1/notifications/device-tokens/:id` let an authenticated user register and remove only their own device tokens (stored in the `device_tokens` table, one active owner per token).
+- FCM/APNs delivery runs after a message is saved and targets only the intended recipients; provider credentials remain on the backend and are never exposed to the mobile application.
+
 ---
 
 # 6. AI Chatbot Rules
@@ -662,6 +684,7 @@ ai_messages
 
 waitlists
 notifications
+device_tokens (for push notification delivery)
 
 pending_doctor_signups (for OTP staging)
 pending_patient_signups (for OTP staging)
@@ -680,6 +703,7 @@ login_otp_challenges (for login OTP challenge state)
 - `015_enforce_secretary_doctor_relationship.sql` - Enforces required foreign key and non-null assignment for `secretaries.doctor_id`
 - `016_doctor_profile_fields.sql` - Adds extended doctor profile fields: contact_number, professional_photo_url, years_of_experience, areas_of_expertise (comma-separated text), consultation_type, languages_spoken (comma-separated text), profile_completion_status, profile_submitted_at
 - `017_modify_pending_doctor_signup_for_basic_flow.sql` - Adds contact_number field to pending_doctor_signups for basic registration flow (professional fields remain in table for compatibility)
+- `028_add_device_tokens.sql` - Creates the `device_tokens` table associating FCM/APNs push tokens with their owning user (one active owner per token, unique on provider+token)
 
 ---
 
@@ -1368,6 +1392,12 @@ For chat:
 [ ] Patient ↔ Secretary works
 [ ] Unauthorized conversation access blocked
 [ ] Patient ↔ Doctor remains blocked
+[ ] Patients access only their own conversations for associated doctors
+[ ] Secretaries access only assigned-doctor patient conversations (shared same-doctor history, no per-secretary duplicates)
+[ ] Unread counts use messages.read_at and exclude the current user's own messages
+[ ] Message notifications go only to recipients (NEW_PATIENT_MESSAGE / NEW_SECRETARY_MESSAGE) with generic, content-free payloads
+[ ] Device tokens belong to their owning user; only the owner can register or remove them
+[ ] Appointment-summary endpoint is read-only, secretary-only, and returns only the fields the patient-info sheet needs
 ```
 
 ---

@@ -1251,6 +1251,17 @@ It does not support:
 Patient ↔ Doctor
 ```
 
+### Conversation Scope and Sharing
+
+- Each patient has a single conversation per doctor. Creating a conversation reuses the existing conversation and message records for that patient–doctor pair; per-secretary duplicate histories are never created.
+- All secretaries assigned to the same doctor (`secretaries.doctor_id`) share access to the relevant patient conversations and write to the same message history.
+
+### Role-Based Access
+
+- A patient may access only their own conversations and only for a doctor with whom they have a matching `patient_doctor_associations` record.
+- A secretary may access conversations only for patients associated with their assigned doctor.
+- Access checks are enforced consistently on conversation listing, creation, retrieval, message retrieval, sending, and read-status updates.
+
 Recommended tables:
 
 ```text
@@ -1268,12 +1279,13 @@ conversations
 id
 patient_id
 secretary_id
+doctor_id
 status
 created_at
 updated_at
 ```
 
-There should be no `doctor_id` in this patient-secretary conversation model.
+The model stores the conversation's doctor (`doctor_id`) so role-based access can scope secretaries to their assigned doctor (`secretaries.doctor_id`) and scope patients to doctors with a matching `patient_doctor_associations` record. There is no dedicated patient-doctor conversation channel in this model; `doctor_id` identifies the practice the conversation belongs to, not a chat participant.
 
 Recommended statuses:
 
@@ -1300,13 +1312,15 @@ read_at
 
 The backend must verify that the sender is an authorized participant.
 
+Read status is tracked by `read_at`. Unread counts are computed from `read_at` and exclude messages sent by the current user. Conversation-list results include this unread count together with a latest-message preview that is consistent with the most recently saved message.
+
 ---
 
 # 28. Chat Architecture
 
 ```text
-Patient Mobile
-      ↓
+Patient Mobile / Secretary Web
+        ↓
 POST /conversations/:id/messages
       ↓
 Backend
@@ -1319,10 +1333,19 @@ Validate Message
       ↓
 Save Message
       ↓
-Notify Secretary
+Notify Recipients (never the sender)
+      ↓
+FCM / APNs push to registered devices
 ```
 
-The same authorization model applies when the secretary replies.
+The same authorization model applies when the secretary replies. Notification titles, bodies, and push payloads are generic and never contain message content:
+
+- Patient-sent message → `NEW_PATIENT_MESSAGE` to the secretaries assigned to the conversation's doctor.
+- Secretary-sent message → `NEW_SECRETARY_MESSAGE` to the patient.
+
+Push delivery targets only the intended recipients' device tokens stored in the `device_tokens` table; FCM/APNs credentials are configurable on the backend only.
+
+The Secretary web chat replaces the placeholder page with a functional three-column interface (conversation list, message thread with distinct sender/recipient styling, composer) and adds an unread badge to the sidebar. It calls the same conversations API through the existing web API client, with the backend and PostgreSQL as the single source of truth — no separate conversation or message storage is added. A secretary mobile chat experience is planned follow-up work.
 
 ---
 
@@ -1665,12 +1688,15 @@ Notifications may be generated when:
 
 - Reservation is created.
 - Queue information changes.
-- Secretary sends a message.
+- A patient sends a chat message (NEW_PATIENT_MESSAGE, to the secretaries of the conversation's doctor).
+- A secretary sends a chat message (NEW_SECRETARY_MESSAGE, to the patient).
 - Payment is verified.
 - Prescription is created.
 - Appointment changes.
 - A confirmed exception or break-period change affects dates with active appointments.
 - Waitlist status changes.
+
+Chat notifications are sent only to recipients (never the sender) with generic titles, bodies, and push payloads that never include message content, and are additionally delivered as FCM/APNs pushes to the recipient's registered device tokens when push credentials are configured.
 
 ---
 
@@ -1738,7 +1764,17 @@ GET  /conversations/:id
 GET  /conversations/:id/messages
 POST /conversations/:id/messages
 PATCH /conversations/:id/read
+GET  /conversations/:id/appointment-summary (secretary-only, read-only patient-info sheet)
 ```
+
+### Device Tokens and Push Delivery
+
+```text
+POST   /notifications/device-tokens       (register a device token for the authenticated user)
+DELETE /notifications/device-tokens/:id   (remove one of the user's own tokens)
+```
+
+Device tokens are stored in the `device_tokens` table, associated with their owning user, and can be registered or removed only by that user. After a chat message is saved, FCM/APNs delivery targets only the intended recipients.
 
 ### AI
 
@@ -1890,6 +1926,7 @@ ai_messages
 
 waitlists
 notifications
+device_tokens (for FCM/APNs push delivery)
 
 pending_doctor_signups (for OTP staging)
 pending_patient_signups (for OTP staging)

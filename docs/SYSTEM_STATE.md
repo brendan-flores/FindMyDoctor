@@ -398,6 +398,7 @@ Current System State (October 2026):
 - Migration `017_modify_pending_doctor_signup_for_basic_flow.sql` adds contact_number field to pending_doctor_signups for basic registration flow (professional fields remain in table for compatibility)
 - Database migration `016_allow_multiple_schedules_per_day.sql` removes UNIQUE constraint on (doctor_id, day_of_week) to support multiple shift blocks per day (e.g., morning and afternoon shifts)
 - Database migration `017_add_doctor_break_periods.sql` adds `doctor_break_periods` table for break period management and adds `is_active` and `updated_at` columns to `doctor_unavailability` table for soft delete support
+- Database migration `028_add_device_tokens.sql` adds the `device_tokens` table associating authenticated users' FCM/APNs push tokens with their owning user (unique on provider+token with one active owner per token; re-registration reassigns the token); applied via `npm run migrate:device-tokens`
 - Database migration `018_add_daily_capacities.sql` adds `daily_capacities` table for storing calculated and configured daily capacity values
 - Doctor registration uses separate first name, middle name (optional), and last name fields instead of a single full name field
 
@@ -510,6 +511,25 @@ Current System State (October 2026):
 - Backend doctors API returns all profile fields including `profile_completion_status` and `profile_submitted_at`
 - Patient-facing doctor search endpoint `GET /api/v1/doctors` does not expose PRC license number, personal contact number, or email address
 - Patient-facing doctor by ID endpoint `GET /api/v1/doctors/:id` does not expose PRC license number, personal contact number, or email address
+
+## Patient-Secretary Messaging and Push Notifications
+- Conversations router mounted at `/api/v1/conversations`; `GET /conversations` lists conversations for the authenticated patient or secretary with patient details, doctor/practice names, an unread count computed from `messages.read_at` (excluding the caller's own sent messages), and a latest-message preview consistent with the newest saved message
+- Conversation access rules: a patient accesses only their own conversations and only for doctors with a matching `patient_doctor_associations` record; a secretary accesses only conversations for patients associated with their assigned doctor via `secretaries.doctor_id`; access is enforced consistently on listing, creation, retrieval, message retrieval, sending, and read-status updates; DOCTOR/ADMIN/SUPERADMIN roles receive no conversation access
+- `POST /conversations` creates or reuses the patient's single conversation per doctor (reporting `Conversation already exists` when reused); secretaries assigned to the same doctor share the same conversation and message history without per-secretary duplicates; creation verifies the patient's doctor association and the requested secretary's assignment to the doctor
+- `GET /conversations/:id` and `GET /conversations/:id/messages` return data only for authorized callers (otherwise 404/403 `CONVERSATION_ACCESS_DENIED`); `POST /conversations/:id/messages` saves the message, updates the conversation timestamp, and rejects empty messages
+- After a message is saved, notifications are sent only to recipients, never the sender: patient-sent → `NEW_PATIENT_MESSAGE` to the secretaries assigned to the conversation's doctor; secretary-sent → `NEW_SECRETARY_MESSAGE` to the patient; titles, bodies, and push payloads are generic and never contain message content
+- Push delivery service at `backend/src/services/pushService.ts` supports FCM (HTTP v1 with service-account credentials, legacy server-key fallback) and APNs token-based delivery over HTTP/2; push is best-effort after a message save, targets only intended recipients' registered device tokens, unregisters invalid tokens, and skips delivery when credentials are unconfigured; all provider credentials remain backend-only environment configuration (never exposed to mobile/web)
+- Device-token endpoints under the notifications prefix: `POST /api/v1/notifications/device-tokens` registers a token for the authenticated user (upsert reassigns the token to the latest owner) and `DELETE /api/v1/notifications/device-tokens/:id` removes only the owner's token (404 otherwise)
+- `PATCH /conversations/:id/read` marks incoming messages (`read_at IS NULL`, others' messages) as read only for authorized callers
+- `GET /api/v1/conversations/:id/appointment-summary` is a read-only, SECRETARY-only patient-info sheet endpoint enforcing conversation access rules; returns only appointment fields the interface needs (date, status, reason for visit, queue number) plus the patient's name/DOB/phone/email and doctor/practice names; exposes no appointment mutations
+- Secretary mobile chat experience is planned follow-up work and is not implemented yet
+
+## Secretary Web Chat
+- Secretary web page at `/secretary/conversations` replaced the placeholder with a functional three-column chat: conversation list (patient details, unread badges/counts, latest-message previews), message thread with distinct sender/recipient styling and read/delivered indicators, and a message composer with Enter-to-send and disable-while-sending
+- Right column renders a read-only patient-info sheet from the appointment-summary endpoint (patient contact block, appointment status/date/queue number/reason, clinic block); backend errors are surfaced with the existing red banner pattern on the list, thread, and info columns
+- `web/src/lib/api/secretaryApi.ts` adds `Conversation`, `ConversationMessage`, `AppointmentSummary` types and the `conversationApi` client (list, get, messages, send, mark-as-read, appointment summary) using relative paths against the existing API base URL, which already includes `/api/v1`
+- The web chat uses the backend and database as the single source of truth with no separate conversation or message storage; the thread auto-refreshes on a 10-second interval while open, and unread badges refresh alongside it
+- `SecretarySidebar` adds an unread badge on the Conversations nav item (polls the conversation list every 30 seconds) without changing the existing sidebar layout
 
 ## Secretary Schedule Management
 - Secretary Portal navigation updated: "Capacity" replaced with "Schedule" linking to `/secretary/schedule`
