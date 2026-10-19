@@ -113,6 +113,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
             // Clear the must_change_password flag from storage
             final prefs = await SharedPreferences.getInstance();
             await prefs.remove('must_change_password');
+            final role = prefs.getString('user_role');
 
             // Update cached app state for route guards
             MyApp.appStateKey.currentState?.clearPasswordChangeRequirement();
@@ -126,9 +127,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 ),
               );
 
-              // For walk-in patients (first login), show onboarding before home
-              // For regular password changes, go directly to home or use callback
-              if (_isRequiredChange) {
+              if (role == 'SECRETARY') {
+                // Secretaries land on the chat-first secretary home
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  '/secretary-home',
+                  (route) => false,
+                );
+              } else if (_isRequiredChange) {
                 // Walk-in first login - show onboarding
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(

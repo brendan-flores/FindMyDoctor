@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/push_notification_service.dart';
 import '../../../core/models/user.dart';
 import '../../../app/app.dart' show MyApp;
 
@@ -82,12 +84,46 @@ class _LoginPageState extends State<LoginPage> {
 
         if (mounted) {
           if (response['success'] == true) {
+            final data = response['data'];
+
+            // Secretary 2FA (when enabled) requires a login OTP that is
+            // completed on the web dashboard; the mobile app keeps the shared
+            // username/password login as required.
+            if (data is Map && data['requiresOtp'] == true) {
+              setState(() {
+                _isLoading = false;
+                _errorMessage =
+                    'Two-factor authentication is required. Please complete sign-in on the web dashboard.';
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(_errorMessage!),
+                  backgroundColor: AppColors.error,
+                  duration: const Duration(seconds: 4),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              return;
+            }
+
+            if (data is! Map || data['user'] == null) {
+              setState(() {
+                _isLoading = false;
+                _errorMessage = 'Login failed. Please try again.';
+              });
+              return;
+            }
+
             // Parse user data from response
-            final userData = response['data']['user'];
-            final user = User.fromJson(userData);
+            final userData = data['user'];
+            final user = User.fromJson(Map<String, dynamic>.from(userData));
+
+            // Persist the authenticated role so route guards and restored
+            // sessions can distinguish patients from secretaries.
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('user_role', user.role);
 
             // Persist mustChangePassword flag
-            final prefs = await SharedPreferences.getInstance();
             if (user.mustChangePassword) {
               await prefs.setBool('must_change_password', true);
             } else {
@@ -99,9 +135,14 @@ class _LoginPageState extends State<LoginPage> {
             MyApp.appStateKey.currentState?.updateAuthState(
               true, // authenticated
               user.mustChangePassword,
+              user.role,
             );
 
             if (!mounted) return;
+
+            // Register this device for push notifications now that the user is
+            // authenticated (best-effort, never blocks navigation).
+            unawaited(PushNotificationService.instance.registerForCurrentUser());
 
             // Brief success feedback before navigating away.
             setState(() {
@@ -117,13 +158,17 @@ class _LoginPageState extends State<LoginPage> {
             if (user.mustChangePassword) {
               // Navigate to change password page
               Navigator.of(context).pushReplacementNamed('/change-password');
+            } else if (user.role == 'SECRETARY') {
+              // Secretaries land on the shared chat-first home
+              Navigator.of(context).pushReplacementNamed('/secretary-home');
             } else {
-              // Navigate to home screen for normal login
+              // Navigate to home screen for normal patient login
               Navigator.of(context).pushReplacementNamed('/home');
             }
           } else {
             // Show error message from backend
-            final message = response['error']['message'] ?? 'Login failed';
+            final message =
+                response['error']?['message'] ?? 'Login failed';
             setState(() {
               _isLoading = false;
               _errorMessage = message;
