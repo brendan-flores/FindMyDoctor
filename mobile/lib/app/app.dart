@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/navigation/app_navigator.dart';
+import '../core/services/push_notification_service.dart';
 import '../core/theme/app_theme.dart';
 import '../core/services/api_service.dart';
 import '../features/auth/presentation/login_page.dart';
@@ -12,6 +16,7 @@ import '../features/doctors/presentation/doctors_page.dart';
 import '../features/appointments/presentation/booking_confirmation_page.dart';
 import '../features/patients/presentation/patient_details_page.dart';
 import '../features/conversations/presentation/conversation_thread_page.dart';
+import '../features/secretary/presentation/secretary_home_page.dart';
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -28,16 +33,24 @@ class MyAppState extends State<MyApp> {
   bool _isInitialized = false;
   bool _isAuthenticated = false;
   bool _mustChangePassword = false;
+  String? _userRole;
 
   // Method to update cached authentication state (called after login)
-  void updateAuthState(bool isAuthenticated, bool mustChangePassword) {
+  void updateAuthState(
+    bool isAuthenticated,
+    bool mustChangePassword, [
+    String? role,
+  ]) {
     if (mounted) {
       setState(() {
         _isAuthenticated = isAuthenticated;
         _mustChangePassword = mustChangePassword;
+        _userRole = isAuthenticated ? (role ?? _userRole) : null;
       });
     }
   }
+
+  bool get _isSecretary => _userRole == 'SECRETARY';
 
   // Method to update password change requirement (called after password change)
   void clearPasswordChangeRequirement() {
@@ -48,7 +61,7 @@ class MyAppState extends State<MyApp> {
     }
   }
 
-  // Determine initial home widget based on authentication state
+  // Determine initial home widget based on authentication state and role
   Widget _getInitialHome() {
     if (!_isAuthenticated) {
       return const LoginPage();
@@ -56,7 +69,7 @@ class MyAppState extends State<MyApp> {
     if (_mustChangePassword) {
       return const ChangePasswordPage();
     }
-    return const HomePage();
+    return _isSecretary ? const SecretaryHomePage() : const HomePage();
   }
 
   @override
@@ -68,16 +81,19 @@ class MyAppState extends State<MyApp> {
   Future<void> _initializeApp() async {
     var isAuthenticated = false;
     var mustChangePassword = false;
+    String? userRole;
 
     try {
       // Initialize ApiService to load token from storage
       await _apiService.init();
+      await PushNotificationService.instance.initialize();
 
       // Check if user is logged in
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
       isAuthenticated = token != null && token.isNotEmpty;
       mustChangePassword = prefs.getBool('must_change_password') ?? false;
+      userRole = prefs.getString('user_role');
     } catch (_) {
       // Fall through to an unauthenticated state rather than leaving the
       // startup progress indicator spinning forever.
@@ -87,8 +103,14 @@ class MyAppState extends State<MyApp> {
     setState(() {
       _isAuthenticated = isAuthenticated;
       _mustChangePassword = mustChangePassword;
+      _userRole = userRole;
       _isInitialized = true;
     });
+
+    // Re-register the device token for a restored session (best-effort).
+    if (isAuthenticated) {
+      unawaited(PushNotificationService.instance.registerForCurrentUser());
+    }
   }
 
   @override
@@ -105,6 +127,7 @@ class MyAppState extends State<MyApp> {
     return MaterialApp(
       title: 'FindMyDoctor',
       theme: AppTheme.lightTheme,
+      navigatorKey: AppNavigator.key,
       home: _getInitialHome(),
       onGenerateRoute: (settings) {
         // Route guards for authentication and password change requirement
@@ -122,6 +145,24 @@ class MyAppState extends State<MyApp> {
             return MaterialPageRoute(
               builder: (context) => const ChangePasswordPage(),
             );
+          case '/secretary-home':
+            // Secretary-only chat-first home. Unauthenticated users are sent
+            // to login, outstanding password changes are enforced, and
+            // non-secretaries fall back to the patient home.
+            if (!_isAuthenticated) {
+              return MaterialPageRoute(builder: (context) => const LoginPage());
+            }
+            if (_mustChangePassword) {
+              return MaterialPageRoute(
+                builder: (context) => const ChangePasswordPage(),
+              );
+            }
+            if (!_isSecretary) {
+              return MaterialPageRoute(builder: (context) => const HomePage());
+            }
+            return MaterialPageRoute(
+              builder: (context) => const SecretaryHomePage(),
+            );
           case '/home':
           case '/doctors':
           case '/doctor-schedule':
@@ -135,6 +176,14 @@ class MyAppState extends State<MyApp> {
             if (_mustChangePassword) {
               return MaterialPageRoute(
                 builder: (context) => const ChangePasswordPage(),
+              );
+            }
+            // Secretaries have no queue, payment, walk-in, or schedule
+            // management screens. Keep them on the chat-first home except for
+            // the shared conversation thread.
+            if (_isSecretary && settings.name != '/conversation-thread') {
+              return MaterialPageRoute(
+                builder: (context) => const SecretaryHomePage(),
               );
             }
             // Allow navigation to protected routes
@@ -190,6 +239,7 @@ class MyAppState extends State<MyApp> {
                 return MaterialPageRoute(
                   builder: (context) => ConversationThreadPage(
                     conversationId: args?['conversationId'] ?? '',
+                    counterpartName: args?['counterpartName'] as String?,
                   ),
                 );
               default:
@@ -207,7 +257,10 @@ class MyAppState extends State<MyApp> {
                 builder: (context) => const ChangePasswordPage(),
               );
             }
-            return MaterialPageRoute(builder: (context) => const HomePage());
+            return MaterialPageRoute(
+              builder: (context) =>
+                  _isSecretary ? const SecretaryHomePage() : const HomePage(),
+            );
         }
       },
       debugShowCheckedModeBanner: false,
