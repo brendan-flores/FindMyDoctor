@@ -62,6 +62,15 @@ dependencies:
   # Image Picker
   image_picker: ^1.0.7
 
+  # Path Provider for file storage
+  path_provider: ^2.1.1
+
+  # Dio for downloading files
+  dio: ^5.4.0
+
+  # Image manipulation for cropping
+  image: ^4.1.7
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
