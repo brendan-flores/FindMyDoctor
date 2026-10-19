@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -8,7 +10,6 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/api_service.dart';
-import '../../../core/constants/api_constants.dart';
 
 class PaymentScreen extends StatefulWidget {
   final String appointmentId;
@@ -35,16 +36,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
   String _selectedPaymentMethod = 'CASH'; // 'GCASH' or 'CASH'
   File? _receiptImage;
   bool _isUploading = false;
+  bool _isDownloading = false;
   bool _isLoadingPayment = true;
   Map<String, dynamic>? _paymentData;
   String? _errorMessage;
-  String? _gcashQrUrl;
 
   @override
   void initState() {
     super.initState();
     _fetchPaymentDetails();
-    _fetchGcashQr();
   }
 
   Future<void> _fetchPaymentDetails() async {
@@ -95,23 +95,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
           _isLoadingPayment = false;
         });
       }
-    }
-  }
-
-  Future<void> _fetchGcashQr() async {
-    try {
-      final response = await _apiService.getGcashQr();
-      if (response['success'] == true) {
-        final qrPath = response['data']?['qrUrl'];
-        // Construct full URL for the QR code
-        if (qrPath != null) {
-          setState(() {
-            _gcashQrUrl = '${ApiConstants.baseUrl}$qrPath';
-          });
-        }
-      }
-    } catch (e) {
-      print('Failed to load GCash QR: $e');
     }
   }
 
@@ -217,6 +200,46 @@ class _PaymentScreenState extends State<PaymentScreen> {
     } finally {
       setState(() {
         _isUploading = false;
+      });
+    }
+  }
+
+  Future<void> _downloadQrCode() async {
+    setState(() {
+      _isDownloading = true;
+    });
+
+    try {
+      // Use application documents directory (no permission required on Android 10+)
+      final directory = await getApplicationDocumentsDirectory();
+      final fileName = 'gcash_qr_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final filePath = '${directory.path}/$fileName';
+
+      // Copy the local QR image to app storage
+      final assetImage = await rootBundle.load('assets/images/gcash_qr_placeholder.jpg');
+      final byteData = assetImage.buffer.asUint8List();
+      await File(filePath).writeAsBytes(byteData);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('QR code saved to app storage'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save QR code: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isDownloading = false;
       });
     }
   }
@@ -545,10 +568,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Widget _buildGcashSection(String? status) {
-    final isPending = status == 'PENDING_VERIFICATION';
-    final isPaid = status == 'PAID';
-    final isRejected = status == 'REJECTED';
-
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Column(
@@ -571,94 +590,95 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ],
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
-          if (_gcashQrUrl != null)
-            Center(
-              child: Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLow,
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                  border: Border.all(color: AppColors.surfaceContainerHighest),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                  child: Image.network(
-                    _gcashQrUrl!,
-                    width: 200,
-                    height: 200,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.qr_code_2,
-                              size: 80,
+          Center(
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLow,
+                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                border: Border.all(color: AppColors.surfaceContainerHighest),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                child: Image.asset(
+                  'assets/images/gcash_qr_placeholder.jpg',
+                  width: 200,
+                  height: 200,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.qr_code_2,
+                            size: 80,
+                            color: AppColors.secondary,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'QR code not available',
+                            style: AppTextStyles.labelSm.copyWith(
                               color: AppColors.secondary,
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'QR code not available',
-                              style: AppTextStyles.labelSm.copyWith(
-                                color: AppColors.secondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            )
-          else
-            Center(
-              child: Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLow,
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                  border: Border.all(color: AppColors.surfaceContainerHighest),
-                ),
-                child: const Center(
-                  child: CircularProgressIndicator(),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
+          ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
+          Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/images/gcash_logo.png',
+                  width: 24,
+                  height: 24,
+                ),
+                const SizedBox(width: spacing.AppSpacing.gutterSm),
+                Text(
+                  'Scan the QR code with GCash to pay',
+                  style: AppTextStyles.bodyMd.copyWith(
+                    color: AppColors.secondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterLg),
+          // Download QR and Upload Receipt buttons
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset(
-                'assets/images/gcash_logo.png',
-                width: 24,
-                height: 24,
+              Expanded(
+                child: PrimaryButton(
+                  text: _isDownloading ? 'Downloading...' : 'Download QR',
+                  onPressed: _isDownloading ? null : _downloadQrCode,
+                  icon: const Icon(Icons.download, size: 20),
+                  maxLines: 2,
+                  height: 56,
+                ),
               ),
-              const SizedBox(width: spacing.AppSpacing.gutterSm),
-              Text(
-                'Scan the QR code with GCash to pay',
-                style: AppTextStyles.bodyMd.copyWith(
-                  color: AppColors.secondary,
+              const SizedBox(width: spacing.AppSpacing.gutterMd),
+              Expanded(
+                child: PrimaryButton(
+                  text: 'Upload Receipt',
+                  onPressed: _pickReceiptImage,
+                  icon: const Icon(Icons.upload, size: 20),
+                  maxLines: 2,
+                  height: 56,
                 ),
               ),
             ],
           ),
           const SizedBox(height: spacing.AppSpacing.gutterLg),
-          if (isPending || isRejected)
+          // Show receipt preview and upload button after image is selected
+          if (_receiptImage != null)
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -671,7 +691,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
                     const SizedBox(width: spacing.AppSpacing.gutterSm),
                     Text(
-                      'Upload Receipt',
+                      'Receipt Preview',
                       style: AppTextStyles.labelSm.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -679,103 +699,63 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   ],
                 ),
                 const SizedBox(height: spacing.AppSpacing.gutterSm),
-                if (_receiptImage != null)
-                  Container(
-                    width: double.infinity,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceLow,
-                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                      border: Border.all(color: AppColors.surfaceContainerHighest),
-                    ),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                          child: Image.file(
-                            _receiptImage!,
-                            width: double.infinity,
-                            height: 150,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        Positioned(
-                          top: spacing.AppSpacing.gutterSm,
-                          right: spacing.AppSpacing.gutterSm,
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _receiptImage = null;
-                              });
-                            },
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: AppColors.error,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.close,
-                                color: AppColors.onError,
-                                size: spacing.AppSpacing.iconSm,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  InkWell(
-                    onTap: _pickReceiptImage,
+                Container(
+                  width: double.infinity,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLow,
                     borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                    child: Container(
-                      width: double.infinity,
-                      height: 150,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLow,
+                    border: Border.all(color: AppColors.surfaceContainerHighest),
+                  ),
+                  child: Stack(
+                    children: [
+                      ClipRRect(
                         borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                        border: Border.all(
-                          color: AppColors.surfaceContainerHighest,
-                          style: BorderStyle.solid,
+                        child: Image.file(
+                          _receiptImage!,
+                          width: double.infinity,
+                          height: 150,
+                          fit: BoxFit.cover,
                         ),
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.add_photo_alternate,
-                            size: 48,
-                            color: AppColors.secondary,
-                          ),
-                          const SizedBox(height: spacing.AppSpacing.gutterSm),
-                          Text(
-                            'Tap to upload receipt',
-                            style: AppTextStyles.labelSm.copyWith(
-                              color: AppColors.secondary,
+                      Positioned(
+                        top: spacing.AppSpacing.gutterSm,
+                        right: spacing.AppSpacing.gutterSm,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _receiptImage = null;
+                            });
+                          },
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: AppColors.error,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.close,
+                              color: AppColors.onError,
+                              size: spacing.AppSpacing.iconSm,
                             ),
                           ),
-                          Text(
-                            'JPEG/PNG, max 5MB',
-                            style: AppTextStyles.labelSm.copyWith(
-                              fontSize: 11,
-                              color: AppColors.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
+                ),
                 const SizedBox(height: spacing.AppSpacing.gutterMd),
                 PrimaryButton(
-                  text: _isUploading ? 'Uploading...' : 'Upload Receipt',
+                  text: _isUploading ? 'Uploading...' : 'Submit Receipt',
                   onPressed: _isUploading ? null : _uploadReceipt,
                   icon: const Icon(Icons.upload, size: 20),
+                  maxLines: 2,
+                  height: 56,
                 ),
               ],
             )
-          else if (isPaid)
+          else if (status == 'PAID')
             Container(
               padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
               decoration: BoxDecoration(
@@ -800,12 +780,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   ),
                 ],
               ),
-            )
-          else
-            PrimaryButton(
-              text: 'I have paid',
-              onPressed: _pickReceiptImage,
-              icon: const Icon(Icons.upload, size: 20),
             ),
         ],
       ),
@@ -813,8 +787,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Widget _buildCashSection(String? status) {
-    final isPaid = status == 'PAID';
-
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Column(
@@ -864,7 +836,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ],
           ),
           const SizedBox(height: spacing.AppSpacing.gutterLg),
-          if (isPaid)
+          if (status == 'PAID')
             Container(
               padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
               decoration: BoxDecoration(
@@ -916,7 +888,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ],
               ),
             ),
-        ],
+          ],
       ),
     );
   }
