@@ -66,6 +66,21 @@ export const config = {
     storageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'doctor-photos',
   },
 
+  // Push notifications (FCM / APNs credentials remain backend-only)
+  push: {
+    // FCM HTTP v1 (service account JSON contents or raw credential)
+    fcmServiceAccountJson: process.env.FCM_SERVICE_ACCOUNT_JSON || '',
+    fcmProjectId: process.env.FCM_PROJECT_ID || '',
+    // Legacy FCM server key fallback (used when no service account is configured)
+    fcmServerKey: process.env.FCM_SERVER_KEY || '',
+    // APNs token-based authentication (contents of the .p8 key)
+    apnsKeyId: process.env.APNS_KEY_ID || '',
+    apnsTeamId: process.env.APNS_TEAM_ID || '',
+    apnsPrivateKey: process.env.APNS_PRIVATE_KEY || '',
+    apnsTopic: process.env.APNS_TOPIC || '',
+    apnsHost: process.env.APNS_HOST || 'api.publish.push.apple.com',
+  },
+
   // Frontend URL for email links
   frontend: {
     url: process.env.FRONTEND_URL || 'http://localhost:3001',
