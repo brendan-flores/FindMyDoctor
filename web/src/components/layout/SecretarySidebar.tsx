@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
+import { conversationApi } from '@/lib/api/secretaryApi';
 
 interface SecretarySidebarProps {
   userName?: string;
@@ -17,6 +18,26 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
     if (pathname.startsWith('/secretary/')) return pathname.replace('/secretary/', '');
     return 'dashboard';
   });
+  const [totalUnread, setTotalUnread] = useState(0);
+
+  useEffect(() => {
+    // Poll unread conversation badges without changing the sidebar layout
+    const fetchUnread = async () => {
+      try {
+        const response = await conversationApi.getConversations();
+        if (response.success && response.data) {
+          const total = response.data.reduce((sum, c) => sum + (c.unread_count || 0), 0);
+          setTotalUnread(total);
+        }
+      } catch {
+        // Badge is best-effort; keep the previous value on failure
+      }
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, [pathname]);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'grid_view' },
@@ -101,7 +122,12 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
               }`}
             >
               <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-              <span>{item.label}</span>
+              <span className="flex-1 text-left">{item.label}</span>
+              {item.id === 'conversations' && totalUnread > 0 && (
+                <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
+                  {totalUnread > 99 ? '99+' : totalUnread}
+                </span>
+              )}
             </button>
           ))}
         </nav>
