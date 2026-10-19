@@ -13,7 +13,18 @@ import '../models/message.dart';
 class ConversationThreadPage extends StatefulWidget {
   final String conversationId;
 
-  const ConversationThreadPage({super.key, required this.conversationId});
+  /// Name of the person on the other side of the conversation.
+  ///
+  /// The secretary conversation list passes the patient's name so the header
+  /// shows who the secretary is talking to. Patients leave this null and keep
+  /// the patient-facing doctor/secretary header.
+  final String? counterpartName;
+
+  const ConversationThreadPage({
+    super.key,
+    required this.conversationId,
+    this.counterpartName,
+  });
 
   @override
   State<ConversationThreadPage> createState() => _ConversationThreadPageState();
@@ -29,6 +40,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
   Timer? _pollingTimer;
   String? _currentUserId;
   String? _doctorName;
+  String? _patientName;
   String? _selectedMessageId;
 
   @override
@@ -54,14 +66,48 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
           (conv) => conv.id == widget.conversationId,
           orElse: () => conversations.first,
         );
+
+        // The secretary conversation list returns the patient's name while the
+        // patient list returns the secretary's; read whichever is present so
+        // the header can name the person the user is messaging.
+        final matchingRow = data.firstWhere(
+          (json) =>
+              json is Map && json['id']?.toString() == widget.conversationId,
+          orElse: () => null,
+        );
+        final raw = matchingRow is Map
+            ? Map<String, dynamic>.from(matchingRow)
+            : const <String, dynamic>{};
+        final patientName = [
+          (raw['patient_first_name'] ?? '').toString().trim(),
+          (raw['patient_last_name'] ?? '').toString().trim(),
+        ].where((part) => part.isNotEmpty).join(' ');
+
         if (!mounted) return;
         setState(() {
           _doctorName = conversation.doctorName;
+          if (patientName.isNotEmpty) {
+            _patientName = patientName;
+          }
         });
       }
     } catch (e) {
       // Silently fail - we'll show a generic header
     }
+  }
+
+  /// Header title: the patient's name for secretaries, and the existing
+  /// doctor/secretary label for patients.
+  String get _headerTitle {
+    final counterpart = widget.counterpartName?.trim();
+    if (counterpart != null && counterpart.isNotEmpty) {
+      return counterpart;
+    }
+    final patient = _patientName?.trim();
+    if (patient != null && patient.isNotEmpty) {
+      return patient;
+    }
+    return _doctorName != null ? "Dr. $_doctorName's Secretary" : 'Conversation';
   }
 
   Future<void> _loadCurrentUser() async {
@@ -203,7 +249,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          _doctorName != null ? "Dr. $_doctorName's Secretary" : 'Conversation',
+          _headerTitle,
           style: AppTextStyles.bodyMdMedium,
           overflow: TextOverflow.ellipsis,
           maxLines: 1,
