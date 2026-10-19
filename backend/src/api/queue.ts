@@ -232,36 +232,56 @@ router.post('/:id/start-checkup', authenticate, requireSecretaryPasswordChange, 
 
 // Complete checkup
 router.post('/:id/complete', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
     const role = req.user!.role;
     const userId = req.user!.id;
 
-    let queryText = '';
-    const params = [];
+    let queueQueryText = '';
+    const queueParams = [];
 
     if (role === 'SECRETARY') {
-      queryText = `UPDATE queue_entries
+      queueQueryText = `UPDATE queue_entries
                    SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                   WHERE id = $1 AND doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2)`;
-      params.push(id, userId);
+                   WHERE id = $1 AND doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2)
+                   RETURNING appointment_id`;
+      queueParams.push(id, userId);
     } else {
       // DOCTOR
-      queryText = `UPDATE queue_entries
+      queueQueryText = `UPDATE queue_entries
                    SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                   WHERE id = $1 AND doctor_id = (SELECT id FROM doctors WHERE user_id = $2)`;
-      params.push(id, userId);
+                   WHERE id = $1 AND doctor_id = (SELECT id FROM doctors WHERE user_id = $2)
+                   RETURNING appointment_id`;
+      queueParams.push(id, userId);
     }
 
-    const result = await query(queryText, params);
+    const queueResult = await client.query(queueQueryText, queueParams);
 
-    if (result.rowCount === 0) {
+    if (queueResult.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Queue entry not found or access denied'));
     }
 
+    const appointmentId = queueResult.rows[0].appointment_id;
+
+    // Update the associated appointment status to COMPLETED
+    const appointmentResult = await client.query(
+      'UPDATE appointments SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      ['COMPLETED', appointmentId]
+    );
+
+    await client.query('COMMIT');
+
     res.json(success(null, 'Checkup completed'));
   } catch (err: any) {
+    await client.query('ROLLBACK');
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to complete checkup'));
+  } finally {
+    client.release();
   }
 });
 

@@ -21,6 +21,7 @@
     "migrate:daily-capacities": "tsx src/database/applyDailyCapacities.ts",
     "migrate:patient-required-fields": "tsx src/database/applyPatientRequiredFields.ts",
     "migrate:pending-patient-signup-details": "tsx src/database/applyPendingPatientSignupDetails.ts",
+    "migrate:sync-completed-appointments": "tsx src/database/applySyncCompletedAppointments.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",
