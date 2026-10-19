@@ -254,3 +254,102 @@ export const secretaryApi = {
     return apiClient.post<void>(`/queue/${queueId}/not-present`, {});
   },
 };
+
+// Conversation list entry (matches GET /conversations response shape)
+export interface Conversation {
+  id: string | null; // null for patients without conversations
+  patient_id: string;
+  secretary_id: string | null; // null for patients without conversations
+  doctor_id: string;
+  status: string | null; // null for patients without conversations
+  created_at: string | null; // null for patients without conversations
+  updated_at: string | null; // null for patients without conversations
+  last_message_preview: string | null;
+  last_message_sent_at: string | null;
+  unread_count: number;
+  secretary_first_name?: string;
+  secretary_last_name?: string;
+  patient_first_name?: string;
+  patient_last_name?: string;
+  doctor_first_name?: string;
+  doctor_last_name?: string;
+  practice_name?: string;
+}
+
+// Chat message (matches GET /conversations/:id/messages response shape)
+export interface ConversationMessage {
+  id: string;
+  conversation_id: string;
+  sender_user_id: string;
+  message: string;
+  sent_at: string;
+  read_at: string | null;
+  sender_email: string;
+}
+
+// Patient-info sheet (read-only appointment summary from GET /conversations/:id/appointment-summary)
+export interface AppointmentSummary {
+  patient: {
+    id: string;
+    firstName: string | null;
+    middleName: string | null;
+    lastName: string | null;
+    dateOfBirth: string | null;
+    phone: string | null;
+    email: string | null;
+  };
+  appointment: {
+    appointmentDate: string;
+    status: string;
+    reasonForVisit: string | null;
+    queueNumber: number | null;
+  } | null;
+  doctor: {
+    firstName: string;
+    lastName: string;
+    practiceName: string;
+  };
+}
+
+// Conversations: secretaries only see their assigned doctor's patients
+export const conversationApi = {
+  // List conversations (patient details, unread badges, latest-message previews)
+  getConversations: async (): Promise<{ success: boolean; data?: Conversation[]; error?: string }> => {
+    return apiClient.get<Conversation[]>('/conversations');
+  },
+
+  // Create a conversation (for secretaries to start chat with a patient)
+  createConversation: async (payload: { patientId: string }): Promise<{ success: boolean; data?: Conversation; error?: string }> => {
+    return apiClient.post<Conversation>('/conversations', payload);
+  },
+
+  // Retrieve a single conversation
+  getConversation: async (conversationId: string): Promise<{ success: boolean; data?: Conversation; error?: string }> => {
+    return apiClient.get<Conversation>(`/conversations/${conversationId}`);
+  },
+
+  // Retrieve message history
+  getMessages: async (conversationId: string): Promise<{ success: boolean; data?: ConversationMessage[]; error?: string }> => {
+    return apiClient.get<ConversationMessage[]>(`/conversations/${conversationId}/messages`);
+  },
+
+  // Send a message
+  sendMessage: async (conversationId: string, message: string): Promise<{ success: boolean; data?: ConversationMessage; error?: string }> => {
+    return apiClient.post<ConversationMessage>(`/conversations/${conversationId}/messages`, { message });
+  },
+
+  // Mark incoming messages as read
+  markAsRead: async (conversationId: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/conversations/${conversationId}/read`, {});
+  },
+
+  // Read-only patient-info sheet for the selected conversation
+  getAppointmentSummary: async (conversationId: string): Promise<{ success: boolean; data?: AppointmentSummary; error?: string }> => {
+    return apiClient.get<AppointmentSummary>(`/conversations/${conversationId}/appointment-summary`);
+  },
+
+  // Read-only patient-info sheet by patient ID (for patients without conversations)
+  getAppointmentSummaryByPatientId: async (patientId: string): Promise<{ success: boolean; data?: AppointmentSummary; error?: string }> => {
+    return apiClient.get<AppointmentSummary>(`/conversations/patient/${patientId}/appointment-summary`);
+  },
+};
