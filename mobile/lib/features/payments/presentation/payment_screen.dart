@@ -16,6 +16,7 @@ class PaymentScreen extends StatefulWidget {
   final String? doctorName;
   final String? consultationFee;
   final DateTime? appointmentDate;
+  final String? doctorId;
 
   const PaymentScreen({
     super.key,
@@ -23,6 +24,7 @@ class PaymentScreen extends StatefulWidget {
     this.doctorName,
     this.consultationFee,
     this.appointmentDate,
+    this.doctorId,
   });
 
   @override
@@ -38,13 +40,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _isUploading = false;
   bool _isDownloading = false;
   bool _isLoadingPayment = true;
+  bool _isLoadingQr = true;
   Map<String, dynamic>? _paymentData;
   String? _errorMessage;
+  String? _qrUrl;
 
   @override
   void initState() {
     super.initState();
     _fetchPaymentDetails();
+    _fetchGcashQr();
   }
 
   Future<void> _fetchPaymentDetails() async {
@@ -95,6 +100,36 @@ class _PaymentScreenState extends State<PaymentScreen> {
           _isLoadingPayment = false;
         });
       }
+    }
+  }
+
+  Future<void> _fetchGcashQr() async {
+    if (widget.doctorId == null) {
+      setState(() {
+        _isLoadingQr = false;
+      });
+      return;
+    }
+
+    try {
+      final response = await _apiService.getGcashQr(doctorId: widget.doctorId!);
+
+      if (response['success'] == true && response['data'] != null) {
+        setState(() {
+          _qrUrl = response['data']['qrUrl'];
+          _isLoadingQr = false;
+        });
+      } else {
+        // QR code not configured, use placeholder
+        setState(() {
+          _isLoadingQr = false;
+        });
+      }
+    } catch (e) {
+      // QR code not available, use placeholder
+      setState(() {
+        _isLoadingQr = false;
+      });
     }
   }
 
@@ -601,33 +636,65 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                child: Image.asset(
-                  'assets/images/gcash_qr_placeholder.jpg',
-                  width: 200,
-                  height: 200,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.qr_code_2,
-                            size: 80,
-                            color: AppColors.secondary,
+                child: _isLoadingQr
+                    ? const Center(
+                        child: CircularProgressIndicator(),
+                      )
+                    : _qrUrl != null
+                        ? Image.network(
+                            _qrUrl!,
+                            width: 200,
+                            height: 200,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.qr_code_2,
+                                      size: 80,
+                                      color: AppColors.secondary,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'QR code not available',
+                                      style: AppTextStyles.labelSm.copyWith(
+                                        color: AppColors.secondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          )
+                        : Image.asset(
+                            'assets/images/gcash_qr_placeholder.jpg',
+                            width: 200,
+                            height: 200,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.qr_code_2,
+                                      size: 80,
+                                      color: AppColors.secondary,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'QR code not available',
+                                      style: AppTextStyles.labelSm.copyWith(
+                                        color: AppColors.secondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'QR code not available',
-                            style: AppTextStyles.labelSm.copyWith(
-                              color: AppColors.secondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
               ),
             ),
           ),

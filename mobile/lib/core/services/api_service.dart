@@ -653,8 +653,12 @@ class ApiService {
     );
   }
 
-  Future<Map<String, dynamic>> getGcashQr() async {
-    return await get('${ApiConstants.payments}/gcash-qr', requireAuth: false);
+  Future<Map<String, dynamic>> getGcashQr({required String doctorId}) async {
+    return await get(
+      '${ApiConstants.payments}/gcash-qr',
+      queryParams: {'doctorId': doctorId},
+      requireAuth: false,
+    );
   }
 }
 
