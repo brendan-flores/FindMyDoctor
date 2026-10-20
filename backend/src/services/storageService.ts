@@ -5,15 +5,16 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * Supabase Storage Service for Doctor Professional Photos
+ * Supabase Storage Service for Doctor Professional Photos and GCash QR Codes
  *
- * This service handles all storage operations for doctor professional photos using
+ * This service handles all storage operations for doctor professional photos and GCash QR codes using
  * Supabase Storage instead of local file system. All credentials remain backend-only.
  *
  * Configuration required in .env:
  * - SUPABASE_URL
  * - SUPABASE_SERVICE_ROLE_KEY
  * - SUPABASE_STORAGE_BUCKET (bucket name for doctor photos)
+ * - SUPABASE_GCASH_BUCKET (bucket name for GCash QR codes, defaults to 'gcash-qr-codes')
  */
 
 const supabaseAdmin = config.supabase.url && config.supabase.serviceRoleKey
@@ -30,6 +31,7 @@ const supabaseAdmin = config.supabase.url && config.supabase.serviceRoleKey
   : null;
 
 const STORAGE_BUCKET = config.supabase.storageBucket || 'doctor-photos';
+const GCASH_STORAGE_BUCKET = config.supabase.gcashStorageBucket || 'gcash-qr-codes';
 
 /**
  * Upload a doctor professional photo to Supabase Storage
@@ -258,6 +260,178 @@ export function validateImageFile(
       valid: false,
       error: 'File is too small to be a valid PNG'
     };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Upload a GCash QR code to Supabase Storage
+ *
+ * @param fileBuffer - Buffer containing the file data
+ * @param fileName - Unique filename for the upload
+ * @param mimeType - MIME type of the file (e.g., 'image/png', 'image/jpeg')
+ * @returns Object with success status, public URL, or error
+ */
+export async function uploadGcashQr(
+  fileBuffer: Buffer,
+  fileName: string,
+  mimeType: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    if (!supabaseAdmin) {
+      return {
+        success: false,
+        error: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to backend/.env.'
+      };
+    }
+
+    console.log(`Uploading GCash QR code to Supabase Storage: ${fileName}`);
+
+    // Upload file to Supabase Storage
+    const { data, error } = await supabaseAdmin.storage
+      .from(GCASH_STORAGE_BUCKET)
+      .upload(fileName, fileBuffer, {
+        contentType: mimeType,
+        upsert: true, // Allow overwriting for QR code replacement
+      });
+
+    if (error) {
+      console.error('Supabase Storage upload error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to upload QR code to storage'
+      };
+    }
+
+    // Get public URL for the uploaded file
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from(GCASH_STORAGE_BUCKET)
+      .getPublicUrl(fileName);
+
+    console.log(`GCash QR code uploaded successfully: ${publicUrl}`);
+    return {
+      success: true,
+      url: publicUrl
+    };
+  } catch (err: any) {
+    console.error('Error uploading GCash QR code:', err);
+    return {
+      success: false,
+      error: err.message || 'QR code upload failed'
+    };
+  }
+}
+
+/**
+ * Delete a GCash QR code from Supabase Storage
+ *
+ * @param qrUrl - Public URL of the QR code to delete
+ * @returns Object with success status or error
+ */
+export async function deleteGcashQr(qrUrl: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!supabaseAdmin) {
+      return {
+        success: false,
+        error: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to backend/.env.'
+      };
+    }
+
+    // Extract filename from URL
+    // Expected URL format: https://<project>.supabase.co/storage/v1/object/public/<bucket>/<filename>
+    const urlParts = qrUrl.split('/');
+    const fileName = urlParts[urlParts.length - 1];
+
+    if (!fileName) {
+      return {
+        success: false,
+        error: 'Invalid QR code URL format'
+      };
+    }
+
+    console.log(`Deleting GCash QR code from Supabase Storage: ${fileName}`);
+
+    // Delete file from Supabase Storage
+    const { error } = await supabaseAdmin.storage
+      .from(GCASH_STORAGE_BUCKET)
+      .remove([fileName]);
+
+    if (error) {
+      console.error('Supabase Storage delete error:', error);
+      // Don't fail if file doesn't exist - it may have already been deleted
+      if (error.message?.includes('not found') || error.message?.includes('No such file')) {
+        console.log('QR code file not found in storage (may have been already deleted)');
+        return { success: true };
+      }
+      return {
+        success: false,
+        error: error.message || 'Failed to delete QR code from storage'
+      };
+    }
+
+    console.log(`GCash QR code deleted successfully: ${fileName}`);
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error deleting GCash QR code:', err);
+    return {
+      success: false,
+      error: err.message || 'QR code deletion failed'
+    };
+  }
+}
+
+/**
+ * Validate GCash QR code file type and size
+ *
+ * @param fileBuffer - Buffer containing the file data
+ * @param mimeType - Declared MIME type of the file
+ * @returns Object with validity status and error if invalid
+ */
+export function validateGcashQrFile(
+  fileBuffer: Buffer,
+  mimeType: string
+): { valid: boolean; error?: string } {
+  // Check MIME type - accept PNG and JPEG for QR codes
+  const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+  if (!allowedMimeTypes.includes(mimeType)) {
+    return {
+      valid: false,
+      error: 'Only PNG and JPEG files are allowed for QR codes'
+    };
+  }
+
+  // Check file size (5MB max for QR codes)
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  if (fileBuffer.length > maxSize) {
+    return {
+      valid: false,
+      error: 'File size exceeds 5MB limit'
+    };
+  }
+
+  // For PNG files, check PNG signature to prevent renamed non-PNG files
+  if (mimeType === 'image/png' && fileBuffer.length >= 8) {
+    const pngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    for (let i = 0; i < 8; i++) {
+      if (fileBuffer[i] !== pngSignature[i]) {
+        return {
+          valid: false,
+          error: 'Invalid PNG file signature'
+        };
+      }
+    }
+  }
+
+  // For JPEG files, check JPEG signature
+  if ((mimeType === 'image/jpeg' || mimeType === 'image/jpg') && fileBuffer.length >= 2) {
+    const jpegSignature = [0xFF, 0xD8];
+    if (fileBuffer[0] !== jpegSignature[0] || fileBuffer[1] !== jpegSignature[1]) {
+      return {
+        valid: false,
+        error: 'Invalid JPEG file signature'
+      };
+    }
   }
 
   return { valid: true };

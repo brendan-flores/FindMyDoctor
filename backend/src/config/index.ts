@@ -64,6 +64,7 @@ export const config = {
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     functionSecret: process.env.FUNCTION_SECRET || '',
     storageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'doctor-photos',
+    gcashStorageBucket: process.env.SUPABASE_GCASH_BUCKET || 'gcash-qr-codes',
   },
 
   // Push notifications (FCM / APNs credentials remain backend-only)

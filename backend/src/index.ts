@@ -27,6 +27,7 @@ import visitsRouter from './api/visits';
 import prescriptionsRouter from './api/prescriptions';
 import notificationsRouter from './api/notifications';
 import adminRouter from './api/admin';
+import gcashQrRouter from './api/gcashQr';
 
 const app = express();
 
@@ -120,6 +121,7 @@ app.use(`/api/${apiVersion}/payments`, authenticate, paymentsRouter);
 app.use(`/api/${apiVersion}/visits`, authenticate, visitsRouter);
 app.use(`/api/${apiVersion}/prescriptions`, authenticate, prescriptionsRouter);
 app.use(`/api/${apiVersion}/notifications`, authenticate, notificationsRouter);
+app.use(`/api/${apiVersion}/gcash-qr`, authenticate, gcashQrRouter);
 app.use(`/api/${apiVersion}/admin`, authenticate, adminRouter);
 
 // Error handling
