@@ -3,6 +3,7 @@ import { config } from '../config';
 import { ErrorCodes } from '../utils/response';
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 
 /**
  * Supabase Storage Service for Doctor Professional Photos and GCash QR Codes
@@ -288,10 +289,19 @@ export async function uploadGcashQr(
 
     console.log(`Uploading GCash QR code to Supabase Storage: ${fileName}`);
 
+    // Resize image to 200x200 with aspect ratio preserved (fit: contain)
+    // This ensures QR codes remain scannable without distortion or cropping
+    const resizedBuffer = await sharp(fileBuffer)
+      .resize(200, 200, {
+        fit: 'contain',
+        background: { r: 255, g: 255, b: 255, alpha: 1 } // White background
+      })
+      .toBuffer();
+
     // Upload file to Supabase Storage
     const { data, error } = await supabaseAdmin.storage
       .from(GCASH_STORAGE_BUCKET)
-      .upload(fileName, fileBuffer, {
+      .upload(fileName, resizedBuffer, {
         contentType: mimeType,
         upsert: true, // Allow overwriting for QR code replacement
       });

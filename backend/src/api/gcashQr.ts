@@ -11,6 +11,7 @@ const router = Router();
 const storage = multer.memoryStorage();
 
 // File filter - accept PNG and JPEG for QR codes
+// Note: Images will be converted to PNG during upload for consistency
 const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg'];
   if (allowedMimeTypes.includes(file.mimetype)) {
@@ -113,13 +114,13 @@ router.post('/doctor/:doctorId/upload', authenticate, requireSecretaryPasswordCh
 
     const currentQrUrl = doctorResult.rows[0].gcash_qr_url;
 
-    // Generate unique filename: gcash_qr_<doctor_id>_<timestamp>.<ext>
+    // Generate unique filename: gcash_qr_<doctor_id>_<timestamp>.png
+    // Always use PNG since sharp converts to PNG for quality and compatibility
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const fileExt = req.file.mimetype === 'image/jpeg' || req.file.mimetype === 'image/jpg' ? 'jpg' : 'png';
-    const fileName = `gcash_qr_${doctorId}_${uniqueSuffix}.${fileExt}`;
+    const fileName = `gcash_qr_${doctorId}_${uniqueSuffix}.png`;
 
     // Upload to Supabase Storage
-    const uploadResult = await uploadGcashQr(req.file.buffer, fileName, req.file.mimetype);
+    const uploadResult = await uploadGcashQr(req.file.buffer, fileName, 'image/png');
 
     if (!uploadResult.success) {
       return res.status(500).json(error(ErrorCodes.SERVER_ERROR, uploadResult.error || 'Failed to upload QR code'));
