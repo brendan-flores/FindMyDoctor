@@ -12,6 +12,7 @@ class PrimaryButton extends StatelessWidget {
   final double? height;
   final Color? backgroundColor;
   final Color? textColor;
+  final int? maxLines;
 
   const PrimaryButton({
     super.key,
@@ -23,6 +24,7 @@ class PrimaryButton extends StatelessWidget {
     this.height,
     this.backgroundColor,
     this.textColor,
+    this.maxLines,
   });
 
   @override
@@ -83,7 +85,7 @@ class PrimaryButton extends StatelessWidget {
                 Flexible(
                   child: Text(
                     text,
-                    maxLines: 1,
+                    maxLines: maxLines ?? 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                   ),

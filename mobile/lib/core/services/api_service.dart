@@ -633,6 +633,29 @@ class ApiService {
       requireAuth: true,
     );
   }
+
+  // ===========================
+  // PAYMENTS METHODS
+  // ===========================
+
+  Future<Map<String, dynamic>> getPayment(String appointmentId) async {
+    return await get('${ApiConstants.payments}/$appointmentId');
+  }
+
+  Future<Map<String, dynamic>> uploadPaymentReceipt({
+    required String appointmentId,
+    required String receiptUrl,
+  }) async {
+    return await post(
+      '${ApiConstants.payments}/$appointmentId${ApiConstants.paymentReceipt}',
+      body: {'receiptUrl': receiptUrl},
+      requireAuth: true,
+    );
+  }
+
+  Future<Map<String, dynamic>> getGcashQr() async {
+    return await get('${ApiConstants.payments}/gcash-qr', requireAuth: false);
+  }
 }
 
 // Custom exception for API errors

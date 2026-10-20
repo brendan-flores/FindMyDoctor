@@ -23,46 +23,52 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
     if (role === 'PATIENT') {
       // Get patient's appointments
       queryText = `
-        SELECT 
+        SELECT
           a.*,
           d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.specialty,
           d.practice_name, d.practice_address, d.practice_latitude, d.practice_longitude,
           q.queue_number, q.status as queue_status,
-          COALESCE(q.registration_source, 'ONLINE') as registration_source
+          COALESCE(q.registration_source, 'ONLINE') as registration_source,
+          p.status as payment_status
         FROM appointments a
         JOIN doctors d ON a.doctor_id = d.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
+        LEFT JOIN payments p ON a.id = p.appointment_id
         WHERE a.patient_id = (SELECT id FROM patients WHERE user_id = $1)
       `;
       params.push(userId);
     } else if (role === 'DOCTOR') {
       // Get doctor's appointments
       queryText = `
-        SELECT 
+        SELECT
           a.*,
           p.first_name as patient_first_name, p.last_name as patient_last_name,
           d.practice_name,
           q.queue_number, q.status as queue_status,
-          COALESCE(q.registration_source, 'ONLINE') as registration_source
+          COALESCE(q.registration_source, 'ONLINE') as registration_source,
+          pay.status as payment_status
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         JOIN doctors d ON a.doctor_id = d.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
+        LEFT JOIN payments pay ON a.id = pay.appointment_id
         WHERE a.doctor_id = (SELECT id FROM doctors WHERE user_id = $1)
       `;
       params.push(userId);
     } else if (role === 'SECRETARY') {
       // Get appointments for the doctor the secretary is assigned to
       queryText = `
-        SELECT 
+        SELECT
           a.*,
           p.first_name as patient_first_name, p.last_name as patient_last_name,
           d.practice_name,
-          q.queue_number, q.status as queue_status
+          q.queue_number, q.status as queue_status,
+          pay.status as payment_status
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         JOIN doctors d ON a.doctor_id = d.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
+        LEFT JOIN payments pay ON a.id = pay.appointment_id
         WHERE a.doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $1)
       `;
       params.push(userId);
