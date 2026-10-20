@@ -478,6 +478,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   Widget _buildPaymentMethodSelection(String? paymentMethod, String? status) {
     final isPaid = status == 'PAID';
+    final hasGcashQr = _qrUrl != null;
 
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
@@ -491,19 +492,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
-          _buildPaymentMethodOption(
-            'GCash',
-            'Pay online with GCash',
-            Icons.account_balance_wallet,
-            customIcon: Image.asset(
-              'assets/images/gcash_logo.png',
-              width: 24,
-              height: 24,
+          if (hasGcashQr) ...[
+            _buildPaymentMethodOption(
+              'GCash',
+              'Pay online with GCash',
+              Icons.account_balance_wallet,
+              customIcon: Image.asset(
+                'assets/images/gcash_logo.png',
+                width: 24,
+                height: 24,
+              ),
+              isSelected: _selectedPaymentMethod == 'GCASH',
+              isEnabled: !isPaid,
             ),
-            isSelected: _selectedPaymentMethod == 'GCASH',
-            isEnabled: !isPaid,
-          ),
-          const SizedBox(height: spacing.AppSpacing.gutterSm),
+            const SizedBox(height: spacing.AppSpacing.gutterSm),
+          ],
           _buildPaymentMethodOption(
             'Cash at Clinic',
             'Pay when you arrive',
@@ -564,7 +567,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               height: 40,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary
+                    ? (customIcon != null ? AppColors.surfaceLowest : AppColors.primary)
                     : AppColors.surfaceContainer,
                 borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
               ),

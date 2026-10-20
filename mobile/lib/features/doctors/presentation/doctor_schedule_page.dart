@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -42,6 +43,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   String _selectedPaymentMethod = 'CASH'; // 'GCASH' or 'CASH'
   File? _receiptImage;
   bool _isDownloading = false;
+  bool _isLoadingQr = true;
+  String? _qrUrl;
 
   Map<String, dynamic>? _availabilityData;
   bool _isLoading = true;
@@ -53,7 +56,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     super.initState();
     _selectedDate = null;
     _fetchAvailability();
-    // No need to fetch GCash QR since we're using local image
+    _fetchGcashQr();
   }
 
   Future<void> _fetchAvailability() async {
@@ -94,6 +97,29 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     }
   }
 
+  Future<void> _fetchGcashQr() async {
+    try {
+      final response = await _apiService.getGcashQr(doctorId: widget.doctorId);
+
+      if (response['success'] == true && response['data'] != null) {
+        setState(() {
+          _qrUrl = response['data']['qrUrl'];
+          _isLoadingQr = false;
+        });
+      } else {
+        // QR code not configured
+        setState(() {
+          _isLoadingQr = false;
+        });
+      }
+    } catch (e) {
+      // QR code not available
+      setState(() {
+        _isLoadingQr = false;
+      });
+    }
+  }
+
   Map<String, dynamic>? _getDateAvailability(DateTime date) {
     if (_availabilityData == null || _availabilityData!['dates'] == null) {
       return null;
@@ -110,6 +136,18 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   }
 
   Future<void> _downloadQrCode() async {
+    if (_qrUrl == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('QR code not available'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _isDownloading = true;
     });
@@ -120,18 +158,21 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
       final fileName = 'gcash_qr_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final filePath = '${directory.path}/$fileName';
 
-      // Copy the local QR image to app storage
-      final assetImage = await rootBundle.load('assets/images/gcash_qr_placeholder.jpg');
-      final byteData = assetImage.buffer.asUint8List();
-      await File(filePath).writeAsBytes(byteData);
+      // Download the QR code from the URL
+      final response = await http.get(Uri.parse(_qrUrl!));
+      if (response.statusCode == 200) {
+        await File(filePath).writeAsBytes(response.bodyBytes);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('QR code saved to app storage'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('QR code saved to app storage'),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to download QR code');
       }
     } catch (e) {
       if (mounted) {
@@ -862,6 +903,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   Widget _buildPaymentMethodSelection() {
     if (_selectedDate == null) return const SizedBox();
 
+    final hasGcashQr = _qrUrl != null;
+
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Column(
@@ -875,8 +918,10 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             ),
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
-          _buildPaymentOption('GCash', 'Pay online with GCash'),
-          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          if (hasGcashQr) ...[
+            _buildPaymentOption('GCash', 'Pay online with GCash'),
+            const SizedBox(height: spacing.AppSpacing.gutterSm),
+          ],
           _buildPaymentOption('Cash at Clinic', 'Pay when you arrive'),
           if (_selectedPaymentMethod == 'GCASH') ...[
             const SizedBox(height: spacing.AppSpacing.gutterLg),
@@ -891,33 +936,57 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                  child: Image.asset(
-                    'assets/images/gcash_qr_placeholder.jpg',
-                    width: 200,
-                    height: 200,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.qr_code_2,
-                              size: 80,
-                              color: AppColors.secondary,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'QR code not available',
-                              style: AppTextStyles.labelSm.copyWith(
-                                color: AppColors.secondary,
+                  child: _isLoadingQr
+                      ? const Center(
+                          child: CircularProgressIndicator(),
+                        )
+                      : _qrUrl != null
+                          ? Image.network(
+                              _qrUrl!,
+                              width: 200,
+                              height: 200,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.qr_code_2,
+                                        size: 80,
+                                        color: AppColors.secondary,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'QR code not available',
+                                        style: AppTextStyles.labelSm.copyWith(
+                                          color: AppColors.secondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            )
+                          : Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.qr_code_2,
+                                    size: 80,
+                                    color: AppColors.secondary,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'QR code not available',
+                                    style: AppTextStyles.labelSm.copyWith(
+                                      color: AppColors.secondary,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
                 ),
               ),
             ),
@@ -1035,6 +1104,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
 
   Widget _buildPaymentOption(String title, String subtitle) {
     final isSelected = _selectedPaymentMethod == (title == 'GCash' ? 'GCASH' : 'CASH');
+    final isGcash = title == 'GCash';
 
     return InkWell(
       onTap: () {
@@ -1061,11 +1131,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               height: 40,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary
+                    ? (isGcash ? AppColors.surfaceLowest : AppColors.primary)
                     : AppColors.surfaceContainer,
                 borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
               ),
-              child: title == 'GCash'
+              child: isGcash
                   ? Image.asset(
                       'assets/images/gcash_logo.png',
                       width: 24,
