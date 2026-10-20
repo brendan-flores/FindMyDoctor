@@ -98,12 +98,22 @@ Current System State (October 2026):
 - All patient details captured at sign-up are staged in `pending_patient_signups` and written to the `patients` table when the account is created after OTP verification
 - User login accepts either email or username for authentication
 - Users table includes username field (unique) for patient identification
+- Username is automatically generated from email (part before @) during registration for all user types (patients, doctors, secretaries, admins)
 - The patient OTP `/send` endpoint checks email and username availability up-front (after the email existence check, before the sign-up is staged or the OTP is sent) and returns `409 Conflict` with `Email is already registered` or `Username already taken`, so the error is shown on the sign-up form without sending an OTP
 - The patient OTP `/verify` endpoint re-checks email and username uniqueness inside the single account-creation transaction and returns `409 Conflict` with a clear `Username already taken` (or `Email already registered`) message instead of a misleading verification error; the `users` unique constraints remain the backstop against concurrent sign-ups
 - Patients table includes phone (restored in migration `025_restore_phone_column.sql`), `middle_name`, and `sex` (migration `023_add_patient_required_fields.sql`)
 - Backend API endpoints for patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
 - Backend doctor OTP API accepts only basic fields (`firstName`, `middleName`, `lastName`, `email`, `contactNumber`, `password`) in the signup payload
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
+
+## Email or Username Login
+- Mobile login page accepts both email and username for authentication
+- Login field label shows "Email or Username" with hint "Enter your email or username"
+- Validation is conditional: if input contains `@`, email format is validated; if no `@`, username is accepted without email format validation
+- Backend `/api/v1/auth/login` endpoint queries both `email` and `username` columns: `WHERE (email = $1 OR username = $1)`
+- Username is automatically populated during all registration flows (patients via OTP, doctors, secretaries, admins, walk-ins) by extracting the part before the `@` symbol from the email address
+- Username column in `users` table is unique (VARCHAR(50)) with an index for efficient lookups
+- All user types (PATIENT, DOCTOR, SECRETARY, ADMIN, SUPERADMIN) have username populated at account creation
 
 ## OTP & Authentication
 - SuperAdmins log in directly without OTP; regular Admins always require login OTP (no setting, no bypass)
