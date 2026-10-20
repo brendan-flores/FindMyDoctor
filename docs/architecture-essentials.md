@@ -712,6 +712,7 @@ login_otp_challenges (for login OTP challenge state)
 - `016_doctor_profile_fields.sql` - Adds extended doctor profile fields: contact_number, professional_photo_url, years_of_experience, areas_of_expertise (comma-separated text), consultation_type, languages_spoken (comma-separated text), profile_completion_status, profile_submitted_at
 - `017_modify_pending_doctor_signup_for_basic_flow.sql` - Adds contact_number field to pending_doctor_signups for basic registration flow (professional fields remain in table for compatibility)
 - `028_add_device_tokens.sql` - Creates the `device_tokens` table associating FCM/APNs push tokens with their owning user (one active owner per token, unique on provider+token)
+- `029_add_gcash_qr_url.sql` - Adds `gcash_qr_url` column to `doctors` table for storing doctor-specific GCash QR code URLs
 
 ---
 

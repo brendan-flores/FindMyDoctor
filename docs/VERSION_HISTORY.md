@@ -4,7 +4,52 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
-<<<<<<< HEAD
+### 01.14 (October 20, 2026)
+
+**Purpose:** Implement GCash QR code management feature for the Secretary Web Dashboard, allowing secretaries to upload, preview, and replace their assigned doctor's GCash QR code, which is displayed to patients in the mobile app during the payment process
+
+**Significant Features:**
+- Secretary Web Dashboard GCash QR Management at `/secretary/settings/gcash-qr`: upload, preview, and replace the clinic's static GCash QR code
+- Doctor-specific GCash QR codes stored in the `doctors.gcash_qr_url` database column (migration `029_add_gcash_qr_url.sql`)
+- Backend API endpoints for GCash QR management: `GET /api/v1/gcash-qr/doctor/:doctorId`, `POST /api/v1/gcash-qr/doctor/:doctorId/upload`, `DELETE /api/v1/gcash-qr/doctor/:doctorId`
+- Updated public GCash QR endpoint `GET /api/v1/payments/gcash-qr` to accept `doctorId` query parameter and return doctor-specific QR from database
+- Mobile app now fetches doctor-specific GCash QR code via `ApiService.getGcashQr(doctorId)` and displays it in the payment screen
+- Supabase Storage integration for GCash QR codes (bucket `gcash-qr-codes`, configurable via `SUPABASE_GCASH_BUCKET`)
+
+**Improvements:**
+- Backend: added `gcash_qr_url` column to `doctors` table with index (migration `029_add_gcash_qr_url.sql`)
+- Backend: extended `storageService.ts` with `uploadGcashQr`, `deleteGcashQr`, and `validateGcashQrFile` functions for QR code storage
+- Backend: created new API router `/backend/src/api/gcashQr.ts` with secretary-only QR management endpoints
+- Backend: updated `payments.ts` public GCash QR endpoint to accept `doctorId` query parameter
+- Web: added `/secretary/settings/gcash-qr/page.tsx` with QR upload (PNG/JPEG, 5MB limit), preview, and delete functionality
+- Web: updated `/secretary/settings/page.tsx` with navigation link to GCash QR Management section
+- Mobile: updated `PaymentScreen` to accept optional `doctorId` parameter and fetch doctor-specific QR code
+- Mobile: updated `ApiService.getGcashQr()` to require `doctorId` parameter and pass it as query parameter
+
+**Removed/Modified Functionality:**
+- No existing payment, booking, or queue functionality was removed
+- Payment verification workflow remains unchanged in the Payments page (receipt review, verify/reject, payment history)
+- GCash QR management is separate from payment verification to maintain clear separation of concerns
+
+**Architecture:**
+- Database: added `/backend/database/029_add_gcash_qr_url.sql` and `/backend/src/database/applyGcashQrUrl.ts`
+- Backend: added `/backend/src/api/gcashQr.ts`, modified `/backend/src/api/payments.ts`, `/backend/src/services/storageService.ts`, and `/backend/src/index.ts`
+- Web: added `/web/src/app/secretary/settings/gcash-qr/page.tsx`, modified `/web/src/app/secretary/settings/page.tsx`
+- Mobile: modified `/mobile/lib/features/payments/presentation/payment_screen.dart` and `/mobile/lib/core/services/api_service.dart`
+
+**Testing:**
+- Backend: migration `029_add_gcash_qr_url.sql` applied successfully via `npm run migrate:gcash-qr-url`
+- Backend: `tsc --noEmit` clean
+- Web: `next build` succeeded (41 routes including `/secretary/settings/gcash-qr`); `tsc --noEmit` clean
+- Mobile: `flutter analyze --no-pub` reports no errors (only pre-existing infos/warnings)
+
+**Documentation:**
+- Updated CURRENT_VERSION.md to 01.14
+- Added VERSION_HISTORY.md entry for 01.14
+- Updated architecture-essentials.md to include new migration `029_add_gcash_qr_url.sql` in the database concepts list
+
+---
+
 ### 01.13 (October 20, 2026)
 
 **Purpose:** Extend the shared mobile application to secretaries so they can sign in with their existing credentials and manage patient conversations from a chat-first home, with role-based routing, push notification deep links, and a read-only patient-info sheet
@@ -95,54 +140,6 @@ This document contains the complete version history for the FindMyDoctor applica
 - Updated `docs/architecture-essentials.md` (Secretary Chat Rules access/sharing/unread/patient-info sheet/push rules, database tables and migration list, chat implementation checklist)
 - Updated `docs/SYSTEM_STATE.md` (Database Schema, Patient-Secretary Messaging and Push Notifications, Secretary Web Chat)
 - Updated CURRENT_VERSION.md to 01.12 and added this VERSION_HISTORY.md entry
-=======
-### 01.12 (October 19, 2026)
-
-**Purpose:** Implement GCash and Cash payment options for clinic appointments
-
-**Significant Features:**
-- Patients can now choose between GCash (with QR code scan and receipt upload) or Cash at Clinic payment methods
-- Added payment screen accessible from booking confirmation and appointments pages
-- Payment status (UNPAID, PENDING_VERIFICATION, PAID, REJECTED) displayed in appointments list
-- Backend API endpoint to serve GCash QR code as static file
-
-**Improvements:**
-- Mobile: Changed booking button label from "Confirm Clinic Date & Reserve Queue" to "Continue Booking" for clearer UX
-- Mobile: Added "Pay Now" option on booking confirmation page for immediate payment access
-- Mobile: Added payment icon button on appointment cards for quick payment access
-- Mobile: Added "Manage Payment" button on appointment detail page
-- Mobile: Created comprehensive payment screen with GCash QR display, receipt upload (up to 5MB), and Cash at Clinic information
-- Mobile: Added image_picker dependency for receipt upload functionality
-- Mobile: Payment status badges displayed on appointment cards (Paid, Pending, Unpaid)
-- Backend: Added GET /api/v1/payments/gcash-qr public endpoint to return QR code URL
-- Backend: Configured static file serving for /public directory to serve GCash QR image
-- Backend: Updated appointments API to include payment_status in query results
-- Backend: Added publicPaymentsRouter for unauthenticated GCash QR endpoint
-
-**UI/UX Changes:**
-- Payment method selection with visual feedback (GCash vs Cash at Clinic)
-- GCash QR code display with loading and error states
-- Receipt upload with file size validation (5MB limit)
-- Payment status indicators with color-coded badges
-
-**Removed/Modified Functionality:**
-- No existing payment, booking, or queue functionality was removed
-- Booking flow unchanged - patients can still complete reservations without advance payment
-- Payment remains optional per architecture requirements
-
-**Architecture:**
-- Mobile: Created `/mobile/lib/features/payments/presentation/payment_screen.dart`
-- Mobile: Modified `/mobile/lib/features/doctors/presentation/doctor_schedule_page.dart` (button label)
-- Mobile: Modified `/mobile/lib/features/appointments/presentation/booking_confirmation_page.dart` (Pay Now action)
-- Mobile: Modified `/mobile/lib/features/appointments/presentation/appointments_page.dart` (payment access and status)
-- Mobile: Modified `/mobile/lib/features/appointments/presentation/appointment_detail_page.dart` (payment button)
-- Mobile: Modified `/mobile/lib/core/services/api_service.dart` (payment methods)
-- Mobile: Modified `/mobile/lib/core/constants/api_constants.dart` (payment constants)
-- Mobile: Updated `/mobile/pubspec.yaml` (added image_picker dependency)
-- Backend: Modified `/backend/src/api/payments.ts` (GCash QR endpoint)
-- Backend: Modified `/backend/src/index.ts` (static file serving and payment routes)
-- Backend: Modified `/backend/src/api/appointments.ts` (payment_status in queries)
-- Backend: Created `/backend/public/` directory with README for GCash QR placeholder
 
 **Testing:**
 - Mobile: Flutter analyze completed with only pre-existing warnings (no new errors)
@@ -154,7 +151,6 @@ This document contains the complete version history for the FindMyDoctor applica
 - Updated CURRENT_VERSION.md to 01.12
 - Added VERSION_HISTORY.md entry for 01.12
 - Created `/backend/public/README.md` with GCash QR setup instructions
->>>>>>> feature/gcash-payment-receipt-upload
 
 ---
 
