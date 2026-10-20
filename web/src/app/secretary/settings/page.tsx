@@ -123,6 +123,31 @@ export default function SecretarySettings() {
             </p>
           </div>
         </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <h2 className="text-xl font-semibold text-slate-900 mb-4">Clinic Payment Settings</h2>
+
+          <div className="flex items-center justify-between py-4">
+            <div>
+              <h3 className="font-semibold text-slate-900">GCash QR Code Management</h3>
+              <p className="text-sm text-slate-600 mt-1">
+                Upload and manage the clinic's GCash QR code for patient payments
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/secretary/settings/gcash-qr')}
+              className="px-4 py-2 bg-[#1A62CD] text-white rounded-lg hover:bg-[#1550A8] transition-colors"
+            >
+              Manage QR Code
+            </button>
+          </div>
+
+          <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
+            <p className="text-sm text-amber-800">
+              The GCash QR code you upload here will be displayed to patients in the mobile app during the payment process. Separate from the Payments page, which is used to review uploaded receipts and verify payments.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
