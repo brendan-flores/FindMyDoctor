@@ -192,14 +192,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
     });
 
     try {
-      // TODO: Implement actual image upload to backend
-      // This requires backend support for multipart/form-data file uploads
-      // For now, simulate upload with a placeholder URL
-      final receiptUrl = 'https://placeholder.com/receipt.jpg';
-
       final response = await _apiService.uploadPaymentReceipt(
         appointmentId: widget.appointmentId,
-        receiptUrl: receiptUrl,
+        receiptFile: _receiptImage!,
       );
 
       if (response['success'] == true) {
@@ -210,6 +205,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
               backgroundColor: AppColors.primary,
             ),
           );
+          // Clear the selected image after successful upload
+          setState(() {
+            _receiptImage = null;
+          });
           // Refresh payment details
           _fetchPaymentDetails();
         }

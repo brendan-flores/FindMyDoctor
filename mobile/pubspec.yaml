@@ -40,6 +40,7 @@ dependencies:
 
   # Networking
   http: ^1.1.0
+  http_parser: ^4.0.2
 
   # Local Storage
   shared_preferences: ^2.2.2

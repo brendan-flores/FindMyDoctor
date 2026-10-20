@@ -355,7 +355,7 @@ export async function calculateAvailability(
     registered: 0,
     remaining: 0,
   };
-  
+
   if (capacityResult.rows.length > 0) {
     const row = capacityResult.rows[0];
     capacity = {
@@ -366,14 +366,16 @@ export async function calculateAvailability(
       remaining: Math.max(0, row.final_capacity - (row.registered_count || 0)),
     };
   } else {
-    // Calculate capacity from available ranges
-    const totalAvailableMinutes = workingRanges.reduce(
-      (total, range) => total + calculateMinutesBetween(range.start, range.end),
-      0
-    );
-    capacity.calculated = Math.floor(totalAvailableMinutes / CONSULTATION_DURATION_MINUTES);
-    capacity.final = capacity.calculated;
-    capacity.remaining = capacity.calculated;
+    // No capacity configured - report as unavailable
+    // Booking requires an existing daily_capacities row, so dates without one cannot be booked
+    return {
+      date,
+      dayOfWeek,
+      status: 'UNAVAILABLE',
+      workingHours: workingRanges,
+      timeSlots: [],
+      capacity,
+    };
   }
   
   // Calculate available time after breaks
