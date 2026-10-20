@@ -113,11 +113,14 @@ router.post('/doctors', authenticate, authorize('ADMIN'), async (req: AuthReques
     // Create user
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Generate username from email (part before @)
+    const username = email.split('@')[0];
+
     const userResult = await query(
-      `INSERT INTO users (email, password_hash, role, must_change_password)
-       VALUES ($1, $2, 'DOCTOR', false)
+      `INSERT INTO users (email, password_hash, role, must_change_password, username)
+       VALUES ($1, $2, 'DOCTOR', false, $3)
        RETURNING id`,
-      [email, passwordHash]
+      [email, passwordHash, username]
     );
 
     const userId = userResult.rows[0].id;
@@ -414,11 +417,14 @@ router.post('/secretaries', authenticate, authorize('ADMIN'), async (req: AuthRe
     // Create user
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Generate username from email (part before @)
+    const username = email.split('@')[0];
+
     const userResult = await query(
-      `INSERT INTO users (email, password_hash, role, must_change_password)
-       VALUES ($1, $2, 'SECRETARY', false)
+      `INSERT INTO users (email, password_hash, role, must_change_password, username)
+       VALUES ($1, $2, 'SECRETARY', false, $3)
        RETURNING id`,
-      [email, passwordHash]
+      [email, passwordHash, username]
     );
 
     const userId = userResult.rows[0].id;
@@ -494,12 +500,15 @@ router.post('/admins', authenticate, authorize('SUPERADMIN'), async (req: AuthRe
     const passwordHash = await bcrypt.hash(password, 10);
     console.log('Password hashed successfully');
 
+    // Generate username from email (part before @)
+    const username = email.split('@')[0];
+
     // Create Admin user (always ADMIN role)
     const userResult = await query(
-      `INSERT INTO users (email, password_hash, role, is_active, must_change_password)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO users (email, password_hash, role, is_active, must_change_password, username)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, email, role, is_active, must_change_password, created_at`,
-      [email, passwordHash, 'ADMIN', true, true]
+      [email, passwordHash, 'ADMIN', true, true, username]
     );
 
     const admin = userResult.rows[0];

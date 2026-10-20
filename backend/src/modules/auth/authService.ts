@@ -55,12 +55,15 @@ export async function register(data: RegisterData) {
   // Hash password
   const passwordHash = await bcrypt.hash(password, 10);
 
+  // Generate username from email (part before @)
+  const username = email.split('@')[0];
+
   // Create user
   const userResult = await query(
-    `INSERT INTO users (email, password_hash, role, must_change_password)
-     VALUES ($1, $2, $3, false)
+    `INSERT INTO users (email, password_hash, role, must_change_password, username)
+     VALUES ($1, $2, $3, false, $4)
      RETURNING id, email, role, must_change_password, created_at`,
-    [email, passwordHash, role]
+    [email, passwordHash, role, username]
   );
 
   const user = userResult.rows[0];
@@ -380,12 +383,15 @@ export async function registerDoctor(data: DoctorRegistrationData) {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Generate username from email (part before @)
+    const username = email.split('@')[0];
+
     // Create the user account
     const userResult = await client.query(
-      `INSERT INTO users (email, password_hash, role, must_change_password)
-       VALUES ($1, $2, 'DOCTOR', false)
+      `INSERT INTO users (email, password_hash, role, must_change_password, username)
+       VALUES ($1, $2, 'DOCTOR', false, $3)
        RETURNING id, email, role`,
-      [email, passwordHash]
+      [email, passwordHash, username]
     );
 
     const user = userResult.rows[0];
