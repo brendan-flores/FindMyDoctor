@@ -129,6 +129,7 @@ class ApiClient {
         const newRefreshToken = data.data.refreshToken;
         
         this.setToken(newToken, newRefreshToken);
+        
         this.onTokenRefreshed(newToken);
         
         return newToken;
@@ -236,12 +237,28 @@ class ApiClient {
     }
   }
 
-  async post<T>(endpoint: string, body: any = {}): Promise<ApiResponse<T>> {
+  async post<T>(endpoint: string, body: any = {}, options?: { isFormData?: boolean; headers?: HeadersInit }): Promise<ApiResponse<T>> {
     try {
+      const headers: Record<string, string> = options?.headers as Record<string, string> || {};
+
+      // Add Authorization header if not provided
+      if (!headers['Authorization']) {
+        const cookieToken = this.getCookie('accessToken');
+        const tokenToUse = cookieToken || this.token;
+        if (tokenToUse && tokenToUse !== 'undefined' && tokenToUse !== 'null') {
+          headers['Authorization'] = `Bearer ${tokenToUse}`;
+        }
+      }
+
+      // Don't set Content-Type for FormData - let the browser set it with boundary
+      if (!options?.isFormData && !headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+      }
+
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(body),
+        headers: headers as HeadersInit,
+        body: options?.isFormData ? body : JSON.stringify(body),
         credentials: 'include',
       });
 
@@ -249,10 +266,22 @@ class ApiClient {
         const newToken = await this.refreshAccessToken();
         if (newToken) {
           // Retry the request with new token
+          const retryHeaders: Record<string, string> = options?.headers as Record<string, string> || {};
+          if (!retryHeaders['Authorization']) {
+            const cookieToken = this.getCookie('accessToken');
+            const tokenToUse = cookieToken || this.token;
+            if (tokenToUse && tokenToUse !== 'undefined' && tokenToUse !== 'null') {
+              retryHeaders['Authorization'] = `Bearer ${tokenToUse}`;
+            }
+          }
+          if (!options?.isFormData && !retryHeaders['Content-Type']) {
+            retryHeaders['Content-Type'] = 'application/json';
+          }
+
           const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
             method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify(body),
+            headers: retryHeaders as HeadersInit,
+            body: options?.isFormData ? body : JSON.stringify(body),
             credentials: 'include',
           });
 
