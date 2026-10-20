@@ -23,6 +23,7 @@
     "migrate:pending-patient-signup-details": "tsx src/database/applyPendingPatientSignupDetails.ts",
     "migrate:sync-completed-appointments": "tsx src/database/applySyncCompletedAppointments.ts",
     "migrate:device-tokens": "tsx src/database/applyDeviceTokens.ts",
+    "migrate:gcash-qr-url": "tsx src/database/applyGcashQrUrl.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",
