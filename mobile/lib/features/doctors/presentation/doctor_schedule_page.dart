@@ -11,6 +11,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/services/doctor_service.dart';
 import '../../../core/services/api_service.dart';
 
@@ -20,6 +21,7 @@ class DoctorSchedulePage extends StatefulWidget {
   final String? specialty;
   final String? clinic;
   final String? consultationFee;
+  final String? professionalPhotoUrl;
 
   const DoctorSchedulePage({
     super.key,
@@ -28,6 +30,7 @@ class DoctorSchedulePage extends StatefulWidget {
     this.specialty,
     this.clinic,
     this.consultationFee,
+    this.professionalPhotoUrl,
   });
 
   @override
@@ -279,47 +282,10 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Row(
         children: [
-          Stack(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.slate800.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.person,
-                  color: AppColors.outline,
-                  size: spacing.AppSpacing.iconXl,
-                ),
-              ),
-              Positioned(
-                bottom: -4,
-                right: -4,
-                child: Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: AppColors.tertiary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.surface, width: 2),
-                  ),
-                  child: Icon(
-                    Icons.check,
-                    color: AppColors.onTertiary,
-                    size: 10,
-                  ),
-                ),
-              ),
-            ],
+          DoctorProfileImage(
+            photoUrl: widget.professionalPhotoUrl,
+            size: 56,
+            showVerifiedBadge: true,
           ),
           const SizedBox(width: spacing.AppSpacing.gutterMd),
           Expanded(
@@ -1259,6 +1225,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 'selectedDate': _selectedDate,
                 'paymentMethod': _selectedPaymentMethod,
                 'receiptImage': _receiptImage,
+                'professionalPhotoUrl': widget.professionalPhotoUrl,
               },
             );
           }
@@ -1276,6 +1243,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 'selectedDate': _selectedDate,
                 'paymentMethod': _selectedPaymentMethod,
                 'receiptImage': _receiptImage,
+                'professionalPhotoUrl': widget.professionalPhotoUrl,
               },
             );
           }

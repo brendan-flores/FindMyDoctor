@@ -208,6 +208,7 @@ class MyAppState extends State<MyApp> {
                     specialty: args?['specialty'],
                     clinic: args?['clinic'],
                     consultationFee: args?['consultationFee'],
+                    professionalPhotoUrl: args?['professionalPhotoUrl'],
                   ),
                 );
               case '/booking-confirmation':
@@ -220,6 +221,7 @@ class MyAppState extends State<MyApp> {
                     clinic: args?['clinic'],
                     consultationFee: args?['consultationFee'],
                     selectedDate: args?['selectedDate'],
+                    professionalPhotoUrl: args?['professionalPhotoUrl'],
                   ),
                 );
               case '/patient-details':
@@ -232,6 +234,7 @@ class MyAppState extends State<MyApp> {
                     clinic: args?['clinic'],
                     consultationFee: args?['consultationFee'],
                     selectedDate: args?['selectedDate'],
+                    professionalPhotoUrl: args?['professionalPhotoUrl'],
                   ),
                 );
               case '/conversation-thread':

@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
+import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/services/api_service.dart';
 import 'appointment_detail_page.dart';
 
@@ -454,6 +455,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     final doctorLastName = appointment['doctor_last_name'] ?? '';
     final specialty = appointment['specialty'] ?? '';
     final practiceName = appointment['practice_name'] ?? 'Private Practice';
+    final professionalPhotoUrl = appointment['professional_photo_url']?.toString();
     final appointmentDate = DateTime.parse(appointment['appointment_date']);
     final queueNumber = appointment['queue_number'];
     final status = appointment['status'];
@@ -523,39 +525,10 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
           // Doctor info
           Row(
             children: [
-              Stack(
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainer,
-                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                    ),
-                    child: Icon(
-                      Icons.person,
-                      color: AppColors.outline,
-                      size: spacing.AppSpacing.iconXl,
-                    ),
-                  ),
-                  Positioned(
-                    bottom: -4,
-                    right: -4,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: AppColors.tertiary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.verified,
-                        color: AppColors.onTertiary,
-                        size: 13,
-                      ),
-                    ),
-                  ),
-                ],
+              DoctorProfileImage(
+                photoUrl: professionalPhotoUrl,
+                size: 64,
+                showVerifiedBadge: true,
               ),
               const SizedBox(width: spacing.AppSpacing.gutterMd),
               Expanded(
