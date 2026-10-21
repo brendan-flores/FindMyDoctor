@@ -71,6 +71,9 @@ dependencies:
   # Image manipulation for cropping
   image: ^4.1.7
 
+  # Cached network image for efficient image loading
+  cached_network_image: ^3.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
