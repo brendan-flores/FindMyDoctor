@@ -284,6 +284,16 @@ export const secretaryApi = {
   getSignedReceiptUrl: async (id: string): Promise<{ success: boolean; data?: { signedUrl: string }; error?: string }> => {
     return apiClient.get<{ signedUrl: string }>(`/payments/${id}/receipt-url`);
   },
+
+  // Payments: add charge to payment (by payment ID)
+  addCharge: async (paymentId: string, description: string, amount: number): Promise<{ success: boolean; data?: PaymentCharge; error?: string }> => {
+    return apiClient.post<PaymentCharge>(`/payments/${paymentId}/charges`, { description, amount });
+  },
+
+  // Payments: delete charge from payment (by payment ID and charge ID)
+  deleteCharge: async (paymentId: string, chargeId: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.delete<void>(`/payments/${paymentId}/charges/${chargeId}`);
+  },
 };
 
 // Payment charge (from payment_charges table)
@@ -293,6 +303,9 @@ export interface PaymentCharge {
   description: string;
   amount: number;
   created_at: string;
+  created_by?: string | null;
+  created_by_first_name?: string | null;
+  created_by_last_name?: string | null;
 }
 
 // Payment (from payments table with joined patient/appointment/verifier data)
