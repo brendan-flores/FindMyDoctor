@@ -128,7 +128,7 @@ router.post('/login', async (req: Request, res: Response) => {
     // Facebook-style: Always use persistent cookies regardless of Remember Me
     const isProduction = process.env.NODE_ENV === 'production';
     const cookieOptions = {
-      httpOnly: true,
+      httpOnly: isProduction, // Only HttpOnly in production
       secure: isProduction,
       sameSite: 'lax' as const,
       path: '/',
@@ -198,6 +198,7 @@ router.post('/login', async (req: Request, res: Response) => {
 router.post('/verify-login-otp', async (req: Request, res: Response) => {
   try {
     const { challengeId, otp, rememberMe } = req.body;
+    const trustedBrowserToken = req.cookies?.trustedBrowser;
 
     if (!challengeId || !otp) {
       return res.status(400).json(
@@ -209,30 +210,43 @@ router.post('/verify-login-otp', async (req: Request, res: Response) => {
 
     console.log('🟢 Login OTP verified for user:', result.user.email);
 
-    // Set HttpOnly cookies
+    // Set HttpOnly cookies - Facebook-style: Always use persistent cookies regardless of Remember Me
     const isProduction = process.env.NODE_ENV === 'production';
     const cookieOptions = {
-      httpOnly: true,
+      httpOnly: isProduction, // Only HttpOnly in production
       secure: isProduction,
       sameSite: 'lax' as const,
       path: '/',
     };
 
+    // Always use 7-day access token and 30-day refresh token (Facebook-style)
     res.cookie('accessToken', result.accessToken, {
       ...cookieOptions,
-      maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.cookie('refreshToken', result.refreshToken, {
       ...cookieOptions,
-      maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 
+    // Remember Me now only controls trusted-browser registration (OTP skip on trusted devices)
     // If Remember Me is checked, register this browser as trusted
     if (rememberMe && result.trustedBrowserToken) {
       res.cookie('trustedBrowser', result.trustedBrowserToken, {
         ...cookieOptions,
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+    } else if (trustedBrowserToken && !rememberMe) {
+      // If Remember Me is unchecked and browser was previously trusted, revoke trust
+      const { revokeTrustedBrowser } = await import('../modules/auth/authService');
+      await revokeTrustedBrowser(result.user.id, trustedBrowserToken);
+      res.clearCookie('trustedBrowser', { path: '/' });
+    } else if (result.isTrustedBrowser && result.trustedBrowserToken) {
+      // Re-issue the trusted browser cookie for existing trusted browsers
+      res.cookie('trustedBrowser', result.trustedBrowserToken, {
+        ...cookieOptions,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
       });
     }
 

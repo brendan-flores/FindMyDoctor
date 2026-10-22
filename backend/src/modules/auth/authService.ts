@@ -713,5 +713,6 @@ export async function verifyLoginOtp(challengeId: string, otp: string, rememberM
     accessToken,
     refreshToken,
     trustedBrowserToken,
+    isTrustedBrowser: shouldRemember, // Browser is now trusted if Remember Me was checked
   };
 }
