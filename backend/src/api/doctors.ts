@@ -980,12 +980,15 @@ router.post('/secretaries', authenticate, authorize('DOCTOR'), async (req: AuthR
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Generate username from email (part before @)
+    const username = email.split('@')[0];
+
     // Create user with SECRETARY role
     const userResult = await client.query(
-      `INSERT INTO users (email, password_hash, role, is_active, must_change_password)
-       VALUES ($1, $2, 'SECRETARY', true, true)
+      `INSERT INTO users (email, password_hash, role, is_active, must_change_password, username)
+       VALUES ($1, $2, 'SECRETARY', true, true, $3)
        RETURNING id, email, role, is_active, must_change_password`,
-      [email, passwordHash]
+      [email, passwordHash, username]
     );
 
     const userId = userResult.rows[0].id;

@@ -4,6 +4,47 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.15 (October 20, 2026)
+
+**Purpose:** Enable mobile login to accept either email or username for authentication, with conditional validation and automatic username population during registration
+
+**Significant Features:**
+- Mobile login page now accepts both email and username for authentication
+- Conditional validation: email format validated only if input contains `@` symbol; usernames accepted without email format validation
+- Backend `/api/v1/auth/login` endpoint queries both `email` and `username` columns for authentication
+- Username automatically generated from email (part before @) during all registration flows
+
+**Improvements:**
+- Mobile: Updated `login_page.dart` validator to accept both email and username with conditional email format validation
+- Backend: Updated `authService.ts` register function to populate username column
+- Backend: Updated `authService.ts` registerDoctor function to populate username column
+- Backend: Updated `walk-ins.ts` walk-in registration to populate username column (both instances)
+- Backend: Updated `doctors.ts` secretary creation to populate username column
+- Backend: Updated `admin.ts` admin creation, doctor creation, and secretary creation to populate username column
+- Backend: Patient OTP registration (`patientOtp.ts`) already populates username from pending signup
+
+**Removed/Modified Functionality:**
+- No existing authentication functionality removed; email-only login still works
+- Username column was already present in database (migration 009_patient_username_migration.sql)
+- Login backend query already supported both email and username; now properly utilized with populated usernames
+
+**Architecture:**
+- Database: username column already exists in `users` table (VARCHAR(50), UNIQUE, indexed)
+- Backend: modified user creation SQL statements across all registration flows to include username
+- Mobile: enhanced validation logic in login form
+
+**Testing:**
+- Backend: all user creation flows now populate username from email
+- Mobile: login validation accepts both email format and username format
+- Backend login query: `WHERE (email = $1 OR username = $1)` leverages populated usernames
+
+**Documentation:**
+- Updated CURRENT_VERSION.md to 01.15
+- Added VERSION_HISTORY.md entry for 01.15
+- Updated SYSTEM_STATE.md with new "Email or Username Login" section documenting conditional validation and automatic username generation
+
+---
+
 ### 01.14 (October 20, 2026)
 
 **Purpose:** Implement GCash QR code management feature for the Secretary Web Dashboard, allowing secretaries to upload, preview, and replace their assigned doctor's GCash QR code, which is displayed to patients in the mobile app during the payment process

@@ -453,6 +453,13 @@ class _LoginPageState extends State<LoginPage> {
             if (value == null || value.isEmpty) {
               return 'Please enter your email or username';
             }
+            // Optional email validation: only validate if input contains @
+            if (value.contains('@')) {
+              final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+              if (!emailRegex.hasMatch(value)) {
+                return 'Please enter a valid email address';
+              }
+            }
             return null;
           },
         ),
