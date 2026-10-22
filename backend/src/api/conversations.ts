@@ -61,7 +61,7 @@ router.get('/', authenticate, requireSecretaryPasswordChange, async (req: AuthRe
       queryText = `
         SELECT c.id, c.patient_id, c.secretary_id, c.doctor_id, c.status, c.created_at, c.updated_at,
                s.first_name as secretary_first_name, s.last_name as secretary_last_name,
-               d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.practice_name,
+               d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.practice_name, d.professional_photo_url as doctor_professional_photo_url,
                ${listExtras(2)}
         FROM conversations c
         JOIN secretaries s ON s.id = c.secretary_id
@@ -78,7 +78,7 @@ router.get('/', authenticate, requireSecretaryPasswordChange, async (req: AuthRe
         SELECT DISTINCT ON (p.id)
                c.id, p.id as patient_id, c.secretary_id, c.doctor_id, c.status, c.created_at, c.updated_at,
                p.first_name as patient_first_name, p.last_name as patient_last_name,
-               d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.practice_name,
+               d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.practice_name, d.professional_photo_url as doctor_professional_photo_url,
                ${listExtras(2)}
         FROM patients p
         JOIN doctors d ON d.id = (SELECT doctor_id FROM secretaries WHERE user_id = $1)
