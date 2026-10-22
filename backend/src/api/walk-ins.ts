@@ -365,6 +365,13 @@ router.post('/', authenticate, requireSecretaryPasswordChange, requireSecretaryP
       [doctorId, appointmentDateOnly]
     );
 
+    // Create UNPAID payment record
+    await client.query(
+      `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_amount, status)
+       VALUES ($1, $2, 'CASH', $3, $3, 'UNPAID')`,
+      [patientId, appointmentId, doctor.consultation_fee]
+    );
+
     // Get total configured capacity for that day
     const totalCapacityResult = await client.query(
       `SELECT final_capacity as total_capacity
@@ -911,6 +918,13 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
     await client.query(
       'UPDATE daily_capacities SET registered_count = registered_count + 1 WHERE doctor_id = $1 AND date = $2',
       [assignedDoctorId, appointmentDateOnly]
+    );
+
+    // Create UNPAID payment record
+    await client.query(
+      `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_amount, status)
+       VALUES ($1, $2, 'CASH', $3, $3, 'UNPAID')`,
+      [patientId, appointmentId, doctorResult.rows[0].consultation_fee]
     );
 
     // Get total configured capacity for that day

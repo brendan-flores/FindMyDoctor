@@ -81,8 +81,8 @@ router.get('/', authenticate, requireSecretaryPasswordChange, requireSecretaryPr
     const assignedDoctorId = secretaryResult.rows[0].doctor_id;
 
     // Validate status filter if provided
-    if (status && !['PENDING_VERIFICATION', 'PAID', 'REJECTED'].includes(status as string)) {
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid status filter. Valid values: PENDING_VERIFICATION, PAID, REJECTED'));
+    if (status && !['UNPAID', 'PENDING_VERIFICATION', 'PAID', 'REJECTED'].includes(status as string)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid status filter. Valid values: UNPAID, PENDING_VERIFICATION, PAID, REJECTED'));
     }
 
     // Build query with optional status filter
@@ -91,6 +91,7 @@ router.get('/', authenticate, requireSecretaryPasswordChange, requireSecretaryPr
         p.id,
         p.appointment_id,
         p.status,
+        p.payment_method,
         p.receipt_url,
         p.consultation_amount,
         p.total_additional_charges,
@@ -262,10 +263,10 @@ router.post('/:appointmentId/receipt', authenticate, authorize('PATIENT'), uploa
     );
 
     if (existingResult.rows.length > 0) {
-      // Update existing payment
+      // Update existing payment (add receipt URL, don't change status if already PENDING_VERIFICATION)
       await client.query(
         `UPDATE payments
-         SET receipt_url = $1, status = 'PENDING_VERIFICATION', updated_at = CURRENT_TIMESTAMP
+         SET receipt_url = $1, payment_method = 'GCASH', updated_at = CURRENT_TIMESTAMP
          WHERE appointment_id = $2`,
         [receiptPath, appointmentId]
       );
@@ -518,6 +519,112 @@ router.patch('/:id/reject', authenticate, requireSecretaryPasswordChange, requir
       console.error('Rollback failed:', rollbackErr);
     }
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to reject payment'));
+  }
+});
+
+// Mark as paid (for cash payments, secretary only)
+router.patch('/:id/mark-paid', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    const { id } = req.params;
+    const secretaryId = req.user!.id;
+
+    await client.query('BEGIN');
+
+    // Get secretary's assigned doctor and secretary id
+    const secretaryResult = await client.query(
+      'SELECT id, doctor_id FROM secretaries WHERE user_id = $1',
+      [secretaryId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const secretaryRecordId = secretaryResult.rows[0].id;
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    // Get payment with doctor assignment check (lock row for update)
+    const paymentResult = await client.query(
+      `SELECT p.*, a.doctor_id, pat.user_id as patient_user_id
+       FROM payments p
+       JOIN appointments a ON p.appointment_id = a.id
+       JOIN patients pat ON p.patient_id = pat.id
+       WHERE p.id = $1
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (paymentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Payment not found'));
+    }
+
+    const payment = paymentResult.rows[0];
+
+    // Verify payment belongs to secretary's assigned doctor
+    if (payment.doctor_id !== assignedDoctorId) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only mark payments as paid for your assigned doctor'));
+    }
+
+    if (payment.status === 'PAID') {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.PAYMENT_ALREADY_VERIFIED, 'Payment already paid'));
+    }
+
+    if (payment.status !== 'UNPAID') {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Only unpaid cash payments can be marked as paid'));
+    }
+
+    // Update payment status
+    await client.query(
+      `UPDATE payments
+       SET status = 'PAID', verified_by = $1, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [secretaryRecordId, id]
+    );
+
+    // Insert notification for patient
+    await client.query(
+      `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
+       VALUES ($1, 'PAYMENT_VERIFIED', 'Payment Received', 'Your cash payment has been received.', 'payment', $2)`,
+      [payment.patient_user_id, id]
+    );
+
+    await client.query('COMMIT');
+    client.release();
+
+    // Send push notification (best-effort, outside transaction)
+    try {
+      await sendPushToUser(payment.patient_user_id, {
+        title: 'Payment Received',
+        body: 'Your cash payment has been received.',
+        data: {
+          type: 'PAYMENT_VERIFIED',
+          paymentId: id,
+        },
+      });
+    } catch (pushErr) {
+      console.error('Push delivery failed:', pushErr);
+    }
+
+    res.json(success(null, 'Payment marked as paid'));
+  } catch (err: any) {
+    try {
+      await client.query('ROLLBACK');
+      client.release();
+    } catch (rollbackErr) {
+      console.error('Rollback failed:', rollbackErr);
+    }
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to mark payment as paid'));
   }
 });
 
