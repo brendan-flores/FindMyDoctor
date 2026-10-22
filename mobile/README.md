@@ -42,6 +42,7 @@ lib/
 - API calls belong in the core services layer and target the backend REST API
 - The app must not connect directly to PostgreSQL or an external AI provider
 - All data operations go through the backend API at `http://10.0.2.2:3000/api/v1` (emulator)
+- Android debug builds allow HTTP for local development; production builds should use an HTTPS API endpoint
 
 ## Getting Started
 
