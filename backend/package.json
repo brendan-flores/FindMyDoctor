@@ -25,6 +25,7 @@
     "migrate:device-tokens": "tsx src/database/applyDeviceTokens.ts",
     "migrate:gcash-qr-url": "tsx src/database/applyGcashQrUrl.ts",
     "migrate:payment-charges-soft-delete": "tsx src/database/applyPaymentChargesSoftDelete.ts",
+    "migrate:admin-audit-log": "tsx src/database/applyAdminAuditLog.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",
