@@ -18,6 +18,7 @@ class PatientDetailsPage extends StatefulWidget {
   final String? consultationFee;
   final DateTime? selectedDate;
   final String? paymentMethod;
+  final String? professionalPhotoUrl;
 
   const PatientDetailsPage({
     super.key,
@@ -28,6 +29,7 @@ class PatientDetailsPage extends StatefulWidget {
     this.consultationFee,
     this.selectedDate,
     this.paymentMethod,
+    this.professionalPhotoUrl,
   });
 
   @override
@@ -148,6 +150,7 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
               'consultationFee': widget.consultationFee,
               'selectedDate': widget.selectedDate,
               'paymentMethod': widget.paymentMethod,
+              'professionalPhotoUrl': widget.professionalPhotoUrl,
             },
           );
         }

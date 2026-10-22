@@ -18,6 +18,7 @@ import '../features/appointments/presentation/booking_confirmation_page.dart';
 import '../features/patients/presentation/patient_details_page.dart';
 import '../features/conversations/presentation/conversation_thread_page.dart';
 import '../features/payments/presentation/payment_screen.dart';
+import '../features/notifications/presentation/notifications_page.dart';
 import '../features/secretary/presentation/secretary_home_page.dart';
 
 class MyApp extends StatefulWidget {
@@ -171,6 +172,7 @@ class MyAppState extends State<MyApp> {
           case '/booking-confirmation':
           case '/patient-details':
           case '/payment':
+          case '/notifications':
           case '/conversation-thread':
             // Protect all authenticated routes - enforce password change requirement
             if (!_isAuthenticated) {
@@ -211,6 +213,7 @@ class MyAppState extends State<MyApp> {
                     specialty: args?['specialty'],
                     clinic: args?['clinic'],
                     consultationFee: args?['consultationFee'],
+                    professionalPhotoUrl: args?['professionalPhotoUrl'],
                   ),
                 );
               case '/booking-confirmation':
@@ -224,6 +227,7 @@ class MyAppState extends State<MyApp> {
                     consultationFee: args?['consultationFee'],
                     selectedDate: args?['selectedDate'],
                     paymentMethod: args?['paymentMethod'],
+                    professionalPhotoUrl: args?['professionalPhotoUrl'],
                   ),
                 );
               case '/patient-details':
@@ -237,6 +241,7 @@ class MyAppState extends State<MyApp> {
                     consultationFee: args?['consultationFee'],
                     selectedDate: args?['selectedDate'],
                     paymentMethod: args?['paymentMethod'],
+                    professionalPhotoUrl: args?['professionalPhotoUrl'],
                   ),
                 );
               case '/conversation-thread':
@@ -246,6 +251,10 @@ class MyAppState extends State<MyApp> {
                     conversationId: args?['conversationId'] ?? '',
                     counterpartName: args?['counterpartName'] as String?,
                   ),
+                );
+              case '/notifications':
+                return MaterialPageRoute(
+                  builder: (context) => const NotificationsPage(),
                 );
               case '/payment':
                 final args = settings.arguments as Map<String, dynamic>?;

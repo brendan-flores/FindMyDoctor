@@ -7,6 +7,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/utils/json_parsers.dart';
 
@@ -18,6 +19,7 @@ class BookingConfirmationPage extends StatefulWidget {
   final String? consultationFee;
   final DateTime? selectedDate;
   final String? paymentMethod;
+  final String? professionalPhotoUrl;
 
   const BookingConfirmationPage({
     super.key,
@@ -28,6 +30,7 @@ class BookingConfirmationPage extends StatefulWidget {
     this.consultationFee,
     this.selectedDate,
     this.paymentMethod,
+    this.professionalPhotoUrl,
   });
 
   @override
@@ -345,39 +348,10 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
             ),
             child: Row(
               children: [
-                Stack(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainer,
-                        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                      ),
-                      child: Icon(
-                        Icons.person,
-                        color: AppColors.outline,
-                        size: spacing.AppSpacing.iconLg,
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: AppColors.tertiaryContainer,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.check,
-                          color: AppColors.onTertiaryContainer,
-                          size: 9,
-                        ),
-                      ),
-                    ),
-                  ],
+                DoctorProfileImage(
+                  photoUrl: widget.professionalPhotoUrl,
+                  size: 48,
+                  showVerifiedBadge: true,
                 ),
                 const SizedBox(width: spacing.AppSpacing.gutterMd),
                 Expanded(

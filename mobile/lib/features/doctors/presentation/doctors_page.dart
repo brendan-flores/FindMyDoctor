@@ -4,6 +4,7 @@ import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
+import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/models/doctor.dart';
 import '../../../core/services/doctor_service.dart';
 
@@ -1162,18 +1163,10 @@ class _DoctorsPageState extends State<DoctorsPage> {
           // Header with avatar and info
           Row(
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                ),
-                child: Icon(
-                  Icons.person,
-                  color: AppColors.outline,
-                  size: spacing.AppSpacing.iconXl,
-                ),
+              DoctorProfileImage(
+                photoUrl: doctor.professionalPhotoUrl,
+                size: 64,
+                showVerifiedBadge: doctor.isApproved,
               ),
               const SizedBox(width: spacing.AppSpacing.gutterMd),
               Expanded(
@@ -1381,6 +1374,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                         'specialty': doctor.specialty,
                         'clinic': doctor.practiceName,
                         'consultationFee': doctor.consultationFee.toString(),
+                        'professionalPhotoUrl': doctor.professionalPhotoUrl,
                       },
                     );
                   },
