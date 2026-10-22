@@ -294,6 +294,12 @@ export const secretaryApi = {
   deleteCharge: async (paymentId: string, chargeId: string): Promise<{ success: boolean; error?: string }> => {
     return apiClient.delete<void>(`/payments/${paymentId}/charges/${chargeId}`);
   },
+
+  // Get secretary dashboard summary
+  getDashboard: async (date?: string): Promise<{ success: boolean; data?: SecretaryDashboard; error?: string }> => {
+    const queryParams = date ? `?date=${encodeURIComponent(date)}` : '';
+    return apiClient.get<SecretaryDashboard>(`/secretaries/me/dashboard${queryParams}`);
+  },
 };
 
 // Payment charge (from payment_charges table)
@@ -436,3 +442,43 @@ export const conversationApi = {
     return apiClient.get<AppointmentSummary>(`/conversations/patient/${patientId}/appointment-summary`);
   },
 };
+
+export interface SecretaryDashboard {
+  date: string;
+  queueCounts: {
+    waiting: number;
+    inConsultation: number;
+    done: number;
+  };
+  capacity: {
+    remaining: number;
+    total: number;
+  };
+  pendingVerificationPayments: number;
+  unreadMessages: number;
+  todayQueue: Array<{
+    queueNumber: number;
+    patientName: string;
+    reason: string | null;
+    status: string;
+    appointmentId: string | null;
+    registrationSource: 'ONLINE' | 'WALK_IN';
+  }>;
+  paymentsNeedingAction: Array<{
+    id: string;
+    appointmentId: string;
+    status: string;
+    paymentMethod: string;
+    totalAmount: number;
+    patientName: string;
+    appointmentDate: string;
+    appointmentStatus: string;
+  }>;
+  recentConversations: Array<{
+    id: string | null;
+    patientId: string;
+    patientName: string;
+    unreadCount: number;
+    updatedAt: string | null;
+  }>;
+}
