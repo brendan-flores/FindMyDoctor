@@ -20,7 +20,7 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
 
   // Load profile and schedules for setup progress
   const refreshProfile = () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('doctor_token') || localStorage.getItem('token');
     if (!token) return;
 
     apiClient.setToken(token);
@@ -82,6 +82,8 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
       console.error('Logout error:', err);
     } finally {
       apiClient.clearToken();
+      localStorage.removeItem('doctor_refreshToken');
+      localStorage.removeItem('doctor_user');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       router.push('/doctor-login');

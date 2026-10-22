@@ -17,7 +17,7 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check authentication - prefer HttpOnly cookies, fall back to localStorage
+    // Check authentication - prefer role-scoped HttpOnly cookies, fall back to localStorage
     const getCookie = (name: string): string | null => {
       const value = `; ${document.cookie}`;
       const parts = value.split(`; ${name}=`);
@@ -27,9 +27,10 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
       return null;
     };
 
-    const cookieToken = getCookie('accessToken');
-    const token = cookieToken || localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
+    // Try role-scoped cookie first, then fallback to global cookie
+    const cookieToken = getCookie('doctor_accessToken') || getCookie('accessToken');
+    const token = cookieToken || localStorage.getItem('doctor_token') || localStorage.getItem('token');
+    const userStr = localStorage.getItem('doctor_user') || localStorage.getItem('user');
 
     let shouldRedirect = false;
     let redirectPath = '';
@@ -43,6 +44,8 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
       if (user.role !== 'DOCTOR') {
         // Cross-role access denied, redirect to appropriate login
         apiClient.clearToken();
+        localStorage.removeItem('doctor_refreshToken');
+        localStorage.removeItem('doctor_user');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         shouldRedirect = true;

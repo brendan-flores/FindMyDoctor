@@ -27,10 +27,33 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     }
 
     if (!token) {
-      // Fall back to cookie
-      const cookieToken = req.cookies?.accessToken;
+      // Fall back to role-scoped cookies based on request path
+      const path = req.path;
+      let rolePrefix = '';
+
+      if (path.startsWith('/doctor')) {
+        rolePrefix = 'doctor';
+      } else if (path.startsWith('/secretary')) {
+        rolePrefix = 'secretary';
+      } else if (path.startsWith('/admin')) {
+        rolePrefix = 'admin';
+      } else if (path.startsWith('/patient')) {
+        rolePrefix = 'patient';
+      }
+
+      // Try role-scoped cookie first
+      const cookieName = rolePrefix ? `${rolePrefix}_accessToken` : 'accessToken';
+      const cookieToken = req.cookies?.[cookieName];
       if (cookieToken && cookieToken !== 'undefined' && cookieToken !== 'null') {
         token = cookieToken;
+      }
+
+      // Fallback to global cookie
+      if (!token) {
+        const globalCookieToken = req.cookies?.accessToken;
+        if (globalCookieToken && globalCookieToken !== 'undefined' && globalCookieToken !== 'null') {
+          token = globalCookieToken;
+        }
       }
     }
 

@@ -127,20 +127,37 @@ router.post('/login', async (req: Request, res: Response) => {
     // Otherwise, normal login - set HttpOnly cookies
     // Facebook-style: Always use persistent cookies regardless of Remember Me
     const isProduction = process.env.NODE_ENV === 'production';
+
+    // Map role to cookie prefix
+    // Use root path for cookies so they're accessible on all pages including login pages
+    const roleToPrefix: Record<string, string> = {
+      'DOCTOR': 'doctor',
+      'SECRETARY': 'secretary',
+      'ADMIN': 'admin',
+      'PATIENT': 'patient',
+    };
+
+    const rolePrefix = roleToPrefix[expectedRole] || '';
+
     const cookieOptions = {
       httpOnly: isProduction, // Only HttpOnly in production
       secure: isProduction,
       sameSite: 'lax' as const,
-      path: '/',
+      path: '/', // Use root path so cookies are accessible on all pages including login pages
     };
 
     // Always use 7-day access token and 30-day refresh token (Facebook-style)
-    res.cookie('accessToken', result.accessToken, {
+    // Use role-scoped cookie names to prevent cross-role session collision
+    const accessTokenCookieName = rolePrefix ? `${rolePrefix}_accessToken` : 'accessToken';
+    const refreshTokenCookieName = rolePrefix ? `${rolePrefix}_refreshToken` : 'refreshToken';
+    const trustedBrowserCookieName = rolePrefix ? `${rolePrefix}_trustedBrowser` : 'trustedBrowser';
+
+    res.cookie(accessTokenCookieName, result.accessToken, {
       ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.cookie('refreshToken', result.refreshToken, {
+    res.cookie(refreshTokenCookieName, result.refreshToken, {
       ...cookieOptions,
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
@@ -151,8 +168,8 @@ router.post('/login', async (req: Request, res: Response) => {
       const { registerTrustedBrowser } = await import('../modules/auth/authService');
       const userAgent = req.headers['user-agent'] || 'unknown';
       const trustedBrowserToken = await registerTrustedBrowser(result.user.id, userAgent);
-      
-      res.cookie('trustedBrowser', trustedBrowserToken, {
+
+      res.cookie(trustedBrowserCookieName, trustedBrowserToken, {
         ...cookieOptions,
         maxAge: 30 * 24 * 60 * 60 * 1000,
       });
@@ -160,10 +177,10 @@ router.post('/login', async (req: Request, res: Response) => {
       // If Remember Me is unchecked and browser was previously trusted, revoke trust
       const { revokeTrustedBrowser } = await import('../modules/auth/authService');
       await revokeTrustedBrowser(result.user.id, trustedBrowserToken);
-      res.clearCookie('trustedBrowser', { path: '/' });
+      res.clearCookie(trustedBrowserCookieName, { path: '/' });
     } else if (result.isTrustedBrowser && trustedBrowserToken) {
       // Re-issue the trusted browser cookie for existing trusted browsers
-      res.cookie('trustedBrowser', trustedBrowserToken, {
+      res.cookie(trustedBrowserCookieName, trustedBrowserToken, {
         ...cookieOptions,
         maxAge: 30 * 24 * 60 * 60 * 1000,
       });
@@ -198,7 +215,6 @@ router.post('/login', async (req: Request, res: Response) => {
 router.post('/verify-login-otp', async (req: Request, res: Response) => {
   try {
     const { challengeId, otp, rememberMe } = req.body;
-    const trustedBrowserToken = req.cookies?.trustedBrowser;
 
     if (!challengeId || !otp) {
       return res.status(400).json(
@@ -212,20 +228,38 @@ router.post('/verify-login-otp', async (req: Request, res: Response) => {
 
     // Set HttpOnly cookies - Facebook-style: Always use persistent cookies regardless of Remember Me
     const isProduction = process.env.NODE_ENV === 'production';
+
+    // Map role to cookie prefix
+    // Use root path for cookies so they're accessible on all pages including login pages
+    const roleToPrefix: Record<string, string> = {
+      'DOCTOR': 'doctor',
+      'SECRETARY': 'secretary',
+      'ADMIN': 'admin',
+      'PATIENT': 'patient',
+    };
+
+    const role = result.user.role;
+    const rolePrefix = roleToPrefix[role] || '';
+
     const cookieOptions = {
       httpOnly: isProduction, // Only HttpOnly in production
       secure: isProduction,
       sameSite: 'lax' as const,
-      path: '/',
+      path: '/', // Use root path so cookies are accessible on all pages including login pages
     };
 
     // Always use 7-day access token and 30-day refresh token (Facebook-style)
-    res.cookie('accessToken', result.accessToken, {
+    // Use role-scoped cookie names to prevent cross-role session collision
+    const accessTokenCookieName = rolePrefix ? `${rolePrefix}_accessToken` : 'accessToken';
+    const refreshTokenCookieName = rolePrefix ? `${rolePrefix}_refreshToken` : 'refreshToken';
+    const trustedBrowserCookieName = rolePrefix ? `${rolePrefix}_trustedBrowser` : 'trustedBrowser';
+
+    res.cookie(accessTokenCookieName, result.accessToken, {
       ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.cookie('refreshToken', result.refreshToken, {
+    res.cookie(refreshTokenCookieName, result.refreshToken, {
       ...cookieOptions,
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
@@ -233,18 +267,16 @@ router.post('/verify-login-otp', async (req: Request, res: Response) => {
     // Remember Me now only controls trusted-browser registration (OTP skip on trusted devices)
     // If Remember Me is checked, register this browser as trusted
     if (rememberMe && result.trustedBrowserToken) {
-      res.cookie('trustedBrowser', result.trustedBrowserToken, {
+      res.cookie(trustedBrowserCookieName, result.trustedBrowserToken, {
         ...cookieOptions,
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       });
-    } else if (trustedBrowserToken && !rememberMe) {
-      // If Remember Me is unchecked and browser was previously trusted, revoke trust
-      const { revokeTrustedBrowser } = await import('../modules/auth/authService');
-      await revokeTrustedBrowser(result.user.id, trustedBrowserToken);
-      res.clearCookie('trustedBrowser', { path: '/' });
+    } else if (!rememberMe) {
+      // If Remember Me is unchecked, clear the trusted browser cookie
+      res.clearCookie(trustedBrowserCookieName, { path: '/' });
     } else if (result.isTrustedBrowser && result.trustedBrowserToken) {
       // Re-issue the trusted browser cookie for existing trusted browsers
-      res.cookie('trustedBrowser', result.trustedBrowserToken, {
+      res.cookie(trustedBrowserCookieName, result.trustedBrowserToken, {
         ...cookieOptions,
         maxAge: 30 * 24 * 60 * 60 * 1000,
       });
@@ -372,21 +404,91 @@ router.post('/resend-login-otp', async (req: Request, res: Response) => {
 });
 
 // Refresh token
-router.post('/refresh', (req: Request, res: Response) => {
-  // For MVP, we'll just require re-login
-  // In production, implement proper refresh token validation
-  res.status(501).json(
-    error(ErrorCodes.SERVER_ERROR, 'Token refresh not implemented')
-  );
+router.post('/refresh', async (req: Request, res: Response) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json(
+        error(ErrorCodes.VALIDATION_ERROR, 'Refresh token is required')
+      );
+    }
+
+    // Verify refresh token and generate new tokens
+    const { refreshAccessToken } = await import('../modules/auth/authService');
+    const result = await refreshAccessToken(refreshToken);
+
+    // Set role-scoped cookies based on user role
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    // Map role to cookie prefix
+    // Use root path for cookies so they're accessible on all pages including login pages
+    const roleToPrefix: Record<string, string> = {
+      'DOCTOR': 'doctor',
+      'SECRETARY': 'secretary',
+      'ADMIN': 'admin',
+      'PATIENT': 'patient',
+    };
+
+    const role = result.user.role;
+    const rolePrefix = roleToPrefix[role] || '';
+
+    const cookieOptions = {
+      httpOnly: isProduction,
+      secure: isProduction,
+      sameSite: 'lax' as const,
+      path: '/', // Use root path so cookies are accessible on all pages including login pages
+    };
+
+    const accessTokenCookieName = rolePrefix ? `${rolePrefix}_accessToken` : 'accessToken';
+    const refreshTokenCookieName = rolePrefix ? `${rolePrefix}_refreshToken` : 'refreshToken';
+
+    res.cookie(accessTokenCookieName, result.accessToken, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.cookie(refreshTokenCookieName, result.refreshToken, {
+      ...cookieOptions,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    res.json(
+      success({
+        user: result.user,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      }, 'Token refreshed successfully')
+    );
+  } catch (err: any) {
+    const errorCode = err.code || ErrorCodes.SERVER_ERROR;
+    const errorMessage = err.message || 'Token refresh failed';
+
+    if (errorCode === ErrorCodes.INVALID_CREDENTIALS) {
+      return res.status(401).json(error(errorCode, errorMessage));
+    }
+
+    res.status(500).json(error(errorCode, errorMessage));
+  }
 });
 
 // Logout
 router.post('/logout', (req: Request, res: Response) => {
-  // Clear authentication cookies only
-  // Do NOT clear trustedBrowser cookie - trust should persist across logout/login cycles (like Facebook)
+  // Clear all role-scoped authentication cookies
+  // Do NOT clear trustedBrowser cookies - trust should persist across logout/login cycles (like Facebook)
   // Users stay logged in on trusted devices even after logging out
+  const rolePrefixes = ['doctor', 'secretary', 'admin', 'patient'];
+
+  // Clear global cookies
   res.clearCookie('accessToken');
   res.clearCookie('refreshToken');
+
+  // Clear role-scoped cookies from root path
+  rolePrefixes.forEach(prefix => {
+    res.clearCookie(`${prefix}_accessToken`, { path: '/' });
+    res.clearCookie(`${prefix}_refreshToken`, { path: '/' });
+  });
+
   res.json(
     success(null, 'Logout successful')
   );
@@ -403,7 +505,13 @@ router.post('/revoke-trusted-browser', authenticate, async (req: AuthRequest, re
       await revokeTrustedBrowser(userId, trustedBrowserToken);
     }
 
-    res.clearCookie('trustedBrowser');
+    // Clear all role-scoped trusted browser cookies
+    const rolePrefixes = ['doctor', 'secretary', 'admin', 'patient'];
+    rolePrefixes.forEach(prefix => {
+      res.clearCookie(`${prefix}_trustedBrowser`, { path: '/' });
+    });
+    res.clearCookie('trustedBrowser', { path: '/' });
+
     res.json(
       success(null, 'Trusted browser revoked')
     );

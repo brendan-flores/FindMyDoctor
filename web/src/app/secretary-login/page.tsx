@@ -32,8 +32,12 @@ export default function SecretaryLogin() {
     setError('');
 
     try {
-      // Get trusted browser token from cookies
+      // Get role-scoped trusted browser token from cookies
       const trustedBrowserToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('secretary_trustedBrowser='))
+        ?.split('=')[1] ||
+        document.cookie
         .split('; ')
         .find(row => row.startsWith('trustedBrowser='))
         ?.split('=')[1];
@@ -58,8 +62,13 @@ export default function SecretaryLogin() {
         // Type guard: this is now AuthResponse (not LoginOtpRequiredResponse)
         const authData = response.data as { user: any; accessToken: string; refreshToken: string };
 
+        // Store tokens in role-scoped localStorage
+        localStorage.setItem('secretary_token', authData.accessToken);
+        localStorage.setItem('secretary_refreshToken', authData.refreshToken);
+        localStorage.setItem('secretary_user', JSON.stringify(authData.user));
+
+        // Also set in apiClient for immediate use
         apiClient.setToken(authData.accessToken, authData.refreshToken);
-        localStorage.setItem('user', JSON.stringify(authData.user));
 
         if (authData.user.role === 'SECRETARY') {
           if (authData.user.mustChangePassword === true) {
@@ -69,8 +78,9 @@ export default function SecretaryLogin() {
           }
         } else {
           setError('Invalid username or password.');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
+          localStorage.removeItem('secretary_token');
+          localStorage.removeItem('secretary_refreshToken');
+          localStorage.removeItem('secretary_user');
           apiClient.clearToken();
         }
       } else {
@@ -85,8 +95,14 @@ export default function SecretaryLogin() {
 
   const handleOtpVerifySuccess = (data: any) => {
     if (data.user.role === 'SECRETARY') {
+      // Store tokens in role-scoped localStorage
+      localStorage.setItem('secretary_token', data.accessToken);
+      localStorage.setItem('secretary_refreshToken', data.refreshToken);
+      localStorage.setItem('secretary_user', JSON.stringify(data.user));
+
+      // Also set in apiClient for immediate use
       apiClient.setToken(data.accessToken, data.refreshToken);
-      localStorage.setItem('user', JSON.stringify(data.user));
+
       if (data.user.mustChangePassword === true) {
         router.push('/secretary/change-password');
       } else {
@@ -94,8 +110,9 @@ export default function SecretaryLogin() {
       }
     } else {
       setError('Invalid username or password.');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      localStorage.removeItem('secretary_token');
+      localStorage.removeItem('secretary_refreshToken');
+      localStorage.removeItem('secretary_user');
       apiClient.clearToken();
     }
   };

@@ -40,8 +40,11 @@ export default function AdminSidebar({ userName = 'Eleanor Vance', userRole = 'S
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await apiClient.post('/auth/logout', {});
     apiClient.clearToken();
+    localStorage.removeItem('admin_refreshToken');
+    localStorage.removeItem('admin_user');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     router.push('/admin/login');

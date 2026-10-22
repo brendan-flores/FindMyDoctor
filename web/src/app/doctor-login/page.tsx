@@ -33,8 +33,12 @@ export default function DoctorLogin() {
     setError('');
 
     try {
-      // Get trusted browser token from cookies
+      // Get role-scoped trusted browser token from cookies
       const trustedBrowserToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('doctor_trustedBrowser='))
+        ?.split('=')[1] ||
+        document.cookie
         .split('; ')
         .find(row => row.startsWith('trustedBrowser='))
         ?.split('=')[1];
@@ -59,15 +63,21 @@ export default function DoctorLogin() {
         // Type guard: this is now AuthResponse (not LoginOtpRequiredResponse)
         const authData = response.data as { user: any; accessToken: string; refreshToken: string };
 
+        // Store tokens in role-scoped localStorage
+        localStorage.setItem('doctor_token', authData.accessToken);
+        localStorage.setItem('doctor_refreshToken', authData.refreshToken);
+        localStorage.setItem('doctor_user', JSON.stringify(authData.user));
+
+        // Also set in apiClient for immediate use
         apiClient.setToken(authData.accessToken, authData.refreshToken);
-        localStorage.setItem('user', JSON.stringify(authData.user));
 
         if (authData.user.role === 'DOCTOR') {
           await routeBasedOnApprovalStatus();
         } else {
           setError('Invalid username or password.');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
+          localStorage.removeItem('doctor_token');
+          localStorage.removeItem('doctor_refreshToken');
+          localStorage.removeItem('doctor_user');
           apiClient.clearToken();
         }
       } else {
@@ -82,15 +92,20 @@ export default function DoctorLogin() {
 
   const handleOtpVerifySuccess = async (data: any) => {
     if (data.user.role === 'DOCTOR') {
+      // Store tokens in role-scoped localStorage
+      localStorage.setItem('doctor_token', data.accessToken);
+      localStorage.setItem('doctor_refreshToken', data.refreshToken);
+      localStorage.setItem('doctor_user', JSON.stringify(data.user));
+
+      // Also set in apiClient for immediate use
       apiClient.setToken(data.accessToken, data.refreshToken);
-      // Store user data in localStorage
-      localStorage.setItem('user', JSON.stringify(data.user));
-      
+
       await routeBasedOnApprovalStatus();
     } else {
       setError('Invalid username or password.');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      localStorage.removeItem('doctor_token');
+      localStorage.removeItem('doctor_refreshToken');
+      localStorage.removeItem('doctor_user');
       apiClient.clearToken();
     }
   };
@@ -124,30 +139,30 @@ export default function DoctorLogin() {
           // PENDING should not normally reach here since backend blocks login
           // Handle defensively
           setError('Your account is awaiting administrator approval');
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
+          localStorage.removeItem('doctor_token');
+          localStorage.removeItem('doctor_refreshToken');
+          localStorage.removeItem('doctor_user');
           apiClient.clearToken();
         } else {
           setError('Invalid account status');
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
+          localStorage.removeItem('doctor_token');
+          localStorage.removeItem('doctor_refreshToken');
+          localStorage.removeItem('doctor_user');
           apiClient.clearToken();
         }
       } else {
         setError('Failed to fetch profile');
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
+        localStorage.removeItem('doctor_token');
+        localStorage.removeItem('doctor_refreshToken');
+        localStorage.removeItem('doctor_user');
         apiClient.clearToken();
       }
     } catch (err) {
       console.error('Error fetching profile:', err);
       setError('An error occurred while fetching your profile');
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      localStorage.removeItem('doctor_token');
+      localStorage.removeItem('doctor_refreshToken');
+      localStorage.removeItem('doctor_user');
       apiClient.clearToken();
     }
   };

@@ -69,9 +69,12 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
     router.push('/secretary/change-password');
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     setIsDropdownOpen(false);
+    await apiClient.post('/auth/logout', {});
     apiClient.clearToken();
+    localStorage.removeItem('secretary_refreshToken');
+    localStorage.removeItem('secretary_user');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     router.push('/secretary-login');

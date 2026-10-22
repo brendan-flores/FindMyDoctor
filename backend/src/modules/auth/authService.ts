@@ -472,6 +472,42 @@ export function generateRefreshToken(user: any, rememberMe: boolean = false) {
   );
 }
 
+export async function refreshAccessToken(refreshToken: string) {
+  try {
+    // Verify the refresh token
+    const decoded = verifyToken(refreshToken) as any;
+
+    // Get the user from database
+    const userResult = await query(
+      `SELECT * FROM users WHERE id = $1 AND is_active = true`,
+      [decoded.id]
+    );
+
+    if (userResult.rows.length === 0) {
+      throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid refresh token' };
+    }
+
+    const user = userResult.rows[0];
+
+    // Generate new access and refresh tokens
+    const newAccessToken = generateAccessToken(user);
+    const newRefreshToken = generateRefreshToken(user);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        mustChangePassword: user.must_change_password,
+      },
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    };
+  } catch (error) {
+    throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid or expired refresh token' };
+  }
+}
+
 export function verifyToken(token: string) {
   return jwt.verify(token, config.jwt.secret);
 }

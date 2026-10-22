@@ -37,9 +37,13 @@ export default function AdminLogin() {
         // Type guard: this is now AuthResponse (not LoginOtpRequiredResponse)
         const authData = response.data as { user: any; accessToken: string; refreshToken: string };
 
-        // Set token in API client (automatically stores in localStorage)
+        // Store tokens in role-scoped localStorage
+        localStorage.setItem('admin_token', authData.accessToken);
+        localStorage.setItem('admin_refreshToken', authData.refreshToken);
+        localStorage.setItem('admin_user', JSON.stringify(authData.user));
+
+        // Also set in apiClient for immediate use
         apiClient.setToken(authData.accessToken, authData.refreshToken);
-        localStorage.setItem('user', JSON.stringify(authData.user));
 
         // Verify backend-returned role is ADMIN or SUPERADMIN
         if (authData.user.role === 'ADMIN' || authData.user.role === 'SUPERADMIN') {
@@ -47,8 +51,9 @@ export default function AdminLogin() {
         } else {
           setError('Invalid username or password.');
           // Clear credentials on role mismatch
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
+          localStorage.removeItem('admin_token');
+          localStorage.removeItem('admin_refreshToken');
+          localStorage.removeItem('admin_user');
           apiClient.clearToken();
         }
       } else {
@@ -64,14 +69,21 @@ export default function AdminLogin() {
   const handleOtpVerifySuccess = (data: any) => {
     // Verify backend-returned role is ADMIN or SUPERADMIN
     if (data.user.role === 'ADMIN' || data.user.role === 'SUPERADMIN') {
+      // Store tokens in role-scoped localStorage
+      localStorage.setItem('admin_token', data.accessToken);
+      localStorage.setItem('admin_refreshToken', data.refreshToken);
+      localStorage.setItem('admin_user', JSON.stringify(data.user));
+
+      // Also set in apiClient for immediate use
       apiClient.setToken(data.accessToken, data.refreshToken);
-      localStorage.setItem('user', JSON.stringify(data.user));
+
       router.push('/admin/dashboard');
     } else {
       setError('Invalid username or password.');
       // Clear credentials on role mismatch
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_refreshToken');
+      localStorage.removeItem('admin_user');
       apiClient.clearToken();
     }
   };

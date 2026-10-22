@@ -47,12 +47,28 @@ class ApiClient {
   private refreshToken: string | null = null;
   private isRefreshing: boolean = false;
   private refreshSubscribers: Array<(token: string) => void> = [];
+  private role: string | null = null;
 
   constructor() {
-    // Load tokens from localStorage on initialization
+    // Detect role from current path and load role-scoped tokens from localStorage
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('token');
-      const storedRefresh = localStorage.getItem('refreshToken');
+      const path = window.location.pathname;
+      let rolePrefix = '';
+
+      if (path.startsWith('/doctor') || path.startsWith('/doctor-login')) {
+        rolePrefix = 'doctor';
+      } else if (path.startsWith('/secretary') || path.startsWith('/secretary-login')) {
+        rolePrefix = 'secretary';
+      } else if (path.startsWith('/admin') || path.startsWith('/admin/login')) {
+        rolePrefix = 'admin';
+      } else if (path.startsWith('/patient')) {
+        rolePrefix = 'patient';
+      }
+
+      this.role = rolePrefix || null;
+
+      const stored = localStorage.getItem(rolePrefix ? `${rolePrefix}_token` : 'token');
+      const storedRefresh = localStorage.getItem(rolePrefix ? `${rolePrefix}_refreshToken` : 'refreshToken');
       if (stored && stored !== 'undefined' && stored !== 'null') {
         this.token = stored;
       }
@@ -69,10 +85,28 @@ class ApiClient {
     }
     this.token = token;
     if (typeof window !== 'undefined') {
-      localStorage.setItem('token', token);
+      // Re-detect role from current path to ensure correct scoping
+      const path = window.location.pathname;
+      let rolePrefix = '';
+
+      if (path.startsWith('/doctor') || path.startsWith('/doctor-login')) {
+        rolePrefix = 'doctor';
+      } else if (path.startsWith('/secretary') || path.startsWith('/secretary-login')) {
+        rolePrefix = 'secretary';
+      } else if (path.startsWith('/admin') || path.startsWith('/admin/login')) {
+        rolePrefix = 'admin';
+      } else if (path.startsWith('/patient')) {
+        rolePrefix = 'patient';
+      }
+
+      this.role = rolePrefix || null;
+
+      const tokenKey = this.role ? `${this.role}_token` : 'token';
+      const refreshKey = this.role ? `${this.role}_refreshToken` : 'refreshToken';
+      localStorage.setItem(tokenKey, token);
       if (refreshToken) {
         this.refreshToken = refreshToken;
-        localStorage.setItem('refreshToken', refreshToken);
+        localStorage.setItem(refreshKey, refreshToken);
       }
     }
   }
@@ -81,9 +115,12 @@ class ApiClient {
     this.token = null;
     this.refreshToken = null;
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      const tokenKey = this.role ? `${this.role}_token` : 'token';
+      const refreshKey = this.role ? `${this.role}_refreshToken` : 'refreshToken';
+      const userKey = this.role ? `${this.role}_user` : 'user';
+      localStorage.removeItem(tokenKey);
+      localStorage.removeItem(refreshKey);
+      localStorage.removeItem(userKey);
     }
   }
 
@@ -162,14 +199,22 @@ class ApiClient {
 
   private getCookie(name: string): string | null {
     if (typeof window === 'undefined') return null;
-    
+
+    // First try role-scoped cookie name
+    const roleName = this.role ? `${this.role}_${name}` : name;
     const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    
+    const parts = value.split(`; ${roleName}=`);
+
     if (parts.length === 2) {
       return parts.pop()?.split(';').shift() || null;
     }
-    
+
+    // Fallback to non-scoped cookie name
+    const parts2 = value.split(`; ${name}=`);
+    if (parts2.length === 2) {
+      return parts2.pop()?.split(';').shift() || null;
+    }
+
     return null;
   }
 
