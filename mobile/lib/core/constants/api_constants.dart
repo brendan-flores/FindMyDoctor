@@ -61,6 +61,7 @@ class ApiConstants {
   
   // Payments endpoints
   static const String payments = '/payments';
+  static const String paymentsById = '/payments';
   static const String paymentReceipt = '/receipt';
   static const String paymentVerify = '/verify';
   static const String paymentReject = '/reject';

@@ -674,20 +674,6 @@ class ApiService {
   }
 
   // ===========================
-  // NOTIFICATIONS METHODS
-  // ===========================
-
-  Future<Map<String, dynamic>> getNotifications() async {
-    return await get(ApiConstants.notifications);
-  }
-
-  Future<Map<String, dynamic>> markNotificationRead(String id) async {
-    return await patch(
-      '${ApiConstants.notifications}/$id${ApiConstants.notificationRead}',
-    );
-  }
-
-  // ===========================
   // PUSH DEVICE TOKEN METHODS
   // ===========================
 
@@ -717,11 +703,34 @@ class ApiService {
   }
 
   // ===========================
+  // NOTIFICATIONS METHODS
+  // ===========================
+
+  Future<Map<String, dynamic>> getNotifications() async {
+    return await get(ApiConstants.notifications, requireAuth: true);
+  }
+
+  Future<Map<String, dynamic>> getUnreadNotificationCount() async {
+    return await get('${ApiConstants.notifications}/unread-count', requireAuth: true);
+  }
+
+  Future<Map<String, dynamic>> markNotificationRead(String notificationId) async {
+    return await patch(
+      '${ApiConstants.notifications}/$notificationId${ApiConstants.notificationRead}',
+      requireAuth: true,
+    );
+  }
+
+  // ===========================
   // PAYMENTS METHODS
   // ===========================
 
   Future<Map<String, dynamic>> getPayment(String appointmentId) async {
     return await get('${ApiConstants.payments}/$appointmentId', requireAuth: true);
+  }
+
+  Future<Map<String, dynamic>> getPaymentById(String paymentId) async {
+    return await get('${ApiConstants.paymentsById}/$paymentId', requireAuth: true);
   }
 
   Future<Map<String, dynamic>> uploadPaymentReceipt({
