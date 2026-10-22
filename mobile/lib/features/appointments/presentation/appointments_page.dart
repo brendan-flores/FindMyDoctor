@@ -6,6 +6,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/utils/json_parsers.dart';
 import 'appointment_detail_page.dart';
 
 class AppointmentsPage extends StatefulWidget {
@@ -454,10 +455,18 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     final doctorLastName = appointment['doctor_last_name'] ?? '';
     final specialty = appointment['specialty'] ?? '';
     final practiceName = appointment['practice_name'] ?? 'Private Practice';
-    final appointmentDate = DateTime.parse(appointment['appointment_date']);
-    final queueNumber = appointment['queue_number'];
+    final appointmentDateStr = parseString(appointment['appointment_date']);
+    final appointmentDate = appointmentDateStr != null
+        ? DateTime.tryParse(appointmentDateStr)
+        : null;
+    final queueNumber = parseInt(appointment['queue_number']);
     final status = appointment['status'];
     final appointmentId = appointment['id']?.toString() ?? '';
+    // consultation_fee is a PostgreSQL DECIMAL column, so the API delivers it
+    // as a JSON string (e.g. "500.00") - parse it instead of casting.
+    final consultationFee = parseNum(appointment['consultation_fee']);
+    final paymentStatus = parseString(appointment['payment_status']);
+    final paymentMethod = parseString(appointment['payment_method']);
 
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
@@ -627,11 +636,15 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          DateFormat('EEEE, MMM d, yyyy').format(appointmentDate),
+                          appointmentDate != null
+                              ? DateFormat('EEEE, MMM d, yyyy').format(appointmentDate)
+                              : 'Date not available',
                           style: AppTextStyles.bodyMdMedium,
                         ),
                         Text(
-                          DateFormat('hh:mm a').format(appointmentDate),
+                          appointmentDate != null
+                              ? DateFormat('hh:mm a').format(appointmentDate)
+                              : 'Time not available',
                           style: AppTextStyles.labelSm.copyWith(
                             color: AppColors.secondary,
                           ),
@@ -651,9 +664,71 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                       ),
                     ),
                     Text(
-                      '₱1,000',
+                      consultationFee != null
+                          ? '₱${consultationFee.toStringAsFixed(0)}'
+                          : '₱---',
                       style: AppTextStyles.headlineSm,
                     ),
+                    if (paymentStatus != null) ...[
+                      const SizedBox(height: spacing.AppSpacing.gutterXs),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            paymentStatus == 'PAID'
+                                ? Icons.check_circle
+                                : paymentStatus == 'PENDING_VERIFICATION'
+                                    ? Icons.pending
+                                    : paymentStatus == 'REJECTED'
+                                        ? Icons.cancel
+                                        : Icons.schedule,
+                            size: 12,
+                            color: paymentStatus == 'PAID'
+                                ? AppColors.brandAccentBlue
+                                : paymentStatus == 'PENDING_VERIFICATION'
+                                    ? AppColors.urgentAmber
+                                    : paymentStatus == 'REJECTED'
+                                        ? AppColors.error
+                                        : AppColors.secondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatPaymentStatus(paymentStatus),
+                            style: AppTextStyles.labelSm.copyWith(
+                              color: paymentStatus == 'PAID'
+                                  ? AppColors.brandAccentBlue
+                                  : paymentStatus == 'PENDING_VERIFICATION'
+                                      ? AppColors.urgentAmber
+                                      : paymentStatus == 'REJECTED'
+                                          ? AppColors.error
+                                          : AppColors.secondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (paymentMethod != null) ...[
+                      const SizedBox(height: spacing.AppSpacing.gutterXs),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            paymentMethod.toUpperCase() == 'GCASH'
+                                ? Icons.account_balance_wallet
+                                : Icons.local_atm,
+                            size: 12,
+                            color: AppColors.secondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            paymentMethod.toUpperCase(),
+                            style: AppTextStyles.labelSm.copyWith(
+                              color: AppColors.secondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -734,5 +809,21 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
         ],
       ),
     );
+  }
+
+  String _formatPaymentStatus(String? status) {
+    if (status == null) return 'Not Available';
+    switch (status) {
+      case 'UNPAID':
+        return 'Unpaid';
+      case 'PENDING_VERIFICATION':
+        return 'Pending';
+      case 'PAID':
+        return 'Paid';
+      case 'REJECTED':
+        return 'Rejected';
+      default:
+        return status;
+    }
   }
 }

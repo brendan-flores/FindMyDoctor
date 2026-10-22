@@ -6,6 +6,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/utils/json_parsers.dart';
 
 class AppointmentDetailPage extends StatefulWidget {
   final String appointmentId;
@@ -257,20 +258,22 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
   Widget _buildContentView() {
     final appointment = _appointment!;
-    final status = appointment['status'] as String? ?? 'SCHEDULED';
+    final status = parseString(appointment['status']) ?? 'SCHEDULED';
     final doctorFirstName = appointment['doctor_first_name'] ?? '';
     final doctorLastName = appointment['doctor_last_name'] ?? '';
     final specialty = appointment['specialty'] ?? '';
     final practiceName = appointment['practice_name'] ?? 'Private Practice';
     final practiceAddress = appointment['practice_address'] ?? '';
-    final appointmentDate = appointment['appointment_date'] != null
-        ? DateTime.parse(appointment['appointment_date'])
+    final appointmentDateStr = parseString(appointment['appointment_date']);
+    final appointmentDate = appointmentDateStr != null
+        ? DateTime.tryParse(appointmentDateStr)
         : null;
-    final endTime = appointment['end_time'];
-    final queueNumber = appointment['queue_number'];
-    final queueStatus = appointment['queue_status'];
-    final registrationSource = appointment['registration_source'] ?? 'ONLINE';
-    final notes = appointment['notes'];
+    final endTime = parseString(appointment['end_time']);
+    final queueNumber = parseInt(appointment['queue_number']);
+    final queueStatus = parseString(appointment['queue_status']);
+    final registrationSource =
+        parseString(appointment['registration_source']) ?? 'ONLINE';
+    final notes = parseString(appointment['notes']);
     final statusColor = _getStatusColor(status);
     final statusIcon = _getStatusIcon(status);
 
@@ -289,6 +292,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             const SizedBox(height: spacing.AppSpacing.gutterLg),
             if (queueNumber != null)
               _buildQueueStatus(queueNumber, queueStatus),
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
+            _buildPaymentInfo(),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
             if (status == 'SCHEDULED')
               _buildActions(),
@@ -634,13 +639,163 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     );
   }
 
+  Widget _buildPaymentInfo() {
+    final paymentMethod = parseString(_appointment?['payment_method']);
+    final paymentStatus = parseString(_appointment?['payment_status']);
+    // consultation_fee is a PostgreSQL DECIMAL column, so the API delivers it
+    // as a JSON string (e.g. "500.00") - parse it instead of casting.
+    final consultationFee = parseNum(_appointment?['consultation_fee']);
+
+    if (paymentMethod == null) {
+      return const SizedBox.shrink();
+    }
+
+    final statusColor = paymentStatus == 'PAID'
+        ? AppColors.brandAccentBlue
+        : paymentStatus == 'PENDING_VERIFICATION'
+            ? AppColors.urgentAmber
+            : paymentStatus == 'REJECTED'
+                ? AppColors.error
+                : AppColors.secondary;
+
+    final statusIcon = paymentStatus == 'PAID'
+        ? Icons.check_circle
+        : paymentStatus == 'PENDING_VERIFICATION'
+            ? Icons.pending
+            : paymentStatus == 'REJECTED'
+                ? Icons.cancel
+                : Icons.schedule;
+
+    final formattedConsultationFee = consultationFee != null
+        ? '₱${consultationFee.toStringAsFixed(2)}'
+        : 'N/A';
+
+    return AppCard(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Payment Information',
+            style: AppTextStyles.labelMd.copyWith(
+              color: AppColors.secondary,
+            ),
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          _buildDetailRow(
+            Icons.payment,
+            'Payment Method',
+            paymentMethod.toUpperCase(),
+          ),
+          _buildDetailRow(
+            Icons.monetization_on,
+            'Consultation Fee',
+            formattedConsultationFee,
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+                ),
+                child: Icon(
+                  statusIcon,
+                  color: statusColor,
+                  size: spacing.AppSpacing.iconLg,
+                ),
+              ),
+              const SizedBox(width: spacing.AppSpacing.gutterMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Payment Status',
+                      style: AppTextStyles.labelSm.copyWith(
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                    Text(
+                      _formatPaymentStatus(paymentStatus),
+                      style: AppTextStyles.bodyMdMedium.copyWith(
+                        color: statusColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatPaymentStatus(String? status) {
+    if (status == null) return 'Not Available';
+    switch (status) {
+      case 'UNPAID':
+        return 'Unpaid';
+      case 'PENDING_VERIFICATION':
+        return 'Pending Verification';
+      case 'PAID':
+        return 'Paid';
+      case 'REJECTED':
+        return 'Rejected';
+      default:
+        return status;
+    }
+  }
+
   Widget _buildActions() {
-    return PrimaryButton(
-      text: 'Cancel Appointment',
-      onPressed: _isCancelling ? null : _cancelAppointment,
-      isLoading: _isCancelling,
-      backgroundColor: AppColors.error,
-      textColor: AppColors.onError,
+    final paymentMethod = parseString(_appointment?['payment_method']);
+    final paymentStatus = parseString(_appointment?['payment_status']);
+
+    // Show upload button for GCash payments in PENDING_VERIFICATION status
+    final shouldShowUploadButton = paymentMethod?.toUpperCase() == 'GCASH' &&
+        paymentStatus == 'PENDING_VERIFICATION';
+
+    // The payment screen expects the fee as text; normalise the API value
+    // (DECIMAL columns arrive as strings) without changing how it is displayed.
+    final consultationFee = parseNum(_appointment?['consultation_fee']);
+    final appointmentDate = parseString(_appointment?['appointment_date']);
+
+    return Column(
+      children: [
+        if (shouldShowUploadButton)
+          PrimaryButton(
+            text: 'Upload Receipt',
+            onPressed: () async {
+              await Navigator.of(context).pushNamed(
+                '/payment',
+                arguments: {
+                  'appointmentId': widget.appointmentId,
+                  'doctorName': '${_appointment?['doctor_first_name']} ${_appointment?['doctor_last_name']}',
+                  'consultationFee': consultationFee?.toStringAsFixed(2),
+                  'appointmentDate': appointmentDate != null
+                      ? DateTime.tryParse(appointmentDate)
+                      : null,
+                  'doctorId': _appointment?['doctor_id'],
+                },
+              );
+              // Refresh appointment details after returning
+              _fetchAppointmentDetails();
+            },
+            icon: const Icon(Icons.upload, size: 20),
+          ),
+        if (shouldShowUploadButton) const SizedBox(height: spacing.AppSpacing.gutterMd),
+        PrimaryButton(
+          text: 'Cancel Appointment',
+          onPressed: _isCancelling ? null : _cancelAppointment,
+          isLoading: _isCancelling,
+          backgroundColor: AppColors.error,
+          textColor: AppColors.onError,
+        ),
+      ],
     );
   }
 }
