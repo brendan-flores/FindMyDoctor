@@ -99,11 +99,6 @@ export default function DoctorSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 shadow-lg">
-        <h1 className="text-2xl font-bold text-white">Settings</h1>
-      </div>
-
       {/* Toast Notification */}
       {success && <Toast message={success} type="success" onClose={() => setSuccess('')} />}
       {error && <Toast message={error} type="error" onClose={() => setError('')} />}

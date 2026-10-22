@@ -93,12 +93,6 @@ export default function DoctorAppointments() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 shadow-lg">
-        <h1 className="text-2xl font-bold text-white">Appointments</h1>
-        <p className="text-blue-100 mt-1">Manage your patient appointments and consultations</p>
-      </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
