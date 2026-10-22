@@ -593,6 +593,7 @@ class ApiService {
     required String doctorId,
     required String appointmentDate,
     String? reasonForVisit,
+    String? paymentMethod,
   }) async {
     return await post(
       ApiConstants.appointments,
@@ -600,6 +601,7 @@ class ApiService {
         'doctorId': doctorId,
         'appointmentDate': appointmentDate,
         if (reasonForVisit != null) 'reasonForVisit': reasonForVisit,
+        if (paymentMethod != null) 'paymentMethod': paymentMethod,
       },
       requireAuth: true,
     );
@@ -719,7 +721,7 @@ class ApiService {
   // ===========================
 
   Future<Map<String, dynamic>> getPayment(String appointmentId) async {
-    return await get('${ApiConstants.payments}/$appointmentId');
+    return await get('${ApiConstants.payments}/$appointmentId', requireAuth: true);
   }
 
   Future<Map<String, dynamic>> uploadPaymentReceipt({
