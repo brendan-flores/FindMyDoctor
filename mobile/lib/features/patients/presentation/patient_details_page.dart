@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -19,7 +18,6 @@ class PatientDetailsPage extends StatefulWidget {
   final String? consultationFee;
   final DateTime? selectedDate;
   final String? paymentMethod;
-  final File? receiptImage;
 
   const PatientDetailsPage({
     super.key,
@@ -30,7 +28,6 @@ class PatientDetailsPage extends StatefulWidget {
     this.consultationFee,
     this.selectedDate,
     this.paymentMethod,
-    this.receiptImage,
   });
 
   @override
@@ -151,7 +148,6 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
               'consultationFee': widget.consultationFee,
               'selectedDate': widget.selectedDate,
               'paymentMethod': widget.paymentMethod,
-              'receiptImage': widget.receiptImage,
             },
           );
         }

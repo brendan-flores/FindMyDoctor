@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,6 +8,7 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/utils/json_parsers.dart';
 
 class BookingConfirmationPage extends StatefulWidget {
   final String? doctorId;
@@ -18,7 +18,6 @@ class BookingConfirmationPage extends StatefulWidget {
   final String? consultationFee;
   final DateTime? selectedDate;
   final String? paymentMethod;
-  final File? receiptImage;
 
   const BookingConfirmationPage({
     super.key,
@@ -29,7 +28,6 @@ class BookingConfirmationPage extends StatefulWidget {
     this.consultationFee,
     this.selectedDate,
     this.paymentMethod,
-    this.receiptImage,
   });
 
   @override
@@ -66,24 +64,17 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
         doctorId: widget.doctorId!,
         appointmentDate: appointmentDate,
         reasonForVisit: 'Regular consultation',
+        paymentMethod: widget.paymentMethod,
       );
 
       if (response['success'] == true) {
         setState(() {
           _queueNumber = response['data']?['queueNumber']?.toString();
-          final totalPatientsRaw = response['data']?['totalPatients'];
-          _totalPatients = totalPatientsRaw != null
-              ? (totalPatientsRaw is String ? int.tryParse(totalPatientsRaw) : totalPatientsRaw as int?)
-              : null;
+          _totalPatients = parseInt(response['data']?['totalPatients']);
           _appointmentId = response['data']?['appointmentId']?.toString();
           _isSuccess = true;
           _isSubmitting = false;
         });
-
-        // If GCash payment method selected and receipt uploaded, upload the receipt
-        if (widget.paymentMethod == 'GCASH' && widget.receiptImage != null && _appointmentId != null) {
-          await _uploadReceipt();
-        }
       } else {
         setState(() {
           _errorMessage = response['error']?['message'] ?? 'Failed to book appointment';
@@ -98,45 +89,7 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
     }
   }
 
-  Future<void> _uploadReceipt() async {
-    if (widget.receiptImage == null || _appointmentId == null) return;
 
-    try {
-      final response = await _apiService.uploadPaymentReceipt(
-        appointmentId: _appointmentId!,
-        receiptFile: widget.receiptImage!,
-      );
-
-      if (response['success'] == true) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Receipt uploaded successfully'),
-              backgroundColor: AppColors.primary,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response['error']?['message'] ?? 'Failed to upload receipt'),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to upload receipt: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
 
   @override
   void initState() {
@@ -238,6 +191,8 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
         const SizedBox(height: spacing.AppSpacing.gutterLg),
         _buildQueueSlip(),
         const SizedBox(height: spacing.AppSpacing.gutterLg),
+        if (widget.paymentMethod?.toUpperCase() == 'GCASH') _buildUploadReceiptButton(),
+        if (widget.paymentMethod?.toUpperCase() == 'GCASH') const SizedBox(height: spacing.AppSpacing.gutterLg),
         _buildSecretaryChat(),
         const SizedBox(height: spacing.AppSpacing.gutterLg),
         _buildLocationCard(),
@@ -654,6 +609,67 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUploadReceiptButton() {
+    return Container(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      decoration: BoxDecoration(
+        color: AppColors.primaryFixed.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.receipt_long,
+                color: AppColors.primary,
+                size: spacing.AppSpacing.iconMd,
+              ),
+              const SizedBox(width: spacing.AppSpacing.gutterSm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Upload Receipt',
+                      style: AppTextStyles.bodyMdMedium.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    Text(
+                      'Upload your payment receipt for verification',
+                      style: AppTextStyles.labelSm.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          PrimaryButton(
+            text: 'Upload Receipt',
+            onPressed: () {
+              Navigator.of(context).pushNamed(
+                '/payment',
+                arguments: {
+                  'appointmentId': _appointmentId,
+                  'doctorName': widget.doctorName,
+                  'consultationFee': widget.consultationFee,
+                  'appointmentDate': widget.selectedDate,
+                  'doctorId': widget.doctorId,
+                },
+              );
+            },
+            icon: const Icon(Icons.upload, size: 20),
           ),
         ],
       ),
