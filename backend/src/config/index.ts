@@ -49,7 +49,7 @@ export const config = {
   // Rate Limiting
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute
-    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000'),
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '5000'), // Increased for development
   },
 
   // CORS
@@ -65,6 +65,7 @@ export const config = {
     functionSecret: process.env.FUNCTION_SECRET || '',
     storageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'doctor-photos',
     gcashStorageBucket: process.env.SUPABASE_GCASH_BUCKET || 'gcash-qr-codes',
+    receiptStorageBucket: process.env.SUPABASE_RECEIPT_BUCKET || 'payment-receipts',
   },
 
   // Push notifications (FCM / APNs credentials remain backend-only)

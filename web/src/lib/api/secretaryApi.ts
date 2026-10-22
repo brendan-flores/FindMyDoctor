@@ -253,7 +253,71 @@ export const secretaryApi = {
   markNotPresent: async (queueId: string): Promise<{ success: boolean; error?: string }> => {
     return apiClient.post<void>(`/queue/${queueId}/not-present`, {});
   },
+
+  // Payments: list payments for secretary (filtered by assigned doctor)
+  getPayments: async (status?: string): Promise<{ success: boolean; data?: Payment[]; error?: string }> => {
+    const queryParams = status ? `?status=${encodeURIComponent(status)}` : '';
+    return apiClient.get<Payment[]>(`/payments${queryParams}`);
+  },
+
+  // Payments: get payment by appointment ID
+  getPayment: async (appointmentId: string): Promise<{ success: boolean; data?: Payment; error?: string }> => {
+    return apiClient.get<Payment>(`/payments/${appointmentId}`);
+  },
+
+  // Payments: verify payment (by payment ID)
+  verifyPayment: async (id: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/payments/${id}/verify`, {});
+  },
+
+  // Payments: reject payment (by payment ID)
+  rejectPayment: async (id: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/payments/${id}/reject`, {});
+  },
+
+  // Payments: get signed receipt URL (by payment ID)
+  getSignedReceiptUrl: async (id: string): Promise<{ success: boolean; data?: { signedUrl: string }; error?: string }> => {
+    return apiClient.get<{ signedUrl: string }>(`/payments/${id}/receipt-url`);
+  },
 };
+
+// Payment charge (from payment_charges table)
+export interface PaymentCharge {
+  id: string;
+  payment_id: string;
+  description: string;
+  amount: number;
+  created_at: string;
+}
+
+// Payment (from payments table with joined patient/appointment/verifier data)
+export interface Payment {
+  id: string;
+  appointment_id: string;
+  patient_id: string;
+  status: 'UNPAID' | 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED';
+  payment_method?: string;
+  receipt_url?: string | null;
+  consultation_amount: number;
+  total_additional_charges: number;
+  total_amount: number;
+  created_at: string;
+  updated_at: string;
+  verified_by?: string | null;
+  verified_at?: string | null;
+  // Patient details (joined)
+  patient_first_name?: string;
+  patient_last_name?: string;
+  patient_phone?: string;
+  // Verifier details (joined)
+  verified_by_first_name?: string | null;
+  verified_by_last_name?: string | null;
+  // Appointment details (joined)
+  appointment_date?: string;
+  reason_for_visit?: string;
+  // Nested charges
+  charges?: PaymentCharge[];
+}
 
 // Conversation list entry (matches GET /conversations response shape)
 export interface Conversation {

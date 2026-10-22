@@ -220,6 +220,8 @@ class MyAppState extends State<MyApp> {
                     clinic: args?['clinic'],
                     consultationFee: args?['consultationFee'],
                     selectedDate: args?['selectedDate'],
+                    paymentMethod: args?['paymentMethod'],
+                    receiptImage: args?['receiptImage'],
                   ),
                 );
               case '/patient-details':
@@ -232,6 +234,8 @@ class MyAppState extends State<MyApp> {
                     clinic: args?['clinic'],
                     consultationFee: args?['consultationFee'],
                     selectedDate: args?['selectedDate'],
+                    paymentMethod: args?['paymentMethod'],
+                    receiptImage: args?['receiptImage'],
                   ),
                 );
               case '/conversation-thread':

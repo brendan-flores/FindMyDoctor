@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/api_constants.dart';
@@ -99,6 +101,84 @@ class ApiService {
     );
 
     return _handleResponse(response);
+  }
+
+  // Generic POST request with multipart file upload
+  Future<Map<String, dynamic>> postMultipart(
+    String endpoint, {
+    required File file,
+    String fileField = 'file',
+    Map<String, String>? fields,
+    bool requireAuth = true,
+  }) async {
+    final url = '$baseUrl$endpoint';
+
+    final client = _httpClient ?? http.Client();
+
+    final request = http.MultipartRequest('POST', Uri.parse(url));
+
+    // Add authorization header if required
+    if (requireAuth && _accessToken != null) {
+      request.headers['Authorization'] = 'Bearer $_accessToken';
+    }
+
+    // Detect MIME type from file extension
+    final fileName = file.path.split('/').last;
+    final fileExtension = fileName.split('.').last.toLowerCase();
+    String contentType = 'application/octet-stream';
+    
+    switch (fileExtension) {
+      case 'jpg':
+      case 'jpeg':
+        contentType = 'image/jpeg';
+        break;
+      case 'png':
+        contentType = 'image/png';
+        break;
+    }
+
+    // Add file
+    final fileStream = http.ByteStream(file.openRead());
+    final fileLength = await file.length();
+    final multipartFile = http.MultipartFile(
+      fileField,
+      fileStream,
+      fileLength,
+      filename: fileName,
+      contentType: MediaType.parse(contentType),
+    );
+    request.files.add(multipartFile);
+
+    // Add additional fields
+    if (fields != null) {
+      request.fields.addAll(fields);
+    }
+
+    final response = await client.send(request);
+    final responseBody = await response.stream.bytesToString();
+
+    try {
+      final body = jsonDecode(responseBody);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return body;
+      } else {
+        throw ApiException(
+          message: body['error']?['message'] ?? 'An error occurred',
+          code: body['error']?['code'] ?? 'UNKNOWN_ERROR',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) {
+        rethrow;
+      }
+      throw ApiException(
+        message: 'Failed to parse server response',
+        code: 'PARSE_ERROR',
+        statusCode: response.statusCode,
+      );
+    }
   }
 
   // Generic PUT request
@@ -644,11 +724,12 @@ class ApiService {
 
   Future<Map<String, dynamic>> uploadPaymentReceipt({
     required String appointmentId,
-    required String receiptUrl,
+    required File receiptFile,
   }) async {
-    return await post(
+    return await postMultipart(
       '${ApiConstants.payments}/$appointmentId${ApiConstants.paymentReceipt}',
-      body: {'receiptUrl': receiptUrl},
+      file: receiptFile,
+      fileField: 'receipt',
       requireAuth: true,
     );
   }

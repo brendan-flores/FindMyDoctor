@@ -39,7 +39,6 @@ class BookingConfirmationPage extends StatefulWidget {
 class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
   final ApiService _apiService = ApiService();
   bool _isSubmitting = false;
-  bool _isUploadingReceipt = false;
   String? _errorMessage;
   String? _queueNumber;
   int? _totalPatients;
@@ -102,19 +101,10 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
   Future<void> _uploadReceipt() async {
     if (widget.receiptImage == null || _appointmentId == null) return;
 
-    setState(() {
-      _isUploadingReceipt = true;
-    });
-
     try {
-      // TODO: Implement actual image upload to backend
-      // This requires backend support for multipart/form-data file uploads
-      // For now, simulate upload with a placeholder URL
-      final receiptUrl = 'https://placeholder.com/receipt.jpg';
-
       final response = await _apiService.uploadPaymentReceipt(
         appointmentId: _appointmentId!,
-        receiptUrl: receiptUrl,
+        receiptFile: widget.receiptImage!,
       );
 
       if (response['success'] == true) {
@@ -145,10 +135,6 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
           ),
         );
       }
-    } finally {
-      setState(() {
-        _isUploadingReceipt = false;
-      });
     }
   }
 
