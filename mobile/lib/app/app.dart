@@ -208,6 +208,7 @@ class MyAppState extends State<MyApp> {
                     specialty: args?['specialty'],
                     clinic: args?['clinic'],
                     consultationFee: args?['consultationFee'],
+                    professionalPhotoUrl: args?['professionalPhotoUrl'],
                   ),
                 );
               case '/booking-confirmation':
@@ -222,6 +223,7 @@ class MyAppState extends State<MyApp> {
                     selectedDate: args?['selectedDate'],
                     paymentMethod: args?['paymentMethod'],
                     receiptImage: args?['receiptImage'],
+                    professionalPhotoUrl: args?['professionalPhotoUrl'],
                   ),
                 );
               case '/patient-details':
@@ -236,6 +238,7 @@ class MyAppState extends State<MyApp> {
                     selectedDate: args?['selectedDate'],
                     paymentMethod: args?['paymentMethod'],
                     receiptImage: args?['receiptImage'],
+                    professionalPhotoUrl: args?['professionalPhotoUrl'],
                   ),
                 );
               case '/conversation-thread':

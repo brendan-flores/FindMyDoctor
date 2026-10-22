@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/services/api_service.dart';
 
 class AppointmentDetailPage extends StatefulWidget {
@@ -263,6 +264,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     final specialty = appointment['specialty'] ?? '';
     final practiceName = appointment['practice_name'] ?? 'Private Practice';
     final practiceAddress = appointment['practice_address'] ?? '';
+    final professionalPhotoUrl = appointment['professional_photo_url']?.toString();
     final appointmentDate = appointment['appointment_date'] != null
         ? DateTime.parse(appointment['appointment_date'])
         : null;
@@ -283,7 +285,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             const SizedBox(height: spacing.AppSpacing.gutterLg),
             _buildHeader(status, statusColor, statusIcon),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
-            _buildDoctorInfo(doctorFirstName, doctorLastName, specialty, practiceName, practiceAddress),
+            _buildDoctorInfo(doctorFirstName, doctorLastName, specialty, practiceName, practiceAddress, professionalPhotoUrl),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
             _buildAppointmentDetails(appointmentDate, endTime, queueNumber, registrationSource, notes),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
@@ -362,6 +364,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     String specialty,
     String practiceName,
     String practiceAddress,
+    String? professionalPhotoUrl,
   ) {
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
@@ -377,18 +380,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           const SizedBox(height: spacing.AppSpacing.gutterMd),
           Row(
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                ),
-                child: Icon(
-                  Icons.person,
-                  color: AppColors.outline,
-                  size: spacing.AppSpacing.iconXl,
-                ),
+              DoctorProfileImage(
+                photoUrl: professionalPhotoUrl,
+                size: 64,
+                showVerifiedBadge: false,
               ),
               const SizedBox(width: spacing.AppSpacing.gutterMd),
               Expanded(
