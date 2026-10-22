@@ -7,6 +7,7 @@ import '../core/navigation/app_navigator.dart';
 import '../core/services/push_notification_service.dart';
 import '../core/theme/app_theme.dart';
 import '../core/services/api_service.dart';
+import '../core/utils/json_parsers.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/signup_page.dart';
 import '../features/auth/presentation/change_password_page.dart';
@@ -16,6 +17,7 @@ import '../features/doctors/presentation/doctors_page.dart';
 import '../features/appointments/presentation/booking_confirmation_page.dart';
 import '../features/patients/presentation/patient_details_page.dart';
 import '../features/conversations/presentation/conversation_thread_page.dart';
+import '../features/payments/presentation/payment_screen.dart';
 import '../features/secretary/presentation/secretary_home_page.dart';
 
 class MyApp extends StatefulWidget {
@@ -168,6 +170,7 @@ class MyAppState extends State<MyApp> {
           case '/doctor-schedule':
           case '/booking-confirmation':
           case '/patient-details':
+          case '/payment':
           case '/conversation-thread':
             // Protect all authenticated routes - enforce password change requirement
             if (!_isAuthenticated) {
@@ -221,7 +224,6 @@ class MyAppState extends State<MyApp> {
                     consultationFee: args?['consultationFee'],
                     selectedDate: args?['selectedDate'],
                     paymentMethod: args?['paymentMethod'],
-                    receiptImage: args?['receiptImage'],
                   ),
                 );
               case '/patient-details':
@@ -235,7 +237,6 @@ class MyAppState extends State<MyApp> {
                     consultationFee: args?['consultationFee'],
                     selectedDate: args?['selectedDate'],
                     paymentMethod: args?['paymentMethod'],
-                    receiptImage: args?['receiptImage'],
                   ),
                 );
               case '/conversation-thread':
@@ -244,6 +245,17 @@ class MyAppState extends State<MyApp> {
                   builder: (context) => ConversationThreadPage(
                     conversationId: args?['conversationId'] ?? '',
                     counterpartName: args?['counterpartName'] as String?,
+                  ),
+                );
+              case '/payment':
+                final args = settings.arguments as Map<String, dynamic>?;
+                return MaterialPageRoute(
+                  builder: (context) => PaymentScreen(
+                    appointmentId: args?['appointmentId'] ?? '',
+                    doctorName: args?['doctorName'],
+                    consultationFee: parseString(args?['consultationFee']),
+                    appointmentDate: args?['appointmentDate'],
+                    doctorId: args?['doctorId'],
                   ),
                 );
               default:
