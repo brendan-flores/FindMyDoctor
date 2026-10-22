@@ -275,6 +275,11 @@ export const secretaryApi = {
     return apiClient.patch<void>(`/payments/${id}/reject`, {});
   },
 
+  // Payments: mark as paid (for cash payments, by payment ID)
+  markAsPaid: async (id: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/payments/${id}/mark-paid`, {});
+  },
+
   // Payments: get signed receipt URL (by payment ID)
   getSignedReceiptUrl: async (id: string): Promise<{ success: boolean; data?: { signedUrl: string }; error?: string }> => {
     return apiClient.get<{ signedUrl: string }>(`/payments/${id}/receipt-url`);
@@ -296,7 +301,7 @@ export interface Payment {
   appointment_id: string;
   patient_id: string;
   status: 'UNPAID' | 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED';
-  payment_method?: string;
+  payment_method: string;
   receipt_url?: string | null;
   consultation_amount: number;
   total_additional_charges: number;

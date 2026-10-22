@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { secretaryApi, Payment, PaymentCharge } from '@/lib/api/secretaryApi';
+import Toast from '@/components/ui/Toast';
 
-type TabType = 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED';
+type TabType = 'UNPAID' | 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED';
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING_VERIFICATION: 'Pending',
@@ -21,11 +22,12 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function SecretaryPayments() {
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [activeTab, setActiveTab] = useState<TabType>('PENDING_VERIFICATION');
+  const [activeTab, setActiveTab] = useState<TabType>('UNPAID');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showVerifyDialog, setShowVerifyDialog] = useState(false);
@@ -35,7 +37,7 @@ export default function SecretaryPayments() {
   const [receiptImageError, setReceiptImageError] = useState(false);
   const [receiptSignedUrl, setReceiptSignedUrl] = useState<string | null>(null);
   const [isFetchingReceiptUrl, setIsFetchingReceiptUrl] = useState(false);
-  const [paymentCounts, setPaymentCounts] = useState({ pending: 0, verified: 0, rejected: 0 });
+  const [paymentCounts, setPaymentCounts] = useState({ unpaid: 0, pending: 0, verified: 0, rejected: 0 });
 
   useEffect(() => {
     fetchPayments();
@@ -44,24 +46,26 @@ export default function SecretaryPayments() {
 
   const fetchPayments = async () => {
     setLoading(true);
-    setError(null);
 
     const response = await secretaryApi.getPayments(activeTab);
     if (response.success && response.data) {
       setPayments(response.data);
     } else {
-      setError(response.error || 'Failed to fetch payments');
+      setToastMessage(response.error || 'Failed to fetch payments');
+      setToastType('error');
+      setShowToast(true);
     }
     setLoading(false);
   };
 
   const fetchPaymentCounts = async () => {
-    const statuses: TabType[] = ['PENDING_VERIFICATION', 'PAID', 'REJECTED'];
-    const counts = { pending: 0, verified: 0, rejected: 0 };
+    const statuses: TabType[] = ['UNPAID', 'PENDING_VERIFICATION', 'PAID', 'REJECTED'];
+    const counts = { unpaid: 0, pending: 0, verified: 0, rejected: 0 };
 
     for (const status of statuses) {
       const response = await secretaryApi.getPayments(status);
       if (response.success && response.data) {
+        if (status === 'UNPAID') counts.unpaid = response.data.length;
         if (status === 'PENDING_VERIFICATION') counts.pending = response.data.length;
         if (status === 'PAID') counts.verified = response.data.length;
         if (status === 'REJECTED') counts.rejected = response.data.length;
@@ -73,38 +77,62 @@ export default function SecretaryPayments() {
 
   const handleVerify = async (paymentId: string) => {
     setActionLoading(true);
-    setError(null);
-    setSuccess(null);
 
     const response = await secretaryApi.verifyPayment(paymentId);
 
     if (response.success) {
-      setSuccess('Payment verified successfully');
+      setToastMessage('Payment verified successfully');
+      setToastType('success');
+      setShowToast(true);
       setShowVerifyDialog(false);
       setShowDetailsModal(false);
       fetchPayments();
       fetchPaymentCounts();
     } else {
-      setError(response.error || 'Failed to verify payment');
+      setToastMessage(response.error || 'Failed to verify payment');
+      setToastType('error');
+      setShowToast(true);
     }
     setActionLoading(false);
   };
 
   const handleReject = async (paymentId: string) => {
     setActionLoading(true);
-    setError(null);
-    setSuccess(null);
 
     const response = await secretaryApi.rejectPayment(paymentId);
 
     if (response.success) {
-      setSuccess('Payment rejected successfully');
+      setToastMessage('Payment rejected successfully');
+      setToastType('success');
+      setShowToast(true);
       setShowRejectDialog(false);
       setShowDetailsModal(false);
       fetchPayments();
       fetchPaymentCounts();
     } else {
-      setError(response.error || 'Failed to reject payment');
+      setToastMessage(response.error || 'Failed to reject payment');
+      setToastType('error');
+      setShowToast(true);
+    }
+    setActionLoading(false);
+  };
+
+  const handleMarkAsPaid = async (paymentId: string) => {
+    setActionLoading(true);
+
+    const response = await secretaryApi.markAsPaid(paymentId);
+
+    if (response.success) {
+      setToastMessage('Payment marked as paid successfully');
+      setToastType('success');
+      setShowToast(true);
+      setShowDetailsModal(false);
+      fetchPayments();
+      fetchPaymentCounts();
+    } else {
+      setToastMessage(response.error || 'Failed to mark payment as paid');
+      setToastType('error');
+      setShowToast(true);
     }
     setActionLoading(false);
   };
@@ -148,6 +176,7 @@ export default function SecretaryPayments() {
     return `₱${numAmount.toFixed(2)}`;
   };
 
+  const unpaidCount = paymentCounts.unpaid;
   const pendingCount = paymentCounts.pending;
   const verifiedCount = paymentCounts.verified;
   const rejectedCount = paymentCounts.rejected;
@@ -162,21 +191,19 @@ export default function SecretaryPayments() {
         <p className="text-xs text-slate-500 mt-0.5">Verify and manage patient payments</p>
       </div>
 
-      {/* Error/Success Messages */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm">
-          {success}
-        </div>
-      )}
-
       {/* Tabs */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <nav className="flex overflow-x-auto gap-1 p-2 border-b border-slate-200">
+          <button
+            onClick={() => setActiveTab('UNPAID')}
+            className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors ${
+              activeTab === 'UNPAID'
+                ? 'bg-[#1b5eb8] text-white'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            Unpaid ({unpaidCount})
+          </button>
           <button
             onClick={() => setActiveTab('PENDING_VERIFICATION')}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors ${
@@ -233,7 +260,9 @@ export default function SecretaryPayments() {
               <span className="material-symbols-outlined text-5xl text-slate-300 mb-3">receipt_long</span>
               <p className="text-slate-600 font-medium">No {STATUS_LABELS[activeTab].toLowerCase()} payments</p>
               <p className="text-xs text-slate-500 mt-1">
-                {activeTab === 'PENDING_VERIFICATION'
+                {activeTab === 'UNPAID'
+                  ? 'Payments without receipts will appear here'
+                  : activeTab === 'PENDING_VERIFICATION'
                   ? 'Payments awaiting verification will appear here'
                   : activeTab === 'PAID'
                   ? 'Verified payments will appear here'
@@ -272,11 +301,11 @@ export default function SecretaryPayments() {
                         )}
                         <div className="flex items-center gap-2">
                           <span className="material-symbols-outlined text-[16px] text-slate-400">payments</span>
-                          <span>{payment.payment_method || 'GCash'}</span>
+                          <span>{payment.payment_method}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="material-symbols-outlined text-[16px] text-slate-400">schedule</span>
-                          <span>Uploaded {formatDate(payment.created_at)}</span>
+                          <span>{payment.status === 'UNPAID' ? 'Created' : 'Uploaded'} {formatDate(payment.created_at)}</span>
                         </div>
                       </div>
                     </div>
@@ -341,25 +370,36 @@ export default function SecretaryPayments() {
                       <span className="text-slate-900">{selectedPayment.reason_for_visit}</span>
                     </div>
                   )}
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Payment Method:</span>
+                    <span className="text-slate-900">{selectedPayment.payment_method}</span>
+                  </div>
                 </div>
               </div>
 
               {/* Receipt */}
-              {selectedPayment.receipt_url && (
+              {selectedPayment.payment_method === 'GCASH' ? (
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900 mb-3">Payment Receipt</h3>
                   <div className="bg-slate-50 rounded-lg p-4">
-                    <button
-                      onClick={() => handleViewReceipt(selectedPayment.id)}
-                      disabled={isFetchingReceiptUrl}
-                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">visibility</span>
-                      {isFetchingReceiptUrl ? 'Loading...' : 'View Receipt'}
-                    </button>
+                    {selectedPayment.receipt_url ? (
+                      <button
+                        onClick={() => handleViewReceipt(selectedPayment.id)}
+                        disabled={isFetchingReceiptUrl}
+                        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">visibility</span>
+                        {isFetchingReceiptUrl ? 'Loading...' : 'View Receipt'}
+                      </button>
+                    ) : (
+                      <p className="text-sm text-slate-600 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-amber-500">warning</span>
+                        No receipt uploaded yet
+                      </p>
+                    )}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Charges Breakdown */}
               <div>
@@ -428,7 +468,20 @@ export default function SecretaryPayments() {
                 </div>
               )}
 
-              {/* Actions for pending payments */}
+              {/* Actions for unpaid payments (cash) */}
+              {selectedPayment.status === 'UNPAID' && (
+                <div className="flex gap-3 pt-4 border-t border-slate-200">
+                  <button
+                    onClick={() => handleMarkAsPaid(selectedPayment.id)}
+                    disabled={actionLoading}
+                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  >
+                    {actionLoading ? 'Marking...' : 'Mark as Paid'}
+                  </button>
+                </div>
+              )}
+
+              {/* Actions for pending payments (GCash) */}
               {selectedPayment.status === 'PENDING_VERIFICATION' && (
                 <div className="flex gap-3 pt-4 border-t border-slate-200">
                   <button
@@ -550,6 +603,16 @@ export default function SecretaryPayments() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Toast Notification */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setShowToast(false)}
+          duration={3000}
+        />
       )}
     </div>
   );
