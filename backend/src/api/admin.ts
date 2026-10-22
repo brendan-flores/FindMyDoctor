@@ -5,6 +5,7 @@ import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 import { sendApprovalEmail, sendRejectionEmail } from '../services/emailService';
 import * as otpService from '../services/otpService';
+import * as auditService from '../services/auditService';
 
 const router = Router();
 
@@ -21,6 +22,86 @@ router.get('/users', authenticate, authorize('ADMIN'), async (req: AuthRequest, 
   }
 });
 
+// Get dashboard statistics (ADMIN or SUPERADMIN)
+router.get('/dashboard/stats', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    // Get doctor status counts
+    const doctorStats = await query(
+      `SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE approval_status = 'PENDING') as pending,
+        COUNT(*) FILTER (WHERE approval_status = 'ACTIVE') as active,
+        COUNT(*) FILTER (WHERE approval_status = 'REJECTED') as rejected
+       FROM doctors`
+    );
+
+    // Get user role counts
+    const userStats = await query(
+      `SELECT
+        role,
+        COUNT(*) as count
+       FROM users
+       GROUP BY role`
+    );
+
+    // Get secretaries without assigned doctor
+    const unassignedSecretaries = await query(
+      `SELECT COUNT(*) as count
+       FROM secretaries
+       WHERE doctor_id IS NULL`
+    );
+
+    // Get pending approvals list (oldest first)
+    const pendingApprovals = await query(
+      `SELECT
+        d.id,
+        d.first_name,
+        d.last_name,
+        d.specialty,
+        d.profile_submitted_at,
+        d.profile_completion_status,
+        u.email
+       FROM doctors d
+       JOIN users u ON d.user_id = u.id
+       WHERE d.approval_status = 'PENDING'
+       ORDER BY d.profile_submitted_at ASC NULLS LAST
+       LIMIT 10`
+    );
+
+    // Format pending approvals
+    const formattedPending = pendingApprovals.rows.map(d => ({
+      id: d.id,
+      firstName: d.first_name,
+      lastName: d.last_name,
+      specialty: d.specialty,
+      profileSubmittedAt: d.profile_submitted_at,
+      profileCompletionStatus: d.profile_completion_status,
+      email: d.email
+    }));
+
+    // Format user stats as an object
+    const userStatsObj: Record<string, number> = {};
+    userStats.rows.forEach(row => {
+      userStatsObj[row.role.toLowerCase()] = parseInt(row.count);
+    });
+
+    res.json(success({
+      doctors: {
+        total: parseInt(doctorStats.rows[0].total),
+        pending: parseInt(doctorStats.rows[0].pending),
+        active: parseInt(doctorStats.rows[0].active),
+        rejected: parseInt(doctorStats.rows[0].rejected)
+      },
+      users: userStatsObj,
+      unassignedSecretaries: parseInt(unassignedSecretaries.rows[0].count),
+      pendingApprovals: formattedPending
+    }));
+  } catch (err: any) {
+    console.error('Failed to fetch dashboard stats:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch dashboard statistics'));
+  }
+});
+
 // Get all doctors with complete profile information
 router.get('/doctors', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
   try {
@@ -30,6 +111,7 @@ router.get('/doctors', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (re
         d.user_id,
         u.email,
         u.email_verified,
+        u.is_active,
         d.first_name,
         d.middle_name,
         d.last_name,
@@ -68,6 +150,7 @@ router.get('/doctors', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (re
       userId: doctor.user_id,
       email: doctor.email || '',
       emailVerified: doctor.email_verified || false,
+      isActive: doctor.is_active !== undefined ? doctor.is_active : true,
       firstName: doctor.first_name || '',
       middleName: doctor.middle_name || null,
       lastName: doctor.last_name || '',
@@ -149,7 +232,7 @@ router.get('/doctors/:id', authenticate, authorize('ADMIN', 'SUPERADMIN'), async
     const { id } = req.params;
     const result = await query(
       `SELECT
-        d.*, u.email, u.email_verified
+        d.*, u.email, u.email_verified, u.is_active
        FROM doctors d
        JOIN users u ON d.user_id = u.id
        WHERE d.id = $1`,
@@ -166,6 +249,7 @@ router.get('/doctors/:id', authenticate, authorize('ADMIN', 'SUPERADMIN'), async
       userId: doctor.user_id,
       email: doctor.email,
       emailVerified: doctor.email_verified,
+      isActive: doctor.is_active,
       firstName: doctor.first_name,
       middleName: doctor.middle_name,
       lastName: doctor.last_name,
@@ -322,6 +406,9 @@ router.patch('/doctors/:id/approve', authenticate, authorize('ADMIN'), async (re
       console.error('Failed to send approval email:', err);
     });
 
+    // Log audit entry
+    await auditService.logDoctorApproval(req.user.id, doctor.id, doctorName);
+
     console.log('Doctor approved successfully:', id);
     res.json(success(null, 'Doctor approved successfully'));
   } catch (err: any) {
@@ -372,6 +459,9 @@ router.patch('/doctors/:id/reject', authenticate, authorize('ADMIN'), async (req
     sendRejectionEmail(doctor.email, doctorName, reason).catch(err => {
       console.error('Failed to send rejection email:', err);
     });
+
+    // Log audit entry
+    await auditService.logDoctorRejection(req.user.id, doctor.id, doctorName, reason);
 
     res.json(success(null, 'Doctor rejected successfully'));
   } catch (err: any) {
@@ -437,6 +527,9 @@ router.post('/secretaries', authenticate, authorize('ADMIN'), async (req: AuthRe
       [userId, doctorId, firstName, lastName]
     );
 
+    // Log audit entry
+    await auditService.logSecretaryCreation(req.user.id, userId, email, doctorId);
+
     res.status(201).json(success(secretaryResult.rows[0], 'Secretary created successfully'));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create secretary'));
@@ -456,6 +549,53 @@ router.patch('/secretaries/:id/approve', authenticate, authorize('ADMIN'), async
     res.json(success(null, 'Secretary approved successfully'));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to approve secretary'));
+  }
+});
+
+// Get all secretaries with profile and doctor information
+router.get('/secretaries', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await query(
+      `SELECT
+        s.id,
+        s.user_id,
+        u.email,
+        u.is_active,
+        u.must_change_password,
+        s.first_name,
+        s.last_name,
+        s.doctor_id,
+        d.first_name as doctor_first_name,
+        d.last_name as doctor_last_name,
+        d.specialty as doctor_specialty,
+        s.is_approved,
+        s.created_at
+       FROM secretaries s
+       JOIN users u ON s.user_id = u.id
+       LEFT JOIN doctors d ON s.doctor_id = d.id
+       ORDER BY s.created_at DESC`
+    );
+
+    // Convert snake_case to camelCase for frontend consistency
+    const formattedSecretaries = result.rows.map(secretary => ({
+      id: secretary.id,
+      userId: secretary.user_id,
+      email: secretary.email,
+      isActive: secretary.is_active,
+      mustChangePassword: secretary.must_change_password,
+      firstName: secretary.first_name || '',
+      lastName: secretary.last_name || '',
+      doctorId: secretary.doctor_id,
+      doctorFirstName: secretary.doctor_first_name,
+      doctorLastName: secretary.doctor_last_name,
+      doctorSpecialty: secretary.doctor_specialty,
+      isApproved: secretary.is_approved,
+      createdAt: secretary.created_at
+    }));
+
+    res.json(success(formattedSecretaries));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch secretaries'));
   }
 });
 
@@ -513,6 +653,9 @@ router.post('/admins', authenticate, authorize('SUPERADMIN'), async (req: AuthRe
 
     const admin = userResult.rows[0];
     console.log('Admin account created:', admin);
+
+    // Log audit entry
+    await auditService.logAdminCreation(req.user.id, admin.id, email);
 
     res.status(201).json(success(admin, 'Admin account created successfully'));
   } catch (err: any) {
@@ -622,6 +765,8 @@ router.post('/secretaries/reconcile-supabase', authenticate, authorize('ADMIN', 
 
 // Update admin account status (SUPERADMIN only)
 router.patch('/admins/:id', authenticate, authorize('SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
   try {
     const { id } = req.params;
     const { is_active } = req.body;
@@ -633,7 +778,7 @@ router.patch('/admins/:id', authenticate, authorize('SUPERADMIN'), async (req: A
 
     // Verify the target is an ADMIN account (not SUPERADMIN)
     const targetUser = await query(
-      'SELECT role FROM users WHERE id = $1',
+      'SELECT id, email, role FROM users WHERE id = $1',
       [id]
     );
 
@@ -645,13 +790,35 @@ router.patch('/admins/:id', authenticate, authorize('SUPERADMIN'), async (req: A
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Can only modify ADMIN accounts'));
     }
 
-    await query(
+    const admin = targetUser.rows[0];
+
+    await client.query('BEGIN');
+
+    // Update is_active status
+    await client.query(
       "UPDATE users SET is_active = $1 WHERE id = $2",
       [is_active, id]
     );
 
+    // If deactivating, invalidate all push device tokens
+    if (is_active === false) {
+      await client.query('DELETE FROM device_tokens WHERE user_id = $1', [id]);
+    }
+
+    await client.query('COMMIT');
+
+    // Log audit entry
+    if (is_active === false) {
+      await auditService.logAdminDeactivation(req.user.id, admin.id, admin.email);
+    } else {
+      await auditService.logAdminReactivation(req.user.id, admin.id, admin.email);
+    }
+
     res.json(success(null, 'Admin account updated successfully'));
   } catch (err: any) {
+    const client = await getClient();
+    await client.query('ROLLBACK');
+    client.release();
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update admin account'));
   }
 });
@@ -698,6 +865,326 @@ router.delete('/admins/:id', authenticate, authorize('SUPERADMIN'), async (req: 
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete admin account'));
   } finally {
     client.release();
+  }
+});
+
+// ============================================
+// DOCTOR ACCOUNT STATUS CONTROLS
+// ============================================
+
+// Deactivate doctor account (ADMIN or SUPERADMIN)
+router.patch('/doctors/:id/deactivate', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    const { id } = req.params;
+
+    // Prevent deactivating self
+    const targetUser = await query(
+      'SELECT u.id, u.role, d.first_name, d.last_name FROM users u JOIN doctors d ON u.id = d.user_id WHERE d.id = $1',
+      [id]
+    );
+
+    if (targetUser.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor not found'));
+    }
+
+    if (targetUser.rows[0].id === req.user.id) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot deactivate your own account'));
+    }
+
+    const doctor = targetUser.rows[0];
+    const doctorName = `${doctor.first_name} ${doctor.last_name}`;
+
+    await client.query('BEGIN');
+
+    // Deactivate user account
+    await client.query('UPDATE users SET is_active = false WHERE id = $1', [doctor.id]);
+
+    // Invalidate all push device tokens for this user
+    await client.query('DELETE FROM device_tokens WHERE user_id = $1', [doctor.id]);
+
+    await client.query('COMMIT');
+
+    // Log audit entry
+    await auditService.logDoctorDeactivation(req.user.id, doctor.id, doctorName);
+
+    res.json(success(null, 'Doctor account deactivated successfully'));
+  } catch (err: any) {
+    const client = await getClient();
+    await client.query('ROLLBACK');
+    client.release();
+    console.error('Failed to deactivate doctor:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to deactivate doctor account'));
+  }
+});
+
+// Reactivate doctor account (ADMIN or SUPERADMIN)
+router.patch('/doctors/:id/reactivate', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const targetUser = await query(
+      'SELECT u.id, d.first_name, d.last_name FROM users u JOIN doctors d ON u.id = d.user_id WHERE d.id = $1',
+      [id]
+    );
+
+    if (targetUser.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor not found'));
+    }
+
+    const doctor = targetUser.rows[0];
+    const doctorName = `${doctor.first_name} ${doctor.last_name}`;
+
+    await query('UPDATE users SET is_active = true WHERE id = $1', [doctor.id]);
+
+    // Log audit entry
+    await auditService.logDoctorReactivation(req.user.id, doctor.id, doctorName);
+
+    res.json(success(null, 'Doctor account reactivated successfully'));
+  } catch (err: any) {
+    console.error('Failed to reactivate doctor:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to reactivate doctor account'));
+  }
+});
+
+// ============================================
+// SECRETARY ACCOUNT STATUS CONTROLS
+// ============================================
+
+// Deactivate secretary account (ADMIN or SUPERADMIN)
+router.patch('/secretaries/:id/deactivate', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    const { id } = req.params;
+
+    // Prevent deactivating self
+    const targetUser = await query(
+      'SELECT u.id, u.role, s.first_name, s.last_name FROM users u JOIN secretaries s ON u.id = s.user_id WHERE s.id = $1',
+      [id]
+    );
+
+    if (targetUser.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary not found'));
+    }
+
+    if (targetUser.rows[0].id === req.user.id) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot deactivate your own account'));
+    }
+
+    const secretary = targetUser.rows[0];
+    const secretaryName = `${secretary.first_name} ${secretary.last_name}`;
+
+    await client.query('BEGIN');
+
+    // Deactivate user account
+    await client.query('UPDATE users SET is_active = false WHERE id = $1', [secretary.id]);
+
+    // Invalidate all push device tokens for this user
+    await client.query('DELETE FROM device_tokens WHERE user_id = $1', [secretary.id]);
+
+    await client.query('COMMIT');
+
+    // Log audit entry
+    await auditService.logSecretaryDeactivation(req.user.id, secretary.id, secretaryName);
+
+    res.json(success(null, 'Secretary account deactivated successfully'));
+  } catch (err: any) {
+    const client = await getClient();
+    await client.query('ROLLBACK');
+    client.release();
+    console.error('Failed to deactivate secretary:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to deactivate secretary account'));
+  }
+});
+
+// Reactivate secretary account (ADMIN or SUPERADMIN)
+router.patch('/secretaries/:id/reactivate', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const targetUser = await query(
+      'SELECT u.id, s.first_name, s.last_name FROM users u JOIN secretaries s ON u.id = s.user_id WHERE s.id = $1',
+      [id]
+    );
+
+    if (targetUser.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary not found'));
+    }
+
+    const secretary = targetUser.rows[0];
+    const secretaryName = `${secretary.first_name} ${secretary.last_name}`;
+
+    await query('UPDATE users SET is_active = true WHERE id = $1', [secretary.id]);
+
+    // Log audit entry
+    await auditService.logSecretaryReactivation(req.user.id, secretary.id, secretaryName);
+
+    res.json(success(null, 'Secretary account reactivated successfully'));
+  } catch (err: any) {
+    console.error('Failed to reactivate secretary:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to reactivate secretary account'));
+  }
+});
+
+// ============================================
+// SECRETARY PASSWORD RESET
+// ============================================
+
+// Reset secretary password (ADMIN or SUPERADMIN)
+// This generates a new temporary password and requires the secretary to change it on first login
+router.post('/secretaries/:id/reset-password', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const targetUser = await query(
+      'SELECT u.id, u.email, s.first_name, s.last_name FROM users u JOIN secretaries s ON u.id = s.user_id WHERE s.id = $1',
+      [id]
+    );
+
+    if (targetUser.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary not found'));
+    }
+
+    const secretary = targetUser.rows[0];
+
+    // Generate a random temporary password
+    const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase();
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    // Update password and set must_change_password flag
+    await query(
+      'UPDATE users SET password_hash = $1, must_change_password = true WHERE id = $2',
+      [passwordHash, secretary.id]
+    );
+
+    // Log audit entry
+    await auditService.logSecretaryPasswordReset(req.user.id, secretary.id, secretary.email);
+
+    // Return the temporary password (this should be communicated securely)
+    res.json(success({
+      email: secretary.email,
+      temporaryPassword: tempPassword
+    }, 'Secretary password reset successfully. The secretary must change this password on first login.'));
+  } catch (err: any) {
+    console.error('Failed to reset secretary password:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to reset secretary password'));
+  }
+});
+
+// ============================================
+// AUDIT LOG ENDPOINTS
+// ============================================
+
+// Get audit log entries with filters and pagination (ADMIN or SUPERADMIN)
+router.get('/audit-log', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const {
+      action,
+      actorId,
+      startDate,
+      endDate,
+      page = '1',
+      limit = '50'
+    } = req.query;
+
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 50;
+    const offset = (pageNum - 1) * limitNum;
+
+    // Build WHERE clause conditions
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (action) {
+      conditions.push(`action = $${paramIndex}`);
+      params.push(action);
+      paramIndex++;
+    }
+
+    if (actorId) {
+      conditions.push(`actor_user_id = $${paramIndex}`);
+      params.push(actorId);
+      paramIndex++;
+    }
+
+    if (startDate) {
+      conditions.push(`timestamp >= $${paramIndex}`);
+      params.push(startDate);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      conditions.push(`timestamp <= $${paramIndex}`);
+      params.push(endDate);
+      paramIndex++;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Get total count for pagination
+    const countResult = await query(
+      `SELECT COUNT(*) as total FROM admin_audit_log ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].total);
+
+    // Get paginated audit log entries with actor and target user details
+    const result = await query(
+      `SELECT
+        al.id,
+        al.actor_user_id,
+        actor.email as actor_email,
+        actor.role as actor_role,
+        al.action,
+        al.target_user_id,
+        target.email as target_email,
+        target.role as target_role,
+        al.target_type,
+        al.timestamp,
+        al.reason,
+        al.metadata,
+        al.created_at
+       FROM admin_audit_log al
+       LEFT JOIN users actor ON al.actor_user_id = actor.id
+       LEFT JOIN users target ON al.target_user_id = target.id
+       ${whereClause}
+       ORDER BY al.timestamp DESC
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limitNum, offset]
+    );
+
+    // Convert snake_case to camelCase
+    const formattedEntries = result.rows.map(entry => ({
+      id: entry.id,
+      actorUserId: entry.actor_user_id,
+      actorEmail: entry.actor_email,
+      actorRole: entry.actor_role,
+      action: entry.action,
+      targetUserId: entry.target_user_id,
+      targetEmail: entry.target_email,
+      targetRole: entry.target_role,
+      targetType: entry.target_type,
+      timestamp: entry.timestamp,
+      reason: entry.reason,
+      metadata: entry.metadata,
+      createdAt: entry.created_at
+    }));
+
+    res.json(success({
+      entries: formattedEntries,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    }));
+  } catch (err: any) {
+    console.error('Failed to fetch audit log:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch audit log'));
   }
 });
 
