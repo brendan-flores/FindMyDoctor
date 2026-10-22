@@ -22,8 +22,18 @@ export default function SecretarySettings() {
   const router = useRouter();
 
   useEffect(() => {
-    // Check if user is authenticated
-    const token = localStorage.getItem('token');
+    // Check if user is authenticated - prefer HttpOnly cookies, fall back to localStorage
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) {
+        return parts.pop()?.split(';').shift() || null;
+      }
+      return null;
+    };
+
+    const cookieToken = getCookie('accessToken');
+    const token = cookieToken || localStorage.getItem('token');
     if (!token) {
       router.push('/secretary-login');
       return;
@@ -109,17 +119,26 @@ export default function SecretarySettings() {
                 Require a verification code every time you sign in
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                Enabled
-              </span>
-            </div>
+            <button
+              onClick={handleToggle2FA}
+              disabled={isSaving}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                twoFactorEnabled ? 'bg-gradient-to-r from-blue-500 to-blue-600' : 'bg-slate-300'
+              } ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
           </div>
 
-          <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-            <p className="text-sm text-emerald-800">
-              Two-factor authentication is mandatory for all secretary accounts. You will be required to enter a verification code sent to your email each time you sign in.
+          <div className="mt-4 p-4 bg-slate-50 rounded-xl">
+            <p className="text-sm text-slate-600">
+              {twoFactorEnabled
+                ? 'Two-factor authentication is enabled. You will be required to enter a verification code sent to your email each time you sign in.'
+                : 'Two-factor authentication is disabled. You can enable it to add an extra layer of security to your account.'}
             </p>
           </div>
         </div>

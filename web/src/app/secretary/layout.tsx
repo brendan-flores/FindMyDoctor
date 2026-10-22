@@ -18,8 +18,18 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check authentication
-    const token = localStorage.getItem('token');
+    // Check authentication - prefer HttpOnly cookies, fall back to localStorage
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) {
+        return parts.pop()?.split(';').shift() || null;
+      }
+      return null;
+    };
+
+    const cookieToken = getCookie('accessToken');
+    const token = cookieToken || localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
 
     let shouldRedirect = false;

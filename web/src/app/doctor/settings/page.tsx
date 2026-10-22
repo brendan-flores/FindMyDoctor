@@ -22,8 +22,18 @@ export default function DoctorSettings() {
   const router = useRouter();
 
   useEffect(() => {
-    // Check if user is authenticated
-    const token = localStorage.getItem('token');
+    // Check if user is authenticated - prefer HttpOnly cookies, fall back to localStorage
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) {
+        return parts.pop()?.split(';').shift() || null;
+      }
+      return null;
+    };
+
+    const cookieToken = getCookie('accessToken');
+    const token = cookieToken || localStorage.getItem('token');
     if (!token) {
       router.push('/doctor-login');
       return;
