@@ -303,12 +303,6 @@ export default function SecretaryPayments() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-        <h1 className="text-lg font-bold text-slate-900">Payments</h1>
-        <p className="text-xs text-slate-500 mt-0.5">Verify and manage patient payments</p>
-      </div>
-
       {/* Tabs */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <nav className="flex overflow-x-auto gap-1 p-2 border-b border-slate-200">
