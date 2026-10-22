@@ -5,6 +5,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/services/doctor_service.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/models/doctor.dart';
@@ -34,6 +35,7 @@ class _HomePageState extends State<HomePage> {
   List<Conversation> _conversations = [];
   bool _isLoadingConversations = true;
   int _totalUnreadCount = 0;
+  int _notificationUnreadCount = 0;
   String? _userName;
   String? _userEmail;
 
@@ -47,6 +49,8 @@ class _HomePageState extends State<HomePage> {
     _loadUserInfo();
     // Load conversations in background to show unread badge
     _loadConversations();
+    // Load notification unread count
+    _loadNotificationUnreadCount();
   }
 
   Future<void> _loadUserInfo() async {
@@ -138,6 +142,21 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _loadNotificationUnreadCount() async {
+    try {
+      final response = await _apiService.getUnreadNotificationCount();
+      if (response['success'] == true && response['data'] != null) {
+        final count = response['data']['count'] as int? ?? 0;
+        if (!mounted) return;
+        setState(() {
+          _notificationUnreadCount = count;
+        });
+      }
+    } catch (e) {
+      // Silently fail - notification count not critical
+    }
+  }
+
   Future<void> _logout() async {
     await _apiService.logout();
     Navigator.of(context).pushReplacementNamed('/login');
@@ -164,7 +183,14 @@ class _HomePageState extends State<HomePage> {
   Widget _buildHomeContent() {
     return Column(
       children: [
-        const AppHeader(showNotifications: true, showProfile: true),
+        AppHeader(
+          showNotifications: true,
+          showProfile: true,
+          unreadCount: _notificationUnreadCount,
+          onNotificationTap: () {
+            Navigator.of(context).pushNamed('/notifications');
+          },
+        ),
         Expanded(
           child: SingleChildScrollView(
             child: Padding(
@@ -224,7 +250,14 @@ class _HomePageState extends State<HomePage> {
 
     return Column(
       children: [
-        const AppHeader(showNotifications: true, showProfile: true),
+        AppHeader(
+          showNotifications: true,
+          showProfile: true,
+          unreadCount: _notificationUnreadCount,
+          onNotificationTap: () {
+            Navigator.of(context).pushNamed('/notifications');
+          },
+        ),
         Expanded(
           child: SingleChildScrollView(
             child: Padding(
@@ -301,18 +334,10 @@ class _HomePageState extends State<HomePage> {
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainer,
-              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-            ),
-            child: Icon(
-              Icons.person,
-              color: AppColors.outline,
-              size: spacing.AppSpacing.iconLg,
-            ),
+          DoctorProfileImage(
+            photoUrl: conversation.doctorProfessionalPhotoUrl,
+            size: 48,
+            showVerifiedBadge: false,
           ),
           const SizedBox(width: spacing.AppSpacing.gutterMd),
           Expanded(
@@ -431,7 +456,14 @@ class _HomePageState extends State<HomePage> {
 
     return Column(
       children: [
-        const AppHeader(showNotifications: true, showProfile: true),
+        AppHeader(
+          showNotifications: true,
+          showProfile: true,
+          unreadCount: _notificationUnreadCount,
+          onNotificationTap: () {
+            Navigator.of(context).pushNamed('/notifications');
+          },
+        ),
         Expanded(
           child: SingleChildScrollView(
             child: Padding(
@@ -825,18 +857,10 @@ class _HomePageState extends State<HomePage> {
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainer,
-              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-            ),
-            child: Icon(
-              Icons.person,
-              color: AppColors.outline,
-              size: spacing.AppSpacing.iconLg,
-            ),
+          DoctorProfileImage(
+            photoUrl: doctor.professionalPhotoUrl,
+            size: 48,
+            showVerifiedBadge: doctor.isApproved,
           ),
           const SizedBox(width: spacing.AppSpacing.gutterMd),
           Expanded(

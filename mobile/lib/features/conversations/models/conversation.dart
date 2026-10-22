@@ -11,6 +11,7 @@ class Conversation {
   final String doctorFirstName;
   final String doctorLastName;
   final String? practiceName;
+  final String? doctorProfessionalPhotoUrl;
   final int unreadCount;
   final String? lastMessagePreview;
   final DateTime? lastMessageSentAt;
@@ -28,6 +29,7 @@ class Conversation {
     required this.doctorFirstName,
     required this.doctorLastName,
     this.practiceName,
+    this.doctorProfessionalPhotoUrl,
     required this.unreadCount,
     this.lastMessagePreview,
     this.lastMessageSentAt,
@@ -47,6 +49,7 @@ class Conversation {
       doctorFirstName: json['doctor_first_name'] as String,
       doctorLastName: json['doctor_last_name'] as String,
       practiceName: json['practice_name'] as String?,
+      doctorProfessionalPhotoUrl: json['doctor_professional_photo_url']?.toString(),
       unreadCount: json['unread_count'] != null
           ? int.tryParse(json['unread_count'].toString()) ?? 0
           : 0,
@@ -71,6 +74,7 @@ class Conversation {
       'doctor_first_name': doctorFirstName,
       'doctor_last_name': doctorLastName,
       'practice_name': practiceName,
+      'doctor_professional_photo_url': doctorProfessionalPhotoUrl,
       'unread_count': unreadCount,
       'last_message_preview': lastMessagePreview,
       'last_message_sent_at': lastMessageSentAt?.toIso8601String(),
