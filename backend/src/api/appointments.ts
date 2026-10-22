@@ -27,9 +27,11 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
           a.*,
           d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.specialty,
           d.practice_name, d.practice_address, d.practice_latitude, d.practice_longitude,
+          d.consultation_fee, d.professional_photo_url,
           q.queue_number, q.status as queue_status,
           COALESCE(q.registration_source, 'ONLINE') as registration_source,
-          p.status as payment_status
+          p.status as payment_status,
+          p.payment_method
         FROM appointments a
         JOIN doctors d ON a.doctor_id = d.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
@@ -44,9 +46,11 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
           a.*,
           p.first_name as patient_first_name, p.last_name as patient_last_name,
           d.practice_name,
+          d.consultation_fee,
           q.queue_number, q.status as queue_status,
           COALESCE(q.registration_source, 'ONLINE') as registration_source,
-          pay.status as payment_status
+          pay.status as payment_status,
+          pay.payment_method
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         JOIN doctors d ON a.doctor_id = d.id
@@ -62,8 +66,10 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
           a.*,
           p.first_name as patient_first_name, p.last_name as patient_last_name,
           d.practice_name,
+          d.consultation_fee,
           q.queue_number, q.status as queue_status,
-          pay.status as payment_status
+          pay.status as payment_status,
+          pay.payment_method
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         JOIN doctors d ON a.doctor_id = d.id
@@ -116,7 +122,7 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
     await client.query('BEGIN');
 
     const userId = req.user!.id;
-    const { doctorId, appointmentDate, reasonForVisit } = req.body;
+    const { doctorId, appointmentDate, reasonForVisit, paymentMethod } = req.body;
 
     // Basic validation
     if (!doctorId || !appointmentDate) {
@@ -326,6 +332,16 @@ router.post('/', authenticate, requirePasswordChange, authorize('PATIENT'), asyn
       [doctorId, appointmentDateOnly]
     );
 
+    // Create payment record with specified payment method (default to CASH)
+    // GCash payments start as PENDING_VERIFICATION, Cash payments start as UNPAID
+    const finalPaymentMethod = paymentMethod || 'CASH';
+    const paymentStatus = finalPaymentMethod.toUpperCase() === 'GCASH' ? 'PENDING_VERIFICATION' : 'UNPAID';
+    await client.query(
+      `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_amount, status)
+       VALUES ($1, $2, $3, $4, $4, $5)`,
+      [patientId, appointmentId, finalPaymentMethod.toUpperCase(), doctor.consultation_fee, paymentStatus]
+    );
+
     // Get total configured capacity for that day
     const totalCapacityResult = await client.query(
       `SELECT final_capacity as total_capacity
@@ -394,11 +410,15 @@ router.get('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
       queryText = `
         SELECT a.*, d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.specialty,
                d.practice_name, d.practice_address, d.practice_latitude, d.practice_longitude, d.practice_phone,
+               d.consultation_fee, d.professional_photo_url,
                q.queue_number, q.status as queue_status,
-               COALESCE(q.registration_source, 'ONLINE') as registration_source
+               COALESCE(q.registration_source, 'ONLINE') as registration_source,
+               p.status as payment_status,
+               p.payment_method
         FROM appointments a
         JOIN doctors d ON a.doctor_id = d.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
+        LEFT JOIN payments p ON a.id = p.appointment_id
         WHERE a.id = $1 AND a.patient_id = (SELECT id FROM patients WHERE user_id = $2)
       `;
       params.push(userId);
@@ -406,6 +426,7 @@ router.get('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
       queryText = `
         SELECT a.*, p.first_name as patient_first_name, p.last_name as patient_last_name,
                d.practice_name,
+               d.consultation_fee,
                q.queue_number, q.status as queue_status
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id

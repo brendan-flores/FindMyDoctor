@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/theme/app_colors.dart';
@@ -40,11 +39,9 @@ class DoctorSchedulePage extends StatefulWidget {
 class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   final DoctorService _doctorService = DoctorService();
   final ApiService _apiService = ApiService();
-  final ImagePicker _imagePicker = ImagePicker();
 
   DateTime? _selectedDate;
   String _selectedPaymentMethod = 'CASH'; // 'GCASH' or 'CASH'
-  File? _receiptImage;
   bool _isDownloading = false;
   bool _isLoadingQr = true;
   String? _qrUrl;
@@ -82,21 +79,27 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
       );
 
       if (availability != null && availability['dates'] != null) {
-        setState(() {
-          _availabilityData = availability;
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _availabilityData = availability;
+            _isLoading = false;
+          });
+        }
       } else {
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'No availability data found';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _errorMessage = 'No availability data found';
+          _errorMessage = 'Failed to load availability: $e';
           _isLoading = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load availability: $e';
-        _isLoading = false;
-      });
     }
   }
 
@@ -105,21 +108,27 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
       final response = await _apiService.getGcashQr(doctorId: widget.doctorId);
 
       if (response['success'] == true && response['data'] != null) {
-        setState(() {
-          _qrUrl = response['data']['qrUrl'];
-          _isLoadingQr = false;
-        });
+        if (mounted) {
+          setState(() {
+            _qrUrl = response['data']['qrUrl'];
+            _isLoadingQr = false;
+          });
+        }
       } else {
         // QR code not configured
+        if (mounted) {
+          setState(() {
+            _isLoadingQr = false;
+          });
+        }
+      }
+    } catch (e) {
+      // QR code not available
+      if (mounted) {
         setState(() {
           _isLoadingQr = false;
         });
       }
-    } catch (e) {
-      // QR code not available
-      setState(() {
-        _isLoadingQr = false;
-      });
     }
   }
 
@@ -187,51 +196,10 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
         );
       }
     } finally {
-      setState(() {
-        _isDownloading = false;
-      });
-    }
-  }
-
-  Future<void> _pickReceiptImage() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
-      );
-
-      if (image != null) {
-        // Check file size (5MB limit)
-        final file = File(image.path);
-        final fileSize = await file.length();
-        const maxSize = 5 * 1024 * 1024; // 5MB
-
-        if (fileSize > maxSize) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Image size must be less than 5MB'),
-                backgroundColor: AppColors.error,
-              ),
-            );
-          }
-          return;
-        }
-
-        setState(() {
-          _receiptImage = file;
-        });
-      }
-    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to pick image: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        setState(() {
+          _isDownloading = false;
+        });
       }
     }
   }
@@ -967,7 +935,6 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               ),
             ),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
-            // Download QR and Upload Receipt buttons
             Row(
               children: [
                 Expanded(
@@ -979,89 +946,18 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                     height: 56,
                   ),
                 ),
-                const SizedBox(width: spacing.AppSpacing.gutterMd),
-                Expanded(
-                  child: PrimaryButton(
-                    text: 'Upload Receipt',
-                    onPressed: _pickReceiptImage,
-                    icon: const Icon(Icons.upload, size: 20),
-                    maxLines: 2,
-                    height: 56,
-                  ),
-                ),
               ],
             ),
-            const SizedBox(height: spacing.AppSpacing.gutterLg),
-            // Show receipt preview after image is selected
-            if (_receiptImage != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Image.asset(
-                        'assets/images/gcash_logo.png',
-                        width: 20,
-                        height: 20,
-                      ),
-                      const SizedBox(width: spacing.AppSpacing.gutterSm),
-                      Text(
-                        'Receipt Preview',
-                        style: AppTextStyles.labelSm.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: spacing.AppSpacing.gutterSm),
-                  Container(
-                    width: double.infinity,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceLow,
-                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                      border: Border.all(color: AppColors.surfaceContainerHighest),
-                    ),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                          child: Image.file(
-                            _receiptImage!,
-                            width: double.infinity,
-                            height: 150,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        Positioned(
-                          top: spacing.AppSpacing.gutterSm,
-                          right: spacing.AppSpacing.gutterSm,
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _receiptImage = null;
-                              });
-                            },
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: AppColors.error,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.close,
-                                color: AppColors.onError,
-                                size: spacing.AppSpacing.iconSm,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+            const SizedBox(height: spacing.AppSpacing.gutterMd),
+            Center(
+              child: Text(
+                'You can upload your GCash receipt after booking',
+                style: AppTextStyles.bodySm.copyWith(
+                  color: AppColors.secondary,
+                ),
+                textAlign: TextAlign.center,
               ),
+            ),
           ],
         ],
       ),
@@ -1194,9 +1090,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   Future<void> _handleBookingConfirmation() async {
     if (_selectedDate == null) return;
 
-    setState(() {
-      _isCheckingRecord = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isCheckingRecord = true;
+      });
+    }
 
     try {
       // Check if patient has an existing record with this doctor
@@ -1204,9 +1102,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
         doctorId: widget.doctorId,
       );
 
-      setState(() {
-        _isCheckingRecord = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isCheckingRecord = false;
+        });
+      }
 
       if (response['success'] == true) {
         final hasRecord = response['data']?['hasRecord'] as bool? ?? false;
@@ -1224,7 +1124,6 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 'consultationFee': widget.consultationFee,
                 'selectedDate': _selectedDate,
                 'paymentMethod': _selectedPaymentMethod,
-                'receiptImage': _receiptImage,
                 'professionalPhotoUrl': widget.professionalPhotoUrl,
               },
             );
@@ -1242,7 +1141,6 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 'consultationFee': widget.consultationFee,
                 'selectedDate': _selectedDate,
                 'paymentMethod': _selectedPaymentMethod,
-                'receiptImage': _receiptImage,
                 'professionalPhotoUrl': widget.professionalPhotoUrl,
               },
             );
@@ -1262,9 +1160,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
         }
       }
     } catch (e) {
-      setState(() {
-        _isCheckingRecord = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isCheckingRecord = false;
+        });
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

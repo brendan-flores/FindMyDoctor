@@ -497,6 +497,8 @@ Current System State (October 2026):
 - Fixing the invalid constraints removes the `Each child must be laid out exactly once.` Scaffold layout crash (a failed body build was replaced by an `ErrorWidget`, leaving the Scaffold's multi-child layout inconsistent) and the frozen loading screen that required a manual refresh or hot restart
 - Mobile home page data (specialties, recommended doctors, clinics) loads from `initState` and clears its loading flags on both success and failure; the resulting `setState` calls are guarded with a `mounted` check
 - Mobile app startup authentication check always resolves initialization (falling back to the login screen if token/storage reads fail) so the startup progress indicator cannot hang
+- Mobile appointment screens parse PostgreSQL `DECIMAL`/`NUMERIC` values (for example `doctors.consultation_fee`, which `pg` returns as a JSON string such as `"500.00"`) through the shared helpers in `mobile/lib/core/utils/json_parsers.dart` (`parseNum`, `parseInt`, `parseString`) instead of casting to `num?`; numeric strings, real numbers, `null`, empty strings, and invalid values all render safely (`₱---` / `N/A` placeholders) and the Appointments page no longer throws `type 'String' is not a subtype of type 'num?'`
+- Mobile appointment date/timestamp fields are parsed with `DateTime.tryParse` on a safely parsed string, and payment status/method empty strings are treated as absent so no blank payment badge is rendered
 
 ## Setup Progress Tracker
 - Web Doctor Sidebar includes a Setup Progress Tracker component that tracks 4 setup steps: Account Registration & Email Verification, Complete Professional Profile, Admin Approval, and Set Availability & Schedule
