@@ -13,6 +13,7 @@ import '../../../core/services/api_service.dart';
 import '../../../core/services/push_notification_service.dart';
 import '../../../core/models/user.dart';
 import '../../../app/app.dart' show MyApp;
+import 'forgot_password_page.dart';
 
 // Interface for dependency injection (test seam)
 // Exported for use in widget tests
@@ -494,7 +495,11 @@ class _LoginPageState extends State<LoginPage> {
       alignment: Alignment.centerRight,
       child: TextButton(
         onPressed: () {
-          // Handle forgot password
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const ForgotPasswordPage(),
+            ),
+          );
         },
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(

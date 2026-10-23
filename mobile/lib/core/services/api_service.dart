@@ -458,6 +458,30 @@ class ApiService {
     return response;
   }
 
+  Future<Map<String, dynamic>> requestPasswordReset(String email) async {
+    return await post(
+      ApiConstants.passwordResetRequest,
+      body: {'email': email},
+      requireAuth: false,
+    );
+  }
+
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    return await post(
+      ApiConstants.passwordResetReset,
+      body: {
+        'email': email,
+        'otp': otp,
+        'newPassword': newPassword,
+      },
+      requireAuth: false,
+    );
+  }
+
   // ===========================
   // USER METHODS
   // ===========================
