@@ -24,6 +24,7 @@ export interface DoctorProfile {
   profile_submitted_at?: string | null;
   approval_status?: 'PENDING' | 'REJECTED' | 'ACTIVE';
   rejection_reason?: string | null;
+  two_factor_enabled?: boolean;
 }
 
 export interface UpdateProfileRequest {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
@@ -11,20 +11,11 @@ export default function SecretaryLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showOtp, setShowOtp] = useState(false);
   const [challengeId, setChallengeId] = useState('');
   const router = useRouter();
-
-  // Check for session expired parameter
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('session') === 'expired') {
-      setError('Your session has expired. Please log in again.');
-    }
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,22 +23,12 @@ export default function SecretaryLogin() {
     setError('');
 
     try {
-      // Get role-scoped trusted browser token from cookies
-      const trustedBrowserToken = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('secretary_trustedBrowser='))
-        ?.split('=')[1] ||
-        document.cookie
-        .split('; ')
-        .find(row => row.startsWith('trustedBrowser='))
-        ?.split('=')[1];
-
       const response = await authApi.login({
         email,
         password,
         expectedRole: 'SECRETARY',
-        rememberMe,
-        trustedBrowserToken,
+        // The trusted-device token is an HttpOnly cookie and is sent
+        // automatically by the browser; it is never read from JavaScript.
       });
 
       if (response.success && response.data) {
@@ -60,26 +41,28 @@ export default function SecretaryLogin() {
         }
 
         // Type guard: this is now AuthResponse (not LoginOtpRequiredResponse)
-        const authData = response.data as { user: any; accessToken: string; refreshToken: string };
+        const authData = response.data as {
+          user: any;
+          accessToken: string;
+          refreshToken: string;
+          requiresTrustPrompt?: boolean;
+          session?: any;
+        };
 
-        // Store tokens in role-scoped localStorage
-        localStorage.setItem('secretary_token', authData.accessToken);
-        localStorage.setItem('secretary_refreshToken', authData.refreshToken);
         localStorage.setItem('secretary_user', JSON.stringify(authData.user));
-
-        // Also set in apiClient for immediate use
-        apiClient.setToken(authData.accessToken, authData.refreshToken);
+        apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null);
 
         if (authData.user.role === 'SECRETARY') {
           if (authData.user.mustChangePassword === true) {
+            // Password change must complete before device trust is offered.
             router.push('/secretary/change-password');
+          } else if (authData.requiresTrustPrompt) {
+            router.push('/secretary/trust-device');
           } else {
             router.push('/secretary/dashboard');
           }
         } else {
           setError('Invalid username or password.');
-          localStorage.removeItem('secretary_token');
-          localStorage.removeItem('secretary_refreshToken');
           localStorage.removeItem('secretary_user');
           apiClient.clearToken();
         }
@@ -95,23 +78,18 @@ export default function SecretaryLogin() {
 
   const handleOtpVerifySuccess = (data: any) => {
     if (data.user.role === 'SECRETARY') {
-      // Store tokens in role-scoped localStorage
-      localStorage.setItem('secretary_token', data.accessToken);
-      localStorage.setItem('secretary_refreshToken', data.refreshToken);
       localStorage.setItem('secretary_user', JSON.stringify(data.user));
-
-      // Also set in apiClient for immediate use
-      apiClient.setToken(data.accessToken, data.refreshToken);
+      apiClient.setToken(data.accessToken, data.refreshToken, data.session || null);
 
       if (data.user.mustChangePassword === true) {
         router.push('/secretary/change-password');
+      } else if (data.requiresTrustPrompt) {
+        router.push('/secretary/trust-device');
       } else {
         router.push('/secretary/dashboard');
       }
     } else {
       setError('Invalid username or password.');
-      localStorage.removeItem('secretary_token');
-      localStorage.removeItem('secretary_refreshToken');
       localStorage.removeItem('secretary_user');
       apiClient.clearToken();
     }
@@ -238,19 +216,6 @@ export default function SecretaryLogin() {
               </div>
             </div>
 
-            <div className="flex items-center pt-1">
-              <label className="flex items-center cursor-pointer select-none" htmlFor="remember-me">
-                <input
-                  id="remember-me"
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-5 w-5 rounded-md border-[#CBD5E1] text-[#0D3B75] focus:ring-[#0D3B75] focus:ring-offset-0 transition duration-150 cursor-pointer"
-                />
-                <span className="ml-2.5 text-[15px] font-normal text-[#64748B]">Remember me</span>
-              </label>
-            </div>
-
             <div className="pt-2">
               <button
                 type="submit"
@@ -269,7 +234,6 @@ export default function SecretaryLogin() {
             onVerifyError={handleOtpVerifyError}
             onCancel={handleOtpCancel}
             onChallengeIdUpdate={handleChallengeIdUpdate}
-            rememberMe={rememberMe}
           />
         )}
       </div>
