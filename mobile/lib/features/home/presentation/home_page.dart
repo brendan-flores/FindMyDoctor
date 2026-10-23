@@ -11,6 +11,7 @@ import '../../../core/models/doctor.dart';
 import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
 import '../../conversations/models/conversation.dart';
+import '../../notifications/presentation/notifications_screen.dart';
 
 class HomePage extends StatefulWidget {
   final int? initialTab;
@@ -154,6 +155,7 @@ class _HomePageState extends State<HomePage> {
           _buildDoctorsContent(),
           _buildAppointmentsContent(),
           _buildChatContent(),
+          _buildNotificationsContent(),
           _buildProfileContent(),
         ],
       ),
@@ -421,6 +423,10 @@ class _HomePageState extends State<HomePage> {
     } else {
       return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
     }
+  }
+
+  Widget _buildNotificationsContent() {
+    return const NotificationsScreen();
   }
 
   Widget _buildProfileContent() {
@@ -1051,7 +1057,8 @@ class _HomePageState extends State<HomePage> {
               _buildNavItem(Icons.local_hospital, 'Doctors', 1),
               _buildNavItem(Icons.calendar_month, 'Appointments', 2),
               _buildNavItem(Icons.chat_bubble, 'Chat', 3, unreadCount: _totalUnreadCount),
-              _buildNavItem(Icons.account_circle, 'Profile', 4),
+              _buildNavItem(Icons.notifications, 'Notifications', 4),
+              _buildNavItem(Icons.account_circle, 'Profile', 5),
             ],
           ),
         ),

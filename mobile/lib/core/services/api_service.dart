@@ -679,7 +679,7 @@ class ApiService {
     return await get(ApiConstants.notifications);
   }
 
-  Future<Map<String, dynamic>> markNotificationRead(String id) async {
+  Future<Map<String, dynamic>> markNotificationAsRead(String id) async {
     return await patch(
       '${ApiConstants.notifications}/$id${ApiConstants.notificationRead}',
     );
