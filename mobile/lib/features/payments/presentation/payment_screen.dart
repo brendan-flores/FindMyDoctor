@@ -39,6 +39,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _isLoadingPayment = true;
   Map<String, dynamic>? _paymentData;
   String? _errorMessage;
+  bool _hasUploadedReceipt = false;
 
   @override
   void initState() {
@@ -63,6 +64,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
         setState(() {
           _paymentData = response['data'];
           _isLoadingPayment = false;
+          // Check if receipt was already uploaded
+          if (_paymentData?['receipt_url'] != null) {
+            _hasUploadedReceipt = true;
+          }
         });
       } else {
         // If payment not found (404), it's normal - patient hasn't made a payment yet
@@ -179,6 +184,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           // Clear the selected image after successful upload
           setState(() {
             _receiptImage = null;
+            _hasUploadedReceipt = true;
           });
           // Refresh payment details
           _fetchPaymentDetails();
@@ -247,7 +253,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
         children: [
           AppHeader(
             showBackButton: true,
-            onBackPressed: () => Navigator.of(context).pop(),
+            onBackPressed: () {
+              if (_hasUploadedReceipt) {
+                // If receipt was uploaded, navigate to appointments page
+                Navigator.of(context).pushNamedAndRemoveUntil('/appointments', (route) {
+                  // Keep the home page in the stack to maintain proper navigation
+                  return route.settings.name == '/home';
+                });
+              } else {
+                // If no receipt uploaded, go back to previous page (booking confirmation)
+                Navigator.of(context).pop();
+              }
+            },
             showNotifications: false,
             showProfile: false,
           ),
