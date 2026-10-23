@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { secretaryApi, type SecretaryDashboard } from '@/lib/api/secretaryApi';
+import TwoFactorBanner from '@/components/settings/TwoFactorBanner';
 
 export default function SecretaryDashboard() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<SecretaryDashboard | null>(null);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -19,11 +21,19 @@ export default function SecretaryDashboard() {
     setError('');
 
     try {
-      const response = await secretaryApi.getDashboard();
-      if (response.success && response.data) {
-        setDashboardData(response.data);
+      const [dashboardResponse, profileResponse] = await Promise.all([
+        secretaryApi.getDashboard(),
+        secretaryApi.getProfile(),
+      ]);
+
+      if (profileResponse.success && profileResponse.data) {
+        setTwoFactorEnabled(profileResponse.data.two_factor_enabled ?? false);
+      }
+
+      if (dashboardResponse.success && dashboardResponse.data) {
+        setDashboardData(dashboardResponse.data);
       } else {
-        setError(response.error || 'Failed to load dashboard data');
+        setError(dashboardResponse.error || 'Failed to load dashboard data');
       }
     } catch (err) {
       console.error('Error loading dashboard:', err);
@@ -64,6 +74,10 @@ export default function SecretaryDashboard() {
 
   return (
     <div className="space-y-6">
+      {twoFactorEnabled === false && (
+        <TwoFactorBanner settingsHref="/secretary/settings" />
+      )}
+
       {/* Metric Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Today's Queue */}

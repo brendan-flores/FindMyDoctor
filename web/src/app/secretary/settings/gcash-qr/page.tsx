@@ -24,8 +24,19 @@ export default function GcashQrManagement() {
   const router = useRouter();
 
   useEffect(() => {
-    // Check if user is authenticated
-    const token = localStorage.getItem('token');
+    // Check if user is authenticated - prefer role-scoped HttpOnly cookies, fall back to localStorage
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) {
+        return parts.pop()?.split(';').shift() || null;
+      }
+      return null;
+    };
+
+    // Try role-scoped cookie first, then fallback to global cookie
+    const cookieToken = getCookie('secretary_accessToken') || getCookie('accessToken');
+    const token = cookieToken || localStorage.getItem('secretary_token') || localStorage.getItem('token');
     if (!token) {
       router.push('/secretary-login');
       return;
@@ -193,6 +204,13 @@ export default function GcashQrManagement() {
     <div className="min-h-screen bg-[#F3F5F9]">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-8">
+          <button
+            onClick={() => router.push('/secretary/settings')}
+            className="inline-flex items-center gap-1.5 rounded-lg text-sm font-semibold text-[#1A62CD] hover:text-[#1550A8] hover:bg-blue-50 px-2 py-1 -ml-2 mb-4 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1A62CD]/40"
+          >
+            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            Back to Settings
+          </button>
           <h1 className="text-3xl font-bold text-slate-900">GCash QR Management</h1>
           <p className="text-slate-600 mt-2">
             Manage the GCash QR code for {doctor?.first_name} {doctor?.last_name}
