@@ -282,7 +282,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
       borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: spacing.AppSpacing.gutterSm,
+          horizontal: spacing.AppSpacing.gutterXs,
           vertical: spacing.AppSpacing.gutterSm,
         ),
         decoration: BoxDecoration(
@@ -300,6 +300,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               label,
@@ -309,8 +310,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
             ),
             const SizedBox(width: spacing.AppSpacing.gutterXs),
             Container(
-              width: 20,
-              height: 20,
+              width: 18,
+              height: 18,
               decoration: BoxDecoration(
                 color: isSelected
                     ? AppColors.primary.withValues(alpha: 0.1)
