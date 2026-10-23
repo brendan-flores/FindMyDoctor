@@ -1,5 +1,6 @@
 import { query } from '../../database/connection';
 import { sendPushToUser } from '../../services/pushService';
+import { createNotification } from '../../api/notifications';
 
 /**
  * Conversation authorization and notification helpers for the
@@ -139,10 +140,13 @@ export async function notifyMessageRecipients(
     if (!recipient.user_id) {
       continue;
     }
-    await query(
-      `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
-       VALUES ($1, $2, $3, $4, 'conversation', $5)`,
-      [recipient.user_id, notification.type, notification.title, notification.message, conversation.id]
+    await createNotification(
+      recipient.user_id,
+      notification.type,
+      notification.title,
+      notification.message,
+      'conversation',
+      String(conversation.id)
     );
 
     // Best-effort push delivery to the recipient's registered devices

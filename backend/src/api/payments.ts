@@ -5,6 +5,7 @@ import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, r
 import { sendPushToUser } from '../services/pushService';
 import multer from 'multer';
 import { uploadPaymentReceipt, validatePaymentReceiptFile, generateSignedReceiptUrl } from '../services/storageService';
+import { createNotification, NotificationTypes } from './notifications';
 
 const router = Router();
 
@@ -385,11 +386,14 @@ router.patch('/:id/verify', authenticate, requireSecretaryPasswordChange, requir
       [secretaryRecordId, id]
     );
 
-    // Insert notification for patient
-    await client.query(
-      `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
-       VALUES ($1, 'PAYMENT_VERIFIED', 'Payment Verified', 'Your payment has been verified.', 'payment', $2)`,
-      [payment.patient_user_id, id]
+    // Insert notification for patient using helper
+    await createNotification(
+      payment.patient_user_id,
+      NotificationTypes.PAYMENT_VERIFIED,
+      'Payment Verified',
+      'Your payment has been verified.',
+      'payment',
+      id
     );
 
     await client.query('COMMIT');
@@ -485,11 +489,14 @@ router.patch('/:id/reject', authenticate, requireSecretaryPasswordChange, requir
       [secretaryRecordId, id]
     );
 
-    // Insert notification for patient
-    await client.query(
-      `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
-       VALUES ($1, 'PAYMENT_REJECTED', 'Payment Rejected', 'Your payment was rejected. Please contact the clinic.', 'payment', $2)`,
-      [payment.patient_user_id, id]
+    // Insert notification for patient using helper
+    await createNotification(
+      payment.patient_user_id,
+      NotificationTypes.PAYMENT_REJECTED,
+      'Payment Rejected',
+      'Your payment was rejected. Please contact the clinic.',
+      'payment',
+      id
     );
 
     await client.query('COMMIT');

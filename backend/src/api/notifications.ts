@@ -8,6 +8,33 @@ const router = Router();
 const VALID_PROVIDERS = ['FCM', 'APNS'];
 const VALID_PLATFORMS = ['IOS', 'ANDROID', 'WEB'];
 
+// Notification type constants
+export const NotificationTypes = {
+  PAYMENT_VERIFIED: 'PAYMENT_VERIFIED',
+  PAYMENT_REJECTED: 'PAYMENT_REJECTED',
+  NEW_SECRETARY_MESSAGE: 'NEW_SECRETARY_MESSAGE',
+  NEW_PATIENT_MESSAGE: 'NEW_PATIENT_MESSAGE',
+} as const;
+
+/**
+ * Helper function to create a notification for a user.
+ * Inserts into the notifications table with the provided details.
+ */
+export async function createNotification(
+  userId: string,
+  type: string,
+  title: string,
+  message: string,
+  relatedEntityType: string,
+  relatedEntityId: string
+): Promise<void> {
+  await query(
+    `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [userId, type, title, message, relatedEntityType, relatedEntityId]
+  );
+}
+
 // Get notifications for current user
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
