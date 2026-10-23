@@ -51,12 +51,70 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   bool _isCheckingRecord = false;
   String? _errorMessage;
 
+  // Week navigation
+  DateTime _currentWeekStart = DateTime.now();
+
+  // Cache for availability data to avoid re-fetching
+  final Map<String, Map<String, dynamic>> _availabilityCache = {};
+
   @override
   void initState() {
     super.initState();
     _selectedDate = null;
+    _currentWeekStart = _getStartOfWeek(DateTime.now());
     _fetchAvailability();
     _fetchGcashQr();
+  }
+
+  DateTime _getStartOfWeek(DateTime date) {
+    final dayOfWeek = date.weekday; // 1 = Monday, 7 = Sunday
+    return date.subtract(Duration(days: dayOfWeek % 7));
+  }
+
+  bool _isCurrentWeek() {
+    final todayStart = _getStartOfWeek(DateTime.now());
+    return _currentWeekStart.year == todayStart.year &&
+           _currentWeekStart.month == todayStart.month &&
+           _currentWeekStart.day == todayStart.day;
+  }
+
+  void _navigateToPreviousWeek() {
+    final today = DateTime.now();
+    final oneWeekAgo = today.subtract(const Duration(days: 7));
+
+    // Don't allow navigating more than 2 weeks into the past
+    if (_currentWeekStart.isBefore(oneWeekAgo)) {
+      return;
+    }
+
+    // Optimistic UI update - update week immediately
+    setState(() {
+      _currentWeekStart = _currentWeekStart.subtract(const Duration(days: 7));
+    });
+
+    // Then fetch data in background
+    _fetchAvailability();
+  }
+
+  void _navigateToNextWeek() {
+    // Optimistic UI update - update week immediately
+    setState(() {
+      _currentWeekStart = _currentWeekStart.add(const Duration(days: 7));
+    });
+
+    // Then fetch data in background
+    _fetchAvailability();
+  }
+
+  void _navigateToToday() {
+    // Optimistic UI update - update week immediately
+    setState(() {
+      _currentWeekStart = _getStartOfWeek(DateTime.now());
+      _selectedDate = null;
+    });
+
+    // Then fetch data in background
+    _fetchAvailability();
   }
 
   Future<void> _fetchAvailability() async {
@@ -66,12 +124,26 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     });
 
     try {
-      // Backend handles week filtering for patients automatically
-      // Just send current month as placeholder
-      final now = DateTime.now();
-      final startDate = DateTime(now.year, now.month, 1);
-      final endDate = DateTime(now.year, now.month + 1, 0);
+      // Only fetch the currently displayed week (fast initial load)
+      final weekEnd = _currentWeekStart.add(const Duration(days: 6));
+      final startDate = _currentWeekStart;
+      final endDate = weekEnd;
 
+      // Create a cache key for this week
+      final cacheKey = '${DateFormat('yyyy-MM-dd').format(startDate)}_${DateFormat('yyyy-MM-dd').format(endDate)}';
+
+      // Check if we have cached data for this week
+      if (_availabilityCache.containsKey(cacheKey)) {
+        if (mounted) {
+          setState(() {
+            _availabilityData = _availabilityCache[cacheKey];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      // Fetch from API (small payload - only 1 week)
       final availability = await _doctorService.getDoctorAvailability(
         doctorId: widget.doctorId,
         startDate: DateFormat('yyyy-MM-dd').format(startDate),
@@ -79,6 +151,9 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
       );
 
       if (availability != null && availability['dates'] != null) {
+        // Cache the result
+        _availabilityCache[cacheKey] = availability;
+
         if (mounted) {
           setState(() {
             _availabilityData = availability;
@@ -356,9 +431,29 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                       ),
                     ),
                     const SizedBox(height: spacing.AppSpacing.gutterXs),
-                    if (_selectedDate != null) ...[
-                      Row(
-                        children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: spacing.AppSpacing.gutterSm,
+                            vertical: spacing.AppSpacing.gutterXs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainer,
+                            borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                            border: Border.all(color: AppColors.surfaceContainerHighest),
+                          ),
+                          child: Text(
+                            'Regular Clinic',
+                            style: AppTextStyles.labelSm.copyWith(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: spacing.AppSpacing.gutterSm),
+                        if (_selectedDate != null) ...[
                           Container(
                             width: 6,
                             height: 6,
@@ -368,60 +463,23 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                             ),
                           ),
                           const SizedBox(width: spacing.AppSpacing.gutterXs),
-                          Text(
-                            _getWorkingHoursText(_selectedDate!),
-                            style: AppTextStyles.labelMd.copyWith(
-                              color: AppColors.secondary,
+                          Expanded(
+                            child: Text(
+                              _getWorkingHoursText(_selectedDate!),
+                              style: AppTextStyles.labelSm.copyWith(
+                                color: AppColors.secondary,
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ],
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: spacing.AppSpacing.gutterMd),
-          Center(
-            // FittedBox(scaleDown) keeps the centered week range + badge combo
-            // at full size when it fits and shrinks it on narrow screens, so
-            // the row can no longer overflow.
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _getWeekRangeText(),
-                    style: AppTextStyles.bodyMdMedium.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(width: spacing.AppSpacing.gutterSm),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: spacing.AppSpacing.gutterSm,
-                      vertical: spacing.AppSpacing.gutterXs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainer,
-                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
-                      border: Border.all(color: AppColors.surfaceContainerHighest),
-                    ),
-                    child: Text(
-                      'Regular Clinic',
-                      style: AppTextStyles.labelSm.copyWith(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
           if (_isLoading)
@@ -437,7 +495,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             Column(
               children: [
                 _buildCalendarGrid(),
-                const SizedBox(height: spacing.AppSpacing.gutterMd),
+                const SizedBox(height: spacing.AppSpacing.gutterSm),
                 _buildCalendarLegend(),
               ],
             ),
@@ -463,15 +521,12 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   }
 
   String _getWeekRangeText() {
-    final now = DateTime.now();
-    final dayOfWeek = now.weekday; // 1 = Monday, 7 = Sunday
-    final startOfWeek = now.subtract(Duration(days: dayOfWeek % 7));
-    final endOfWeek = startOfWeek.add(const Duration(days: 6));
+    final endOfWeek = _currentWeekStart.add(const Duration(days: 6));
 
     final startFormat = DateFormat('MMM d');
     final endFormat = DateFormat('MMM d, yyyy');
 
-    return '${startFormat.format(startOfWeek)} - ${endFormat.format(endOfWeek)}';
+    return '${startFormat.format(_currentWeekStart)} - ${endFormat.format(endOfWeek)}';
   }
 
   Widget _buildCalendarGrid() {
@@ -485,13 +540,55 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
       availabilityMap[dateData['date'] as String] = dateData;
     }
 
-    // Calculate current week (Sunday to Saturday)
-    final now = DateTime.now();
-    final dayOfWeek = now.weekday; // 1 = Monday, 7 = Sunday
-    final startOfWeek = now.subtract(Duration(days: dayOfWeek % 7));
-
     return Column(
       children: [
+        // Week navigation arrows
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              onPressed: _navigateToPreviousWeek,
+              icon: const Icon(Icons.chevron_left),
+              color: AppColors.primary,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: _navigateToToday,
+                child: Text(
+                  _getWeekRangeText(),
+                  style: AppTextStyles.bodyMdMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: AppColors.primary,
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: _navigateToNextWeek,
+              icon: const Icon(Icons.chevron_right),
+              color: AppColors.primary,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ),
+        const SizedBox(height: spacing.AppSpacing.gutterXs),
+        if (!_isCurrentWeek())
+          Center(
+            child: Text(
+              'Tap on the date range to return to today',
+              style: AppTextStyles.labelSm.copyWith(
+                fontSize: 10,
+                color: AppColors.secondary,
+              ),
+            ),
+          ),
+        const SizedBox(height: spacing.AppSpacing.gutterSm),
         // Weekday headers
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -511,10 +608,10 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               .toList(),
         ),
         const SizedBox(height: spacing.AppSpacing.gutterSm),
-        // Calendar days - display as a single row of 7 days (this week)
+        // Calendar days - display as a single row of 7 days (current week)
         Row(
           children: List.generate(7, (index) {
-            final date = startOfWeek.add(Duration(days: index));
+            final date = _currentWeekStart.add(Duration(days: index));
             final dateStr = DateFormat('yyyy-MM-dd').format(date);
             final availability = availabilityMap[dateStr];
             final status = availability?['status'] as String? ?? 'NON_WORKING';
@@ -984,7 +1081,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     return InkWell(
       onTap: () {
         setState(() {
-          _selectedPaymentMethod = title == 'GCash' ? 'GCASH' : 'CASH';
+          _selectedPaymentMethod = isGcash ? 'GCASH' : 'CASH';
         });
       },
       borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
