@@ -1068,7 +1068,7 @@ class _HomePageState extends State<HomePage> {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: spacing.AppSpacing.gutterMd,
       crossAxisSpacing: spacing.AppSpacing.gutterMd,
-      childAspectRatio: 2.2,
+      childAspectRatio: 2.5,
       children: [
         _buildQuickActionCard(
           'Find a Doctor',
@@ -1118,12 +1118,15 @@ class _HomePageState extends State<HomePage> {
           });
         }
       },
-      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      padding: EdgeInsets.symmetric(
+        horizontal: spacing.AppSpacing.gutterSm,
+        vertical: spacing.AppSpacing.gutterSm,
+      ),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: iconBgColor,
               borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
@@ -1131,17 +1134,28 @@ class _HomePageState extends State<HomePage> {
             child: Icon(
               icon,
               color: iconColor,
-              size: spacing.AppSpacing.iconLg,
+              size: spacing.AppSpacing.iconSm,
             ),
           ),
-          const SizedBox(width: spacing.AppSpacing.gutterMd),
+          const SizedBox(width: spacing.AppSpacing.gutterSm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(title, style: AppTextStyles.bodyMdMedium),
-                Text(subtitle, style: AppTextStyles.labelSm),
+                Text(
+                  title,
+                  style: AppTextStyles.labelMd.copyWith(fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  style: AppTextStyles.labelSm.copyWith(fontSize: 10),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
