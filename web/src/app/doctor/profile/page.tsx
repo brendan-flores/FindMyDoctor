@@ -72,7 +72,7 @@ export default function DoctorProfilePage() {
   }));
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = apiClient.getStoredToken();
     if (!token) {
       router.push('/doctor-login');
       return;
@@ -200,7 +200,7 @@ export default function DoctorProfilePage() {
     setError('');
 
     try {
-      const token = localStorage.getItem('token');
+      const token = apiClient.getStoredToken();
       if (!token) {
         router.push('/doctor-login');
         return;

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
 import Toast from '@/components/ui/Toast';
+import TrustedBrowsersCard from '@/components/settings/TrustedBrowsersCard';
+import ChangePasswordCard from '@/components/settings/ChangePasswordCard';
 
 interface DoctorProfile {
   two_factor_enabled?: boolean;
@@ -15,25 +17,14 @@ interface TwoFactorUpdateResponse {
 
 export default function DoctorSettings() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [twoFactorLoaded, setTwoFactorLoaded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const router = useRouter();
 
   useEffect(() => {
-    // Check if user is authenticated - prefer HttpOnly cookies, fall back to localStorage
-    const getCookie = (name: string): string | null => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) {
-        return parts.pop()?.split(';').shift() || null;
-      }
-      return null;
-    };
-
-    const cookieToken = getCookie('accessToken');
-    const token = cookieToken || localStorage.getItem('token');
+    const token = apiClient.getStoredToken();
     if (!token) {
       router.push('/doctor-login');
       return;
@@ -45,7 +36,7 @@ export default function DoctorSettings() {
   }, [router]);
 
   const fetchSettings = async () => {
-    setIsLoading(true);
+    setTwoFactorLoaded(false);
     try {
       const response = await apiClient.get('/doctors/me');
       if (response.success && response.data) {
@@ -58,7 +49,7 @@ export default function DoctorSettings() {
       console.error('Error fetching doctor settings:', err);
       setError('Failed to load settings');
     } finally {
-      setIsLoading(false);
+      setTwoFactorLoaded(true);
     }
   };
 
@@ -86,56 +77,64 @@ export default function DoctorSettings() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1A62CD] mx-auto"></div>
-          <p className="mt-4 text-slate-600">Loading settings...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Toast Notification */}
+    <div className="py-2">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
+        <p className="text-slate-600 mt-2">Manage your account security settings</p>
+      </div>
+
+      {/* Toast notifications */}
       {success && <Toast message={success} type="success" onClose={() => setSuccess('')} />}
       {error && <Toast message={error} type="error" onClose={() => setError('')} />}
 
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
-        <h2 className="text-xl font-bold text-slate-800 mb-4">Security</h2>
+      <section aria-labelledby="account-section-heading">
+        <h2 id="account-section-heading" className="text-lg font-bold text-slate-500 uppercase tracking-wide mb-4">
+          Account
+        </h2>
 
-        <div className="flex items-center justify-between py-4 border-b border-slate-100">
-          <div>
-            <h3 className="font-semibold text-slate-800">Two-Factor Authentication</h3>
-            <p className="text-sm text-slate-600 mt-1">
-              Require a verification code every time you sign in
-            </p>
+        <div className="space-y-6">
+          {/* Two-Factor Authentication */}
+          <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-slate-800">Two-Factor Authentication</h3>
+                <p className="text-sm text-slate-600 mt-1">
+                  Require a verification code when you sign in from a new or untrusted browser.
+                </p>
+              </div>
+              {!twoFactorLoaded ? (
+                <span className="text-sm text-slate-400" aria-busy="true">
+                  Loading…
+                </span>
+              ) : (
+                <button
+                  onClick={handleToggle2FA}
+                  disabled={isSaving}
+                  role="switch"
+                  aria-checked={twoFactorEnabled}
+                  aria-label="Two-Factor Authentication"
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                    twoFactorEnabled ? 'bg-gradient-to-r from-blue-500 to-blue-600' : 'bg-slate-300'
+                  } ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              )}
+            </div>
           </div>
-          <button
-            onClick={handleToggle2FA}
-            disabled={isSaving}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              twoFactorEnabled ? 'bg-gradient-to-r from-blue-500 to-blue-600' : 'bg-slate-300'
-            } ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
-        </div>
 
-        <div className="mt-4 p-4 bg-slate-50 rounded-xl">
-          <p className="text-sm text-slate-600">
-            {twoFactorEnabled
-              ? 'Two-factor authentication is enabled. You will be required to enter a verification code sent to your email each time you sign in.'
-              : 'Two-factor authentication is disabled. You can enable it to add an extra layer of security to your account.'}
-          </p>
+          {/* Change Password */}
+          <ChangePasswordCard />
+
+          {/* Trusted Browsers */}
+          <TrustedBrowsersCard />
         </div>
-      </div>
+      </section>
     </div>
   );
 }

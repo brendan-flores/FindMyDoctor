@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
 import { doctorApi, DoctorProfile, type DoctorDashboard } from '@/lib/api/doctorApi';
 import Toast from '@/components/ui/Toast';
+import TwoFactorBanner from '@/components/settings/TwoFactorBanner';
 
 export default function DoctorDashboard() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function DoctorDashboard() {
 
   useEffect(() => {
     const checkApprovalStatus = async () => {
-      const token = localStorage.getItem('doctor_token') || localStorage.getItem('token');
+      const token = apiClient.getStoredToken();
 
       if (!token) {
         localStorage.removeItem('token');
@@ -185,6 +186,10 @@ export default function DoctorDashboard() {
 
   return (
     <div className="space-y-6">
+      {profile?.two_factor_enabled === false && (
+        <TwoFactorBanner settingsHref="/doctor/settings" />
+      )}
+
       {/* Metric Cards - Full Width */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Today's Appointments */}
