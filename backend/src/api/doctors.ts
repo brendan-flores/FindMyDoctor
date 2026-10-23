@@ -523,17 +523,8 @@ router.get('/:id/availability', authenticate, async (req: AuthRequest, res: Resp
         patientId = patientResult.rows[0].id;
       }
 
-      // Restrict patients to current week only
-      const now = new Date();
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
-
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
-
-      // Override request parameters to this week
-      req.query.startDate = toClinicDateString(startOfWeek);
-      req.query.endDate = toClinicDateString(endOfWeek);
+      // Allow patients to see availability for the requested date range
+      // Don't restrict to current week - let them browse through weeks
     }
 
     if (date) {
@@ -543,22 +534,6 @@ router.get('/:id/availability', authenticate, async (req: AuthRequest, res: Resp
     } else if (startDate && endDate) {
       // Get availability for a date range
       const availabilityRange = await calculateAvailabilityRange(id, String(startDate), String(endDate), patientId);
-
-      // For patients, filter to only show 7 days (this week)
-      if (role === 'PATIENT' && availabilityRange.dates) {
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
-
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
-
-        // Filter dates to only include this week
-        availabilityRange.dates = availabilityRange.dates.filter((d: any) => {
-          const date = new Date(d.date);
-          return date >= startOfWeek && date <= endOfWeek;
-        });
-      }
 
       res.json(success(availabilityRange));
     } else {
