@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { sendPatientSignupOtp, verifyPatientOtpToken } from '../services/patientOtpService';
+import { ensurePatientSupabaseIdentity } from '../services/otpService';
 import { success, error, ErrorCodes } from '../utils/response';
 import { query, getClient } from '../database/connection';
 import bcrypt from 'bcryptjs';
@@ -385,6 +386,16 @@ router.post('/verify', async (req: Request, res: Response) => {
     await client.query('DELETE FROM pending_patient_signups WHERE email = $1', [email]);
 
     await client.query('COMMIT');
+
+    // Ensure patient has Supabase Auth identity for password reset
+    // This is done after the PostgreSQL account is created for consistency
+    try {
+      await ensurePatientSupabaseIdentity(email);
+    } catch (err) {
+      console.error('Failed to ensure Supabase identity for patient:', err);
+      // Don't fail the signup if Supabase identity creation fails
+      // The PostgreSQL account is already created successfully
+    }
 
     // Return success message with access token - patient is automatically authenticated
     const accessToken = generateAccessToken(user);
