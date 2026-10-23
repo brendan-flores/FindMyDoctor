@@ -383,37 +383,45 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             ],
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                _getWeekRangeText(),
-                style: AppTextStyles.bodyMdMedium.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                ),
-              ),
-              const SizedBox(width: spacing.AppSpacing.gutterSm),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: spacing.AppSpacing.gutterSm,
-                  vertical: spacing.AppSpacing.gutterXs,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
-                  border: Border.all(color: AppColors.surfaceContainerHighest),
-                ),
-                child: Text(
-                  'Regular Clinic',
-                  style: AppTextStyles.labelSm.copyWith(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
+          Center(
+            // FittedBox(scaleDown) keeps the centered week range + badge combo
+            // at full size when it fits and shrinks it on narrow screens, so
+            // the row can no longer overflow.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _getWeekRangeText(),
+                    style: AppTextStyles.bodyMdMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: spacing.AppSpacing.gutterSm),
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: spacing.AppSpacing.gutterSm,
+                      vertical: spacing.AppSpacing.gutterXs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainer,
+                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                      border: Border.all(color: AppColors.surfaceContainerHighest),
+                    ),
+                    child: Text(
+                      'Regular Clinic',
+                      style: AppTextStyles.labelSm.copyWith(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
           if (_isLoading)
@@ -769,7 +777,6 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
 
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
           children: [
@@ -788,12 +795,18 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             ),
           ],
         ),
-        Text(
-          value,
-          style: AppTextStyles.labelSm.copyWith(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: AppColors.onSurface,
+        const SizedBox(width: spacing.AppSpacing.gutterSm),
+        // Expanded lets long values wrap on narrow screens instead of
+        // overflowing the row by a few pixels.
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: AppTextStyles.labelSm.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: AppColors.onSurface,
+            ),
           ),
         ),
       ],

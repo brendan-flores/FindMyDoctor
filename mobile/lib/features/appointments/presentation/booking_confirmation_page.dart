@@ -105,13 +105,23 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // A confirmed booking must not be escaped back into the pre-filled
+    // booking form. Once the success state is showing, both the header back
+    // button and the system back gesture route to the appointments list.
+    return PopScope(
+      canPop: !_isSuccess,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _isSuccess) {
+          _goToAppointments();
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
           AppHeader(
             showBackButton: true,
-            onBackPressed: () => Navigator.of(context).pop(),
+            onBackPressed: _isSuccess ? _goToAppointments : () => Navigator.of(context).pop(),
             showNotifications: false,
             showProfile: false,
           ),
@@ -136,7 +146,18 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
           ),
           if (_isSuccess) _buildBottomButton(context),
         ],
+        ),
       ),
+    );
+  }
+
+  /// Replaces the whole navigation stack below home with the appointments tab
+  /// (same destination as the "View in Appointments" success button) so the
+  /// already-consumed booking form can never be surfaced again.
+  void _goToAppointments() {
+    Navigator.of(context).pushReplacementNamed(
+      '/home',
+      arguments: {'initialTab': 2},
     );
   }
 
