@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import DoctorSidebar from '@/components/layout/DoctorSidebar';
 import DoctorHeader from '@/components/layout/DoctorHeader';
 import { apiClient } from '@/lib/api/apiClient';
@@ -12,6 +12,8 @@ interface DoctorLayoutProps {
 
 export default function DoctorLayout({ children }: DoctorLayoutProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const isTrustPage = pathname === '/doctor/trust-device';
   const [userName, setUserName] = useState('Dr. Smith');
   const [userRole, setUserRole] = useState('Doctor');
   const [isLoading, setIsLoading] = useState(true);
@@ -70,6 +72,10 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
         <div className="text-slate-600">Loading...</div>
       </div>
     );
+  }
+
+  if (isTrustPage) {
+    return <>{children}</>;
   }
 
   return (

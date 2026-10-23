@@ -13,6 +13,7 @@ interface SecretaryLayoutProps {
 export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const isTrustPage = pathname === '/secretary/trust-device';
   const [userName, setUserName] = useState('Secretary');
   const [userRole, setUserRole] = useState('Secretary');
   const [isLoading, setIsLoading] = useState(true);
@@ -59,8 +60,13 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
           shouldRedirect = true;
           redirectPath = '/secretary/change-password';
         } else {
-          // Check if profile completion is required (only after password change)
-          if (user.mustChangePassword === false && !pathname.includes('/complete-profile')) {
+          // Check if profile completion is required (only after password change).
+          // The device-trust prompt is allowed before profile completion.
+          if (
+            user.mustChangePassword === false &&
+            !pathname.includes('/complete-profile') &&
+            !isTrustPage
+          ) {
             asyncLoadNeeded = true;
             // Fetch secretary profile to check completion status and get real name
             apiClient.get('/users/me')
@@ -117,7 +123,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
     if (!asyncLoadNeeded) {
       setIsLoading(false);
     }
-  }, [router, pathname]);
+  }, [router, pathname, isTrustPage]);
 
   if (isLoading) {
     return (
@@ -125,6 +131,10 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
         <div className="text-slate-600">Loading...</div>
       </div>
     );
+  }
+
+  if (isTrustPage) {
+    return <>{children}</>;
   }
 
   return (

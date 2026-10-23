@@ -20,7 +20,7 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
 
   // Load profile and schedules for setup progress
   const refreshProfile = () => {
-    const token = localStorage.getItem('doctor_token') || localStorage.getItem('token');
+    const token = apiClient.getStoredToken();
     if (!token) return;
 
     apiClient.setToken(token);
