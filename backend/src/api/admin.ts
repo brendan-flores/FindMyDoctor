@@ -794,15 +794,22 @@ router.patch('/admins/:id', authenticate, authorize('SUPERADMIN'), async (req: A
 
     await client.query('BEGIN');
 
-    // Update is_active status
+    // Update is_active status. Deactivation revokes refresh tokens by bumping
+    // the session version; access tokens expire on their own short lifetime.
     await client.query(
-      "UPDATE users SET is_active = $1 WHERE id = $2",
+      is_active === false
+        ? 'UPDATE users SET is_active = $1, session_version = session_version + 1 WHERE id = $2'
+        : 'UPDATE users SET is_active = $1 WHERE id = $2',
       [is_active, id]
     );
 
-    // If deactivating, invalidate all push device tokens
+    // If deactivating, invalidate all push device tokens and trusted browsers
     if (is_active === false) {
       await client.query('DELETE FROM device_tokens WHERE user_id = $1', [id]);
+      await client.query(
+        'UPDATE trusted_browsers SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND revoked_at IS NULL',
+        [id]
+      );
     }
 
     await client.query('COMMIT');
@@ -898,11 +905,18 @@ router.patch('/doctors/:id/deactivate', authenticate, authorize('ADMIN', 'SUPERA
 
     await client.query('BEGIN');
 
-    // Deactivate user account
-    await client.query('UPDATE users SET is_active = false WHERE id = $1', [doctor.id]);
+    // Deactivate user account and revoke every existing session.
+    await client.query(
+      'UPDATE users SET is_active = false, session_version = session_version + 1 WHERE id = $1',
+      [doctor.id]
+    );
 
     // Invalidate all push device tokens for this user
     await client.query('DELETE FROM device_tokens WHERE user_id = $1', [doctor.id]);
+    await client.query(
+      'UPDATE trusted_browsers SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND revoked_at IS NULL',
+      [doctor.id]
+    );
 
     await client.query('COMMIT');
 
@@ -978,11 +992,18 @@ router.patch('/secretaries/:id/deactivate', authenticate, authorize('ADMIN', 'SU
 
     await client.query('BEGIN');
 
-    // Deactivate user account
-    await client.query('UPDATE users SET is_active = false WHERE id = $1', [secretary.id]);
+    // Deactivate user account and revoke every existing session.
+    await client.query(
+      'UPDATE users SET is_active = false, session_version = session_version + 1 WHERE id = $1',
+      [secretary.id]
+    );
 
     // Invalidate all push device tokens for this user
     await client.query('DELETE FROM device_tokens WHERE user_id = $1', [secretary.id]);
+    await client.query(
+      'UPDATE trusted_browsers SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND revoked_at IS NULL',
+      [secretary.id]
+    );
 
     await client.query('COMMIT');
 
@@ -1053,10 +1074,15 @@ router.post('/secretaries/:id/reset-password', authenticate, authorize('ADMIN', 
     const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase();
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 
-    // Update password and set must_change_password flag
+    // Update password, set must_change_password flag, revoke refresh tokens,
+    // and revoke every trusted browser for this secretary.
     await query(
-      'UPDATE users SET password_hash = $1, must_change_password = true WHERE id = $2',
+      'UPDATE users SET password_hash = $1, must_change_password = true, session_version = session_version + 1 WHERE id = $2',
       [passwordHash, secretary.id]
+    );
+    await query(
+      'UPDATE trusted_browsers SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND revoked_at IS NULL',
+      [secretary.id]
     );
 
     // Log audit entry
