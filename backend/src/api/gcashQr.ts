@@ -51,9 +51,9 @@ router.get('/doctor/:doctorId', authenticate, requireSecretaryPasswordChange, re
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only manage QR codes for your assigned doctor'));
     }
 
-    // Get the doctor's GCash QR URL
+    // Get the doctor's GCash QR URL and its last-updated timestamp
     const doctorResult = await query(
-      'SELECT gcash_qr_url FROM doctors WHERE id = $1',
+      'SELECT gcash_qr_url, gcash_qr_updated_at FROM doctors WHERE id = $1',
       [doctorId]
     );
 
@@ -62,8 +62,9 @@ router.get('/doctor/:doctorId', authenticate, requireSecretaryPasswordChange, re
     }
 
     const gcashQrUrl = doctorResult.rows[0].gcash_qr_url;
+    const gcashQrUpdatedAt = doctorResult.rows[0].gcash_qr_updated_at;
 
-    res.json(success({ gcashQrUrl }, 'GCash QR code retrieved'));
+    res.json(success({ gcashQrUrl, gcashQrUpdatedAt }, 'GCash QR code retrieved'));
   } catch (err: any) {
     console.error('Error fetching GCash QR code:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch GCash QR code'));
@@ -131,17 +132,18 @@ router.post('/doctor/:doctorId/upload', authenticate, requireSecretaryPasswordCh
       await deleteGcashQr(currentQrUrl);
     }
 
-    // Update database with new QR URL
+    // Update database with new QR URL and its upload timestamp
     const result = await query(
       `UPDATE doctors
-       SET gcash_qr_url = $1, updated_at = CURRENT_TIMESTAMP
+       SET gcash_qr_url = $1, gcash_qr_updated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = $2
-       RETURNING gcash_qr_url`,
+       RETURNING gcash_qr_url, gcash_qr_updated_at`,
       [uploadResult.url, doctorId]
     );
 
     res.json(success({
-      gcashQrUrl: result.rows[0].gcash_qr_url
+      gcashQrUrl: result.rows[0].gcash_qr_url,
+      gcashQrUpdatedAt: result.rows[0].gcash_qr_updated_at
     }, 'GCash QR code uploaded successfully'));
   } catch (err: any) {
     console.error('Error uploading GCash QR code:', err);
@@ -194,9 +196,9 @@ router.delete('/doctor/:doctorId', authenticate, requireSecretaryPasswordChange,
       return res.status(500).json(error(ErrorCodes.SERVER_ERROR, deleteResult.error || 'Failed to delete QR code'));
     }
 
-    // Clear database field
+    // Clear database field and the QR upload timestamp
     await query(
-      'UPDATE doctors SET gcash_qr_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      'UPDATE doctors SET gcash_qr_url = NULL, gcash_qr_updated_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
       [doctorId]
     );
 
