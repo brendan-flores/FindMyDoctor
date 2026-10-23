@@ -418,3 +418,29 @@ export const conversationApi = {
     return apiClient.get<AppointmentSummary>(`/conversations/patient/${patientId}/appointment-summary`);
   },
 };
+
+// Notification interface (from notifications table)
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  related_entity_type?: string | null;
+  related_entity_id?: string | null;
+}
+
+// Notifications API
+export const notificationApi = {
+  // Get all notifications for current user
+  getNotifications: async (): Promise<{ success: boolean; data?: Notification[]; error?: string }> => {
+    return apiClient.get<Notification[]>('/notifications');
+  },
+
+  // Mark notification as read
+  markAsRead: async (notificationId: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/notifications/${notificationId}/read`, {});
+  },
+};
