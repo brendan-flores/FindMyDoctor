@@ -144,6 +144,21 @@ Current System State (October 2026):
 - Doctor and Secretary login forms no longer include a Remember Me checkbox.
 - After a Doctor or Secretary successfully completes authentication (password and, when 2FA is enabled, OTP), an untrusted browser is shown `/doctor/trust-device` or `/secretary/trust-device`. The page displays the detected browser and operating system and offers "Trust this device" and "Do not trust this device".
 - **Trust this device:** registers the browser for 30 days, upgrades the current session to the 30-day persistent policy, and skips OTP on later logins from that browser when 2FA is enabled. The password is always required.
+
+## Password Reset via Email OTP
+
+- Users can reset their password through a secure email OTP flow without authentication
+- Mobile password reset flow: Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Login with success message
+- Backend API endpoints for password reset: `POST /api/v1/auth/password-reset/request` (send OTP) and `POST /api/v1/auth/password-reset/reset` (verify OTP and update password)
+- Password reset request endpoint validates email, checks if user exists in PostgreSQL, and sends OTP via Supabase Auth
+- For security, the request endpoint returns a success message even if the email is not registered (does not reveal email existence)
+- Password reset request is rate-limited to 3 requests per 10 minutes per email to prevent abuse
+- Password reset endpoint validates the 6-digit OTP with Supabase Auth, hashes the new password with bcrypt, updates the PostgreSQL users table, and clears the `must_change_password` flag if present
+- Password reset also increments the `session_version` in the users table to invalidate all existing refresh tokens and trusted browser sessions
+- Mobile forgot password page (`forgot_password_page.dart`) follows the same design patterns as login and signup pages: background with soft blobs, back button, logo, white form card, custom text fields, primary button, and trust footer
+- Mobile reset password page (`reset_password_page.dart`) includes OTP field (6 digits), new password field, confirm password field, password requirements indicators (8+ chars, number, uppercase), resend code button with 60-second cooldown, error banner, and loading state
+- OTP service functions `sendPasswordResetOtp()` and `verifyPasswordResetOtp()` in `otpService.ts` use Supabase Auth with `shouldCreateUser: false` to prevent creating Supabase users; PostgreSQL remains the source of truth for application accounts
+- Password reset is available to all user roles (PATIENT, DOCTOR, SECRETARY, ADMIN, SUPERADMIN) through the same flow
 - **Do not trust this device:** keeps browser-session cookies, 8-hour idle timeout, 7-hour access token, 8-hour refresh token, and no trusted browser. OTP is required on every login when 2FA is enabled, and any stale trust cookie is cleared.
 - Trusting a device never bypasses the OTP required for the current login. `POST /api/v1/auth/verify-login-otp` always issues a short untrusted session; only the explicit trust endpoint upgrades it.
 - A browser that is already trusted skips OTP and the trust page on later logins.
