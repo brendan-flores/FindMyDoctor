@@ -19,7 +19,7 @@ FindMyDoctor REST API - Healthcare appointment management system serving both Fl
 - **Patient Registration**: Email OTP verification with staged signup flow
 - **Doctor Self-Registration**: OTP-verified registration with profile completion and approval workflow
 - **Two-Factor Authentication**: Optional 2FA for doctors and secretaries with trusted browser management
-- **Remember Me**: Persistent sessions for doctors and secretaries
+- **Device Trust**: Post-login trusted-browser prompt for doctors and secretaries
 - **Appointment Management**: Atomic booking with capacity enforcement and duplicate booking prevention
 - **Unified Queue System**: Combined queue for online and walk-in patients with sequential numbering
 - **Concurrency-Safe Queue Assignment**: PostgreSQL advisory locks prevent duplicate queue numbers under concurrent requests
@@ -358,7 +358,7 @@ If no capacity row exists, the system calculates capacity from doctor's working 
 
 ### Two-Factor Authentication
 - Optional 2FA for doctors and secretaries
-- Remember Me: Persistent sessions for 30 days on trusted browsers
+- Device trust: Trusting a browser after login grants a 30-day persistent session and skips OTP on later logins from that browser; the password is always required
 - Login OTP: 6-digit code sent via email
 - Trusted browser management: Add/remove trusted devices
 
