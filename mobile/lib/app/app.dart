@@ -16,6 +16,8 @@ import '../features/doctors/presentation/doctor_schedule_page.dart';
 import '../features/doctors/presentation/doctors_page.dart';
 import '../features/appointments/presentation/booking_confirmation_page.dart';
 import '../features/patients/presentation/patient_details_page.dart';
+import '../features/patients/presentation/patient_profile_page.dart';
+import '../features/settings/presentation/privacy_notice_page.dart';
 import '../features/conversations/presentation/conversation_thread_page.dart';
 import '../features/payments/presentation/payment_screen.dart';
 import '../features/notifications/presentation/notifications_page.dart';
@@ -171,6 +173,8 @@ class MyAppState extends State<MyApp> {
           case '/doctor-schedule':
           case '/booking-confirmation':
           case '/patient-details':
+          case '/patient-profile':
+          case '/privacy-notice':
           case '/payment':
           case '/notifications':
           case '/conversation-thread':
@@ -251,6 +255,14 @@ class MyAppState extends State<MyApp> {
                     conversationId: args?['conversationId'] ?? '',
                     counterpartName: args?['counterpartName'] as String?,
                   ),
+                );
+              case '/patient-profile':
+                return MaterialPageRoute(
+                  builder: (context) => const PatientProfilePage(),
+                );
+              case '/privacy-notice':
+                return MaterialPageRoute(
+                  builder: (context) => const PrivacyNoticePage(),
                 );
               case '/notifications':
                 return MaterialPageRoute(
