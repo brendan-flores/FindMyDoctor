@@ -149,10 +149,11 @@ async function testDatabaseConnection() {
 // Start server only after database connection test
 testDatabaseConnection().then((connected) => {
   if (connected) {
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`FindMyDoctor API server running on port ${PORT}`);
       console.log(`Environment: ${config.app.env}`);
       console.log(`API version: ${apiVersion}`);
+      console.log(`Accepting connections from all network interfaces`);
     });
   } else {
     console.error('Server not started due to database connection failure');
