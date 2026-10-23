@@ -6,6 +6,8 @@
 
 import request from 'supertest';
 import express from 'express';
+import cookieParser from 'cookie-parser';
+import crypto from 'crypto';
 import authRouter from './auth';
 
 // Mock dependencies
@@ -27,6 +29,7 @@ describe('Auth API - Patient Login Validation', () => {
   beforeEach(() => {
     app = express();
     app.use(express.json());
+    app.use(cookieParser());
     app.use('/api/v1/auth', authRouter);
     jest.clearAllMocks();
   });
@@ -642,6 +645,80 @@ describe('Auth API - Patient Login Validation', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.error.message).toContain('Invalid credentials or account role');
+    });
+  });
+
+  describe('GET /api/v1/auth/trusted-browsers', () => {
+    function trustedBrowserRow(id: string, isCurrent: boolean) {
+      return {
+        id,
+        device_info: 'Mozilla/5.0 (Windows NT 10.0) Chrome/123.0.0.0',
+        created_at: '2026-10-01T00:00:00.000Z',
+        last_used_at: '2026-10-20T00:00:00.000Z',
+        expires_at: '2026-10-31T00:00:00.000Z',
+        is_current: isCurrent,
+      };
+    }
+
+    it('flags the row matching the request trusted-browser cookie as is_current', async () => {
+      const rawToken = 'raw-trusted-token';
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('FROM trusted_browsers')) {
+          // The route hashes the request's trust cookie and passes it as $2
+          expect(params[1]).toBe(tokenHash);
+          return Promise.resolve({
+            rows: [trustedBrowserRow('browser-1', true), trustedBrowserRow('browser-2', false)],
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const jwt = require('jsonwebtoken');
+      jest.spyOn(jwt, 'verify').mockReturnValue({
+        id: 'doctor-id',
+        email: 'doctor@example.com',
+        role: 'DOCTOR',
+        mustChangePassword: false,
+      });
+
+      const response = await request(app)
+        .get('/api/v1/auth/trusted-browsers')
+        .set('Authorization', 'Bearer test-token')
+        .set('Cookie', [`doctor_trustedBrowser=${rawToken}`]);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.browsers[0]).toMatchObject({ id: 'browser-1', is_current: true });
+      expect(response.body.data.browsers[1]).toMatchObject({ id: 'browser-2', is_current: false });
+    });
+
+    it('returns every row as not current when no trusted-browser cookie is sent', async () => {
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('FROM trusted_browsers')) {
+          expect(params[1]).toBeNull();
+          return Promise.resolve({
+            rows: [trustedBrowserRow('browser-1', false), trustedBrowserRow('browser-2', false)],
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const jwt = require('jsonwebtoken');
+      jest.spyOn(jwt, 'verify').mockReturnValue({
+        id: 'doctor-id',
+        email: 'doctor@example.com',
+        role: 'DOCTOR',
+        mustChangePassword: false,
+      });
+
+      const response = await request(app)
+        .get('/api/v1/auth/trusted-browsers')
+        .set('Authorization', 'Bearer test-token');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.browsers.every((b: any) => b.is_current === false)).toBe(true);
     });
   });
 
