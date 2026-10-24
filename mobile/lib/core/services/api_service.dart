@@ -466,16 +466,30 @@ class ApiService {
     );
   }
 
-  Future<Map<String, dynamic>> resetPassword({
+  Future<Map<String, dynamic>> verifyPasswordResetOtp({
     required String email,
     required String otp,
+  }) async {
+    return await post(
+      ApiConstants.passwordResetVerify,
+      body: {
+        'email': email,
+        'otp': otp,
+      },
+      requireAuth: false,
+    );
+  }
+
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String resetToken,
     required String newPassword,
   }) async {
     return await post(
       ApiConstants.passwordResetReset,
       body: {
         'email': email,
-        'otp': otp,
+        'resetToken': resetToken,
         'newPassword': newPassword,
       },
       requireAuth: false,

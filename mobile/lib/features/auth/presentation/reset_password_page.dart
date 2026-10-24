@@ -25,9 +25,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  bool _isVerifying = false;
   bool _isLoading = false;
   bool _isSuccess = false;
   String? _errorMessage;
+
+  // Two-step verification state
+  bool _isCodeVerified = false;
+  String? _resetToken;
 
   // Password requirement indicators
   bool _hasMinLength = false;
@@ -124,6 +129,99 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     }
   }
 
+  Future<void> _handleVerifyCode() async {
+    FocusScope.of(context).unfocus();
+
+    if (_errorMessage != null) {
+      setState(() {
+        _errorMessage = null;
+      });
+    }
+
+    final otp = _otpController.text.trim();
+    if (otp.length != 6) {
+      setState(() {
+        _errorMessage = 'Please enter a valid 6-digit code';
+      });
+      return;
+    }
+
+    setState(() {
+      _isVerifying = true;
+    });
+
+    try {
+      final response = await _apiService.verifyPasswordResetOtp(
+        email: widget.email,
+        otp: otp,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isVerifying = false;
+        });
+
+        if (response['success'] == true && response['data']?['resetToken'] != null) {
+          setState(() {
+            _isCodeVerified = true;
+            _resetToken = response['data']['resetToken'];
+            _errorMessage = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Code verified successfully. Enter your new password.'),
+              backgroundColor: AppColors.brandPrimary,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          final message = response['error']?['message'] ?? 'Invalid or expired verification code';
+          setState(() {
+            _errorMessage = message;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isVerifying = false;
+        });
+        String errorMessage = 'An error occurred during verification. Please try again.';
+        final errorString = e.toString();
+
+        if (errorString.contains('Connection refused') ||
+            errorString.contains('Failed host lookup')) {
+          errorMessage =
+              'Cannot connect to server. Please ensure backend is running at http://10.0.2.2:3000';
+        } else if (errorString.contains('timeout')) {
+          errorMessage = 'Request timed out. Please check your connection.';
+        } else if (errorString.length < 100) {
+          errorMessage = errorString;
+        }
+
+        setState(() {
+          _errorMessage = errorMessage;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _handleResetPassword() async {
     FocusScope.of(context).unfocus();
 
@@ -151,17 +249,23 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       return;
     }
 
+    if (_resetToken == null) {
+      setState(() {
+        _errorMessage = 'Please verify your verification code first.';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final otp = _otpController.text.trim();
       final newPassword = _newPasswordController.text;
 
       final response = await _apiService.resetPassword(
         email: widget.email,
-        otp: otp,
+        resetToken: _resetToken!,
         newPassword: newPassword,
       );
 
@@ -171,6 +275,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         });
 
         if (response['success'] == true) {
+          setState(() {
+            _isSuccess = true;
+          });
           // Show success message and navigate back to login
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -407,7 +514,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         ),
         const SizedBox(height: AppSpacing.gutterSm),
         Text(
-          'Enter the code sent to ${widget.email} and your new password.',
+          _isCodeVerified
+              ? 'Enter your new password below.'
+              : 'Enter the code sent to ${widget.email}',
           textAlign: TextAlign.center,
           style: AppTextStyles.bodyMd.copyWith(
             color: AppColors.slate500,
@@ -441,38 +550,44 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildOtpField(),
-          const SizedBox(height: AppSpacing.gutterMd + 2),
-          _buildNewPasswordField(),
-          const SizedBox(height: AppSpacing.gutterSm),
-          _buildPasswordRequirements(),
-          const SizedBox(height: AppSpacing.gutterMd + 2),
-          _buildConfirmPasswordField(),
-          const SizedBox(height: AppSpacing.gutterMd),
-          _buildResendButton(),
-          const SizedBox(height: AppSpacing.gutterMd),
-          _buildErrorBanner(),
-          _buildResetButton(),
-        ],
+        children: _isCodeVerified
+            ? [
+                _buildNewPasswordField(),
+                const SizedBox(height: AppSpacing.gutterSm),
+                _buildPasswordRequirements(),
+                const SizedBox(height: AppSpacing.gutterMd + 2),
+                _buildConfirmPasswordField(),
+                const SizedBox(height: AppSpacing.gutterMd),
+                _buildErrorBanner(),
+                _buildResetButton(),
+              ]
+            : [
+                _buildOtpField(),
+                const SizedBox(height: AppSpacing.gutterMd),
+                _buildResendButton(),
+                const SizedBox(height: AppSpacing.gutterMd),
+                _buildErrorBanner(),
+                _buildVerifyButton(),
+              ],
       ),
     );
   }
 
   Widget _buildOtpField() {
     return CustomTextField(
-      label: 'Reset Code',
+      label: 'Verification Code',
       hint: 'Enter 6-digit code',
       controller: _otpController,
       keyboardType: TextInputType.number,
-      textInputAction: TextInputAction.next,
+      textInputAction: TextInputAction.done,
       prefixIcon: Icons.lock_outlined,
-      enabled: !_isLoading,
+      enabled: !_isVerifying,
       borderRadius: AppSpacing.radiusXl,
       maxLength: 6,
+      onSubmitted: (_) => _handleVerifyCode(),
       validator: (value) {
         if (value == null || value.isEmpty) {
-          return 'Please enter the reset code';
+          return 'Please enter the verification code';
         }
         if (value.length != 6) {
           return 'Please enter a valid 6-digit code';
@@ -629,6 +744,33 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildVerifyButton() {
+    const Color buttonColor = AppColors.brandPrimary;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        boxShadow: [
+          BoxShadow(
+            color: buttonColor.withValues(alpha: 0.30),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: PrimaryButton(
+        text: _isVerifying ? 'Verifying...' : 'Verify Code',
+        onPressed: _handleVerifyCode,
+        isLoading: _isVerifying,
+        backgroundColor: buttonColor,
+        icon: const Icon(
+          Icons.check_circle_outline,
+          size: 20,
+        ),
+      ),
     );
   }
 
