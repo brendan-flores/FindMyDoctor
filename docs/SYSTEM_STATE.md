@@ -147,28 +147,28 @@ Current System State (October 2026):
 
 ## Password Reset via Email OTP
 
-- Users can reset their password through a secure email OTP flow without authentication
-- Mobile password reset flow: Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Login with success message
-- Web Doctor Portal password reset flow: Doctor Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Doctor Login with success message
-- Web Secretary Portal password reset flow: Secretary Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Secretary Login with success message
-- Backend API endpoints for password reset: `POST /api/v1/auth/password-reset/request` (send OTP) and `POST /api/v1/auth/password-reset/reset` (verify OTP and update password)
-- Password reset request endpoint validates email, checks if user exists in PostgreSQL, and sends OTP via Supabase Auth
-- For security, the request endpoint returns a success message even if the email is not registered (does not reveal email existence)
-- Password reset request is rate-limited to 3 requests per 10 minutes per email to prevent abuse
-- Password reset endpoint validates the 6-digit OTP with Supabase Auth, hashes the new password with bcrypt, updates the PostgreSQL users table, and clears the `must_change_password` flag if present
-- Password reset also increments the `session_version` in the users table to invalidate all existing refresh tokens and trusted browser sessions
-- Mobile forgot password page (`forgot_password_page.dart`) follows the same design patterns as login and signup pages: background with soft blobs, back button, logo, white form card, custom text fields, primary button, and trust footer
-- Mobile reset password page (`reset_password_page.dart`) includes OTP field (6 digits), new password field, confirm password field, password requirements indicators (8+ chars, number, uppercase), resend code button with 60-second cooldown, error banner, and loading state
-- Web Doctor forgot password page (`/web/src/app/doctor/forgot-password/page.tsx`) with email input form, following the same design patterns as the login page (colors, spacing, card styling, buttons)
-- Web Doctor reset password page (`/web/src/app/doctor/reset-password/page.tsx`) with OTP field (6 digits), new password field, confirm password field, password requirements indicators (8+ chars, number, uppercase), resend code button with 60-second cooldown, error banner, and loading state
-- Web Secretary forgot password page (`/web/src/app/secretary/forgot-password/page.tsx`) with email input form, following the same design patterns as the secretary login page
-- Web Secretary reset password page (`/web/src/app/secretary/reset-password/page.tsx`) with OTP field, new password field, confirm password field, password requirements indicators, resend code button with 60-second cooldown, error banner, and loading state
-- Web password reset API client functions in `authApi.ts`: `requestPasswordReset()` and `resetPassword()` methods calling the existing backend endpoints
-- Doctor login page links to `/doctor/forgot-password` via the "Forgot Password?" link
-- Secretary login page links to `/secretary/forgot-password` via the "Forgot Password?" link
-- OTP service functions `sendPasswordResetOtp()` and `verifyPasswordResetOtp()` in `otpService.ts` use Supabase Auth with `shouldCreateUser: false` to prevent creating Supabase users; PostgreSQL remains the source of truth for application accounts
+- Users can reset their password through a secure two-step email OTP verification flow without authentication
+- Password reset email delivery uses Supabase Auth with `auth_flow: 'password_reset'` where the email contains only the verification code
+- Two-step verification sequence across all clients (Mobile Patient, Web Doctor, Web Secretary):
+  1. User enters their email address and requests a password reset (`POST /api/v1/auth/password-reset/request`).
+  2. System sends an email containing only the verification code.
+  3. After the email is sent, the UI displays only the verification code input field and the "Verify Code" button (plus resend button with 60-second cooldown). New password and confirm password fields are strictly hidden.
+  4. User enters the 6-digit verification code and submits it to backend verification (`POST /api/v1/auth/password-reset/verify`).
+  5. Upon successful code verification, backend returns a cryptographically signed `resetToken` (15-minute expiry, bound to user, email, and current `session_version`).
+  6. The UI reveals the new password field, confirm password field, password requirement indicators (8+ characters, number, uppercase), and the "Reset Password" button.
+  7. User enters and confirms their new password, which is submitted with the `resetToken` to `POST /api/v1/auth/password-reset/reset`.
+  8. Backend validates the `resetToken` and matching `session_version`, updates `password_hash`, increments `session_version` (preventing token reuse and invalidating old sessions), and clears `must_change_password`.
+- Backend API endpoints for password reset:
+  - `POST /api/v1/auth/password-reset/request`: rate-limited to 3 requests per 10 minutes per email; sends OTP via Supabase Auth without revealing whether email exists
+  - `POST /api/v1/auth/password-reset/verify`: rate-limited to 5 requests per 10 minutes; verifies 6-digit OTP and returns signed `resetToken`
+  - `POST /api/v1/auth/password-reset/reset`: validates `resetToken` against user's current `session_version`, hashes new password with bcrypt, updates PostgreSQL `users`, increments `session_version`, and clears `must_change_password`
+- Backend enforcement: Resetting passwords without a valid `resetToken` obtained from `/verify` is strictly rejected (cannot bypass verification by submitting to `/reset` directly)
+- Mobile forgot password page (`forgot_password_page.dart`) and reset password page (`reset_password_page.dart`) follow established design patterns with two-step UI progression
+- Web Doctor forgot password page (`/doctor/forgot-password`) and reset password page (`/doctor/reset-password`) follow established design patterns with two-step UI progression
+- Web Secretary forgot password page (`/secretary/forgot-password`) and reset password page (`/secretary/reset-password`) follow established design patterns with two-step UI progression
+- Web password reset API client in `authApi.ts`: `requestPasswordReset()`, `verifyResetCode()`, and `resetPassword()`
+- Mobile API service in `api_service.dart`: `requestPasswordReset()`, `verifyPasswordResetOtp()`, and `resetPassword()`
 - Password reset is available to all user roles (PATIENT, DOCTOR, SECRETARY, ADMIN, SUPERADMIN) through the same flow
-- Web pages follow the existing web login page design patterns (shadcn/ui components, Tailwind styling) and include password strength indicators matching the mobile implementation
 - **Do not trust this device:** keeps browser-session cookies, 8-hour idle timeout, 7-hour access token, 8-hour refresh token, and no trusted browser. OTP is required on every login when 2FA is enabled, and any stale trust cookie is cleared.
 - Trusting a device never bypasses the OTP required for the current login. `POST /api/v1/auth/verify-login-otp` always issues a short untrusted session; only the explicit trust endpoint upgrades it.
 - A browser that is already trusted skips OTP and the trust page on later logins.

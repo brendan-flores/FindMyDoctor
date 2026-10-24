@@ -19,10 +19,11 @@ The application passes the following non-sensitive flow identifiers in the `data
 | Login | `login` | Admin/Doctor/Secretary login verification |
 | Doctor Signup | `doctor_signup` | Doctor self-registration verification |
 | Patient Signup | `patient_signup` | Patient registration verification |
+| Password Reset | `password_reset` | Password reset verification (contains only the verification code) |
 
 ## Required Supabase Email Template Updates
 
-To correctly distinguish between login and signup OTP emails, update the **Magic Link / OTP email template** in your Supabase project.
+To correctly distinguish between login, signup, and password reset OTP emails, update the **Magic Link / OTP email template** in your Supabase project.
 
 ### Accessing Email Templates
 
@@ -60,6 +61,8 @@ Use the following template with conditional logic based on `{{ .Data.auth_flow }
 <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px;">{{ .Token }}</p>
 
 <p>Enter this code in FindMyDoctor to complete your patient registration.</p>
+{{ else if eq .Data.auth_flow "password_reset" }}
+<p style="font-size: 28px; font-weight: bold; letter-spacing: 4px;">{{ .Token }}</p>
 {{ else }}
 <h2>FindMyDoctor Verification Code</h2>
 
@@ -75,7 +78,7 @@ Use the following template with conditional logic based on `{{ .Data.auth_flow }
 Update the email subject to:
 
 ```
-{{ if eq .Data.auth_flow "login" }}FindMyDoctor Login Verification Code{{ else if eq .Data.auth_flow "doctor_signup" }}FindMyDoctor Doctor Registration{{ else if eq .Data.auth_flow "patient_signup" }}FindMyDoctor Patient Registration{{ else }}FindMyDoctor Verification Code{{ end }}
+{{ if eq .Data.auth_flow "login" }}FindMyDoctor Login Verification Code{{ else if eq .Data.auth_flow "doctor_signup" }}FindMyDoctor Doctor Registration{{ else if eq .Data.auth_flow "patient_signup" }}FindMyDoctor Patient Registration{{ else if eq .Data.auth_flow "password_reset" }}Verification Code{{ else }}FindMyDoctor Verification Code{{ end }}
 ```
 
 ## Implementation Notes

@@ -4,6 +4,44 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.24 (October 24, 2026)
+
+**Purpose:** Enforce two-step verification sequence in the forgot password flow across Mobile Patient, Web Doctor, and Web Secretary platforms, ensuring passwords cannot be reset without prior valid code verification.
+
+**Significant Features:**
+- Two-step Forgot Password verification flow:
+  1. User submits email to request a reset code (`POST /api/v1/auth/password-reset/request`).
+  2. The email sent contains only the verification code (no magic links or other reset controls).
+  3. UI displays only the verification code (OTP) input field and the "Verify Code" button (with resend button on cooldown).
+  4. New password, confirm password, and password reset controls remain hidden until the code is verified.
+  5. Upon successful code verification (`POST /api/v1/auth/password-reset/verify`), backend returns a signed `resetToken` (15-minute expiry, bound to user and current `session_version`).
+  6. UI reveals new password, confirm password, and "Reset Password" button.
+  7. User resets password using the `resetToken` (`POST /api/v1/auth/password-reset/reset`).
+- Added backend endpoint `POST /api/v1/auth/password-reset/verify` to verify 6-digit OTP with Supabase Auth and issue signed `resetToken`.
+- Updated backend endpoint `POST /api/v1/auth/password-reset/reset` to require and validate `resetToken` against user's current `session_version`, preventing bypass and replay attacks.
+- Updated Web Doctor reset password page (`/doctor/reset-password`) to follow the two-step verification sequence.
+- Updated Web Secretary reset password page (`/secretary/reset-password`) to follow the two-step verification sequence.
+- Updated Mobile Patient reset password page (`reset_password_page.dart`) to follow the two-step verification sequence.
+- Updated Web API client `authApi.ts` with `verifyResetCode()` and updated `resetPassword()` to send `resetToken`.
+- Updated Mobile `api_service.dart` with `verifyPasswordResetOtp()` and updated `resetPassword()` to send `resetToken`.
+- Documented `password_reset` flow in `supabase-email-template-configuration.md` with template rendering only the verification code.
+- Added comprehensive unit tests in `backend/src/api/passwordReset.test.ts` and widget tests in `mobile/test/reset_password_page_test.dart`.
+
+**Improvements:**
+- Backend-enforced security: password reset requests without a valid `resetToken` obtained from successful verification are rejected.
+- Single-use reset tokens: `session_version` increment prevents token reuse and replay attacks.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:**
+- Removed simultaneous display of OTP and new password fields immediately upon opening the reset password page.
+
+**Breaking Changes:** None (backward compatibility preserved; clients updated simultaneously across Web and Mobile).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md`, `VERSION_HISTORY.md`, `SYSTEM_STATE.md`, and `supabase-email-template-configuration.md`.
+
+---
+
 ### 01.23 (October 24, 2026)
 
 **Purpose:** Extend the forgot password feature to the web Doctor and Secretary portals for consistent user experience across all platforms.
