@@ -520,7 +520,6 @@ router.patch('/:id/reject', authenticate, requireSecretaryPasswordChange, requir
       [secretaryRecordId, id]
     );
 
-<<<<<<< HEAD
     // Insert notification for patient using helper
     await createNotification(
       payment.patient_user_id,
@@ -529,31 +528,6 @@ router.patch('/:id/reject', authenticate, requireSecretaryPasswordChange, requir
       'Your payment was rejected. Please contact the clinic.',
       'payment',
       id
-=======
-    // Get charge breakdown for notification
-    const chargesResult = await client.query(
-      `SELECT description, amount FROM payment_charges WHERE payment_id = $1 AND deleted_at IS NULL ORDER BY created_at`,
-      [id]
-    );
-
-    // Recalculate total amount to ensure it includes all charges
-    const totalCharges = chargesResult.rows.reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
-    const totalAmount = parseFloat(payment.consultation_amount) + totalCharges;
-
-    // Build charge breakdown message
-    let chargeBreakdown = '';
-    if (chargesResult.rows.length > 0) {
-      chargeBreakdown = chargesResult.rows.map((c: any) => `• ${c.description}: ₱${parseFloat(c.amount).toFixed(2)}`).join('\n');
-    }
-
-    const notificationMessage = `Your payment of ₱${totalAmount.toFixed(2)} was rejected. Please contact the clinic.${chargeBreakdown ? '\n\nCharges:\n' + chargeBreakdown : ''}`;
-
-    // Insert notification for patient with charge breakdown
-    await client.query(
-      `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
-       VALUES ($1, 'PAYMENT_REJECTED', 'Payment Rejected', $2, 'payment', $3)`,
-      [payment.patient_user_id, notificationMessage, id]
->>>>>>> dev
     );
 
     await client.query('COMMIT');
@@ -563,11 +537,10 @@ router.patch('/:id/reject', authenticate, requireSecretaryPasswordChange, requir
     try {
       await sendPushToUser(payment.patient_user_id, {
         title: 'Payment Rejected',
-        body: `Your payment of ₱${totalAmount.toFixed(2)} was rejected. Please contact the clinic.`,
+        body: 'Your payment was rejected. Please contact the clinic.',
         data: {
           type: 'PAYMENT_REJECTED',
           paymentId: id,
-          amount: totalAmount.toString(),
         },
       });
     } catch (pushErr) {
