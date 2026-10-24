@@ -14,19 +14,6 @@ export default function AdminSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Settings Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#1b5eb8] shrink-0">
-            <span className="material-symbols-outlined text-[26px]">tune</span>
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-slate-900">Settings</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Manage your admin account and system preferences</p>
-          </div>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Settings Navigation */}
         <div className="lg:col-span-1">

@@ -89,6 +89,23 @@ void main() {
       expect(patientDetailsPage.selectedDate, DateTime(2026, 10, 20));
     });
 
+    testWidgets('Payment method parameter is preserved in widget', (WidgetTester tester) async {
+      // This test verifies paymentMethod is properly passed through navigation
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PatientDetailsPage(
+            doctorId: 'test-doctor-id',
+            doctorName: 'Dr. Test',
+            paymentMethod: 'GCASH',
+          ),
+        ),
+      );
+
+      final patientDetailsPage = tester.widget<PatientDetailsPage>(find.byType(PatientDetailsPage));
+
+      expect(patientDetailsPage.paymentMethod, 'GCASH');
+    });
+
     testWidgets('Error state can be displayed', (WidgetTester tester) async {
       // This test verifies error state UI exists
       await tester.pumpWidget(

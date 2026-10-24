@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, type GetOptions } from './apiClient';
 
 export interface User {
   id: string;
@@ -30,6 +30,7 @@ export interface Doctor {
   consultationFee?: number | null;
   languagesSpoken?: string | null;
   isApproved: boolean;
+  isActive?: boolean;
   approvalStatus?: 'PENDING' | 'ACTIVE' | 'REJECTED';
   profileCompletionStatus?: 'INCOMPLETE' | 'COMPLETE' | 'SUBMITTED';
   profileSubmittedAt?: string | null;
@@ -48,10 +49,17 @@ export interface Doctor {
 export interface Secretary {
   id: string;
   userId: string;
+  email: string;
+  isActive: boolean;
+  mustChangePassword: boolean;
   firstName: string;
   lastName: string;
   doctorId: string;
+  doctorFirstName?: string;
+  doctorLastName?: string;
+  doctorSpecialty?: string;
   isApproved: boolean;
+  createdAt: string;
 }
 
 export interface DoctorSchedule {
@@ -62,6 +70,58 @@ export interface DoctorSchedule {
   endTime: string;
   consultationDurationMinutes: number;
   isActive: boolean;
+}
+
+export interface DashboardStats {
+  doctors: {
+    total: number;
+    pending: number;
+    active: number;
+    rejected: number;
+  };
+  users: {
+    patient: number;
+    doctor: number;
+    secretary: number;
+    admin: number;
+    superadmin: number;
+  };
+  unassignedSecretaries: number;
+  pendingApprovals: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    specialty: string;
+    profileSubmittedAt: string | null;
+    profileCompletionStatus: string;
+    email: string;
+  }>;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  actorUserId: string;
+  actorEmail: string;
+  actorRole: string;
+  action: string;
+  targetUserId: string | null;
+  targetEmail: string | null;
+  targetRole: string | null;
+  targetType: string | null;
+  timestamp: string;
+  reason: string | null;
+  metadata: Record<string, any>;
+  createdAt: string;
+}
+
+export interface AuditLogResponse {
+  entries: AuditLogEntry[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export const adminApi = {
@@ -124,5 +184,57 @@ export const adminApi = {
 
   approveSecretary: async (secretaryId: string) => {
     return apiClient.patch<{ secretary: Secretary }>(`/admin/secretaries/${secretaryId}/approve`, {});
+  },
+
+  getAllSecretaries: async () => {
+    return apiClient.get<Secretary[]>('/admin/secretaries');
+  },
+
+  // Dashboard Statistics
+  getDashboardStats: async (options?: GetOptions) => {
+    return apiClient.get<DashboardStats>('/admin/dashboard/stats', options);
+  },
+
+  // Doctor Account Status Controls
+  deactivateDoctor: async (doctorId: string) => {
+    return apiClient.patch(`/admin/doctors/${doctorId}/deactivate`, {});
+  },
+
+  reactivateDoctor: async (doctorId: string) => {
+    return apiClient.patch(`/admin/doctors/${doctorId}/reactivate`, {});
+  },
+
+  // Secretary Account Status Controls
+  deactivateSecretary: async (secretaryId: string) => {
+    return apiClient.patch(`/admin/secretaries/${secretaryId}/deactivate`, {});
+  },
+
+  reactivateSecretary: async (secretaryId: string) => {
+    return apiClient.patch(`/admin/secretaries/${secretaryId}/reactivate`, {});
+  },
+
+  resetSecretaryPassword: async (secretaryId: string) => {
+    return apiClient.post<{ email: string; temporaryPassword: string }>(`/admin/secretaries/${secretaryId}/reset-password`, {});
+  },
+
+  // Audit Log
+  getAuditLog: async (params?: {
+    action?: string;
+    actorId?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }, options?: GetOptions) => {
+    const queryParams = new URLSearchParams();
+    if (params?.action) queryParams.append('action', params.action);
+    if (params?.actorId) queryParams.append('actorId', params.actorId);
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const queryString = queryParams.toString();
+    return apiClient.get<AuditLogResponse>(`/admin/audit-log${queryString ? `?${queryString}` : ''}`, options);
   },
 };

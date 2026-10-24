@@ -40,6 +40,7 @@ dependencies:
 
   # Networking
   http: ^1.1.0
+  http_parser: ^4.0.2
 
   # Local Storage
   shared_preferences: ^2.2.2
@@ -71,6 +72,19 @@ dependencies:
   # Image manipulation for cropping
   image: ^4.1.7
 
+  # Cached network image for efficient image loading
+  cached_network_image: ^3.3.1
+
+  # Runtime notification-permission request/check + open system settings.
+  # Required for the Profile push-notifications switch: the app has no native
+  # push host or permission plumbing (audit 2026-10-23), and Android 13+/iOS
+  # require an explicit runtime notification permission.
+  permission_handler: ^12.0.0
+
+  # Reads the app version from pubspec.yaml at runtime for the Profile
+  # "About" section (no other version source exists in the app).
+  package_info_plus: ^8.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -81,6 +95,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+  # Test-only import for the settable PermissionHandlerPlatform used to fake
+  # OS notification-permission outcomes in test/profile_section_test.dart.
+  permission_handler_platform_interface: ^4.4.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

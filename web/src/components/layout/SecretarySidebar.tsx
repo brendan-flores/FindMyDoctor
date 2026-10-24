@@ -71,6 +71,8 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
       console.error('Logout error:', err);
     } finally {
       apiClient.clearToken();
+      localStorage.removeItem('secretary_refreshToken');
+      localStorage.removeItem('secretary_user');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       router.push('/secretary-login');

@@ -35,11 +35,15 @@ export default function AdminLogin() {
         }
 
         // Type guard: this is now AuthResponse (not LoginOtpRequiredResponse)
-        const authData = response.data as { user: any; accessToken: string; refreshToken: string };
+        const authData = response.data as {
+          user: any;
+          accessToken: string;
+          refreshToken: string;
+          session?: any;
+        };
 
-        // Set token in API client (automatically stores in localStorage)
-        apiClient.setToken(authData.accessToken, authData.refreshToken);
-        localStorage.setItem('user', JSON.stringify(authData.user));
+        localStorage.setItem('admin_user', JSON.stringify(authData.user));
+        apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null);
 
         // Verify backend-returned role is ADMIN or SUPERADMIN
         if (authData.user.role === 'ADMIN' || authData.user.role === 'SUPERADMIN') {
@@ -47,8 +51,7 @@ export default function AdminLogin() {
         } else {
           setError('Invalid username or password.');
           // Clear credentials on role mismatch
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
+          localStorage.removeItem('admin_user');
           apiClient.clearToken();
         }
       } else {
@@ -64,14 +67,14 @@ export default function AdminLogin() {
   const handleOtpVerifySuccess = (data: any) => {
     // Verify backend-returned role is ADMIN or SUPERADMIN
     if (data.user.role === 'ADMIN' || data.user.role === 'SUPERADMIN') {
-      apiClient.setToken(data.accessToken, data.refreshToken);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('admin_user', JSON.stringify(data.user));
+      apiClient.setToken(data.accessToken, data.refreshToken, data.session || null);
+
       router.push('/admin/dashboard');
     } else {
       setError('Invalid username or password.');
       // Clear credentials on role mismatch
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      localStorage.removeItem('admin_user');
       apiClient.clearToken();
     }
   };
@@ -204,17 +207,12 @@ export default function AdminLogin() {
               </div>
             </div>
 
-            {/* Remember Me */}
-            <div className="flex items-center pt-1">
-              <label className="flex items-center cursor-pointer select-none" htmlFor="remember-me">
-                <input
-                  id="remember-me"
-                  type="checkbox"
-                  defaultChecked
-                  className="h-5 w-5 rounded-md border-[#CBD5E1] text-[#0D3B75] focus:ring-[#0D3B75] focus:ring-offset-0 transition duration-150 cursor-pointer"
-                />
-                <span className="ml-2.5 text-[15px] font-normal text-[#64748B]">Remember me</span>
-              </label>
+            {/* Session policy notice: no device trust for administrators */}
+            <div className="rounded-xl border border-[#D6E2F5] bg-[#F5F8FD] px-4 py-3">
+              <p className="text-[13px] leading-relaxed text-[#4A5B75]">
+                Administrator access always requires a verification code and ends after 2 hours of
+                inactivity or 8 hours in total. Stay signed in is not available for this portal.
+              </p>
             </div>
 
             {/* Submit Button */}

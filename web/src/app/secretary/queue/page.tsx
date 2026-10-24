@@ -331,58 +331,26 @@ export default function SecretaryQueue() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-          <div className="flex-1">
-            {/* Tag */}
-            <div className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold uppercase tracking-wider mb-3">
-              Patient Reception Queue
-            </div>
-            
-            {/* Date */}
-            <div className="text-sm text-slate-600 mb-2 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[16px] text-slate-500">calendar_today</span>
-              {formatDate(selectedDate)}
-            </div>
-            
-            {/* Location and Doctor Info */}
-            <div className="text-sm text-slate-600 mb-3 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[16px] text-slate-500">location_on</span>
-              {secretary?.practice_name || 'Clinic'} {secretary?.room_number ? `• ${secretary.room_number}` : ''} • Dr. {secretary?.doctor_first_name} {secretary?.doctor_last_name}
-            </div>
-            
-            {/* Main Title */}
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">Today's Queue</h1>
-            
-            {/* Subtitle */}
-            <p className="text-sm text-slate-500">
-              Real-time unified daily patient queue, lobby reception tracking, and consultation dispatch.
-            </p>
-          </div>
-          
-          {/* Right Side - Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 lg:mt-4">
-            <DatePicker />
-            <div className="flex gap-3">
-              <button
-                onClick={handleCallNext}
-                disabled={actionLoading || waitingInLobby === 0}
-                className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-              >
-                <span className="material-symbols-outlined text-[18px]">notifications_active</span>
-                Call Next Patient
-              </button>
-              <button
-                onClick={fetchQueue}
-                disabled={loading}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-sm text-slate-700 disabled:opacity-50"
-              >
-                <span className="material-symbols-outlined text-[18px] text-slate-500">refresh</span>
-                Refresh List
-              </button>
-            </div>
-          </div>
+      {/* Header Controls */}
+      <div className="flex flex-col sm:flex-row gap-3 justify-between items-start">
+        <DatePicker />
+        <div className="flex gap-3">
+          <button
+            onClick={handleCallNext}
+            disabled={actionLoading || waitingInLobby === 0}
+            className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+          >
+            <span className="material-symbols-outlined text-[18px]">notifications_active</span>
+            Call Next Patient
+          </button>
+          <button
+            onClick={fetchQueue}
+            disabled={loading}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-sm text-slate-700 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[18px] text-slate-500">refresh</span>
+            Refresh List
+          </button>
         </div>
       </div>
 

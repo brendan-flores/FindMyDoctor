@@ -63,6 +63,7 @@ Current System State (October 2026):
 - Web Doctor profile page supports saving draft profiles and submitting for approval with validation
 - Web Doctor profile page explicitly handles REJECTED state: shows rejection banner with reason, allows profile editing, allows resubmission, does not lock form when `profile_completion_status === 'SUBMITTED'` if `approval_status === 'REJECTED'`
 - Web Doctor profile page shows submission confirmation modal after successful profile submission with title "Profile Submitted Successfully!", message stating "Your professional profile has been submitted successfully. Once approved, your doctor profile will be displayed to patients in the FindMyDoctor mobile app.", and "Go to Dashboard" button redirecting to `/doctor/dashboard`
+- Web Doctor login stores the session in role-scoped `doctor_token`, `doctor_refreshToken`, and `doctor_user` localStorage keys; the dashboard must read the role-scoped token (with the legacy generic `token` fallback) before checking approval status
 - Web Doctor login page routes authenticated Doctors based on approval_status: ACTIVE → `/doctor/dashboard`, REJECTED → `/doctor-profile`
 - Active Doctors can view their own personal and professional registration details on the read-only Doctor Portal page at `/doctor/profile` (with slash); it excludes schedule management and uses the authenticated `GET /api/v1/doctors/me` endpoint
 - The authenticated `GET /api/v1/doctors/me` endpoint includes the doctor's account email for display on their own profile page
@@ -98,12 +99,22 @@ Current System State (October 2026):
 - All patient details captured at sign-up are staged in `pending_patient_signups` and written to the `patients` table when the account is created after OTP verification
 - User login accepts either email or username for authentication
 - Users table includes username field (unique) for patient identification
+- Username is automatically generated from email (part before @) during registration for all user types (patients, doctors, secretaries, admins)
 - The patient OTP `/send` endpoint checks email and username availability up-front (after the email existence check, before the sign-up is staged or the OTP is sent) and returns `409 Conflict` with `Email is already registered` or `Username already taken`, so the error is shown on the sign-up form without sending an OTP
 - The patient OTP `/verify` endpoint re-checks email and username uniqueness inside the single account-creation transaction and returns `409 Conflict` with a clear `Username already taken` (or `Email already registered`) message instead of a misleading verification error; the `users` unique constraints remain the backstop against concurrent sign-ups
 - Patients table includes phone (restored in migration `025_restore_phone_column.sql`), `middle_name`, and `sex` (migration `023_add_patient_required_fields.sql`)
 - Backend API endpoints for patient OTP: `/api/v1/auth/patient/otp/send`, `/api/v1/auth/patient/otp/verify`, `/api/v1/auth/patient/otp/resend`
 - Backend doctor OTP API accepts only basic fields (`firstName`, `middleName`, `lastName`, `email`, `contactNumber`, `password`) in the signup payload
 - Backend API endpoints for doctor OTP: `/api/v1/auth/otp/send`, `/api/v1/auth/otp/verify`, `/api/v1/auth/otp/resend`
+
+## Email or Username Login
+- Mobile login page accepts both email and username for authentication
+- Login field label shows "Email or Username" with hint "Enter your email or username"
+- Validation is conditional: if input contains `@`, email format is validated; if no `@`, username is accepted without email format validation
+- Backend `/api/v1/auth/login` endpoint queries both `email` and `username` columns: `WHERE (email = $1 OR username = $1)`
+- Username is automatically populated during all registration flows (patients via OTP, doctors, secretaries, admins, walk-ins) by extracting the part before the `@` symbol from the email address
+- Username column in `users` table is unique (VARCHAR(50)) with an index for efficient lookups
+- All user types (PATIENT, DOCTOR, SECRETARY, ADMIN, SUPERADMIN) have username populated at account creation
 
 ## OTP & Authentication
 - SuperAdmins log in directly without OTP; regular Admins always require login OTP (no setting, no bypass)
@@ -119,41 +130,54 @@ Current System State (October 2026):
 - Login OTP verification endpoint: `POST /api/v1/auth/verify-login-otp` (accepts challengeId and OTP)
 - Login OTP resend endpoint: `POST /api/v1/auth/resend-login-otp` (accepts challengeId, enforces 60-second cooldown, invalidates previous challenges)
 - Login OTP challenges expire after 5 minutes, support up to 5 failed attempts, and are marked as used after successful verification
-- PostgreSQL `login_otp_challenges` table stores server-side OTP challenge state with hashed challenge tokens and remember_me column
+- PostgreSQL `login_otp_challenges` table stores server-side OTP challenge state with hashed challenge tokens and a `remember_me` column retained for schema compatibility (new challenges store `false`; it no longer grants device trust)
 - PostgreSQL `doctors` and `secretaries` tables include `two_factor_enabled` column (migration 013_add_two_factor_settings.sql) - optional 2FA, must be turned on by user
-- Secretary settings page at `/secretary/settings` provides optional two-factor authentication toggle
-- Doctor settings page at `/doctor/settings` provides optional two-factor authentication toggle
+- Secretary settings page at `/secretary/settings` groups cards into a labeled "Account" section (optional two-factor authentication toggle, Change password card reusing `POST /api/v1/auth/change-password`, and the Trusted Browsers card) and a "Clinic" section (Clinic Payment Settings with the GCash QR thumbnail, Active/Not uploaded status, and last-updated date from `doctors.gcash_qr_updated_at`, plus display-only "Coming soon" placeholders for Invoice details and GCash account details that have no logic, storage, or endpoints)
+- Doctor settings page at `/doctor/settings` provides a single labeled "Account" section containing the optional two-factor authentication toggle (description: "Require a verification code when you sign in from a new or untrusted browser."), a Change password card, and the Trusted Browsers card
 - Supabase is used only for OTP email verification and Storage, not for storing application data
 - Login OTP uses `shouldCreateUser: false` to prevent Supabase from creating application accounts
 - Web application includes shared `OtpVerification` component for login OTP verification (6-digit input, auto-focus, paste support, resend timer)
 
-## Remember Me & Trusted Browser
-- Web application authentication for Doctor and Secretary accounts now uses trusted-browser Remember Me functionality
-- Doctor and Secretary login forms include Remember Me checkbox that controls trusted-browser registration only
-- **Facebook-style Session Persistence:** Sessions persist across browser closes regardless of Remember Me checkbox
-- Access tokens always have 7-day expiration (no 15-minute timeout)
-- Refresh tokens always have 30-day expiration (no session cookies)
-- Users are only logged out when they manually log out or tokens expire
-- When Remember Me is unchecked: browser is NOT registered as trusted; OTP is required on every login (if 2FA is enabled); session still persists across browser closes (tokens are long-lived); if browser was previously trusted, trust is revoked
-- When Remember Me is checked: browser is registered as trusted for 30 days; subsequent logins from the same trusted browser skip OTP (if 2FA is enabled) but still require password; trusted-browser credential is stored in HttpOnly cookie with 30-day expiration
-- Trusted-browser recognition uses cryptographically secure random tokens stored as SHA-256 hashes in PostgreSQL trusted_browsers table; each trusted-browser record includes user_id, token_hash, device_info, expires_at (30 days), created_at, revoked_at, and last_used_at
-- Trusted-browser lifetime is 30 days from successful trust registration; this is an absolute limit that does not reset on page refresh or session renewal
-- New browser or device always requires OTP (if 2FA is enabled); expired trusted-browser credential requires OTP (if 2FA is enabled); cleared cookies or trusted-browser data requires OTP (if 2FA is enabled)
-- Password change or password reset revokes all existing trusted-browser credentials and requires OTP again on next login
-- Account suspended, rejected, or otherwise unauthorized denies access according to existing account-status rules; trusted-browser status never overrides account restrictions
-- Unchecking Remember Me during login revokes that browser's trust and clears the trusted-browser cookie
-- Logout does NOT revoke trusted-browser status (trust persists across logout/login cycles like Facebook)
-- Users must manually uncheck Remember Me during login to revoke trust, or revoke via dedicated endpoint
-- Token storage uses HttpOnly cookies with Secure flag enabled in production and SameSite=lax policy for security
-- Backend generates access tokens with 7-day expiration regardless of Remember Me (Facebook-style)
-- Refresh tokens have 30-day expiration regardless of Remember Me (Facebook-style)
-- Session expiration on frontend clears authentication cookies, rejects protected API requests, redirects to appropriate login page with message "Your session has expired. Please log in again."
-- Logout invalidates server-side session by clearing accessToken, refreshToken, and trustedBrowser cookies
-- Admin and SuperAdmin authentication behavior remains unchanged (no Remember Me modification)
-- Web apiClient automatically loads token from localStorage on initialization for backward compatibility, but prefers HttpOnly cookies when available
-- **Automatic Token Refresh:** Web apiClient implements automatic token refresh on 401 responses; when an API request returns 401, the client automatically attempts to refresh the access token using the stored refresh token via `POST /api/v1/auth/refresh`; if refresh succeeds, the original request is retried with the new token; if refresh fails, the session is cleared and user is redirected to login; concurrent 401 responses are coordinated so only one refresh occurs while others wait
-- Backend API endpoints for authentication: `POST /api/v1/auth/login` (with trusted-browser support), `POST /api/v1/auth/verify-login-otp` (with trusted-browser registration), `POST /api/v1/auth/logout` (clears all cookies), `POST /api/v1/auth/revoke-trusted-browser` (revokes current browser trust), `POST /api/v1/auth/refresh` (refreshes access token)
-- Database schema includes `trusted_browsers` table (migration 022_add_trusted_browsers.sql) for Remember Me trusted-browser functionality with columns: id, user_id, token_hash (SHA-256), device_info, expires_at (30 days), created_at, revoked_at, last_used_at
+## Device Trust, Trusted Browsers & Session Lifetime
+
+- Session behavior is centralized in `backend/src/modules/auth/sessionPolicy.ts`; the web client only mirrors the idle/absolute limits. The internal `rememberMe` claim/session-policy flag is retained for compatibility but now represents an explicit trusted-device session.
+- Doctor and Secretary login forms no longer include a Remember Me checkbox.
+- After a Doctor or Secretary successfully completes authentication (password and, when 2FA is enabled, OTP), an untrusted browser is shown `/doctor/trust-device` or `/secretary/trust-device`. The page displays the detected browser and operating system and offers "Trust this device" and "Do not trust this device".
+- **Trust this device:** registers the browser for 30 days, upgrades the current session to the 30-day persistent policy, and skips OTP on later logins from that browser when 2FA is enabled. The password is always required.
+- **Do not trust this device:** keeps browser-session cookies, 8-hour idle timeout, 7-hour access token, 8-hour refresh token, and no trusted browser. OTP is required on every login when 2FA is enabled, and any stale trust cookie is cleared.
+- Trusting a device never bypasses the OTP required for the current login. `POST /api/v1/auth/verify-login-otp` always issues a short untrusted session; only the explicit trust endpoint upgrades it.
+- A browser that is already trusted skips OTP and the trust page on later logins.
+- **Admin and SuperAdmin:** OTP is mandatory on every login; there is no device-trust prompt and no trusted-browser support. Sessions use browser-session cookies with a 90-minute access token, 2-hour refresh token, 2-hour idle timeout, and an 8-hour absolute maximum. Logout clears the Admin/SuperAdmin session.
+- **Patient:** the existing 7-day access / 30-day refresh behavior is unchanged.
+- Trusted-browser tokens are high-entropy random values stored only as SHA-256 hashes in the PostgreSQL `trusted_browsers` table (`user_id`, `token_hash`, `device_info`, `expires_at` 30 days, `created_at`, `revoked_at`, `last_used_at`).
+- The trusted-browser token is sent only in an HttpOnly/Secure/SameSite=lax cookie, rotated on each successful use, and never returned in a response body, stored in localStorage, or read by JavaScript.
+- Trust expires after 30 days; new browsers, expired tokens, or cleared cookies require OTP again when 2FA is enabled.
+- Password change, password reset, account deactivation, and "Sign out of all devices" revoke all trusted browsers and refresh tokens for the account. Refresh-token revocation uses `users.session_version` (migration `032_add_session_version.sql`); old refresh tokens fail validation after the version is incremented.
+- Logout ends only the current portal session and does not revoke trusted-browser status.
+- `/doctor/settings` and `/secretary/settings` include a Trusted Browsers card listing device label, created date, last used date, and expiry (dates in Asia/Manila), with per-browser Revoke and "Sign out of all devices". The row matching the request's trusted-browser cookie is labeled "This browser" via the `is_current` flag from `GET /api/v1/auth/trusted-browsers`. Confirming revocation of the current browser warns that the next sign-in will require a verification code; "Sign out of all devices" confirms "Sign out everywhere? You will need to sign in again on every device." More than five entries show the five most recent plus a "View all" toggle. The doctor settings page groups 2FA, Change password, and Trusted Browsers in one labeled "Account" section; a Change password card calls `POST /api/v1/auth/change-password`, which revokes other trusted browsers and refresh tokens while keeping the current session signed in.
+- A non-blocking dashboard banner recommends enabling 2FA when it is disabled; it never blocks access.
+- Cookies are role-scoped (`doctor_accessToken`, `doctor_refreshToken`, `doctor_trustedBrowser`, `secretary_*`, `admin_*`, `patient_*`) with path `/`, plus legacy global fallbacks. Access/refresh cookies are HttpOnly and Secure in production; the trusted-browser cookie is always HttpOnly.
+- Non-persistent sessions also set a non-sensitive, JavaScript-readable `<prefix>_sessionActive` browser-session hint cookie. `apiClient` uses it to discard localStorage tokens after a browser restart.
+- Multiple portal sessions may coexist. Middleware treats role-namespaced paths (`/doctors`, `/secretaries`, `/admin`) as authoritative, uses `X-Portal-Role` for shared resource paths such as `/patients/:id`, `/prescriptions/patients/:id`, and `/visits/patient/:id`, checks the matching role cookies with a global fallback, and rejects cross-role token use. Shared sub-resources are exempt: `/doctors/:id/availability` accepts both PATIENT tokens (the mobile patient booking journey) and DOCTOR tokens; doctor-portal-only routes remain guarded by `authorize('DOCTOR')`.
+- Web `apiClient` sends `X-Portal-Role`, retries a request once after a successful refresh, coordinates concurrent refreshes, runs an idle/absolute watchdog, and clears expired sessions with "Your session has expired. Please log in again." Only a 400/401 refresh response clears the session; transient rate-limit, server, and network failures do not. Safe `GET` reads are cached for 15 seconds per role and retried on `429` with bounded backoff; mutations are never cached or retried.
+- Authentication endpoints: `POST /api/v1/auth/login`, `POST /api/v1/auth/verify-login-otp`, `POST /api/v1/auth/resend-login-otp`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, `POST /api/v1/auth/change-password`, `GET /api/v1/auth/trusted-browsers`, `GET /api/v1/auth/trusted-browsers/current-device`, `POST /api/v1/auth/trusted-browsers/trust-current`, `DELETE /api/v1/auth/trusted-browsers/:id`, `POST /api/v1/auth/trusted-browsers/revoke-all`, and `POST /api/v1/auth/revoke-trusted-browser` (also used for "Do not trust this device").
+- `login_otp_challenges` retains `remember_me` for schema compatibility; new challenges store `false` and the client cannot use it to upgrade to trust.
+- Device trust never bypasses password, account status, role, or approval checks; failures stay generic and token validation is rate-limited and logged without token values.
+- Secretary password change takes precedence over the device-trust prompt; profile completion follows the trust choice. The trust pages bypass the dashboard shell.
+- **Deployment note:** migration `032_add_session_version.sql` (`npm run migrate:session-version`) was applied to the configured PostgreSQL database on 2026-10-23, and `users.session_version` was verified as `integer NOT NULL DEFAULT 0`. Migration `033_add_gcash_qr_updated_at.sql` (`npm run migrate:gcash-qr-updated-at`) was also applied on 2026-10-23, adding `doctors.gcash_qr_updated_at` for the secretary settings QR status card. Any other environment must run both idempotent migrations before deploying this behavior. No new migration is required for the device-trust prompt; it reuses `trusted_browsers`.
+
+## API Rate Limiting and Read Performance
+
+- General API budget: `RATE_LIMIT_MAX_REQUESTS` (default 300) per `RATE_LIMIT_WINDOW_MS` (default 60,000 ms) per IP.
+- Sensitive authentication budget: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default 30) per `AUTH_RATE_LIMIT_WINDOW_MS` (default 900,000 ms) per IP, covering login, login OTP verify/resend, registration, patient OTP, and password change. Sensitive routes also count against the general budget, so the stricter limit applies.
+- `429` responses include a `Retry-After` header and `{ success: false, error: { code: "RATE_LIMIT", message } }`; `OPTIONS` pre-flight requests are skipped.
+- Implemented in `backend/src/middleware/rateLimit.ts` and mounted in `backend/src/index.ts`. Rate limiting is additional to token and role checks, not a replacement.
+- Availability range reads without a patient identity are cached for `AVAILABILITY_CACHE_TTL_MS` (default 20,000 ms) in `backend/src/modules/availability/availabilityService.ts`. The cache is invalidated by successful non-GET requests through the doctors, secretaries, appointments, and walk-ins routers and is never used for patient-specific reads.
+- `calculateCapacityRange` uses four batched queries instead of per-date queries. Doctor and Secretary dashboards read concurrently and reuse loaded rows; the payments list loads charges in one query.
+- Web `apiClient` caches successful `GET` responses for 15 seconds per role, shares concurrent identical non-abortable reads, retries only `GET` on `429` (3 attempts, exponential backoff with jitter, 5-second cap, `Retry-After` precedence), and clears its cache on token/role change, logout/session expiry, and any successful mutation.
+- Dashboard pages abort in-flight reads on unmount. Sidebar refresh after a save uses `skipCache: true`.
+- Web tests: `cd web && npm test` (Node built-in test runner). Backend tests include `rateLimit.test.ts`, `ttlCache.test.ts`, `availabilityCache.test.ts`, and `capacityService.test.ts`.
+- No database schema change or migration was required for this work.
 
 ## Secretary Management
 - Each Secretary has a required `doctor_id` relationship to one Doctor; Doctors can list only their own Secretaries via the authenticated backend API
@@ -365,7 +389,7 @@ Current System State (October 2026):
 ## Patient Reservation Flow
 - Mobile patient app includes a complete reservation flow from date selection to appointment confirmation
 - Reservation flow: Doctor Schedule & Date page (`/doctor-schedule`) → patient record check → if no record: Patient Details page (`/patient-details`) → Booking Confirmation page (`/booking-confirmation`) → automatic submission to backend → queue number assignment → display confirmation
-- Mobile Doctor Schedule page displays doctor availability via `GET /api/v1/doctors/:doctorId/availability` endpoint and allows patients to select available dates
+- Mobile Doctor Schedule page displays doctor availability via `GET /api/v1/doctors/:doctorId/availability` endpoint and allows patients to select available dates. The endpoint accepts the patient's PATIENT token (shared sub-resource exemption from the portal cross-role check; previously it 401'd valid patient tokens with "Invalid or expired token" because the `/doctors` namespace was forced to the DOCTOR portal)
 - When patient confirms a date, the app checks if they have an existing record with the selected doctor via `GET /api/v1/patients/check-record?doctorId={id}`
 - If patient has a complete record (hasRecord: true), they proceed directly to booking confirmation
 - If patient has no record or incomplete record (hasRecord: false), they are redirected to the Patient Details page to submit required information
@@ -487,6 +511,15 @@ Current System State (October 2026):
 - Fixing the invalid constraints removes the `Each child must be laid out exactly once.` Scaffold layout crash (a failed body build was replaced by an `ErrorWidget`, leaving the Scaffold's multi-child layout inconsistent) and the frozen loading screen that required a manual refresh or hot restart
 - Mobile home page data (specialties, recommended doctors, clinics) loads from `initState` and clears its loading flags on both success and failure; the resulting `setState` calls are guarded with a `mounted` check
 - Mobile app startup authentication check always resolves initialization (falling back to the login screen if token/storage reads fail) so the startup progress indicator cannot hang
+- Mobile appointment screens parse PostgreSQL `DECIMAL`/`NUMERIC` values (for example `doctors.consultation_fee`, which `pg` returns as a JSON string such as `"500.00"`) through the shared helpers in `mobile/lib/core/utils/json_parsers.dart` (`parseNum`, `parseInt`, `parseString`) instead of casting to `num?`; numeric strings, real numbers, `null`, empty strings, and invalid values all render safely (`₱---` / `N/A` placeholders) and the Appointments page no longer throws `type 'String' is not a subtype of type 'num?'`
+- Mobile appointment date/timestamp fields are parsed with `DateTime.tryParse` on a safely parsed string, and payment status/method empty strings are treated as absent so no blank payment badge is rendered
+- Mobile patient Profile tab is grouped into labeled Account / Security / Notifications / About / Log Out sections: an account summary card opens the standalone read-only `PatientProfilePage` (route `/patient-profile`), Change password reuses `ChangePasswordPage` and returns to Profile on success, a push-notifications switch reflects a persisted `push_notifications_enabled` preference (default ON), the About section shows the runtime app version (via `package_info_plus`) and a "Privacy notice" row (route `/privacy-notice`, static screen), and Log Out keeps the previous logout behavior with no confirmation dialog
+- The mobile push-notifications switch registers this device's token through `POST /api/v1/notifications/device-tokens` when enabled and removes it through `DELETE /api/v1/notifications/device-tokens/:id` when disabled; the preference is stored locally via SharedPreferences, the OS notification permission is requested on first enable with a "open settings" hint when denied, and startup auto-registration for users who never opened the Profile screen still counts the preference (default ON) so nothing silently re-enables after the user turned it off
+- Unauthenticated requests for `/patient-profile` or `/privacy-notice` are bounced to the login page by the shared route guard (same handling as other authenticated routes); secretaries are kept on the chat-first home for these routes
+- `PushNotificationService` supports a test seam: `registerForCurrentUser()` returns `Future<bool>` (true only when a token was actually registered), added idempotent `disableForCurrentUser()`, the `PushNotificationService.channel` constant is public, and `PushNotificationService.withApiService(apiService)` lets tests inject a stub; `HomePage` accepts an optional `pushNotificationService` for widget tests
+- New mobile dependencies: `permission_handler` (OS notification-permission UX; the app has no native push host — bare `MainActivity.kt`, no iOS folder) and `package_info_plus` (runtime app version); the previously committed `pubspec.lock` was corrupt (unparsable) and was regenerated
+- Fixed the pre-existing mobile first-frame crash in the chat tab's empty-conversations filler (`MediaQuery.size.height - 300` unguarded on the zero-sized first layout pass, producing `BoxConstraints` with negative minimum height — the regression `test/initial_frame_layout_test.dart` guards against); the filler is now height-guarded like the other zero-frame-safe fillers
+- Fixed the blank Secretary Chat tab (no list, no empty state, no spinner whenever the patient had conversations): the 01.20 height guard nested inside the `_conversations.isEmpty` collection-if branch made the trailing `else` bind to the inner guard instead of the outer empty-check, so a non-empty conversation list rendered nothing; the tab body is now a public `ChatTabContent` widget (`home_page.dart`) with explicit early-return branches (loading spinner / height-guarded empty state / card list), covered by `test/chat_tab_content_test.dart`
 
 ## Setup Progress Tracker
 - Web Doctor Sidebar includes a Setup Progress Tracker component that tracks 4 setup steps: Account Registration & Email Verification, Complete Professional Profile, Admin Approval, and Set Availability & Schedule

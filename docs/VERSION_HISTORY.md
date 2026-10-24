@@ -4,7 +4,288 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
-<<<<<<< HEAD
+### 01.21 (October 23, 2026)
+
+**Purpose:** Fix the mobile Secretary Chat tab rendering a completely blank page (no list, no empty state, no spinner) whenever the patient actually had conversations.
+
+**Bug Fix:**
+- Root cause: the 01.20 zero-frame guard (`if (MediaQuery.of(context).size.height > 300)`) was nested inside the `_conversations.isEmpty` branch of the inline collection-if chain in `_buildChatContent()`. Dart binds a trailing `else` to the nearest unmatched `if`, so the final `else` (the conversation-card list) attached to the *inner height guard* instead of the outer `else if (_conversations.isEmpty)` chain. The effective logic became: loading → spinner, empty → empty state, **has conversations → render nothing at all**. Any patient with an existing conversation saw the blank tab; a patient with zero conversations still saw the "No conversations yet" state, which is why the bug surfaced only for accounts with real message history.
+- Fix: the tab body was extracted into a public `ChatTabContent` stateless widget (`mobile/lib/features/home/presentation/home_page.dart`) with explicit early-return branches — loading → spinner, empty → height-guarded "No conversations yet" filler (zero-first-frame safety preserved), otherwise → `Column` of conversation cards. `_buildChatContent()` now delegates via `isLoading` / `conversations` / `onRefresh`; `onRefresh` preserves the previous behavior of reloading conversations after a thread is closed (mounted-checked). `_buildConversationCard` and `_formatTimestamp` moved unchanged into the widget.
+
+**Tests:**
+- Added `mobile/test/chat_tab_content_test.dart` (4 tests, all passing): conversation list renders cards when the list is not empty, empty state renders when no conversations exist, loading spinner renders while loading, unread badge shows the unread count.
+- Full mobile `flutter test` suite: 138 pass / 11 failing — the same 11 pre-existing failures (verified in 01.20); `flutter analyze` stays at the 42 pre-existing issues baseline.
+- Verified on the Android emulator: the Chat tab now renders the conversation card (secretary name, practice, preview, timestamp) and the card opens the conversation thread with full message history.
+
+**Breaking Changes:** None. Backend, API, data, and login/session flow untouched.
+
+**Documentation Updates:** `SYSTEM_STATE.md` updated in the Mobile Application section; version files synced.
+
+---
+
+### 01.20 (October 23, 2026)
+
+**Purpose:** Redesign the patient Profile tab on mobile into grouped Account / Security / Notifications / About / Log Out sections, add a standalone read-only patient profile screen and a static privacy notice screen, and give the user a persisted push-notification preference.
+
+**Significant Features:**
+- Mobile Profile tab (`_buildProfileContent` in `home_page.dart`) rewritten into labeled sections:
+  - **Account:** summary card (name, email, role) with a "View patient profile" row that opens the new standalone `PatientProfilePage` (read-only, `GET /api/v1/patients/me` via the existing `getCurrentPatient()` call; loading/error+retry states; shows exactly the same fields as the patient-details flow — fixed a literal `'_userEmail'` rendering bug while wiring it up).
+  - **Security:** "Change password" row opening `ChangePasswordPage` via `MaterialPageRoute` with `onSuccess` returning to the Profile tab (success flow now returns to Profile instead of pushing the change page inline).
+  - **Notifications:** push-notifications switch labeled `profile_push_switch`, backed by a persisted `push_notifications_enabled` preference (default ON so first-time users match the existing auto-registration behavior). Toggling ON asks the native host / OS for the FCM token and registers it through the existing `POST /device-tokens` endpoint (returns `409`-tolerant idempotent registration); Toggling OFF removes the stored token through `DELETE /device-tokens/:id` and clears the preference. If the OS notification permission is denied, a hint plus `openAppSettings()` is shown. No per-category switches were added.
+  - **About:** app version read at runtime via `package_info_plus` (pubspec version), and a "Privacy notice" row opening the new static `PrivacyNoticePage` ("Last updated: October 2026").
+  - **Log Out:** unchanged behavior (no confirmation dialog, still removes the device token server-side before clearing the local session).
+- New public routes `/patient-profile` and `/privacy-notice` in `app.dart`, inside the authenticated guarded group (unauthenticated requests bounce to `/login`; logout-required state enforces `/change-password`; secretaries are kept on the chat-first home). Mobile patients can only ever view and change their own data through the same pre-existing patient-scoped endpoints — no new endpoints, no queue/payment/clinic-management features.
+- `PushNotificationService` (`mobile/lib/core/services/push_notification_service.dart`): `registerForCurrentUser()` now returns `Future<bool>` (true when a token was actually registered); added idempotent `disableForCurrentUser()` (DELETE via the stored `device_token_id`, then clears prefs), the `push_notifications_enabled` preference key with `isPushPreferred()`/`setPushPreferred()`, a test-only `PushNotificationService.withApiService(apiService)` constructor, and the method channel is now exposed as the public `PushNotificationService.channel` constant.
+- `HomePage` accepts an optional test seam `pushNotificationService` (falls back to `PushNotificationService.instance`), so widget tests can inject a fake registration service.
+
+**Improvements:**
+- New mobile dependencies: `permission_handler` (^12.0.0, needed because the app had no native push host/permission plumbing — bare `MainActivity.kt`) and `package_info_plus` (^8.0.0, the only runtime source of the pubspec version for the About section). `pubspec.lock` regenerated (the previously committed lock was already corrupt and could not be parsed).
+- Accessibility/large-text: all new Profile rows use ≥44 px touch targets with `Semantics` labels (`profile_view_details`, `profile_change_password`, `profile_privacy_notice`, `profile_push_switch`), consistent spacing, and text scaling-safe layout.
+- Fixed the pre-existing first-frame crash in `_buildChatContent()`: the empty-conversations filler used an unguarded `MediaQuery.of(context).size.height - 300` that produced a negative `BoxConstraints` (`h=-299.0`) on the zero-sized first layout pass — the exact bug class `test/initial_frame_layout_test.dart` was added to prevent in commit `488dcee`. The filler is now guarded (`if > 300`), matching the pattern the old profile filler had. This also un-wedges `initial_frame_layout_test.dart`, which previously failed (and hung a 10-minute attempt) — verified to fail identically at the previous commit (`85b8532` guard regression).
+
+**Removed/Modified Functionality:**
+- The old lightweight Profile tab (single card of rows) is replaced by the grouped sections above; the mate "View patient profile" flow now goes through the standalone screen instead of the patient-details form.
+- `registerForCurrentUser` callers that ignored the return value still work (the `bool` result is additive, non-breaking).
+
+**Breaking Changes:** None (all changes reuse existing patient-scoped endpoints; no schema changes; login, session handling, and `_logout()` flow untouintouched).
+
+**Tests:**
+- Added `mobile/test/profile_section_test.dart` (8 tests, all passing): switch ON registers a token through an injected fake `ApiService`; switch OFF removes the stored token; permission-denied surfaces the settings hint (via a fake `PermissionHandlerPlatform`); Account row opens `/patient-profile`; Privacy row opens `/privacy-notice`; Change password row opens `ChangePasswordPage`; About shows the pubspec version (mocked `PackageInfo`); unauthenticated `MyApp` cannot reach `/patient-profile` (redirects to login).
+- Full mobile `flutter test` suite run; `flutter analyze` back at the 42 pre-existing issues baseline (no new analyzer issues). `initial_frame_layout_test.dart` now passes again after the chat-filler guard.
+- Pre-existing failures NOT touched: `booking_confirmation_page_test.dart` + `patient_details_test.dart` (reference a nonexistent `receiptImage` param), `change_password_page_test.dart` "Unauthenticated access..." + `otp_verification_page_test.dart` structure test (both verified to fail identically at the previous commit — MyApp's `_initializeApp` await on the push method channel never completes under the fake-async test binding without a channel mock, leaving the splash on screen), and the backend's 5 known jest failures.
+
+**Documentation Updates:** `SYSTEM_STATE.md` updated (profile sections, push preference, new routes/screens), version files synced.
+
+---
+
+### 01.19 (October 23, 2026)
+
+**Purpose:** Fix the mobile Doctor Schedule page failing with 401 "Invalid or expired token" in the "Clinic Schedule & Calendar" card, and remove a RenderFlex pixel overflow on the doctor schedule page.
+
+**Significant Features:** None (bug fixes).
+
+**Improvements:**
+- Mobile: the week-range header ("Oct 18 – Oct 24, 2026" + "Regular Clinic" badge) is wrapped in `Center(FittedBox(scaleDown))` so the once-overflowing row scales down on narrow screens instead of clipping; date-info rows (`_buildInfoRow`) give the value an `Expanded(Text(textAlign: end))` so long values wrap instead of overflowing.
+- Mobile: fixed a 14 px RenderFlex overflow on the Doctors page "Hospitals & Medical Centers" section header (`doctors_page.dart`) by wrapping the title/subtitle column in `Expanded` (same pattern as the "Top Verified Doctors" header) so the "See all" action never pushes the row past its bounds and the subtitle wraps instead of clipping.
+
+**Bug Fixes:**
+- Backend: `middleware/auth.ts` `resolveRolePrefix` exempted the shared sub-resource `/doctors/:id/availability` from the DOCTOR namespace check. The patient mobile app sends its PATIENT token to that endpoint, which the cross-role portal check rejected (401 "Invalid or expired token"), breaking the Clinic Schedule & Calendar card. The endpoint already supports patients (patient-scoped response filtering) and was only reachable with a DOCTOR token after the cross-role hardening. Doctor-portal-only routes remain guarded by `authorize('DOCTOR')`.
+
+**Breaking Changes:** None.
+
+**Tests:**
+- `middleware/auth.test.ts`: +3 tests — PATIENT and DOCTOR tokens both pass `authenticate` on `/api/v1/doctors/:id/availability`; `/doctors/me` still rejects PATIENT (401). Backend jest: 342 passing, same 5 pre-existing unrelated failures (`date`, `appointments`, `conversations`, `payments`, `queue`).
+- Mobile: `flutter analyze doctor_schedule_page.dart` clean (only a pre-existing unnecessary-import info).
+
+**Documentation Updates:** `SYSTEM_STATE.md`, `architecture.md`, and `architecture-essentials.md` updated with the shared sub-resource exemption.
+
+---
+
+### 01.18 (October 23, 2026)
+
+**Purpose:** Redesign the Secretary Settings page (`/secretary/settings`) into labeled "Account" and "Clinic" sections, adding a Change password card, QR-code status (thumbnail, Active/Not uploaded badge, last-updated date), and display-only "Coming soon" placeholders for upcoming clinic settings.
+
+**Significant Features:**
+- Secretary Settings grouped into "Account" (Two-Factor Authentication, Change password, Trusted Browsers) and "Clinic" (Clinic Payment Settings plus placeholders) with equal card spacing; the missing-gap bug between Trusted Browsers and Clinic Payment cards was fixed.
+- Change password card added (reuses `POST /api/v1/auth/change-password`): verifies the current password, revokes all other trusted browsers and refresh tokens server-side, and keeps the current session signed in (fresh token pair for this browser).
+- Clinic Payment Settings card now shows the current GCash QR thumbnail, an "Active"/"Not uploaded" status badge, and the last-updated date (Asia/Manila), with the note shortened to: "Patients see this QR code in the mobile app when they pay. Receipt review is on the Payments page."
+- Display-only "Coming soon" placeholder cards added: "Invoice details" (waiting for the invoice feature) and "GCash account details" (waiting for the patient payments view). They have no interactivity and make no requests.
+
+**Improvements:**
+- Backend: added `doctors.gcash_qr_updated_at` (migration `033_add_gcash_qr_updated_at.sql`, applied via `npm run migrate:gcash-qr-updated-at`); set on QR upload, cleared on QR deletion, and returned by `GET /api/v1/gcash-qr/doctor/:doctorId` as `gcashQrUpdatedAt`. `doctors.updated_at` could not be used because profile/photo edits also bump it.
+- Backend: fixed portal-role resolution in `middleware/auth.ts` `resolveRolePrefix` — role names are now anchored to the mount namespace, so secretary-only sub-resource paths like `/gcash-qr/doctor/:id` are no longer misread as the DOCTOR portal (a valid secretary token previously received 401 on that route).
+- Shared `TrustedBrowsersCard` gained a `confirmDialogs` prop (default true for the doctor page); the secretary page passes false so Revoke and "Sign out of all devices" act immediately without confirmation dialogs, as required.
+- 2FA description reworded to "Require a verification code when you sign in from a new or untrusted browser." with the duplicated explainer removed; toggle uses `role="switch"` / `aria-checked`.
+
+**Bug Fixes:**
+- Fixed secretary tokens being rejected with 401 "Invalid or expired token" on `/api/v1/gcash-qr/doctor/:id` due to over-greedy URL role matching in `resolveRolePrefix`.
+
+**Removed/Modified Functionality:**
+- `GET /api/v1/gcash-qr/doctor/:doctorId` response now includes the optional additive `gcashQrUpdatedAt` field (non-breaking).
+
+**Breaking Changes:** None.
+
+**Tests:**
+- Added `gcashQr.test.ts`: assigned-doctor GET returns the URL and upload timestamp; a secretary assigned to another doctor is 403; missing doctor is 404. These tests also regress the `resolveRolePrefix` fix.
+- Backend jest: all auth/middleware/gcash suites pass (339 passing; the 5 remaining failures — `date.test.ts`, `appointments`, `conversations`, `payments`, `queue` — are pre-existing stale-date/mock-teardown failures unrelated to this work).
+- Web `tsc --noEmit` and `next build` pass.
+
+**Documentation Updates:**
+- `prd.md` FR-021, `SYSTEM_STATE.md` (secretary settings, deployment note), and `architecture-essentials.md` (migrations list, settings pages) updated.
+
+**TODOs / Known Issues (pre-existing, not introduced here):**
+- Pre-existing backend test failures: `src/utils/date.test.ts` expects a hardcoded clinic date (`2026-10-16`) while the current clinic date is `2026-10-23`; `appointments/conversations/payments/queue` tests share a mock `release` teardown error.
+
+---
+
+### 01.17 (October 23, 2026)
+
+**Purpose:** Redesign the Doctor Settings page (`/doctor/settings`) into a single labeled "Account" section with the 2FA toggle, a Change password card (reusing the shared password-change endpoint), and an enhanced Trusted Browsers card that identifies the current browser.
+
+**Significant Features:**
+- Doctor Settings page redesigned into one labeled "Account" section with equal card spacing containing: Two-Factor Authentication, Change password, and Trusted Browsers. No payment/Clinic section (Secretary-only).
+- Change password card added builds (`web/src/components/settings/ChangePasswordCard.tsx`): current/new/confirm fields, show/hide toggles, min-8 validation, and reuse of the existing `POST /api/v1/auth/change-password` endpoint.
+- A successful password change revokes all other trusted browsers and refresh tokens server-side while the current session stays signed in (fresh token pair issued for this browser).
+- Trusted Browsers card now labels the row matching the request's trust cookie with a "This browser" badge.
+
+**Improvements:**
+- Backend: `GET /api/v1/auth/trusted-browsers` returns an `is_current` boolean on each row by comparing the request's trusted-browser cookie against stored `token_hash` hashes; no token or hash value is exposed. No schema change required.
+- Trusted Browsers card: revoking the current browser confirms that the next sign-in will require a verification code; "Sign out of all devices" confirms "Sign out everywhere? You will need to sign in again on every device." `window.confirm` replaced with a keyboard-accessible `ConfirmDialog` component (`web/src/components/ui/ConfirmDialog.tsx`, no libraries).
+- Trusted Browsers card shows the 5 most recent browsers with a "View all" toggle when more exist; dates render in Asia/Manila.
+- 2FA description reworded to "Require a verification code when you sign in from a new or untrusted browser." with the duplicated explainer removed; the toggle uses `role="switch"` / `aria-checked`.
+
+**Bug Fixes:** None.
+
+**Removed/Modified Functionality:**
+- `GET /api/v1/auth/trusted-browsers` response rows now include the optional additive `is_current` field (non-breaking).
+- 2FA toggles remain doctor/Secretary-scoped with unchanged backend endpoints and role checks.
+
+**Breaking Changes:** None.
+
+**Tests:**
+- Added backend tests: trusted-browsers list flags the current browser via the request trust cookie and returns all rows as not current without the cookie; existing auth suites (change-password, session policy) still pass.
+- Web `tsc --noEmit` and `next build` pass.
+
+**Documentation Updates:**
+- `prd.md` FR-002-A item 10, `SYSTEM_STATE.md`, and `architecture-essentials.md` updated for "This browser" labeling, View-all cap, confirmation texts, and the doctor Account section.
+
+**TODOs / Known Issues (pre-existing, not introduced here):**
+- The trusted-browsers/device-trust feature remains uncommitted baseline work on `main`; this version builds on it.
+- Pre-existing backend test failures unrelated to settings: `src/utils/date.test.ts` expects a hardcoded clinic date (`2026-10-16`) but the current clinic date is `2026-10-23`; `queue.test.ts`/`conversations.test.ts` fail on a mock `release` teardown error.
+
+
+
+**Purpose:** Replace the Doctor/Secretary "Remember Me" checkbox with an explicit post-login device-trust prompt that grants a 30-day persistent session and OTP skipping only after the current login has fully succeeded.
+
+**Significant Features:**
+- Removed the Remember Me checkbox from `/doctor-login` and `/secretary-login`.
+- Added post-login trust pages at `/doctor/trust-device` and `/secretary/trust-device` showing the detected browser, operating system, and device type.
+- "Trust this device" registers/rotates a trusted browser for 30 days, upgrades the current session to the 30-day persistent policy, and skips OTP on later logins from that browser when 2FA is enabled. The password is always required.
+- "Do not trust this device" keeps the 7-hour access / 8-hour refresh / 8-hour idle browser-session policy, registers no trust, and clears any stale trusted-browser cookie.
+- Trusting a device never bypasses the OTP required for the current login; OTP verification always issues a short untrusted session and the prompt appears afterward.
+- Existing trusted browsers skip OTP and the trust prompt on later logins.
+
+**Improvements:**
+- Backend: `authService.login()` treats the trusted-device cookie as the source of truth, ignores the legacy `rememberMe` login field, and returns `isTrustedBrowser` / `requiresTrustPrompt`.
+- Backend: `verifyLoginOtp()` always issues a short staff session and never auto-registers trust.
+- Backend: added `trustCurrentBrowser()` to register/rotate the device and reissue a 30-day persistent token pair while preserving the original session start.
+- Backend: added `GET /api/v1/auth/trusted-browsers/current-device` and `POST /api/v1/auth/trusted-browsers/trust-current`; reused `POST /api/v1/auth/revoke-trusted-browser` for "Do not trust this device".
+- Backend: `AuthRequest` exposes the access token's `sst`/`iat` so the trust upgrade preserves the session start.
+- Web: added shared `deviceInfo.ts`, `DeviceTrustCard`, and trust pages; trust pages bypass the dashboard shell.
+- Web: Secretary password change takes precedence over the trust prompt; profile completion follows the trust choice.
+- Web: `authApi` includes the new trust response fields and device/trust methods; `OtpVerification` no longer sends `rememberMe`.
+- Reused the existing `trusted_browsers` table; no new database migration was required.
+
+**Removed/Modified Functionality:**
+- Remember Me is no longer a login-form choice for Doctor/Secretary accounts.
+- The internal `rememberMe` token/session-policy flag is retained for backward compatibility but now means an explicit trusted-device session.
+- `login_otp_challenges.remember_me` remains in the schema for compatibility; new challenges store `false` and it no longer grants trust.
+- Admin/SuperAdmin and Patient behavior is unchanged.
+
+**Architecture:**
+- Session policy remains centralized in `backend/src/modules/auth/sessionPolicy.ts`.
+- Trusted-device tokens remain SHA-256 hashes in PostgreSQL, sent only through HttpOnly/Secure/SameSite cookies, rotated on use, and never exposed to JavaScript or API response bodies.
+- Trust state is still revoked by password change/reset, account deactivation, and "Sign out of all devices" via `users.session_version`.
+
+**Testing:**
+- Backend and web TypeScript checks pass.
+- Targeted Jest: `auth.session.test.ts`, `auth.test.ts`, and `authService.test.ts` — 65/65 pass.
+- Full backend Jest run: 334 passed, 24 failed; the 24 failures are the same pre-existing suites (`date`, `conversations`, `payments`, `appointments`, `queue`), with no new failures.
+- Live browser verification still requires real Doctor/Secretary credentials, OTP delivery, and a running backend.
+
+**Documentation:**
+- Updated `docs/prd.md`, `docs/architecture.md`, `docs/architecture-essentials.md`, `docs/SYSTEM_STATE.md`, `backend/README.md`, and `CHANGES.md`.
+- Updated `CURRENT_VERSION.md` to 01.16 and added this entry to `VERSION_HISTORY.md`.
+
+---
+
+### 01.15 (October 20, 2026)
+
+**Purpose:** Enable mobile login to accept either email or username for authentication, with conditional validation and automatic username population during registration
+
+**Significant Features:**
+- Mobile login page now accepts both email and username for authentication
+- Conditional validation: email format validated only if input contains `@` symbol; usernames accepted without email format validation
+- Backend `/api/v1/auth/login` endpoint queries both `email` and `username` columns for authentication
+- Username automatically generated from email (part before @) during all registration flows
+
+**Improvements:**
+- Mobile: Updated `login_page.dart` validator to accept both email and username with conditional email format validation
+- Backend: Updated `authService.ts` register function to populate username column
+- Backend: Updated `authService.ts` registerDoctor function to populate username column
+- Backend: Updated `walk-ins.ts` walk-in registration to populate username column (both instances)
+- Backend: Updated `doctors.ts` secretary creation to populate username column
+- Backend: Updated `admin.ts` admin creation, doctor creation, and secretary creation to populate username column
+- Backend: Patient OTP registration (`patientOtp.ts`) already populates username from pending signup
+
+**Removed/Modified Functionality:**
+- No existing authentication functionality removed; email-only login still works
+- Username column was already present in database (migration 009_patient_username_migration.sql)
+- Login backend query already supported both email and username; now properly utilized with populated usernames
+
+**Architecture:**
+- Database: username column already exists in `users` table (VARCHAR(50), UNIQUE, indexed)
+- Backend: modified user creation SQL statements across all registration flows to include username
+- Mobile: enhanced validation logic in login form
+
+**Testing:**
+- Backend: all user creation flows now populate username from email
+- Mobile: login validation accepts both email format and username format
+- Backend login query: `WHERE (email = $1 OR username = $1)` leverages populated usernames
+
+**Documentation:**
+- Updated CURRENT_VERSION.md to 01.15
+- Added VERSION_HISTORY.md entry for 01.15
+- Updated SYSTEM_STATE.md with new "Email or Username Login" section documenting conditional validation and automatic username generation
+
+---
+
+### 01.14 (October 20, 2026)
+
+**Purpose:** Implement GCash QR code management feature for the Secretary Web Dashboard, allowing secretaries to upload, preview, and replace their assigned doctor's GCash QR code, which is displayed to patients in the mobile app during the payment process
+
+**Significant Features:**
+- Secretary Web Dashboard GCash QR Management at `/secretary/settings/gcash-qr`: upload, preview, and replace the clinic's static GCash QR code
+- Doctor-specific GCash QR codes stored in the `doctors.gcash_qr_url` database column (migration `029_add_gcash_qr_url.sql`)
+- Backend API endpoints for GCash QR management: `GET /api/v1/gcash-qr/doctor/:doctorId`, `POST /api/v1/gcash-qr/doctor/:doctorId/upload`, `DELETE /api/v1/gcash-qr/doctor/:doctorId`
+- Updated public GCash QR endpoint `GET /api/v1/payments/gcash-qr` to accept `doctorId` query parameter and return doctor-specific QR from database
+- Mobile app now fetches doctor-specific GCash QR code via `ApiService.getGcashQr(doctorId)` and displays it in the payment screen
+- Supabase Storage integration for GCash QR codes (bucket `gcash-qr-codes`, configurable via `SUPABASE_GCASH_BUCKET`)
+
+**Improvements:**
+- Backend: added `gcash_qr_url` column to `doctors` table with index (migration `029_add_gcash_qr_url.sql`)
+- Backend: extended `storageService.ts` with `uploadGcashQr`, `deleteGcashQr`, and `validateGcashQrFile` functions for QR code storage
+- Backend: created new API router `/backend/src/api/gcashQr.ts` with secretary-only QR management endpoints
+- Backend: updated `payments.ts` public GCash QR endpoint to accept `doctorId` query parameter
+- Web: added `/secretary/settings/gcash-qr/page.tsx` with QR upload (PNG/JPEG, 5MB limit), preview, and delete functionality
+- Web: updated `/secretary/settings/page.tsx` with navigation link to GCash QR Management section
+- Mobile: updated `PaymentScreen` to accept optional `doctorId` parameter and fetch doctor-specific QR code
+- Mobile: updated `ApiService.getGcashQr()` to require `doctorId` parameter and pass it as query parameter
+
+**Removed/Modified Functionality:**
+- No existing payment, booking, or queue functionality was removed
+- Payment verification workflow remains unchanged in the Payments page (receipt review, verify/reject, payment history)
+- GCash QR management is separate from payment verification to maintain clear separation of concerns
+
+**Architecture:**
+- Database: added `/backend/database/029_add_gcash_qr_url.sql` and `/backend/src/database/applyGcashQrUrl.ts`
+- Backend: added `/backend/src/api/gcashQr.ts`, modified `/backend/src/api/payments.ts`, `/backend/src/services/storageService.ts`, and `/backend/src/index.ts`
+- Web: added `/web/src/app/secretary/settings/gcash-qr/page.tsx`, modified `/web/src/app/secretary/settings/page.tsx`
+- Mobile: modified `/mobile/lib/features/payments/presentation/payment_screen.dart` and `/mobile/lib/core/services/api_service.dart`
+
+**Testing:**
+- Backend: migration `029_add_gcash_qr_url.sql` applied successfully via `npm run migrate:gcash-qr-url`
+- Backend: `tsc --noEmit` clean
+- Web: `next build` succeeded (41 routes including `/secretary/settings/gcash-qr`); `tsc --noEmit` clean
+- Mobile: `flutter analyze --no-pub` reports no errors (only pre-existing infos/warnings)
+
+**Documentation:**
+- Updated CURRENT_VERSION.md to 01.14
+- Added VERSION_HISTORY.md entry for 01.14
+- Updated architecture-essentials.md to include new migration `029_add_gcash_qr_url.sql` in the database concepts list
+
+---
+
 ### 01.13 (October 20, 2026)
 
 **Purpose:** Extend the shared mobile application to secretaries so they can sign in with their existing credentials and manage patient conversations from a chat-first home, with role-based routing, push notification deep links, and a read-only patient-info sheet
@@ -95,54 +376,6 @@ This document contains the complete version history for the FindMyDoctor applica
 - Updated `docs/architecture-essentials.md` (Secretary Chat Rules access/sharing/unread/patient-info sheet/push rules, database tables and migration list, chat implementation checklist)
 - Updated `docs/SYSTEM_STATE.md` (Database Schema, Patient-Secretary Messaging and Push Notifications, Secretary Web Chat)
 - Updated CURRENT_VERSION.md to 01.12 and added this VERSION_HISTORY.md entry
-=======
-### 01.12 (October 19, 2026)
-
-**Purpose:** Implement GCash and Cash payment options for clinic appointments
-
-**Significant Features:**
-- Patients can now choose between GCash (with QR code scan and receipt upload) or Cash at Clinic payment methods
-- Added payment screen accessible from booking confirmation and appointments pages
-- Payment status (UNPAID, PENDING_VERIFICATION, PAID, REJECTED) displayed in appointments list
-- Backend API endpoint to serve GCash QR code as static file
-
-**Improvements:**
-- Mobile: Changed booking button label from "Confirm Clinic Date & Reserve Queue" to "Continue Booking" for clearer UX
-- Mobile: Added "Pay Now" option on booking confirmation page for immediate payment access
-- Mobile: Added payment icon button on appointment cards for quick payment access
-- Mobile: Added "Manage Payment" button on appointment detail page
-- Mobile: Created comprehensive payment screen with GCash QR display, receipt upload (up to 5MB), and Cash at Clinic information
-- Mobile: Added image_picker dependency for receipt upload functionality
-- Mobile: Payment status badges displayed on appointment cards (Paid, Pending, Unpaid)
-- Backend: Added GET /api/v1/payments/gcash-qr public endpoint to return QR code URL
-- Backend: Configured static file serving for /public directory to serve GCash QR image
-- Backend: Updated appointments API to include payment_status in query results
-- Backend: Added publicPaymentsRouter for unauthenticated GCash QR endpoint
-
-**UI/UX Changes:**
-- Payment method selection with visual feedback (GCash vs Cash at Clinic)
-- GCash QR code display with loading and error states
-- Receipt upload with file size validation (5MB limit)
-- Payment status indicators with color-coded badges
-
-**Removed/Modified Functionality:**
-- No existing payment, booking, or queue functionality was removed
-- Booking flow unchanged - patients can still complete reservations without advance payment
-- Payment remains optional per architecture requirements
-
-**Architecture:**
-- Mobile: Created `/mobile/lib/features/payments/presentation/payment_screen.dart`
-- Mobile: Modified `/mobile/lib/features/doctors/presentation/doctor_schedule_page.dart` (button label)
-- Mobile: Modified `/mobile/lib/features/appointments/presentation/booking_confirmation_page.dart` (Pay Now action)
-- Mobile: Modified `/mobile/lib/features/appointments/presentation/appointments_page.dart` (payment access and status)
-- Mobile: Modified `/mobile/lib/features/appointments/presentation/appointment_detail_page.dart` (payment button)
-- Mobile: Modified `/mobile/lib/core/services/api_service.dart` (payment methods)
-- Mobile: Modified `/mobile/lib/core/constants/api_constants.dart` (payment constants)
-- Mobile: Updated `/mobile/pubspec.yaml` (added image_picker dependency)
-- Backend: Modified `/backend/src/api/payments.ts` (GCash QR endpoint)
-- Backend: Modified `/backend/src/index.ts` (static file serving and payment routes)
-- Backend: Modified `/backend/src/api/appointments.ts` (payment_status in queries)
-- Backend: Created `/backend/public/` directory with README for GCash QR placeholder
 
 **Testing:**
 - Mobile: Flutter analyze completed with only pre-existing warnings (no new errors)
@@ -154,7 +387,6 @@ This document contains the complete version history for the FindMyDoctor applica
 - Updated CURRENT_VERSION.md to 01.12
 - Added VERSION_HISTORY.md entry for 01.12
 - Created `/backend/public/README.md` with GCash QR setup instructions
->>>>>>> feature/gcash-payment-receipt-upload
 
 ---
 

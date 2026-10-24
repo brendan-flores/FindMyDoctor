@@ -4,8 +4,6 @@ export interface LoginCredentials {
   email: string;
   password: string;
   expectedRole: 'DOCTOR' | 'SECRETARY' | 'ADMIN';
-  rememberMe?: boolean;
-  trustedBrowserToken?: string;
 }
 
 export interface RegisterCredentials {
@@ -14,6 +12,13 @@ export interface RegisterCredentials {
   firstName: string;
   lastName: string;
   role: 'PATIENT' | 'DOCTOR' | 'SECRETARY' | 'ADMIN';
+}
+
+export interface SessionMetadata {
+  rememberMe: boolean;
+  persistent: boolean;
+  idleTimeoutMinutes: number;
+  maxSessionMinutes: number | null;
 }
 
 export interface AuthResponse {
@@ -25,17 +30,37 @@ export interface AuthResponse {
   };
   accessToken: string;
   refreshToken: string;
+  rememberMe?: boolean;
+  isTrustedBrowser?: boolean;
+  requiresTrustPrompt?: boolean;
+  session?: SessionMetadata;
 }
 
 export interface LoginOtpRequiredResponse {
   requiresOtp: true;
   challengeId: string;
+  requiresTrustPrompt?: boolean;
+  session?: SessionMetadata;
+}
+
+export interface CurrentDeviceResponse {
+  deviceInfo: string | null;
+  capturedAt: string;
+}
+
+export interface TrustedBrowser {
+  id: string;
+  device_info: string | null;
+  created_at: string;
+  last_used_at: string | null;
+  expires_at: string;
+  /** True when this row belongs to the browser making the request. */
+  is_current?: boolean;
 }
 
 export interface VerifyLoginOtpRequest {
   challengeId: string;
   otp: string;
-  rememberMe?: boolean;
 }
 
 export interface ResendLoginOtpRequest {
@@ -108,7 +133,27 @@ export const authApi = {
     return apiClient.post('/auth/revoke-trusted-browser', {});
   },
 
-  refreshToken: async (refreshToken: string) => {
+  getTrustedBrowsers: async () => {
+    return apiClient.get<{ browsers: TrustedBrowser[] }>('/auth/trusted-browsers');
+  },
+
+  getCurrentDevice: async () => {
+    return apiClient.get<CurrentDeviceResponse>('/auth/trusted-browsers/current-device');
+  },
+
+  trustCurrentDevice: async () => {
+    return apiClient.post<AuthResponse>('/auth/trusted-browsers/trust-current', {});
+  },
+
+  revokeTrustedBrowserById: async (id: string) => {
+    return apiClient.delete<{ revoked: boolean }>(`/auth/trusted-browsers/${encodeURIComponent(id)}`);
+  },
+
+  signOutAllDevices: async () => {
+    return apiClient.post('/auth/trusted-browsers/revoke-all', {});
+  },
+
+  refreshToken: async (refreshToken?: string) => {
     return apiClient.post<AuthResponse>('/auth/refresh', { refreshToken });
   },
 };

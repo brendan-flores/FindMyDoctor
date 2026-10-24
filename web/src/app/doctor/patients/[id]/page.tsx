@@ -279,28 +279,26 @@ export default function PatientDetail() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <button
-              onClick={() => router.push('/doctor/patients')}
-              className="text-blue-100 hover:text-white mb-2 flex items-center gap-2"
-            >
-              <span className="material-symbols-outlined">arrow_back</span>
-              Back to Patients
-            </button>
-            <h1 className="text-2xl font-bold text-white">{getFullName(patient)}</h1>
-            <p className="text-blue-100 mt-1">{patient.email || 'No email on file'}</p>
-          </div>
-          {!isEditMode && (
-            <button
-              onClick={() => setIsEditMode(true)}
-              className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium"
-            >
-              Edit Profile
-            </button>
-          )}
+      <div className="flex items-center justify-between">
+        <div>
+          <button
+            onClick={() => router.push('/doctor/patients')}
+            className="text-slate-600 hover:text-slate-900 mb-2 flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+            Back to Patients
+          </button>
+          <h1 className="text-2xl font-bold text-slate-900">{getFullName(patient)}</h1>
+          <p className="text-slate-500 mt-1">{patient.email || 'No email on file'}</p>
         </div>
+        {!isEditMode && (
+          <button
+            onClick={() => setIsEditMode(true)}
+            className="px-4 py-2 bg-[#1b5eb8] text-white rounded-lg hover:bg-[#14468f] font-medium"
+          >
+            Edit Profile
+          </button>
+        )}
       </div>
 
       {saveError && (

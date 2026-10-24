@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/services/doctor_service.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/push_notification_service.dart';
 import '../../../core/models/doctor.dart';
+import '../../../features/auth/presentation/change_password_page.dart';
 import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
 import '../../conversations/models/conversation.dart';
@@ -15,7 +21,11 @@ import '../../conversations/models/conversation.dart';
 class HomePage extends StatefulWidget {
   final int? initialTab;
 
-  const HomePage({super.key, this.initialTab});
+  /// Test-only override for the push-notification service. When omitted the
+  /// process-wide [PushNotificationService.instance] is used.
+  final PushNotificationService? pushNotificationService;
+
+  const HomePage({super.key, this.initialTab, this.pushNotificationService});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -34,19 +44,33 @@ class _HomePageState extends State<HomePage> {
   List<Conversation> _conversations = [];
   bool _isLoadingConversations = true;
   int _totalUnreadCount = 0;
+  int _notificationUnreadCount = 0;
   String? _userName;
   String? _userEmail;
+  bool _accountInfoFailed = false;
+
+  // Profile "About" and "Notifications" section state.
+  String? _appVersion;
+  bool _pushEnabled = true;
+  bool _isPushBusy = false;
+  bool _permissionDeniedHintVisible = false;
+  late final PushNotificationService _pushService;
 
   @override
   void initState() {
     super.initState();
+    _pushService =
+        widget.pushNotificationService ?? PushNotificationService.instance;
     if (widget.initialTab != null) {
       _currentIndex = widget.initialTab!;
     }
     _loadData();
     _loadUserInfo();
+    _loadProfileExtras();
     // Load conversations in background to show unread badge
     _loadConversations();
+    // Load notification unread count
+    _loadNotificationUnreadCount();
   }
 
   Future<void> _loadUserInfo() async {
@@ -55,14 +79,51 @@ class _HomePageState extends State<HomePage> {
       if (response['success'] == true && response['data'] != null) {
         if (!mounted) return;
         setState(() {
-          _userName = response['data']['firstName'] != null && response['data']['lastName'] != null
+          _userName =
+              response['data']['firstName'] != null &&
+                  response['data']['lastName'] != null
               ? '${response['data']['firstName']} ${response['data']['lastName']}'
               : response['data']['email'];
           _userEmail = response['data']['email'];
+          _accountInfoFailed = false;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _accountInfoFailed = true;
         });
       }
     } catch (e) {
-      // Silently fail - keep default profile info
+      // Surface a retry affordance in the profile; other tabs are unaffected.
+      if (!mounted) return;
+      setState(() {
+        _accountInfoFailed = true;
+      });
+    }
+  }
+
+  /// Loads the Profile-only extras: the app version (from pubspec.yaml via
+  /// package_info_plus) and the stored push preference, which defaults to
+  /// enabled to match the existing auto-registration behavior at startup.
+  Future<void> _loadProfileExtras() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() {
+        _appVersion = info.version;
+      });
+    } catch (_) {
+      // Version display is cosmetic; leave the placeholder on failure.
+    }
+
+    try {
+      final preferred = await _pushService.isPushPreferred();
+      if (!mounted) return;
+      setState(() {
+        _pushEnabled = preferred;
+      });
+    } catch (_) {
+      // Keep the default (enabled), matching device startup behavior.
     }
   }
 
@@ -71,21 +132,23 @@ class _HomePageState extends State<HomePage> {
       final allDoctors = await _doctorService.getDoctors();
 
       // Extract unique specialties
-      final uniqueSpecialties = allDoctors
-          .map((d) => d.specialty)
-          .where((s) => s.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
+      final uniqueSpecialties =
+          allDoctors
+              .map((d) => d.specialty)
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
 
       // Extract unique hospitals/clinics
-      final uniqueHospitals = allDoctors
-          .map((d) => d.practiceName)
-          .whereType<String>()
-          .where((h) => h.isNotEmpty && h != 'Private Practice')
-          .toSet()
-          .toList()
-        ..sort();
+      final uniqueHospitals =
+          allDoctors
+              .map((d) => d.practiceName)
+              .whereType<String>()
+              .where((h) => h.isNotEmpty && h != 'Private Practice')
+              .toSet()
+              .toList()
+            ..sort();
 
       // Take first 2 doctors as recommended
       final recommended = allDoctors.take(2).toList();
@@ -112,8 +175,13 @@ class _HomePageState extends State<HomePage> {
       final response = await _apiService.getConversations();
       if (response['success'] == true && response['data'] != null) {
         final List<dynamic> data = response['data'];
-        final conversations = data.map((json) => Conversation.fromJson(json)).toList();
-        final totalUnread = conversations.fold<int>(0, (sum, conv) => sum + conv.unreadCount);
+        final conversations = data
+            .map((json) => Conversation.fromJson(json))
+            .toList();
+        final totalUnread = conversations.fold<int>(
+          0,
+          (sum, conv) => sum + conv.unreadCount,
+        );
         if (!mounted) return;
         setState(() {
           _conversations = conversations;
@@ -135,6 +203,21 @@ class _HomePageState extends State<HomePage> {
         _totalUnreadCount = 0;
         _isLoadingConversations = false;
       });
+    }
+  }
+
+  Future<void> _loadNotificationUnreadCount() async {
+    try {
+      final response = await _apiService.getUnreadNotificationCount();
+      if (response['success'] == true && response['data'] != null) {
+        final count = response['data']['count'] as int? ?? 0;
+        if (!mounted) return;
+        setState(() {
+          _notificationUnreadCount = count;
+        });
+      }
+    } catch (e) {
+      // Silently fail - notification count not critical
     }
   }
 
@@ -164,7 +247,14 @@ class _HomePageState extends State<HomePage> {
   Widget _buildHomeContent() {
     return Column(
       children: [
-        const AppHeader(showNotifications: true, showProfile: true),
+        AppHeader(
+          showNotifications: true,
+          showProfile: true,
+          unreadCount: _notificationUnreadCount,
+          onNotificationTap: () {
+            Navigator.of(context).pushNamed('/notifications');
+          },
+        ),
         Expanded(
           child: SingleChildScrollView(
             child: Padding(
@@ -224,7 +314,14 @@ class _HomePageState extends State<HomePage> {
 
     return Column(
       children: [
-        const AppHeader(showNotifications: true, showProfile: true),
+        AppHeader(
+          showNotifications: true,
+          showProfile: true,
+          unreadCount: _notificationUnreadCount,
+          onNotificationTap: () {
+            Navigator.of(context).pushNamed('/notifications');
+          },
+        ),
         Expanded(
           child: SingleChildScrollView(
             child: Padding(
@@ -233,50 +330,17 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  Text(
-                    'Secretary Chat',
-                    style: AppTextStyles.headlineLg,
-                  ),
+                  Text('Secretary Chat', style: AppTextStyles.headlineLg),
                   const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  if (_isLoadingConversations)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  else if (_conversations.isEmpty)
-                    SizedBox(
-                      height: MediaQuery.of(context).size.height - 300,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.chat_bubble,
-                              size: 64,
-                              color: AppColors.secondary,
-                            ),
-                            const SizedBox(height: spacing.AppSpacing.gutterMd),
-                            Text(
-                              'No conversations yet',
-                              style: AppTextStyles.bodyMd.copyWith(
-                                color: AppColors.secondary,
-                              ),
-                            ),
-                            const SizedBox(height: spacing.AppSpacing.gutterSm),
-                            Text(
-                              'Secretaries will start conversations with you',
-                              style: AppTextStyles.labelSm.copyWith(
-                                color: AppColors.outline,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else
-                    ..._conversations.map((conversation) => _buildConversationCard(conversation)),
+                  ChatTabContent(
+                    isLoading: _isLoadingConversations,
+                    conversations: _conversations,
+                    onRefresh: () {
+                      if (mounted) {
+                        _loadConversations();
+                      }
+                    },
+                  ),
                 ],
               ),
             ),
@@ -286,152 +350,17 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildConversationCard(Conversation conversation) {
-    return AppCard(
-      onTap: () async {
-        await Navigator.of(context).pushNamed(
-          '/conversation-thread',
-          arguments: {'conversationId': conversation.id},
-        );
-        // Reload conversations when returning to update unread count
-        if (mounted) {
-          _loadConversations();
-        }
-      },
-      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainer,
-              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-            ),
-            child: Icon(
-              Icons.person,
-              color: AppColors.outline,
-              size: spacing.AppSpacing.iconLg,
-            ),
-          ),
-          const SizedBox(width: spacing.AppSpacing.gutterMd),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      conversation.secretaryName,
-                      style: AppTextStyles.bodyMdMedium.copyWith(
-                        fontWeight: conversation.unreadCount > 0
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
-                    if (conversation.practiceName != null) ...[
-                      const SizedBox(width: spacing.AppSpacing.gutterXs),
-                      Text(
-                        '•',
-                        style: AppTextStyles.labelSm.copyWith(
-                          color: AppColors.outline,
-                        ),
-                      ),
-                      const SizedBox(width: spacing.AppSpacing.gutterXs),
-                      Expanded(
-                        child: Text(
-                          conversation.practiceName!,
-                          style: AppTextStyles.labelSm,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: spacing.AppSpacing.gutterXs),
-                Text(
-                  conversation.lastMessagePreview ?? 'No messages yet',
-                  style: AppTextStyles.labelSm.copyWith(
-                    color: AppColors.secondary,
-                    fontWeight: conversation.unreadCount > 0
-                        ? FontWeight.w700
-                        : FontWeight.w400,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: spacing.AppSpacing.gutterSm),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (conversation.lastMessageSentAt != null)
-                Text(
-                  _formatTimestamp(conversation.lastMessageSentAt!),
-                  style: AppTextStyles.labelSm.copyWith(
-                    color: AppColors.outline,
-                  ),
-                ),
-              if (conversation.unreadCount > 0) ...[
-                const SizedBox(height: spacing.AppSpacing.gutterXs),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: spacing.AppSpacing.gutterSm,
-                    vertical: spacing.AppSpacing.gutterXs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.error,
-                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
-                  ),
-                  constraints: const BoxConstraints(
-                    minWidth: 20,
-                    minHeight: 20,
-                  ),
-                  child: Text(
-                    conversation.unreadCount > 99 ? '99+' : conversation.unreadCount.toString(),
-                    style: AppTextStyles.labelSm.copyWith(
-                      color: AppColors.onError,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatTimestamp(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
-    }
-  }
-
   Widget _buildProfileContent() {
-    // See _buildChatContent: keep the filler valid on the zero-sized first
-    // layout pass instead of subtracting from a zero height.
-    final double emptyStateHeight =
-        MediaQuery.of(context).size.height - 350;
-
     return Column(
       children: [
-        const AppHeader(showNotifications: true, showProfile: true),
+        AppHeader(
+          showNotifications: true,
+          showProfile: true,
+          unreadCount: _notificationUnreadCount,
+          onNotificationTap: () {
+            Navigator.of(context).pushNamed('/notifications');
+          },
+        ),
         Expanded(
           child: SingleChildScrollView(
             child: Padding(
@@ -440,42 +369,18 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  Text(
-                    'My Profile',
-                    style: AppTextStyles.headlineLg,
-                  ),
+                  Text('My Profile', style: AppTextStyles.headlineLg),
                   const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  if (emptyStateHeight > 0)
-                    SizedBox(
-                      height: emptyStateHeight,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.account_circle,
-                              size: 64,
-                              color: AppColors.secondary,
-                            ),
-                            const SizedBox(height: spacing.AppSpacing.gutterMd),
-                            Text(
-                              _userName ?? 'Loading...',
-                              style: AppTextStyles.headlineSm.copyWith(
-                                color: AppColors.secondary,
-                              ),
-                            ),
-                            const SizedBox(height: spacing.AppSpacing.gutterSm),
-                            Text(
-                              _userEmail ?? 'Loading...',
-                              style: AppTextStyles.bodyMd.copyWith(
-                                color: AppColors.outline,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                  _buildAccountSection(),
                   const SizedBox(height: spacing.AppSpacing.gutterLg),
+                  _buildSecuritySection(),
+                  const SizedBox(height: spacing.AppSpacing.gutterLg),
+                  _buildNotificationsSection(),
+                  const SizedBox(height: spacing.AppSpacing.gutterLg),
+                  _buildAboutSection(),
+                  const SizedBox(height: spacing.AppSpacing.gutterLg),
+                  // Log out keeps its existing behavior exactly (no dialogs);
+                  // API logout removes this device's push token.
                   PrimaryButton(
                     text: 'Log Out',
                     onPressed: _logout,
@@ -488,6 +393,511 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSectionLabel(String title) {
+    return Text(
+      title.toUpperCase(),
+      style: AppTextStyles.labelSm.copyWith(
+        color: AppColors.slate500,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 0.8,
+        fontSize: 12,
+      ),
+    );
+  }
+
+  Widget _buildSection({
+    required String label,
+    required List<Widget> children,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionLabel(label),
+        const SizedBox(height: spacing.AppSpacing.gutterSm),
+        AppCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (var i = 0; i < children.length; i++) ...[
+                if (i > 0)
+                  const Divider(
+                    height: 1,
+                    thickness: 1,
+                    indent: spacing.AppSpacing.gutterLg,
+                    color: AppColors.slate200,
+                  ),
+                children[i],
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccountSection() {
+    return _buildSection(
+      label: 'Account',
+      children: [
+        _buildAccountSummaryRow(),
+        _buildActionRow(
+          key: const ValueKey('profile_view_details'),
+          icon: Icons.person_outline,
+          title: 'View patient profile',
+          semanticLabel: 'View patient profile',
+          onTap: () {
+            Navigator.of(context).pushNamed('/patient-profile');
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccountSummaryRow() {
+    return Padding(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: AppColors.surfaceContainer,
+            child: Icon(
+              Icons.person,
+              color: AppColors.primary,
+              size: spacing.AppSpacing.iconLg,
+            ),
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterMd),
+          Expanded(
+            child: _accountInfoFailed
+                ? _buildAccountErrorContent()
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _userName ?? 'Loading…',
+                        style: AppTextStyles.headlineSm.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (_userEmail != null) ...[
+                        const SizedBox(height: spacing.AppSpacing.gutterXs),
+                        Text(
+                          _userEmail!,
+                          style: AppTextStyles.bodySm.copyWith(
+                            color: AppColors.secondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountErrorContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Couldn\'t load account info',
+          style: AppTextStyles.bodyMdMedium.copyWith(
+            color: AppColors.onSurface,
+          ),
+        ),
+        const SizedBox(height: spacing.AppSpacing.gutterXs),
+        Row(
+          children: [
+            Text(
+              'Check your connection.',
+              style: AppTextStyles.bodySm.copyWith(color: AppColors.error),
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterXs),
+            Semantics(
+              button: true,
+              label: 'Retry loading account info',
+              child: InkWell(
+                onTap: _loadUserInfo,
+                borderRadius: BorderRadius.circular(
+                  spacing.AppSpacing.radiusSm,
+                ),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.AppSpacing.gutterSm,
+                    vertical: spacing.AppSpacing.gutterXs,
+                  ),
+                  child: Text(
+                    'Retry',
+                    style: AppTextStyles.labelMd.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSecuritySection() {
+    return _buildSection(
+      label: 'Security',
+      children: [
+        _buildActionRow(
+          key: const ValueKey('profile_change_password'),
+          icon: Icons.lock_outline,
+          title: 'Change password',
+          semanticLabel: 'Change password',
+          onTap: () {
+            // The change-password screen shows "Password changed
+            // successfully" and revokes this user's other sessions and
+            // refresh tokens server-side while keeping this session signed
+            // in (it stores the fresh access token before navigating back).
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ChangePasswordPage(
+                  onSuccess: () => Navigator.of(context).pop(),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNotificationsSection() {
+    return _buildSection(
+      label: 'Notifications',
+      children: [
+        _buildSwitchRow(
+          icon: Icons.notifications_outlined,
+          title: 'Push notifications',
+          subtitle: 'Appointment and message alerts on this device',
+          value: _pushEnabled,
+          busy: _isPushBusy,
+          onChanged: _togglePushNotifications,
+        ),
+        if (_permissionDeniedHintVisible) _buildPermissionHintRow(),
+      ],
+    );
+  }
+
+  Future<void> _togglePushNotifications(bool enabled) async {
+    if (_isPushBusy) return;
+
+    setState(() {
+      _isPushBusy = true;
+    });
+
+    final pushService = _pushService;
+
+    try {
+      if (!enabled) {
+        final removed = await pushService.disableForCurrentUser();
+        await pushService.setPushPreferred(false);
+        if (!mounted) return;
+        setState(() {
+          _pushEnabled = false;
+          _isPushBusy = false;
+          _permissionDeniedHintVisible = false;
+        });
+        _showProfileSnackBar(
+          removed
+              ? 'Push notifications turned off for this device.'
+              : 'Push notifications are off, but removing this device\'s '
+                    'registration from the server failed. It will stop working '
+                    'after your next logout.',
+        );
+        return;
+      }
+
+      // Ask for the OS notification permission only when it is undecided.
+      var status = await Permission.notification.status;
+      if (status.isDenied || status.isRestricted) {
+        status = await Permission.notification.request();
+      }
+
+      if (!status.isGranted && !status.isLimited) {
+        if (!mounted) return;
+        setState(() {
+          _permissionDeniedHintVisible = true;
+          _pushEnabled = false;
+          _isPushBusy = false;
+        });
+        return;
+      }
+
+      await pushService.setPushPreferred(true);
+      final registered = await pushService.registerForCurrentUser();
+      if (!mounted) return;
+      setState(() {
+        _pushEnabled = true;
+        _permissionDeniedHintVisible = false;
+        _isPushBusy = false;
+      });
+      _showProfileSnackBar(
+        registered
+            ? 'Push notifications enabled for this device.'
+            : 'Push notifications are on for this device, but it is not yet '
+                  'registered for push. Registration will run when the app '
+                  'starts with its native push configuration.',
+      );
+    } catch (_) {
+      // Missing native plumbing (or another platform error) must never crash
+      // the profile; surface it as an "off" state with the hint.
+      if (!mounted) return;
+      setState(() {
+        _isPushBusy = false;
+        _pushEnabled = false;
+      });
+      _showProfileSnackBar('Notifications are not available on this device.');
+    }
+  }
+
+  void _showProfileSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 4)),
+    );
+  }
+
+  Widget _buildPermissionHintRow() {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: spacing.AppSpacing.gutterLg,
+        vertical: spacing.AppSpacing.gutterSm,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline,
+            color: AppColors.secondary,
+            size: spacing.AppSpacing.iconMd,
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterMd),
+          Expanded(
+            child: Text(
+              'Notification permission is turned off for FindMyDoctor. Enable it in system settings to get alerts.',
+              style: AppTextStyles.bodySm.copyWith(color: AppColors.secondary),
+            ),
+          ),
+          Semantics(
+            button: true,
+            label: 'Open system notification settings',
+            child: InkWell(
+              onTap: () async {
+                await openAppSettings();
+              },
+              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusSm),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: spacing.AppSpacing.gutterSm,
+                  vertical: spacing.AppSpacing.gutterXs,
+                ),
+                child: Text(
+                  'Open Settings',
+                  style: AppTextStyles.labelMd.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAboutSection() {
+    return _buildSection(
+      label: 'About',
+      children: [
+        _buildValueRow(
+          icon: Icons.info_outline,
+          title: 'App version',
+          value: _appVersion ?? '—',
+        ),
+        _buildActionRow(
+          key: const ValueKey('profile_privacy_notice'),
+          icon: Icons.privacy_tip_outlined,
+          title: 'Privacy notice',
+          semanticLabel: 'Privacy notice',
+          onTap: () {
+            Navigator.of(context).pushNamed('/privacy-notice');
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionRow({
+    Key? key,
+    required IconData icon,
+    required String title,
+    required String semanticLabel,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: key,
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: spacing.AppSpacing.touchTarget,
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: spacing.AppSpacing.gutterLg,
+                vertical: spacing.AppSpacing.gutterSm,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    icon,
+                    color: AppColors.primary,
+                    size: spacing.AppSpacing.iconMd,
+                  ),
+                  const SizedBox(width: spacing.AppSpacing.gutterMd),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: AppTextStyles.bodyMdMedium.copyWith(
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: AppColors.outline,
+                    size: spacing.AppSpacing.iconLg,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwitchRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required bool busy,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(
+        minHeight: spacing.AppSpacing.touchTarget,
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: spacing.AppSpacing.gutterLg,
+          vertical: spacing.AppSpacing.gutterSm,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: AppColors.primary,
+              size: spacing.AppSpacing.iconMd,
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppTextStyles.bodyMdMedium.copyWith(
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: spacing.AppSpacing.gutterXs),
+                  Text(
+                    subtitle,
+                    style: AppTextStyles.bodySm.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterMd),
+            Semantics(
+              toggled: value,
+              label: 'Push notifications for this device',
+              child: Switch(
+                key: const ValueKey('profile_push_switch'),
+                value: value,
+                onChanged: busy ? null : onChanged,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildValueRow({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(
+        minHeight: spacing.AppSpacing.touchTarget,
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: spacing.AppSpacing.gutterLg,
+          vertical: spacing.AppSpacing.gutterSm,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: AppColors.primary,
+              size: spacing.AppSpacing.iconMd,
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterMd),
+            Expanded(
+              child: Text(
+                title,
+                style: AppTextStyles.bodyMdMedium.copyWith(
+                  color: AppColors.onSurface,
+                ),
+              ),
+            ),
+            Text(
+              value,
+              style: AppTextStyles.bodyMd.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -599,7 +1009,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSpecialtyChip(String label, IconData icon, bool isSelected, String? specialty) {
+  Widget _buildSpecialtyChip(
+    String label,
+    IconData icon,
+    bool isSelected,
+    String? specialty,
+  ) {
     return GestureDetector(
       onTap: specialty != null
           ? () {
@@ -653,7 +1068,7 @@ class _HomePageState extends State<HomePage> {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: spacing.AppSpacing.gutterMd,
       crossAxisSpacing: spacing.AppSpacing.gutterMd,
-      childAspectRatio: 2.2,
+      childAspectRatio: 2.5,
       children: [
         _buildQuickActionCard(
           'Find a Doctor',
@@ -703,12 +1118,15 @@ class _HomePageState extends State<HomePage> {
           });
         }
       },
-      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      padding: EdgeInsets.symmetric(
+        horizontal: spacing.AppSpacing.gutterSm,
+        vertical: spacing.AppSpacing.gutterSm,
+      ),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: iconBgColor,
               borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
@@ -716,22 +1134,27 @@ class _HomePageState extends State<HomePage> {
             child: Icon(
               icon,
               color: iconColor,
-              size: spacing.AppSpacing.iconLg,
+              size: spacing.AppSpacing.iconSm,
             ),
           ),
-          const SizedBox(width: spacing.AppSpacing.gutterMd),
+          const SizedBox(width: spacing.AppSpacing.gutterSm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   title,
-                  style: AppTextStyles.bodyMdMedium,
+                  style: AppTextStyles.labelMd.copyWith(fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 1),
                 Text(
                   subtitle,
-                  style: AppTextStyles.labelSm,
+                  style: AppTextStyles.labelSm.copyWith(fontSize: 10),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -751,14 +1174,8 @@ class _HomePageState extends State<HomePage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Recommended Doctors',
-                  style: AppTextStyles.headlineSm,
-                ),
-                Text(
-                  'Family health specialists',
-                  style: AppTextStyles.labelSm,
-                ),
+                Text('Recommended Doctors', style: AppTextStyles.headlineSm),
+                Text('Family health specialists', style: AppTextStyles.labelSm),
               ],
             ),
             TextButton(
@@ -768,10 +1185,7 @@ class _HomePageState extends State<HomePage> {
                   _currentIndex = 1;
                 });
               },
-              child: Text(
-                'See all',
-                style: AppTextStyles.labelMd,
-              ),
+              child: Text('See all', style: AppTextStyles.labelMd),
             ),
           ],
         ),
@@ -788,11 +1202,7 @@ class _HomePageState extends State<HomePage> {
             padding: EdgeInsets.all(spacing.AppSpacing.gutterXl),
             child: Column(
               children: [
-                Icon(
-                  Icons.person_search,
-                  size: 64,
-                  color: AppColors.outline,
-                ),
+                Icon(Icons.person_search, size: 64, color: AppColors.outline),
                 const SizedBox(height: 16),
                 Text(
                   'No Doctors Found',
@@ -825,28 +1235,17 @@ class _HomePageState extends State<HomePage> {
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainer,
-              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-            ),
-            child: Icon(
-              Icons.person,
-              color: AppColors.outline,
-              size: spacing.AppSpacing.iconLg,
-            ),
+          DoctorProfileImage(
+            photoUrl: doctor.professionalPhotoUrl,
+            size: 48,
+            showVerifiedBadge: doctor.isApproved,
           ),
           const SizedBox(width: spacing.AppSpacing.gutterMd),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  doctor.fullName,
-                  style: AppTextStyles.bodyMdMedium,
-                ),
+                Text(doctor.fullName, style: AppTextStyles.bodyMdMedium),
                 Text(
                   '${doctor.specialty} • ${doctor.practiceName ?? 'Private Practice'}',
                   style: AppTextStyles.labelSm,
@@ -878,13 +1277,12 @@ class _HomePageState extends State<HomePage> {
                   vertical: spacing.AppSpacing.gutterXs,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+                  borderRadius: BorderRadius.circular(
+                    spacing.AppSpacing.radiusMd,
+                  ),
                 ),
               ),
-              child: Text(
-                'Book',
-                style: AppTextStyles.labelSm,
-              ),
+              child: Text('Book', style: AppTextStyles.labelSm),
             ),
           ),
         ],
@@ -902,10 +1300,7 @@ class _HomePageState extends State<HomePage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Accredited Nearby',
-                  style: AppTextStyles.headlineSm,
-                ),
+                Text('Accredited Nearby', style: AppTextStyles.headlineSm),
                 Text(
                   'Walk-ins & queue updates available',
                   style: AppTextStyles.labelSm,
@@ -965,7 +1360,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildClinicCard(String hospitalName) {
-    final doctorCount = _recommendedDoctors.where((d) => d.practiceName == hospitalName).length;
+    final doctorCount = _recommendedDoctors
+        .where((d) => d.practiceName == hospitalName)
+        .length;
 
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
@@ -989,10 +1386,7 @@ class _HomePageState extends State<HomePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  hospitalName,
-                  style: AppTextStyles.bodyMdMedium,
-                ),
+                Text(hospitalName, style: AppTextStyles.bodyMdMedium),
                 Text(
                   '$doctorCount Doctor${doctorCount != 1 ? 's' : ''}',
                   style: AppTextStyles.labelSm,
@@ -1007,7 +1401,9 @@ class _HomePageState extends State<HomePage> {
             ),
             decoration: BoxDecoration(
               color: AppColors.secondaryContainer,
-              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+              borderRadius: BorderRadius.circular(
+                spacing.AppSpacing.radiusFull,
+              ),
             ),
             child: Text(
               '$doctorCount',
@@ -1050,7 +1446,12 @@ class _HomePageState extends State<HomePage> {
               _buildNavItem(Icons.home, 'Home', 0),
               _buildNavItem(Icons.local_hospital, 'Doctors', 1),
               _buildNavItem(Icons.calendar_month, 'Appointments', 2),
-              _buildNavItem(Icons.chat_bubble, 'Chat', 3, unreadCount: _totalUnreadCount),
+              _buildNavItem(
+                Icons.chat_bubble,
+                'Chat',
+                3,
+                unreadCount: _totalUnreadCount,
+              ),
               _buildNavItem(Icons.account_circle, 'Profile', 4),
             ],
           ),
@@ -1059,7 +1460,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index, {int? unreadCount}) {
+  Widget _buildNavItem(
+    IconData icon,
+    String label,
+    int index, {
+    int? unreadCount,
+  }) {
     final isActive = _currentIndex == index;
     return InkWell(
       onTap: () {
@@ -1088,7 +1494,9 @@ class _HomePageState extends State<HomePage> {
               children: [
                 Icon(
                   icon,
-                  color: isActive ? AppColors.primaryContainer : AppColors.secondary,
+                  color: isActive
+                      ? AppColors.primaryContainer
+                      : AppColors.secondary,
                   size: spacing.AppSpacing.iconLg,
                 ),
                 if (unreadCount != null && unreadCount > 0)
@@ -1102,7 +1510,9 @@ class _HomePageState extends State<HomePage> {
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.error,
-                        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                        borderRadius: BorderRadius.circular(
+                          spacing.AppSpacing.radiusFull,
+                        ),
                       ),
                       constraints: const BoxConstraints(
                         minWidth: 16,
@@ -1125,7 +1535,9 @@ class _HomePageState extends State<HomePage> {
             Text(
               label,
               style: AppTextStyles.labelSm.copyWith(
-                color: isActive ? AppColors.primaryContainer : AppColors.secondary,
+                color: isActive
+                    ? AppColors.primaryContainer
+                    : AppColors.secondary,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
@@ -1160,6 +1572,213 @@ class _HomePageState extends State<HomePage> {
         return Icons.hearing;
       default:
         return Icons.medical_services;
+    }
+  }
+}
+
+/// Body content of the patient Secretary Chat tab.
+///
+/// Kept public so it can be unit-tested directly (see
+/// test/chat_tab_content_test.dart): the previous inline collection-if chain
+/// let the final `else` bind to a nested guard instead of the
+/// `_conversations.isEmpty` branch, leaving the tab blank whenever
+/// conversations actually existed.
+class ChatTabContent extends StatelessWidget {
+  const ChatTabContent({
+    super.key,
+    required this.isLoading,
+    required this.conversations,
+    required this.onRefresh,
+  });
+
+  final bool isLoading;
+  final List<Conversation> conversations;
+
+  /// Called after a conversation thread is closed so the list refreshes.
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (conversations.isEmpty) {
+      // Keep the filler valid on the zero-sized first layout pass instead of
+      // subtracting from a zero height. See test/initial_frame_layout_test.dart.
+      if (MediaQuery.of(context).size.height > 300) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height - 300,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.chat_bubble, size: 64, color: AppColors.secondary),
+                const SizedBox(height: spacing.AppSpacing.gutterMd),
+                Text(
+                  'No conversations yet',
+                  style: AppTextStyles.bodyMd.copyWith(
+                    color: AppColors.secondary,
+                  ),
+                ),
+                const SizedBox(height: spacing.AppSpacing.gutterSm),
+                Text(
+                  'Secretaries will start conversations with you',
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.outline,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      children: conversations
+          .map((conversation) => _buildConversationCard(context, conversation))
+          .toList(),
+    );
+  }
+
+  Widget _buildConversationCard(
+    BuildContext context,
+    Conversation conversation,
+  ) {
+    return AppCard(
+      onTap: () async {
+        await Navigator.of(context).pushNamed(
+          '/conversation-thread',
+          arguments: {'conversationId': conversation.id},
+        );
+        // Reload conversations when returning to update unread count
+        onRefresh();
+      },
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      child: Row(
+        children: [
+          DoctorProfileImage(
+            photoUrl: conversation.doctorProfessionalPhotoUrl,
+            size: 48,
+            showVerifiedBadge: false,
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      conversation.secretaryName,
+                      style: AppTextStyles.bodyMdMedium.copyWith(
+                        fontWeight: conversation.unreadCount > 0
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                    if (conversation.practiceName != null) ...[
+                      const SizedBox(width: spacing.AppSpacing.gutterXs),
+                      Text(
+                        '•',
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.outline,
+                        ),
+                      ),
+                      const SizedBox(width: spacing.AppSpacing.gutterXs),
+                      Expanded(
+                        child: Text(
+                          conversation.practiceName!,
+                          style: AppTextStyles.labelSm,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
+                Text(
+                  conversation.lastMessagePreview ?? 'No messages yet',
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.secondary,
+                    fontWeight: conversation.unreadCount > 0
+                        ? FontWeight.w700
+                        : FontWeight.w400,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterSm),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (conversation.lastMessageSentAt != null)
+                Text(
+                  _formatTimestamp(conversation.lastMessageSentAt!),
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.outline,
+                  ),
+                ),
+              if (conversation.unreadCount > 0) ...[
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.AppSpacing.gutterSm,
+                    vertical: spacing.AppSpacing.gutterXs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(
+                      spacing.AppSpacing.radiusFull,
+                    ),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 20,
+                    minHeight: 20,
+                  ),
+                  child: Text(
+                    conversation.unreadCount > 99
+                        ? '99+'
+                        : conversation.unreadCount.toString(),
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.onError,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
     }
   }
 }

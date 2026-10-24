@@ -36,7 +36,7 @@ export default function SecretaryConversations() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const userStr = localStorage.getItem('user');
+        const userStr = localStorage.getItem('secretary_user') || localStorage.getItem('user');
         if (userStr) {
           const user = JSON.parse(userStr);
           if (user?.id) {
@@ -148,12 +148,14 @@ export default function SecretaryConversations() {
         if (createResponse.success && createResponse.data) {
           // Select the newly created conversation
           const newConversation = createResponse.data;
-          setSelectedId(newConversation.id);
-          setSelectedConversation(newConversation);
-          setSummary(null);
-          setSummaryError(null);
-          // Fetch thread for the new conversation
-          fetchThread(newConversation.id);
+          if (newConversation.id) {
+            setSelectedId(newConversation.id);
+            setSelectedConversation(newConversation);
+            setSummary(null);
+            setSummaryError(null);
+            // Fetch thread for the new conversation
+            fetchThread(newConversation.id);
+          }
           // Refresh conversations list to update the UI
           fetchConversations();
         } else {

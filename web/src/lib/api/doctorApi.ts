@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, type GetOptions } from './apiClient';
 
 export interface DoctorProfile {
   id: string;
@@ -24,6 +24,7 @@ export interface DoctorProfile {
   profile_submitted_at?: string | null;
   approval_status?: 'PENDING' | 'REJECTED' | 'ACTIVE';
   rejection_reason?: string | null;
+  two_factor_enabled?: boolean;
 }
 
 export interface UpdateProfileRequest {
@@ -143,8 +144,8 @@ export interface Visit {
 
 export const doctorApi = {
   // Get current doctor's profile
-  getProfile: async (): Promise<{ success: boolean; data?: DoctorProfile; error?: string }> => {
-    return apiClient.get<DoctorProfile>('/doctors/me');
+  getProfile: async (options?: GetOptions): Promise<{ success: boolean; data?: DoctorProfile; error?: string }> => {
+    return apiClient.get<DoctorProfile>('/doctors/me', options);
   },
 
   // Update doctor's professional profile
@@ -158,8 +159,8 @@ export const doctorApi = {
   },
 
   // Get doctor's schedules
-  getSchedules: async (): Promise<{ success: boolean; data?: any[]; error?: string }> => {
-    return apiClient.get<any[]>('/doctors/me/schedules');
+  getSchedules: async (options?: GetOptions): Promise<{ success: boolean; data?: any[]; error?: string }> => {
+    return apiClient.get<any[]>('/doctors/me/schedules', options);
   },
 
   // Create a new schedule
@@ -211,4 +212,53 @@ export const doctorApi = {
   associatePatient: async (payload: AssociatePatientRequest): Promise<{ success: boolean; data?: Patient; error?: string }> => {
     return apiClient.post<Patient>('/patients/associate', payload);
   },
+
+  // Get doctor dashboard summary
+  getDashboard: async (date?: string, options?: GetOptions): Promise<{ success: boolean; data?: DoctorDashboard; error?: string }> => {
+    const queryParams = date ? `?date=${encodeURIComponent(date)}` : '';
+    return apiClient.get<DoctorDashboard>(`/doctors/me/dashboard${queryParams}`, options);
+  },
 };
+
+export interface DoctorDashboard {
+  date: string;
+  appointmentCounts: {
+    completed: number;
+    waiting: number;
+    cancelled: number;
+  };
+  capacity: {
+    used: number;
+    total: number;
+    remaining: number;
+  };
+  nextPatient: {
+    queueNumber: number;
+    patientName: string;
+    appointmentId: string | null;
+  } | null;
+  todayQueue: Array<{
+    queueNumber: number;
+    patientName: string;
+    reason: string | null;
+    status: string;
+    appointmentId: string | null;
+  }>;
+  upcomingAppointments: Array<{
+    date: string;
+    patientName: string;
+    reason: string | null;
+    status: string;
+    queueNumber: number | null;
+  }>;
+  todaySchedule: {
+    workingHours: Array<{ start: string; end: string }>;
+    breaks: Array<{ start: string; end: string }>;
+    hasException: boolean;
+    exception: {
+      startDate: string;
+      endDate: string;
+      reason: string | null;
+    } | null;
+  };
+}

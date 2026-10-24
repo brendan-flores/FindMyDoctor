@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/api_constants.dart';
@@ -99,6 +101,84 @@ class ApiService {
     );
 
     return _handleResponse(response);
+  }
+
+  // Generic POST request with multipart file upload
+  Future<Map<String, dynamic>> postMultipart(
+    String endpoint, {
+    required File file,
+    String fileField = 'file',
+    Map<String, String>? fields,
+    bool requireAuth = true,
+  }) async {
+    final url = '$baseUrl$endpoint';
+
+    final client = _httpClient ?? http.Client();
+
+    final request = http.MultipartRequest('POST', Uri.parse(url));
+
+    // Add authorization header if required
+    if (requireAuth && _accessToken != null) {
+      request.headers['Authorization'] = 'Bearer $_accessToken';
+    }
+
+    // Detect MIME type from file extension
+    final fileName = file.path.split('/').last;
+    final fileExtension = fileName.split('.').last.toLowerCase();
+    String contentType = 'application/octet-stream';
+    
+    switch (fileExtension) {
+      case 'jpg':
+      case 'jpeg':
+        contentType = 'image/jpeg';
+        break;
+      case 'png':
+        contentType = 'image/png';
+        break;
+    }
+
+    // Add file
+    final fileStream = http.ByteStream(file.openRead());
+    final fileLength = await file.length();
+    final multipartFile = http.MultipartFile(
+      fileField,
+      fileStream,
+      fileLength,
+      filename: fileName,
+      contentType: MediaType.parse(contentType),
+    );
+    request.files.add(multipartFile);
+
+    // Add additional fields
+    if (fields != null) {
+      request.fields.addAll(fields);
+    }
+
+    final response = await client.send(request);
+    final responseBody = await response.stream.bytesToString();
+
+    try {
+      final body = jsonDecode(responseBody);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return body;
+      } else {
+        throw ApiException(
+          message: body['error']?['message'] ?? 'An error occurred',
+          code: body['error']?['code'] ?? 'UNKNOWN_ERROR',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) {
+        rethrow;
+      }
+      throw ApiException(
+        message: 'Failed to parse server response',
+        code: 'PARSE_ERROR',
+        statusCode: response.statusCode,
+      );
+    }
   }
 
   // Generic PUT request
@@ -513,6 +593,7 @@ class ApiService {
     required String doctorId,
     required String appointmentDate,
     String? reasonForVisit,
+    String? paymentMethod,
   }) async {
     return await post(
       ApiConstants.appointments,
@@ -520,6 +601,7 @@ class ApiService {
         'doctorId': doctorId,
         'appointmentDate': appointmentDate,
         if (reasonForVisit != null) 'reasonForVisit': reasonForVisit,
+        if (paymentMethod != null) 'paymentMethod': paymentMethod,
       },
       requireAuth: true,
     );
@@ -592,20 +674,6 @@ class ApiService {
   }
 
   // ===========================
-  // NOTIFICATIONS METHODS
-  // ===========================
-
-  Future<Map<String, dynamic>> getNotifications() async {
-    return await get(ApiConstants.notifications);
-  }
-
-  Future<Map<String, dynamic>> markNotificationRead(String id) async {
-    return await patch(
-      '${ApiConstants.notifications}/$id${ApiConstants.notificationRead}',
-    );
-  }
-
-  // ===========================
   // PUSH DEVICE TOKEN METHODS
   // ===========================
 
@@ -635,26 +703,54 @@ class ApiService {
   }
 
   // ===========================
-  // PAYMENTS METHODS
+  // NOTIFICATIONS METHODS
   // ===========================
 
-  Future<Map<String, dynamic>> getPayment(String appointmentId) async {
-    return await get('${ApiConstants.payments}/$appointmentId');
+  Future<Map<String, dynamic>> getNotifications() async {
+    return await get(ApiConstants.notifications, requireAuth: true);
   }
 
-  Future<Map<String, dynamic>> uploadPaymentReceipt({
-    required String appointmentId,
-    required String receiptUrl,
-  }) async {
-    return await post(
-      '${ApiConstants.payments}/$appointmentId${ApiConstants.paymentReceipt}',
-      body: {'receiptUrl': receiptUrl},
+  Future<Map<String, dynamic>> getUnreadNotificationCount() async {
+    return await get('${ApiConstants.notifications}/unread-count', requireAuth: true);
+  }
+
+  Future<Map<String, dynamic>> markNotificationRead(String notificationId) async {
+    return await patch(
+      '${ApiConstants.notifications}/$notificationId${ApiConstants.notificationRead}',
       requireAuth: true,
     );
   }
 
-  Future<Map<String, dynamic>> getGcashQr() async {
-    return await get('${ApiConstants.payments}/gcash-qr', requireAuth: false);
+  // ===========================
+  // PAYMENTS METHODS
+  // ===========================
+
+  Future<Map<String, dynamic>> getPayment(String appointmentId) async {
+    return await get('${ApiConstants.payments}/$appointmentId', requireAuth: true);
+  }
+
+  Future<Map<String, dynamic>> getPaymentById(String paymentId) async {
+    return await get('${ApiConstants.paymentsById}/$paymentId', requireAuth: true);
+  }
+
+  Future<Map<String, dynamic>> uploadPaymentReceipt({
+    required String appointmentId,
+    required File receiptFile,
+  }) async {
+    return await postMultipart(
+      '${ApiConstants.payments}/$appointmentId${ApiConstants.paymentReceipt}',
+      file: receiptFile,
+      fileField: 'receipt',
+      requireAuth: true,
+    );
+  }
+
+  Future<Map<String, dynamic>> getGcashQr({required String doctorId}) async {
+    return await get(
+      '${ApiConstants.payments}/gcash-qr',
+      queryParams: {'doctorId': doctorId},
+      requireAuth: false,
+    );
   }
 }
 

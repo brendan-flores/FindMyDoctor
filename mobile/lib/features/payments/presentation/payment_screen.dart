@@ -1,8 +1,7 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -16,6 +15,7 @@ class PaymentScreen extends StatefulWidget {
   final String? doctorName;
   final String? consultationFee;
   final DateTime? appointmentDate;
+  final String? doctorId;
 
   const PaymentScreen({
     super.key,
@@ -23,6 +23,7 @@ class PaymentScreen extends StatefulWidget {
     this.doctorName,
     this.consultationFee,
     this.appointmentDate,
+    this.doctorId,
   });
 
   @override
@@ -33,13 +34,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
   final ApiService _apiService = ApiService();
   final ImagePicker _imagePicker = ImagePicker();
 
-  String _selectedPaymentMethod = 'CASH'; // 'GCASH' or 'CASH'
   File? _receiptImage;
   bool _isUploading = false;
-  bool _isDownloading = false;
   bool _isLoadingPayment = true;
   Map<String, dynamic>? _paymentData;
   String? _errorMessage;
+  bool _hasUploadedReceipt = false;
 
   @override
   void initState() {
@@ -56,10 +56,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
     try {
       final response = await _apiService.getPayment(widget.appointmentId);
 
+      if (kDebugMode) {
+        print('Payment response: $response');
+      }
+
       if (response['success'] == true) {
         setState(() {
           _paymentData = response['data'];
           _isLoadingPayment = false;
+          // Check if receipt was already uploaded
+          if (_paymentData?['receipt_url'] != null) {
+            _hasUploadedReceipt = true;
+          }
         });
       } else {
         // If payment not found (404), it's normal - patient hasn't made a payment yet
@@ -80,6 +88,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
         }
       }
     } catch (e) {
+      if (kDebugMode) {
+        print('Payment fetch error: $e');
+      }
       // Check if it's a 404 error (payment not found)
       if (e.toString().contains('NOT_FOUND') || e.toString().contains('404')) {
         setState(() {
@@ -157,14 +168,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
     });
 
     try {
-      // TODO: Implement actual image upload to backend
-      // This requires backend support for multipart/form-data file uploads
-      // For now, simulate upload with a placeholder URL
-      final receiptUrl = 'https://placeholder.com/receipt.jpg';
-
       final response = await _apiService.uploadPaymentReceipt(
         appointmentId: widget.appointmentId,
-        receiptUrl: receiptUrl,
+        receiptFile: _receiptImage!,
       );
 
       if (response['success'] == true) {
@@ -175,6 +181,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
               backgroundColor: AppColors.primary,
             ),
           );
+          // Clear the selected image after successful upload
+          setState(() {
+            _receiptImage = null;
+            _hasUploadedReceipt = true;
+          });
           // Refresh payment details
           _fetchPaymentDetails();
         }
@@ -200,46 +211,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     } finally {
       setState(() {
         _isUploading = false;
-      });
-    }
-  }
-
-  Future<void> _downloadQrCode() async {
-    setState(() {
-      _isDownloading = true;
-    });
-
-    try {
-      // Use application documents directory (no permission required on Android 10+)
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = 'gcash_qr_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final filePath = '${directory.path}/$fileName';
-
-      // Copy the local QR image to app storage
-      final assetImage = await rootBundle.load('assets/images/gcash_qr_placeholder.jpg');
-      final byteData = assetImage.buffer.asUint8List();
-      await File(filePath).writeAsBytes(byteData);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('QR code saved to app storage'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save QR code: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } finally {
-      setState(() {
-        _isDownloading = false;
       });
     }
   }
@@ -282,7 +253,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
         children: [
           AppHeader(
             showBackButton: true,
-            onBackPressed: () => Navigator.of(context).pop(),
+            onBackPressed: () {
+              if (_hasUploadedReceipt) {
+                // If receipt was uploaded, navigate to appointments page
+                Navigator.of(context).pushNamedAndRemoveUntil('/appointments', (route) {
+                  // Keep the home page in the stack to maintain proper navigation
+                  return route.settings.name == '/home';
+                });
+              } else {
+                // If no receipt uploaded, go back to previous page (booking confirmation)
+                Navigator.of(context).pop();
+              }
+            },
             showNotifications: false,
             showProfile: false,
           ),
@@ -300,6 +282,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       const Center(child: CircularProgressIndicator())
                     else if (_errorMessage != null)
                       _buildErrorState()
+                    else if (_paymentData == null)
+                      const Center(
+                        child: Text('No payment data available'),
+                      )
                     else
                       _buildPaymentContent(),
                     const SizedBox(height: spacing.AppSpacing.gutter3xl),
@@ -318,14 +304,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Payment',
+          'Upload Receipt',
           style: AppTextStyles.headlineMd.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: spacing.AppSpacing.gutterXs),
         Text(
-          'Choose your payment method',
+          'Upload your GCash payment receipt for verification',
           style: AppTextStyles.bodyMd.copyWith(
             color: AppColors.secondary,
           ),
@@ -366,16 +352,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   Widget _buildPaymentContent() {
     final status = _paymentData?['status'] as String?;
-    final paymentMethod = _paymentData?['payment_method'] as String?;
+    final receiptUrl = _paymentData?['receipt_url'] as String?;
 
+    // If already paid or receipt uploaded, show status
+    if (status == 'PAID' || receiptUrl != null) {
+      return Column(
+        children: [
+          _buildPaymentStatusCard(status),
+          const SizedBox(height: spacing.AppSpacing.gutterLg),
+          if (receiptUrl != null) _buildReceiptView(receiptUrl),
+        ],
+      );
+    }
+
+    // Show receipt upload interface for pending verification or unpaid
     return Column(
       children: [
         _buildPaymentStatusCard(status),
         const SizedBox(height: spacing.AppSpacing.gutterLg),
-        _buildPaymentMethodSelection(paymentMethod, status),
-        const SizedBox(height: spacing.AppSpacing.gutterLg),
-        if (_selectedPaymentMethod == 'GCASH') _buildGcashSection(status),
-        if (_selectedPaymentMethod == 'CASH') _buildCashSection(status),
+        _buildReceiptUploadSection(),
       ],
     );
   }
@@ -441,393 +436,34 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Widget _buildPaymentMethodSelection(String? paymentMethod, String? status) {
-    final isPaid = status == 'PAID';
-
+  Widget _buildReceiptUploadSection() {
     return AppCard(
-      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Payment Method',
-            style: AppTextStyles.headlineSm.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: spacing.AppSpacing.gutterMd),
-          _buildPaymentMethodOption(
-            'GCash',
-            'Pay online with GCash',
-            Icons.account_balance_wallet,
-            customIcon: Image.asset(
-              'assets/images/gcash_logo.png',
-              width: 24,
-              height: 24,
-            ),
-            isSelected: _selectedPaymentMethod == 'GCASH',
-            isEnabled: !isPaid,
-          ),
-          const SizedBox(height: spacing.AppSpacing.gutterSm),
-          _buildPaymentMethodOption(
-            'Cash at Clinic',
-            'Pay when you arrive',
-            Icons.local_atm,
-            isSelected: _selectedPaymentMethod == 'CASH',
-            isEnabled: !isPaid,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentMethodOption(
-    String title,
-    String subtitle,
-    IconData icon, {
-    Widget? customIcon,
-    bool isSelected = false,
-    bool isEnabled = true,
-  }) {
-    // Handle the icon based on whether customIcon is provided
-    // Custom icons (like GCash logo) should use their own colors
-    // Standard icons should use theme colors
-    Widget iconWidget;
-    if (customIcon != null) {
-      iconWidget = customIcon;
-    } else {
-      iconWidget = Icon(
-        icon,
-        color: isSelected ? AppColors.onPrimary : AppColors.secondary,
-        size: spacing.AppSpacing.iconMd,
-      );
-    }
-    return InkWell(
-      onTap: isEnabled
-          ? () {
-              setState(() {
-                _selectedPaymentMethod = title == 'GCash' ? 'GCASH' : 'CASH';
-              });
-            }
-          : null,
-      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-      child: Container(
-        padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primaryFixed.withValues(alpha: 0.1)
-              : AppColors.surfaceLow,
-          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.surfaceContainerHighest,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primary
-                    : AppColors.surfaceContainer,
-                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-              ),
-              child: iconWidget,
-            ),
-            const SizedBox(width: spacing.AppSpacing.gutterMd),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: AppTextStyles.bodyMdMedium.copyWith(
-                      color: isSelected ? AppColors.primary : AppColors.onSurface,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: AppTextStyles.labelSm.copyWith(
-                      color: AppColors.secondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isSelected)
-              Icon(
-                Icons.check_circle,
-                color: AppColors.primary,
-                size: spacing.AppSpacing.iconLg,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGcashSection(String? status) {
-    return AppCard(
-      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Image.asset(
-                'assets/images/gcash_logo.png',
-                width: 32,
-                height: 32,
+              Icon(
+                Icons.receipt_long,
+                color: AppColors.primary,
+                size: spacing.AppSpacing.iconMd,
               ),
               const SizedBox(width: spacing.AppSpacing.gutterSm),
-              Text(
-                'GCash Payment',
-                style: AppTextStyles.headlineSm.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: spacing.AppSpacing.gutterMd),
-          Center(
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceLow,
-                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                border: Border.all(color: AppColors.surfaceContainerHighest),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                child: Image.asset(
-                  'assets/images/gcash_qr_placeholder.jpg',
-                  width: 200,
-                  height: 200,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.qr_code_2,
-                            size: 80,
-                            color: AppColors.secondary,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'QR code not available',
-                            style: AppTextStyles.labelSm.copyWith(
-                              color: AppColors.secondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: spacing.AppSpacing.gutterMd),
-          Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(
-                  'assets/images/gcash_logo.png',
-                  width: 24,
-                  height: 24,
-                ),
-                const SizedBox(width: spacing.AppSpacing.gutterSm),
-                Text(
-                  'Scan the QR code with GCash to pay',
-                  style: AppTextStyles.bodyMd.copyWith(
-                    color: AppColors.secondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: spacing.AppSpacing.gutterLg),
-          // Download QR and Upload Receipt buttons
-          Row(
-            children: [
-              Expanded(
-                child: PrimaryButton(
-                  text: _isDownloading ? 'Downloading...' : 'Download QR',
-                  onPressed: _isDownloading ? null : _downloadQrCode,
-                  icon: const Icon(Icons.download, size: 20),
-                  maxLines: 2,
-                  height: 56,
-                ),
-              ),
-              const SizedBox(width: spacing.AppSpacing.gutterMd),
-              Expanded(
-                child: PrimaryButton(
-                  text: 'Upload Receipt',
-                  onPressed: _pickReceiptImage,
-                  icon: const Icon(Icons.upload, size: 20),
-                  maxLines: 2,
-                  height: 56,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: spacing.AppSpacing.gutterLg),
-          // Show receipt preview and upload button after image is selected
-          if (_receiptImage != null)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Image.asset(
-                      'assets/images/gcash_logo.png',
-                      width: 20,
-                      height: 20,
-                    ),
-                    const SizedBox(width: spacing.AppSpacing.gutterSm),
-                    Text(
-                      'Receipt Preview',
-                      style: AppTextStyles.labelSm.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: spacing.AppSpacing.gutterSm),
-                Container(
-                  width: double.infinity,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLow,
-                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                    border: Border.all(color: AppColors.surfaceContainerHighest),
-                  ),
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                        child: Image.file(
-                          _receiptImage!,
-                          width: double.infinity,
-                          height: 150,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Positioned(
-                        top: spacing.AppSpacing.gutterSm,
-                        right: spacing.AppSpacing.gutterSm,
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _receiptImage = null;
-                            });
-                          },
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: AppColors.error,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.close,
-                              color: AppColors.onError,
-                              size: spacing.AppSpacing.iconSm,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: spacing.AppSpacing.gutterMd),
-                PrimaryButton(
-                  text: _isUploading ? 'Uploading...' : 'Submit Receipt',
-                  onPressed: _isUploading ? null : _uploadReceipt,
-                  icon: const Icon(Icons.upload, size: 20),
-                  maxLines: 2,
-                  height: 56,
-                ),
-              ],
-            )
-          else if (status == 'PAID')
-            Container(
-              padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-              decoration: BoxDecoration(
-                color: AppColors.primaryFixed.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    color: AppColors.primary,
-                    size: spacing.AppSpacing.iconMd,
-                  ),
-                  const SizedBox(width: spacing.AppSpacing.gutterSm),
-                  Expanded(
-                    child: Text(
-                      'Payment verified',
-                      style: AppTextStyles.bodyMdMedium.copyWith(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCashSection(String? status) {
-    return AppCard(
-      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Cash at Clinic',
-            style: AppTextStyles.headlineSm.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: spacing.AppSpacing.gutterMd),
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryFixed,
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                ),
-                child: Icon(
-                  Icons.store,
-                  color: AppColors.primary,
-                  size: spacing.AppSpacing.iconXl,
-                ),
-              ),
-              const SizedBox(width: spacing.AppSpacing.gutterMd),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Pay at the clinic cashier',
-                      style: AppTextStyles.bodyMdMedium,
+                      'Upload GCash Receipt',
+                      style: AppTextStyles.bodyMdMedium.copyWith(
+                        color: AppColors.primary,
+                      ),
                     ),
-                    const SizedBox(height: spacing.AppSpacing.gutterXs),
                     Text(
-                      'Please bring exact amount if possible',
+                      'Upload your payment receipt for verification',
                       style: AppTextStyles.labelSm.copyWith(
-                        color: AppColors.secondary,
+                        color: AppColors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -836,59 +472,124 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ],
           ),
           const SizedBox(height: spacing.AppSpacing.gutterLg),
-          if (status == 'PAID')
-            Container(
-              padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-              decoration: BoxDecoration(
-                color: AppColors.primaryFixed.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    color: AppColors.primary,
-                    size: spacing.AppSpacing.iconMd,
+          PrimaryButton(
+            text: 'Select Receipt Image',
+            onPressed: _pickReceiptImage,
+            icon: const Icon(Icons.upload, size: 20),
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterLg),
+          if (_receiptImage != null) ...[
+            Row(
+              children: [
+                Image.asset(
+                  'assets/images/gcash_logo.png',
+                  width: 20,
+                  height: 20,
+                ),
+                const SizedBox(width: spacing.AppSpacing.gutterSm),
+                Text(
+                  'Receipt Preview',
+                  style: AppTextStyles.labelSm.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: spacing.AppSpacing.gutterSm),
-                  Expanded(
-                    child: Text(
-                      'Payment recorded',
-                      style: AppTextStyles.bodyMdMedium.copyWith(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
+                ),
+              ],
+            ),
+            const SizedBox(height: spacing.AppSpacing.gutterSm),
             Container(
-              padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+              width: double.infinity,
+              height: 150,
               decoration: BoxDecoration(
                 color: AppColors.surfaceLow,
                 borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+                border: Border.all(color: AppColors.surfaceContainerHighest),
               ),
-              child: Row(
+              child: Stack(
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: AppColors.tertiary,
-                    size: spacing.AppSpacing.iconMd,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+                    child: Image.file(
+                      _receiptImage!,
+                      width: double.infinity,
+                      height: 150,
+                      fit: BoxFit.cover,
+                    ),
                   ),
-                  const SizedBox(width: spacing.AppSpacing.gutterSm),
-                  Expanded(
-                    child: Text(
-                      'Payment will be recorded when you visit the clinic',
-                      style: AppTextStyles.labelSm.copyWith(
-                        color: AppColors.secondary,
+                  Positioned(
+                    top: spacing.AppSpacing.gutterSm,
+                    right: spacing.AppSpacing.gutterSm,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _receiptImage = null;
+                        });
+                      },
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.close,
+                          color: AppColors.onError,
+                          size: spacing.AppSpacing.iconSm,
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: spacing.AppSpacing.gutterMd),
+            PrimaryButton(
+              text: _isUploading ? 'Uploading...' : 'Submit Receipt',
+              onPressed: _isUploading ? null : _uploadReceipt,
+              icon: const Icon(Icons.upload, size: 20),
+            ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReceiptView(String receiptUrl) {
+    return AppCard(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.check_circle,
+                color: AppColors.primary,
+                size: spacing.AppSpacing.iconMd,
+              ),
+              const SizedBox(width: spacing.AppSpacing.gutterSm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Receipt Uploaded',
+                      style: AppTextStyles.bodyMdMedium.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    Text(
+                      'Your receipt has been uploaded and is pending verification',
+                      style: AppTextStyles.labelSm.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

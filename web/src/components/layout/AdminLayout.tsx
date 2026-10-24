@@ -27,9 +27,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       return;
     }
 
-    // Check authentication
-    const token = localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
+    // Check authentication - prefer role-scoped HttpOnly cookies, fall back to localStorage
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) {
+        return parts.pop()?.split(';').shift() || null;
+      }
+      return null;
+    };
+
+    // Try role-scoped cookie first, then fallback to global cookie
+    const cookieToken = getCookie('admin_accessToken') || getCookie('accessToken');
+    const token = cookieToken || localStorage.getItem('admin_token') || localStorage.getItem('token');
+    const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
 
     if (!token) {
       router.push('/admin/login');
@@ -42,6 +53,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       if (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
         // Cross-role access denied, redirect to admin login
         apiClient.clearToken();
+        localStorage.removeItem('admin_refreshToken');
+        localStorage.removeItem('admin_user');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         router.push('/admin/login');

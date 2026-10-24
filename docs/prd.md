@@ -823,25 +823,52 @@ Patients shall be able to register accounts through email OTP verification. The 
 
 The system shall authenticate users before protected access.
 
-## FR-002-A — Remember Me and Trusted Browser Authentication
+## FR-002-A — Device Trust, Trusted Browsers, and Session Lifetime
 
-The system shall provide a Remember Me feature for Doctor and Secretary accounts to improve user experience while maintaining security:
+The system shall let Doctor and Secretary accounts explicitly trust a browser after authentication, while Admin and SuperAdmin sessions are intentionally short and never rememberable.
 
-1. Doctor and Secretary login forms shall include a Remember Me checkbox.
-2. When Remember Me is unchecked, users must complete OTP verification on every login (if 2FA is enabled), but sessions still persist across browser closes
-3. When Remember Me is checked:
-   - Users must complete normal password and OTP flow on first login from an untrusted browser (if 2FA is enabled)
-   - After successful authentication, the browser is registered as trusted for 30 days
-   - Subsequent logins from the same trusted browser skip OTP (if 2FA is enabled) but still require password
-   - Session persists across browser restarts with 7-day access token and 30-day refresh token
-4. Trusted-browser recognition shall use cryptographically secure random tokens stored as SHA-256 hashes in PostgreSQL.
-5. Password change or password reset shall revoke all existing trusted-browser credentials.
-6. Account suspended, rejected, or unauthorized shall deny access; trusted-browser status shall never override account restrictions.
-7. New browser or device shall always require OTP (if 2FA is enabled).
-8. Logout shall NOT revoke trusted-browser status (trust persists across logout/login cycles like Facebook).
-9. Users must manually uncheck Remember Me during login to revoke trust, or revoke via dedicated endpoint.
-10. Remember Me shall be available for Doctor and Secretary accounts only; Admin and SuperAdmin authentication behavior remains unchanged.
-11. Token storage shall use HttpOnly cookies with Secure flag enabled in production and SameSite=lax policy.
+1. Doctor and Secretary login forms shall not include a Remember Me checkbox.
+2. After a Doctor or Secretary successfully completes authentication (password and, when 2FA is enabled, OTP), an untrusted browser shall be shown a device-trust page displaying the detected browser and operating-system details.
+3. The device-trust page shall offer "Trust this device" and "Do not trust this device".
+4. When the user chooses "Trust this device" (Doctor/Secretary):
+   - The browser is registered as trusted for 30 days.
+   - The current session is upgraded to the 30-day persistent session policy.
+   - Later logins from that browser skip OTP when 2FA is enabled, but the password is always required.
+5. When the user chooses "Do not trust this device" (Doctor/Secretary):
+   - No trusted browser is registered.
+   - The session uses browser-session cookies and ends when the browser closes or after 8 hours of inactivity, whichever comes first.
+   - OTP is required on every login when 2FA is enabled.
+   - Any stale trusted-browser cookie for that browser is cleared.
+6. The trust decision shall occur only after the current login has fully succeeded. Trusting a device shall never bypass the OTP required for the current login.
+7. A browser that is already trusted shall skip OTP (when 2FA is enabled) and the device-trust page on later logins.
+8. Trusted-browser tokens shall be high-entropy random values stored only as SHA-256 hashes in PostgreSQL, sent only through an HttpOnly/Secure/SameSite cookie, rotated on each successful use, and never exposed to JavaScript, localStorage, or API response bodies.
+9. Device trust shall never bypass password verification, account status checks, role checks, or approval checks, and it shall never reveal which condition failed.
+10. Doctor and Secretary settings shall list trusted browsers (device label, created date, last used date, expiry shown in Asia/Manila) with a per-browser Revoke action and a "Sign out of all devices" action. The row belonging to the browser making the request shall be labeled "This browser". Revoking the current browser shall confirm that the next sign-in will require a verification code. "Sign out of all devices" shall show the confirmation "Sign out everywhere? You will need to sign in again on every device." When more than five trusted browsers exist, the settings shall show the five most recent and offer a "View all" toggle.
+11. Changing or resetting a password, deactivating an account, or choosing "Sign out of all devices" shall revoke all trusted browsers and refresh tokens for that account.
+12. Logging out shall end only the current portal session and shall not revoke trusted-browser status.
+13. When 2FA is disabled, the Doctor/Secretary dashboard shall show a non-blocking banner recommending (not requiring) that 2FA be enabled.
+14. Admin and SuperAdmin accounts:
+    - OTP is mandatory on every login; there is no device-trust prompt and no trusted-browser support.
+    - Sessions use browser-session cookies with a 2-hour idle timeout, a 90-minute access token, and an 8-hour absolute maximum.
+    - Logout clears the Admin/SuperAdmin session.
+15. Access and refresh cookies shall be role-scoped (`doctor_`, `secretary_`, `admin_`, `patient_` prefixes), use path `/`, and be HttpOnly and Secure in production. A non-sensitive, JavaScript-readable browser-session hint cookie (`<prefix>_sessionActive`) lets the web client discard a non-persistent session after a browser restart.
+16. Multiple portal sessions in different roles may coexist in the same browser; middleware resolves the session from the role implied by the request path and rejects cross-role use.
+17. Token validation shall be rate-limited, failures shall be logged without token values, and expired sessions shall be cleared with the message "Your session has expired. Please log in again."
+
+## FR-002-B — API Rate Limiting and Read Reliability
+
+The system shall keep dashboard navigation responsive without weakening authentication limits or authorization checks.
+
+1. The API shall enforce two per-IP rate-limit budgets: a general budget of 300 requests per 60-second window for normal dashboard traffic, and a stricter budget of 30 requests per 15-minute window for login, login-OTP verification/resend, registration, patient OTP, and password change.
+2. Rate-limited (`429`) responses shall include a `Retry-After` header and the standard `{ success: false, error: { code: "RATE_LIMIT", message } }` envelope. Pre-flight `OPTIONS` requests shall not consume either budget.
+3. Rate limiting shall never replace authentication or role authorization; every API request shall still be authenticated and authorized as before.
+4. The web client may automatically retry only idempotent `GET` requests, up to three total attempts, with exponential backoff and jitter capped at 5 seconds. A server-provided `Retry-After` value shall take precedence when present.
+5. The web client shall never automatically retry `POST`, `PUT`, `PATCH`, or `DELETE` requests.
+6. The web client may cache successful `GET` responses in memory for at most 15 seconds, scoped to the current portal role. The cache shall be cleared when the session token or role changes, after any successful data-changing request, and on logout.
+7. Role-scoped or patient-specific data shall not be served from a cache shared across different users or roles.
+8. Server-side availability range caching may reuse results for at most 20 seconds, keyed by doctor and date range, only for reads without a patient identity. Any successful data-changing request through the doctors, secretaries, appointments, or walk-ins modules shall invalidate it.
+9. Dashboard endpoints shall aggregate data in a bounded number of queries rather than per-row queries.
+10. Client-side list filtering shall be performed locally and shall not issue a network request per keystroke.
 
 ## FR-003 — Role-Based Access
 
@@ -937,6 +964,8 @@ The patient shall be required to change the temporary password before using norm
 
 The system shall display the static GCash QR code.
 
+Secretaries manage the QR code for their assigned doctor from the secretary dashboard (`/secretary/settings/gcash-qr`), and the secretary settings page shows the current QR image, an Active/Not uploaded status badge, and the last-updated date (Asia/Manila). No clinic payment setting besides the QR code itself is active; invoice details and GCash account details exist only as display-only "Coming soon" placeholders.
+
 ## FR-022 — Receipt Upload
 
 Patients shall be able to upload GCash payment receipts.
@@ -1020,6 +1049,8 @@ The system shall provide relevant application notifications, including notificat
 Chat message notifications use two types: `NEW_PATIENT_MESSAGE` (sent to the secretaries assigned to the conversation's doctor when a patient sends a message) and `NEW_SECRETARY_MESSAGE` (sent to the patient when a secretary sends a message). Notifications go only to recipients (never the sender), use generic titles and bodies, and never include message content. Users may register and remove push device tokens through `POST /api/v1/notifications/device-tokens` and `DELETE /api/v1/notifications/device-tokens/:id`; registered users' devices receive FCM/APNs pushes with the same generic payloads, and provider credentials remain on the backend.
 
 The mobile application registers the device token after successful authentication and removes or invalidates it during logout. A tapped `NEW_PATIENT_MESSAGE` or `NEW_SECRETARY_MESSAGE` notification opens the conversation thread only for the role that owns that notification type, and only after the authenticated user's access to the conversation is verified.
+
+The mobile patient Profile tab is grouped into Account, Security, Notifications, About, and Log Out sections. The Account section opens a read-only standalone patient profile screen for the signed-in patient; the Security section reuses the shared change-password flow; the About section shows the running app version and opens a static in-app privacy notice. The Notifications section exposes a single push-notifications switch (no per-category switches): turning it ON registers this device's token through the existing device-token endpoint, turning it OFF removes the stored token through the same endpoint, and the on/off intent persists locally (`push_notifications_enabled`, default ON so existing auto-registration behavior is unchanged) so nothing silently re-enables push after the user disables it. If the OS notification permission is denied, a hint plus the OS app-settings screen is offered.
 
 ## FR-040 — Doctor Approval
 
@@ -1386,7 +1417,8 @@ FiDo Web
 - Doctor-only UI with no role selector
 - The login request identifies the expected DOCTOR role, which the backend verifies before issuing an OTP challenge or sending an OTP
 - Admin, SuperAdmin, and Secretary accounts are rejected with a generic invalid-credentials/account-role error and do not proceed to OTP verification
-- Successful login redirects to `/doctor/dashboard`
+- Successful login redirects to `/doctor/trust-device` when the browser is untrusted; after the trust choice it continues to `/doctor/dashboard` (or the profile-correction page for a rejected doctor)
+- A browser that is already trusted goes directly to `/doctor/dashboard`
 - Non-Doctor login attempts are denied
 
 **Secretary Authentication:**
@@ -1394,49 +1426,48 @@ FiDo Web
 - Secretary-only UI with no role selector
 - The login request identifies the expected SECRETARY role, which the backend verifies before issuing an OTP challenge or sending an OTP
 - Admin, SuperAdmin, and Doctor accounts are rejected with a generic invalid-credentials/account-role error and do not proceed to OTP verification
-- Successful login redirects to `/secretary/dashboard`
+- Successful login redirects to `/secretary/change-password` when a password change is required; otherwise to `/secretary/trust-device` when the browser is untrusted
+- After the trust choice, login continues to `/secretary/dashboard` (or the profile-completion page)
+- A browser that is already trusted goes directly to `/secretary/dashboard`
 - Non-Secretary login attempts are denied
 
-### Remember Me and Trusted Browser Authentication
+### Device Trust, Trusted Browsers, and Session Lifetime
 
-The web application implements a Remember Me feature for Doctor and Secretary accounts to improve user experience while maintaining security:
-
-**Remember Me Behavior:**
-- Doctor and Secretary login forms include a Remember Me checkbox
-- **Facebook-style Session Persistence:** Sessions persist across browser closes regardless of Remember Me checkbox
-- Access tokens always have 7-day expiration (no 15-minute timeout)
-- Refresh tokens always have 30-day expiration (no session cookies)
-- Users are only logged out when they manually log out or tokens expire
-- **Remember Me CHECKED:**
-  - Browser is registered as trusted for 30 days
-  - Subsequent logins from the same trusted browser skip OTP (if 2FA is enabled) but still require password
-  - Trusted-browser credential stored in HttpOnly cookie with 30-day expiration
-- **Remember Me UNCHECKED:**
-  - Browser is NOT registered as trusted
-  - OTP is required on every login (if 2FA is enabled)
-  - Session still persists across browser closes (tokens are long-lived)
-  - If browser was previously trusted, trust is revoked
+**Device Trust Prompt (Doctor and Secretary):**
+- Login forms do not include a Remember Me checkbox.
+- After the current login is fully authenticated, an untrusted browser is shown a device-trust page with the detected browser and operating-system details.
+- **Trust this device:** registers the browser for 30 days, upgrades the current session to the 30-day persistent policy, and skips OTP on later logins from that browser when 2FA is enabled. The password is always required.
+- **Do not trust this device:** keeps browser-session cookies with an 8-hour idle timeout, registers no trust, and requires OTP on every login when 2FA is enabled. Any stale trust cookie is cleared.
+- Trusting a device never bypasses the OTP required for the current login. The trust page appears only after that OTP has succeeded.
+- Existing trusted browsers skip both the OTP and the trust page on later logins.
 
 **Trusted Browser Recognition:**
-- Uses cryptographically secure random tokens stored as SHA-256 hashes in PostgreSQL `trusted_browsers` table
-- Each trusted-browser record includes: user_id, token_hash, device_info, expires_at (30 days), created_at, revoked_at, last_used_at
-- Trusted-browser lifetime is 30 days from successful trust registration (absolute limit, does not reset on refresh)
-- New browser or device always requires OTP (if 2FA is enabled)
-- Expired trusted-browser credential requires OTP (if 2FA is enabled)
-- Cleared cookies or trusted-browser data requires OTP (if 2FA is enabled)
+- Tokens are cryptographically secure random values stored only as SHA-256 hashes in the PostgreSQL `trusted_browsers` table.
+- Each record includes `user_id`, `token_hash`, `device_info`, `expires_at` (30 days), `created_at`, `revoked_at`, and `last_used_at`.
+- The token lives only in an HttpOnly/Secure/SameSite `trustedBrowser` cookie, is rotated on each successful use, and is never returned in a response body, stored in localStorage, or read by JavaScript.
+- Trust expires after 30 days; a new browser, an expired token, or cleared cookies require OTP again when 2FA is enabled.
+- Password change, password reset, account deactivation, or "Sign out of all devices" revokes all trusted browsers and refresh tokens for the account.
 
-**Security Requirements:**
-- Password change or password reset revokes all existing trusted-browser credentials
-- Account suspended, rejected, or unauthorized denies access; trusted-browser status never overrides account restrictions
-- Unchecking Remember Me during login revokes that browser's trust and clears the trusted-browser cookie
-- Logout does NOT revoke trusted-browser status (trust persists across logout/login cycles like Facebook)
-- Token storage uses HttpOnly cookies with Secure flag enabled in production and SameSite=lax policy
-- Backend generates access tokens with 7-day expiration and refresh tokens with 30-day expiration regardless of Remember Me (Facebook-style)
+**Settings and Revocation:**
+- Doctor and Secretary settings pages show trusted browsers with device label, created date, last used date, and expiry.
+- Each browser can be revoked individually; "Sign out of all devices" revokes every trusted browser and refresh token.
+- Logout ends only the current portal session and does not revoke trust.
+
+**Admin and SuperAdmin:**
+- OTP is mandatory on every login; device trust and trusted browsers are not available.
+- Browser-session cookies, 2-hour idle timeout, 90-minute access token, 8-hour absolute maximum.
+- Logout clears the Admin/SuperAdmin session.
+
+**Session Storage and Isolation:**
+- Cookies are role-scoped (`doctor_`, `secretary_`, `admin_`, `patient_` prefixes) and use path `/`.
+- Access/refresh cookies are HttpOnly and Secure in production. A non-sensitive `<prefix>_sessionActive` browser-session hint is JavaScript-readable so the client can drop a non-persistent session after a browser restart.
+- Multiple portal sessions may coexist; middleware resolves the role from the request path and rejects cross-role use.
+- Password verification, account status, role, and approval checks always apply; device trust cannot bypass them.
+- Token validation is rate-limited, failures are logged without token values, and expired sessions redirect to login with "Your session has expired. Please log in again."
 
 **Scope:**
-- Remember Me is available for Doctor and Secretary accounts only
-- Admin and SuperAdmin authentication behavior remains unchanged (no Remember Me modification)
-- The feature applies only to the web application (doctor and secretary dashboards)
+- Applies to the web application (Doctor and Secretary dashboards; Admin portal for the shorter-session rules).
+- Patient mobile/web behavior keeps its existing 7-day access / 30-day refresh policy.
 
 ### Doctor Sign-Up (Self-Registration)
 

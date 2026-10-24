@@ -1,4 +1,6 @@
 import { query } from '../../database/connection';
+import { config } from '../../config';
+import { TtlCache } from '../../utils/ttlCache';
 
 const CONSULTATION_DURATION_MINUTES = 30;
 
@@ -33,6 +35,15 @@ export interface AvailabilityRange {
 interface TimeRange {
   start: string;
   end: string;
+}
+
+// Cached date-range availability. Keyed by doctor + dates only (never by
+// patient) so one user's booking state cannot leak to another user.
+const availabilityRangeCache = new TtlCache<AvailabilityRange>();
+
+/** Drop cached availability for a doctor, or every doctor when omitted. */
+export function invalidateAvailabilityCache(doctorId?: string): void {
+  availabilityRangeCache.invalidate(doctorId ? `availability:${doctorId}:` : 'availability:');
 }
 
 /**
@@ -286,7 +297,7 @@ export async function calculateAvailability(
   
   // Check for full-day unavailability
   const unavailabilityResult = await query(
-    `SELECT * FROM doctor_unavailability
+    `SELECT start_date, end_date FROM doctor_unavailability
      WHERE doctor_id = $1 AND is_active = true
      AND start_date <= $2 AND end_date >= $2`,
     [doctorId, date]
@@ -355,7 +366,7 @@ export async function calculateAvailability(
     registered: 0,
     remaining: 0,
   };
-  
+
   if (capacityResult.rows.length > 0) {
     const row = capacityResult.rows[0];
     capacity = {
@@ -366,14 +377,16 @@ export async function calculateAvailability(
       remaining: Math.max(0, row.final_capacity - (row.registered_count || 0)),
     };
   } else {
-    // Calculate capacity from available ranges
-    const totalAvailableMinutes = workingRanges.reduce(
-      (total, range) => total + calculateMinutesBetween(range.start, range.end),
-      0
-    );
-    capacity.calculated = Math.floor(totalAvailableMinutes / CONSULTATION_DURATION_MINUTES);
-    capacity.final = capacity.calculated;
-    capacity.remaining = capacity.calculated;
+    // No capacity configured - report as unavailable
+    // Booking requires an existing daily_capacities row, so dates without one cannot be booked
+    return {
+      date,
+      dayOfWeek,
+      status: 'UNAVAILABLE',
+      workingHours: workingRanges,
+      timeSlots: [],
+      capacity,
+    };
   }
   
   // Calculate available time after breaks
@@ -417,7 +430,13 @@ export async function calculateAvailability(
 }
 
 /**
- * Calculate availability for a date range
+ * Calculate availability for a date range (optimized with batched queries)
+ *
+ * Results are cached for a very short time when no patient is supplied.
+ * Patient-specific results are never shared because they include the
+ * caller's own ALREADY_BOOKED state and must stay scoped to one patient.
+ * Any successful write through the doctor, secretary, or appointment routers
+ * clears this cache (see `invalidateAvailabilityCache`).
  */
 export async function calculateAvailabilityRange(
   doctorId: string,
@@ -425,20 +444,303 @@ export async function calculateAvailabilityRange(
   endDate: string,
   patientId?: string | null
 ): Promise<AvailabilityRange> {
-  const results: DateAvailability[] = [];
+  if (patientId) {
+    return calculateAvailabilityRangeUncached(doctorId, startDate, endDate, patientId);
+  }
 
+  const cacheKey = `availability:${doctorId}:${startDate}:${endDate}`;
+  return availabilityRangeCache.getOrLoad(
+    cacheKey,
+    config.cache.availabilityTtlMs,
+    () => calculateAvailabilityRangeUncached(doctorId, startDate, endDate, null)
+  );
+}
+
+async function calculateAvailabilityRangeUncached(
+  doctorId: string,
+  startDate: string,
+  endDate: string,
+  patientId?: string | null
+): Promise<AvailabilityRange> {
   const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
   const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
   const start = new Date(sYear, sMonth - 1, sDay);
   const end = new Date(eYear, eMonth - 1, eDay);
 
+  // Batch fetch all data needed for the date range
+  const dateRange = [];
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const yearStr = d.getFullYear();
     const monthStr = String(d.getMonth() + 1).padStart(2, '0');
     const dayStr = String(d.getDate()).padStart(2, '0');
-    const dateStr = `${yearStr}-${monthStr}-${dayStr}`;
-    const availability = await calculateAvailability(doctorId, dateStr, patientId);
-    results.push(availability);
+    dateRange.push(`${yearStr}-${monthStr}-${dayStr}`);
+  }
+
+  // Batch 1: Get all unavailability for the date range
+  const unavailabilityResult = await query(
+    `SELECT start_date, end_date FROM doctor_unavailability
+     WHERE doctor_id = $1 AND is_active = true
+     AND start_date <= $2 AND end_date >= $3`,
+    [doctorId, endDate, startDate]
+  );
+
+  // Batch 2: Get all schedules for all days of week in range
+  const dayOfWeekSet = new Set(dateRange.map(d => new Date(d).getDay()));
+  const dayOfWeekArray = Array.from(dayOfWeekSet);
+  const schedulesResult = await query(
+    `SELECT day_of_week, start_time, end_time FROM doctor_schedules
+     WHERE doctor_id = $1 AND day_of_week = ANY($2::int[]) AND is_active = true
+     ORDER BY day_of_week, start_time`,
+    [doctorId, dayOfWeekArray]
+  );
+
+  // Batch 3: Get all breaks for the date range
+  const breaksResult = await query(
+    `SELECT break_date, start_time, end_time FROM doctor_break_periods
+     WHERE doctor_id = $1 AND break_date = ANY($2::date[]) AND is_active = true
+     ORDER BY break_date, start_time`,
+    [doctorId, dateRange]
+  );
+
+  // Batch 4: Get all capacities for the date range
+  const capacityResult = await query(
+    `SELECT date, calculated_capacity, configured_capacity, final_capacity, registered_count
+     FROM daily_capacities
+     WHERE doctor_id = $1 AND date = ANY($2::date[])`,
+    [doctorId, dateRange]
+  );
+
+  // Batch 5: Get all booked appointments for the date range
+  const bookedResult = await query(
+    `SELECT 
+       DATE(appointment_date) as date,
+       EXTRACT(HOUR FROM appointment_date) * 60 + EXTRACT(MINUTE FROM appointment_date) as start_minutes,
+       EXTRACT(HOUR FROM appointment_date + (CONSULTATION_DURATION_MINUTES || ' minutes')::interval) * 60 + 
+       EXTRACT(MINUTE FROM appointment_date + (CONSULTATION_DURATION_MINUTES || ' minutes')::interval) as end_minutes
+     FROM appointments
+     CROSS JOIN (SELECT 30 as CONSULTATION_DURATION_MINUTES) as duration
+     WHERE doctor_id = $1
+     AND DATE(appointment_date) = ANY($2::date[])
+     AND status IN ('SCHEDULED', 'CONFIRMED', 'IN_PROGRESS')
+     ORDER BY appointment_date`,
+    [doctorId, dateRange]
+  );
+
+  // Batch 6: Check for existing patient appointments (if patientId provided)
+  let existingAppointmentsMap: Record<string, boolean> = {};
+  if (patientId) {
+    const existingResult = await query(
+      `SELECT DATE(appointment_date) as date
+       FROM appointments
+       WHERE patient_id = $1 AND doctor_id = $2
+       AND DATE(appointment_date) = ANY($3::date[])
+       AND status NOT IN ('CANCELLED', 'NO_SHOW')`,
+      [patientId, doctorId, dateRange]
+    );
+    existingResult.rows.forEach(row => {
+      let dateStr: string;
+      if (row.date instanceof Date) {
+        const year = row.date.getFullYear();
+        const month = String(row.date.getMonth() + 1).padStart(2, '0');
+        const day = String(row.date.getDate()).padStart(2, '0');
+        dateStr = `${year}-${month}-${day}`;
+      } else {
+        dateStr = String(row.date).split('T')[0];
+      }
+      existingAppointmentsMap[dateStr] = true;
+    });
+  }
+
+  // Process data into maps for fast lookup
+  const unavailabilityMap: Record<string, boolean> = {};
+  unavailabilityResult.rows.forEach(row => {
+    const [uYear, uMonth, uDay] = row.start_date.split('-').map(Number);
+    const [eYear, eMonth, eDay] = row.end_date.split('-').map(Number);
+    const uStart = new Date(uYear, uMonth - 1, uDay);
+    const uEnd = new Date(eYear, eMonth - 1, eDay);
+    
+    for (let d = new Date(uStart); d <= uEnd; d.setDate(d.getDate() + 1)) {
+      const dStr = d.toISOString().split('T')[0];
+      unavailabilityMap[dStr] = true;
+    }
+  });
+
+  const schedulesMap: Record<number, TimeRange[]> = {};
+  schedulesResult.rows.forEach(row => {
+    if (!schedulesMap[row.day_of_week]) {
+      schedulesMap[row.day_of_week] = [];
+    }
+    schedulesMap[row.day_of_week].push({
+      start: row.start_time,
+      end: row.end_time,
+    });
+  });
+
+  const breaksMap: Record<string, TimeRange[]> = {};
+  breaksResult.rows.forEach(row => {
+    let dateStr: string;
+    if (row.break_date instanceof Date) {
+      const year = row.break_date.getFullYear();
+      const month = String(row.break_date.getMonth() + 1).padStart(2, '0');
+      const day = String(row.break_date.getDate()).padStart(2, '0');
+      dateStr = `${year}-${month}-${day}`;
+    } else {
+      dateStr = String(row.break_date).split('T')[0];
+    }
+    if (!breaksMap[dateStr]) {
+      breaksMap[dateStr] = [];
+    }
+    breaksMap[dateStr].push({
+      start: row.start_time,
+      end: row.end_time,
+    });
+  });
+
+  const capacityMap: Record<string, any> = {};
+  capacityResult.rows.forEach(row => {
+    // Convert date to string format for consistent comparison
+    // Use the date portion directly from the database without timezone conversion
+    let dateStr: string;
+    if (row.date instanceof Date) {
+      // Get the local date parts to avoid timezone issues
+      const year = row.date.getFullYear();
+      const month = String(row.date.getMonth() + 1).padStart(2, '0');
+      const day = String(row.date.getDate()).padStart(2, '0');
+      dateStr = `${year}-${month}-${day}`;
+    } else {
+      dateStr = String(row.date).split('T')[0];
+    }
+    capacityMap[dateStr] = {
+      calculated: row.calculated_capacity,
+      configured: row.configured_capacity,
+      final: row.final_capacity,
+      registered: row.registered_count || 0,
+      remaining: Math.max(0, row.final_capacity - (row.registered_count || 0)),
+    };
+  });
+
+  const bookedMap: Record<string, TimeRange[]> = {};
+  bookedResult.rows.forEach(row => {
+    let dateStr: string;
+    if (row.date instanceof Date) {
+      const year = row.date.getFullYear();
+      const month = String(row.date.getMonth() + 1).padStart(2, '0');
+      const day = String(row.date.getDate()).padStart(2, '0');
+      dateStr = `${year}-${month}-${day}`;
+    } else {
+      dateStr = String(row.date).split('T')[0];
+    }
+    if (!bookedMap[dateStr]) {
+      bookedMap[dateStr] = [];
+    }
+    bookedMap[dateStr].push({
+      start: formatMinutes(row.start_minutes),
+      end: formatMinutes(row.end_minutes),
+    });
+  });
+
+  // Now calculate availability for each date using the batched data
+  const results: DateAvailability[] = [];
+  const now = new Date();
+
+  for (const dateStr of dateRange) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    const dayOfWeek = dateObj.getDay();
+
+    // Check if date is in the past
+    const isPast = dateObj < new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (isPast) {
+      results.push({
+        date: dateStr,
+        dayOfWeek,
+        status: 'PAST',
+        workingHours: [],
+        timeSlots: [],
+        capacity: { calculated: 0, configured: null, final: 0, registered: 0, remaining: 0 },
+      });
+      continue;
+    }
+
+    // Check for full-day unavailability
+    if (unavailabilityMap[dateStr]) {
+      results.push({
+        date: dateStr,
+        dayOfWeek,
+        status: 'UNAVAILABLE',
+        workingHours: [],
+        timeSlots: [],
+        capacity: { calculated: 0, configured: null, final: 0, registered: 0, remaining: 0 },
+      });
+      continue;
+    }
+
+    // Get working hours for this day of week
+    const workingRanges = schedulesMap[dayOfWeek] || [];
+
+    if (workingRanges.length === 0) {
+      results.push({
+        date: dateStr,
+        dayOfWeek,
+        status: 'NON_WORKING',
+        workingHours: [],
+        timeSlots: [],
+        capacity: { calculated: 0, configured: null, final: 0, registered: 0, remaining: 0 },
+      });
+      continue;
+    }
+
+    // Get break periods for this date
+    const breakRanges = breaksMap[dateStr] || [];
+
+    // Get capacity information
+    const capacity = capacityMap[dateStr] || {
+      calculated: 0,
+      configured: null,
+      final: 0,
+      registered: 0,
+      remaining: 0,
+    };
+
+    // If no capacity configured, mark as unavailable
+    if (!capacityMap[dateStr]) {
+      results.push({
+        date: dateStr,
+        dayOfWeek,
+        status: 'UNAVAILABLE',
+        workingHours: workingRanges,
+        timeSlots: [],
+        capacity,
+      });
+      continue;
+    }
+
+    // Get booked intervals
+    const bookedIntervals = bookedMap[dateStr] || [];
+
+    // Generate time slots
+    const timeSlots = generateTimeSlots(workingRanges, bookedIntervals, breakRanges, dateObj, capacity.remaining);
+
+    // Determine status
+    let status: 'AVAILABLE' | 'FULL' | 'UNAVAILABLE' | 'PAST' | 'NON_WORKING' | 'ALREADY_BOOKED' = 'AVAILABLE';
+    if (capacity.remaining <= 0) {
+      status = 'FULL';
+    }
+
+    // Check if patient already has an appointment
+    if (patientId && existingAppointmentsMap[dateStr]) {
+      status = 'ALREADY_BOOKED';
+    }
+
+    results.push({
+      date: dateStr,
+      dayOfWeek,
+      status,
+      workingHours: workingRanges,
+      timeSlots,
+      capacity,
+    });
   }
 
   return {

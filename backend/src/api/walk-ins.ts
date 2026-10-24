@@ -2,10 +2,23 @@ import { Router, Response } from 'express';
 import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, requireSecretaryProfileCompletion } from '../middleware/auth';
+import { invalidateAvailabilityCache } from '../modules/availability/availabilityService';
 import { getClinicDate, getClinicDateTime, toClinicDateString } from '../utils/date';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
+
+// Walk-in registration creates appointments and consumes capacity.
+router.use((req, res, next) => {
+  if (req.method !== 'GET') {
+    res.on('finish', () => {
+      if (res.statusCode < 400) {
+        invalidateAvailabilityCache();
+      }
+    });
+  }
+  next();
+});
 
 // Valid sex values
 const VALID_SEX_VALUES = ['MALE', 'FEMALE', 'OTHER', 'NOT_SPECIFIED'];
@@ -115,12 +128,15 @@ router.post('/create-account', authenticate, requireSecretaryPasswordChange, req
     const temporaryPassword = generatePassword();
     const passwordHash = await bcrypt.hash(temporaryPassword, 10);
 
+    // Generate username from email (part before @)
+    const username = email.split('@')[0];
+
     // Create user with temporary password
     const userResult = await client.query(
-      `INSERT INTO users (email, password_hash, role, must_change_password)
-       VALUES ($1, $2, 'PATIENT', true)
+      `INSERT INTO users (email, password_hash, role, must_change_password, username)
+       VALUES ($1, $2, 'PATIENT', true, $3)
        RETURNING id, email, must_change_password`,
-      [email, passwordHash]
+      [email, passwordHash, username]
     );
 
     const user = userResult.rows[0];
@@ -363,6 +379,13 @@ router.post('/', authenticate, requireSecretaryPasswordChange, requireSecretaryP
     await client.query(
       'UPDATE daily_capacities SET registered_count = registered_count + 1 WHERE doctor_id = $1 AND date = $2',
       [doctorId, appointmentDateOnly]
+    );
+
+    // Create UNPAID payment record
+    await client.query(
+      `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_amount, status)
+       VALUES ($1, $2, 'CASH', $3, $3, 'UNPAID')`,
+      [patientId, appointmentId, doctor.consultation_fee]
     );
 
     // Get total configured capacity for that day
@@ -819,12 +842,15 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
     const temporaryPassword = generateSecurePassword();
     const passwordHash = await bcrypt.hash(temporaryPassword, 10);
 
+    // Generate username from email (part before @)
+    const username = trimmedEmail.split('@')[0];
+
     // Create user with temporary password
     const userResult = await client.query(
-      `INSERT INTO users (email, password_hash, role, must_change_password)
-       VALUES ($1, $2, 'PATIENT', true)
+      `INSERT INTO users (email, password_hash, role, must_change_password, username)
+       VALUES ($1, $2, 'PATIENT', true, $3)
        RETURNING id, email, must_change_password`,
-      [trimmedEmail, passwordHash]
+      [trimmedEmail, passwordHash, username]
     );
 
     const user = userResult.rows[0];
@@ -911,6 +937,13 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
     await client.query(
       'UPDATE daily_capacities SET registered_count = registered_count + 1 WHERE doctor_id = $1 AND date = $2',
       [assignedDoctorId, appointmentDateOnly]
+    );
+
+    // Create UNPAID payment record
+    await client.query(
+      `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_amount, status)
+       VALUES ($1, $2, 'CASH', $3, $3, 'UNPAID')`,
+      [patientId, appointmentId, doctorResult.rows[0].consultation_fee]
     );
 
     // Get total configured capacity for that day

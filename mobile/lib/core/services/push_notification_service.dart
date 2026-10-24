@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,26 +18,36 @@ import 'api_service.dart';
 /// on logout, and opens only authorized conversation threads when a
 /// NEW_PATIENT_MESSAGE or NEW_SECRETARY_MESSAGE notification is tapped.
 class PushNotificationService {
-  PushNotificationService._();
+  PushNotificationService._() : _apiService = ApiService();
+
+  /// Test-only constructor that lets tests inject a stub API service
+  /// instead of the HTTP-backed singleton.
+  @visibleForTesting
+  PushNotificationService.withApiService(this._apiService);
 
   static final PushNotificationService instance = PushNotificationService._();
 
-  static const MethodChannel _channel = MethodChannel('findmydoctor/push');
+  static const MethodChannel channel = MethodChannel('findmydoctor/push');
 
   static const String deviceTokenIdKey = 'device_token_id';
   static const String deviceTokenKey = 'device_token';
 
-  final ApiService _apiService = ApiService();
+  /// Stored user intent for the Profile push-notifications switch. Defaults
+  /// to enabled so the switch matches the existing auto-registration at
+  /// startup for users who have never opened the Profile screen.
+  static const String pushEnabledKey = 'push_notifications_enabled';
+
+  final ApiService _apiService;
   bool _initialized = false;
 
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
 
-    _channel.setMethodCallHandler(_handleNativeMethodCall);
+    channel.setMethodCallHandler(_handleNativeMethodCall);
 
     try {
-      final initial = await _channel.invokeMethod<dynamic>(
+      final initial = await channel.invokeMethod<dynamic>(
         'getInitialNotification',
       );
       if (initial is Map) {
@@ -54,7 +65,11 @@ class PushNotificationService {
   /// A token can be supplied directly by the native host (or tests). When it
   /// is omitted the service asks the native host for the current FCM/APNs
   /// token. Registration is silently skipped when no token is available.
-  Future<void> registerForCurrentUser({String? token}) async {
+  ///
+  /// Returns true only when a device token was actually registered with the
+  /// backend, so the Profile switch can give real feedback. Startup and
+  /// token-refresh callers ignore the result.
+  Future<bool> registerForCurrentUser({String? token}) async {
     await initialize();
 
     var deviceToken = token?.trim();
@@ -62,7 +77,7 @@ class PushNotificationService {
       deviceToken = await _loadTokenFromHost();
     }
     if (deviceToken == null || deviceToken.isEmpty) {
-      return;
+      return false;
     }
 
     try {
@@ -85,10 +100,50 @@ class PushNotificationService {
           await prefs.setString(deviceTokenIdKey, id);
         }
         await prefs.setString(deviceTokenKey, deviceToken);
+        return true;
       }
+      return false;
     } catch (_) {
       // Push registration is best-effort; the chat itself remains usable.
+      return false;
     }
+  }
+
+  /// Removes this device's push registration for the current user using the
+  /// existing DELETE /notifications/device-tokens/:id call and clears the
+  /// locally cached token ids. Idempotent: without a stored registration it
+  /// simply clears local state and reports success.
+  Future<bool> disableForCurrentUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final id = prefs.getString(deviceTokenIdKey);
+      if (id != null && id.isNotEmpty) {
+        final response = await _apiService.removeDeviceToken(id);
+        if (response['success'] != true) {
+          return false;
+        }
+      }
+    } catch (_) {
+      return false;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(deviceTokenIdKey);
+    await prefs.remove(deviceTokenKey);
+    return true;
+  }
+
+  /// Reads the stored push preference for this device. Users who have never
+  /// toggled the switch are treated as enabled, matching the existing
+  /// auto-registration behavior at startup.
+  Future<bool> isPushPreferred() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(pushEnabledKey) ?? true;
+  }
+
+  Future<void> setPushPreferred(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(pushEnabledKey, value);
   }
 
   /// Handles a notification tap and opens the conversation thread only when
@@ -153,7 +208,7 @@ class PushNotificationService {
 
   Future<String?> _loadTokenFromHost() async {
     try {
-      final token = await _channel.invokeMethod<String>('getToken');
+      final token = await channel.invokeMethod<String>('getToken');
       if (token != null && token.trim().isNotEmpty) {
         return token.trim();
       }

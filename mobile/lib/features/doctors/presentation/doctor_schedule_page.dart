@@ -2,14 +2,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/services/doctor_service.dart';
 import '../../../core/services/api_service.dart';
 
@@ -19,6 +20,7 @@ class DoctorSchedulePage extends StatefulWidget {
   final String? specialty;
   final String? clinic;
   final String? consultationFee;
+  final String? professionalPhotoUrl;
 
   const DoctorSchedulePage({
     super.key,
@@ -27,6 +29,7 @@ class DoctorSchedulePage extends StatefulWidget {
     this.specialty,
     this.clinic,
     this.consultationFee,
+    this.professionalPhotoUrl,
   });
 
   @override
@@ -36,24 +39,82 @@ class DoctorSchedulePage extends StatefulWidget {
 class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   final DoctorService _doctorService = DoctorService();
   final ApiService _apiService = ApiService();
-  final ImagePicker _imagePicker = ImagePicker();
 
   DateTime? _selectedDate;
   String _selectedPaymentMethod = 'CASH'; // 'GCASH' or 'CASH'
-  File? _receiptImage;
   bool _isDownloading = false;
+  bool _isLoadingQr = true;
+  String? _qrUrl;
 
   Map<String, dynamic>? _availabilityData;
   bool _isLoading = true;
   bool _isCheckingRecord = false;
   String? _errorMessage;
 
+  // Week navigation
+  DateTime _currentWeekStart = DateTime.now();
+
+  // Cache for availability data to avoid re-fetching
+  final Map<String, Map<String, dynamic>> _availabilityCache = {};
+
   @override
   void initState() {
     super.initState();
     _selectedDate = null;
+    _currentWeekStart = _getStartOfWeek(DateTime.now());
     _fetchAvailability();
-    // No need to fetch GCash QR since we're using local image
+    _fetchGcashQr();
+  }
+
+  DateTime _getStartOfWeek(DateTime date) {
+    final dayOfWeek = date.weekday; // 1 = Monday, 7 = Sunday
+    return date.subtract(Duration(days: dayOfWeek % 7));
+  }
+
+  bool _isCurrentWeek() {
+    final todayStart = _getStartOfWeek(DateTime.now());
+    return _currentWeekStart.year == todayStart.year &&
+           _currentWeekStart.month == todayStart.month &&
+           _currentWeekStart.day == todayStart.day;
+  }
+
+  void _navigateToPreviousWeek() {
+    final today = DateTime.now();
+    final oneWeekAgo = today.subtract(const Duration(days: 7));
+
+    // Don't allow navigating more than 2 weeks into the past
+    if (_currentWeekStart.isBefore(oneWeekAgo)) {
+      return;
+    }
+
+    // Optimistic UI update - update week immediately
+    setState(() {
+      _currentWeekStart = _currentWeekStart.subtract(const Duration(days: 7));
+    });
+
+    // Then fetch data in background
+    _fetchAvailability();
+  }
+
+  void _navigateToNextWeek() {
+    // Optimistic UI update - update week immediately
+    setState(() {
+      _currentWeekStart = _currentWeekStart.add(const Duration(days: 7));
+    });
+
+    // Then fetch data in background
+    _fetchAvailability();
+  }
+
+  void _navigateToToday() {
+    // Optimistic UI update - update week immediately
+    setState(() {
+      _currentWeekStart = _getStartOfWeek(DateTime.now());
+      _selectedDate = null;
+    });
+
+    // Then fetch data in background
+    _fetchAvailability();
   }
 
   Future<void> _fetchAvailability() async {
@@ -63,12 +124,26 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     });
 
     try {
-      // Backend handles week filtering for patients automatically
-      // Just send current month as placeholder
-      final now = DateTime.now();
-      final startDate = DateTime(now.year, now.month, 1);
-      final endDate = DateTime(now.year, now.month + 1, 0);
+      // Only fetch the currently displayed week (fast initial load)
+      final weekEnd = _currentWeekStart.add(const Duration(days: 6));
+      final startDate = _currentWeekStart;
+      final endDate = weekEnd;
 
+      // Create a cache key for this week
+      final cacheKey = '${DateFormat('yyyy-MM-dd').format(startDate)}_${DateFormat('yyyy-MM-dd').format(endDate)}';
+
+      // Check if we have cached data for this week
+      if (_availabilityCache.containsKey(cacheKey)) {
+        if (mounted) {
+          setState(() {
+            _availabilityData = _availabilityCache[cacheKey];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      // Fetch from API (small payload - only 1 week)
       final availability = await _doctorService.getDoctorAvailability(
         doctorId: widget.doctorId,
         startDate: DateFormat('yyyy-MM-dd').format(startDate),
@@ -76,21 +151,59 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
       );
 
       if (availability != null && availability['dates'] != null) {
-        setState(() {
-          _availabilityData = availability;
-          _isLoading = false;
-        });
+        // Cache the result
+        _availabilityCache[cacheKey] = availability;
+
+        if (mounted) {
+          setState(() {
+            _availabilityData = availability;
+            _isLoading = false;
+          });
+        }
       } else {
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'No availability data found';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _errorMessage = 'No availability data found';
+          _errorMessage = 'Failed to load availability: $e';
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _fetchGcashQr() async {
+    try {
+      final response = await _apiService.getGcashQr(doctorId: widget.doctorId);
+
+      if (response['success'] == true && response['data'] != null) {
+        if (mounted) {
+          setState(() {
+            _qrUrl = response['data']['qrUrl'];
+            _isLoadingQr = false;
+          });
+        }
+      } else {
+        // QR code not configured
+        if (mounted) {
+          setState(() {
+            _isLoadingQr = false;
+          });
+        }
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load availability: $e';
-        _isLoading = false;
-      });
+      // QR code not available
+      if (mounted) {
+        setState(() {
+          _isLoadingQr = false;
+        });
+      }
     }
   }
 
@@ -110,6 +223,18 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   }
 
   Future<void> _downloadQrCode() async {
+    if (_qrUrl == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('QR code not available'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _isDownloading = true;
     });
@@ -120,18 +245,21 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
       final fileName = 'gcash_qr_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final filePath = '${directory.path}/$fileName';
 
-      // Copy the local QR image to app storage
-      final assetImage = await rootBundle.load('assets/images/gcash_qr_placeholder.jpg');
-      final byteData = assetImage.buffer.asUint8List();
-      await File(filePath).writeAsBytes(byteData);
+      // Download the QR code from the URL
+      final response = await http.get(Uri.parse(_qrUrl!));
+      if (response.statusCode == 200) {
+        await File(filePath).writeAsBytes(response.bodyBytes);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('QR code saved to app storage'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('QR code saved to app storage'),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to download QR code');
       }
     } catch (e) {
       if (mounted) {
@@ -143,51 +271,10 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
         );
       }
     } finally {
-      setState(() {
-        _isDownloading = false;
-      });
-    }
-  }
-
-  Future<void> _pickReceiptImage() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
-      );
-
-      if (image != null) {
-        // Check file size (5MB limit)
-        final file = File(image.path);
-        final fileSize = await file.length();
-        const maxSize = 5 * 1024 * 1024; // 5MB
-
-        if (fileSize > maxSize) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Image size must be less than 5MB'),
-                backgroundColor: AppColors.error,
-              ),
-            );
-          }
-          return;
-        }
-
-        setState(() {
-          _receiptImage = file;
-        });
-      }
-    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to pick image: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        setState(() {
+          _isDownloading = false;
+        });
       }
     }
   }
@@ -238,47 +325,10 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Row(
         children: [
-          Stack(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.slate800.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.person,
-                  color: AppColors.outline,
-                  size: spacing.AppSpacing.iconXl,
-                ),
-              ),
-              Positioned(
-                bottom: -4,
-                right: -4,
-                child: Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: AppColors.tertiary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.surface, width: 2),
-                  ),
-                  child: Icon(
-                    Icons.check,
-                    color: AppColors.onTertiary,
-                    size: 10,
-                  ),
-                ),
-              ),
-            ],
+          DoctorProfileImage(
+            photoUrl: widget.professionalPhotoUrl,
+            size: 56,
+            showVerifiedBadge: true,
           ),
           const SizedBox(width: spacing.AppSpacing.gutterMd),
           Expanded(
@@ -381,9 +431,29 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                       ),
                     ),
                     const SizedBox(height: spacing.AppSpacing.gutterXs),
-                    if (_selectedDate != null) ...[
-                      Row(
-                        children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: spacing.AppSpacing.gutterSm,
+                            vertical: spacing.AppSpacing.gutterXs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainer,
+                            borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                            border: Border.all(color: AppColors.surfaceContainerHighest),
+                          ),
+                          child: Text(
+                            'Regular Clinic',
+                            style: AppTextStyles.labelSm.copyWith(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: spacing.AppSpacing.gutterSm),
+                        if (_selectedDate != null) ...[
                           Container(
                             width: 6,
                             height: 6,
@@ -393,49 +463,20 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                             ),
                           ),
                           const SizedBox(width: spacing.AppSpacing.gutterXs),
-                          Text(
-                            _getWorkingHoursText(_selectedDate!),
-                            style: AppTextStyles.labelMd.copyWith(
-                              color: AppColors.secondary,
+                          Expanded(
+                            child: Text(
+                              _getWorkingHoursText(_selectedDate!),
+                              style: AppTextStyles.labelSm.copyWith(
+                                color: AppColors.secondary,
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: spacing.AppSpacing.gutterMd),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                _getWeekRangeText(),
-                style: AppTextStyles.bodyMdMedium.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                ),
-              ),
-              const SizedBox(width: spacing.AppSpacing.gutterSm),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: spacing.AppSpacing.gutterSm,
-                  vertical: spacing.AppSpacing.gutterXs,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
-                  border: Border.all(color: AppColors.surfaceContainerHighest),
-                ),
-                child: Text(
-                  'Regular Clinic',
-                  style: AppTextStyles.labelSm.copyWith(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
                 ),
               ),
             ],
@@ -454,7 +495,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             Column(
               children: [
                 _buildCalendarGrid(),
-                const SizedBox(height: spacing.AppSpacing.gutterMd),
+                const SizedBox(height: spacing.AppSpacing.gutterSm),
                 _buildCalendarLegend(),
               ],
             ),
@@ -480,15 +521,12 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   }
 
   String _getWeekRangeText() {
-    final now = DateTime.now();
-    final dayOfWeek = now.weekday; // 1 = Monday, 7 = Sunday
-    final startOfWeek = now.subtract(Duration(days: dayOfWeek % 7));
-    final endOfWeek = startOfWeek.add(const Duration(days: 6));
+    final endOfWeek = _currentWeekStart.add(const Duration(days: 6));
 
     final startFormat = DateFormat('MMM d');
     final endFormat = DateFormat('MMM d, yyyy');
 
-    return '${startFormat.format(startOfWeek)} - ${endFormat.format(endOfWeek)}';
+    return '${startFormat.format(_currentWeekStart)} - ${endFormat.format(endOfWeek)}';
   }
 
   Widget _buildCalendarGrid() {
@@ -502,13 +540,55 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
       availabilityMap[dateData['date'] as String] = dateData;
     }
 
-    // Calculate current week (Sunday to Saturday)
-    final now = DateTime.now();
-    final dayOfWeek = now.weekday; // 1 = Monday, 7 = Sunday
-    final startOfWeek = now.subtract(Duration(days: dayOfWeek % 7));
-
     return Column(
       children: [
+        // Week navigation arrows
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              onPressed: _navigateToPreviousWeek,
+              icon: const Icon(Icons.chevron_left),
+              color: AppColors.primary,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: _navigateToToday,
+                child: Text(
+                  _getWeekRangeText(),
+                  style: AppTextStyles.bodyMdMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: AppColors.primary,
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: _navigateToNextWeek,
+              icon: const Icon(Icons.chevron_right),
+              color: AppColors.primary,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ),
+        const SizedBox(height: spacing.AppSpacing.gutterXs),
+        if (!_isCurrentWeek())
+          Center(
+            child: Text(
+              'Tap on the date range to return to today',
+              style: AppTextStyles.labelSm.copyWith(
+                fontSize: 10,
+                color: AppColors.secondary,
+              ),
+            ),
+          ),
+        const SizedBox(height: spacing.AppSpacing.gutterSm),
         // Weekday headers
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -528,10 +608,10 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               .toList(),
         ),
         const SizedBox(height: spacing.AppSpacing.gutterSm),
-        // Calendar days - display as a single row of 7 days (this week)
+        // Calendar days - display as a single row of 7 days (current week)
         Row(
           children: List.generate(7, (index) {
-            final date = startOfWeek.add(Duration(days: index));
+            final date = _currentWeekStart.add(Duration(days: index));
             final dateStr = DateFormat('yyyy-MM-dd').format(date);
             final availability = availabilityMap[dateStr];
             final status = availability?['status'] as String? ?? 'NON_WORKING';
@@ -794,7 +874,6 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
 
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
           children: [
@@ -813,12 +892,18 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             ),
           ],
         ),
-        Text(
-          value,
-          style: AppTextStyles.labelSm.copyWith(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: AppColors.onSurface,
+        const SizedBox(width: spacing.AppSpacing.gutterSm),
+        // Expanded lets long values wrap on narrow screens instead of
+        // overflowing the row by a few pixels.
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: AppTextStyles.labelSm.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: AppColors.onSurface,
+            ),
           ),
         ),
       ],
@@ -862,6 +947,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   Widget _buildPaymentMethodSelection() {
     if (_selectedDate == null) return const SizedBox();
 
+    final hasGcashQr = _qrUrl != null;
+
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       child: Column(
@@ -875,8 +962,10 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             ),
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
-          _buildPaymentOption('GCash', 'Pay online with GCash'),
-          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          if (hasGcashQr) ...[
+            _buildPaymentOption('GCash', 'Pay online with GCash'),
+            const SizedBox(height: spacing.AppSpacing.gutterSm),
+          ],
           _buildPaymentOption('Cash at Clinic', 'Pay when you arrive'),
           if (_selectedPaymentMethod == 'GCASH') ...[
             const SizedBox(height: spacing.AppSpacing.gutterLg),
@@ -891,33 +980,57 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                  child: Image.asset(
-                    'assets/images/gcash_qr_placeholder.jpg',
-                    width: 200,
-                    height: 200,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.qr_code_2,
-                              size: 80,
-                              color: AppColors.secondary,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'QR code not available',
-                              style: AppTextStyles.labelSm.copyWith(
-                                color: AppColors.secondary,
+                  child: _isLoadingQr
+                      ? const Center(
+                          child: CircularProgressIndicator(),
+                        )
+                      : _qrUrl != null
+                          ? Image.network(
+                              _qrUrl!,
+                              width: 200,
+                              height: 200,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.qr_code_2,
+                                        size: 80,
+                                        color: AppColors.secondary,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'QR code not available',
+                                        style: AppTextStyles.labelSm.copyWith(
+                                          color: AppColors.secondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            )
+                          : Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.qr_code_2,
+                                    size: 80,
+                                    color: AppColors.secondary,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'QR code not available',
+                                    style: AppTextStyles.labelSm.copyWith(
+                                      color: AppColors.secondary,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
                 ),
               ),
             ),
@@ -932,7 +1045,6 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               ),
             ),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
-            // Download QR and Upload Receipt buttons
             Row(
               children: [
                 Expanded(
@@ -944,89 +1056,18 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                     height: 56,
                   ),
                 ),
-                const SizedBox(width: spacing.AppSpacing.gutterMd),
-                Expanded(
-                  child: PrimaryButton(
-                    text: 'Upload Receipt',
-                    onPressed: _pickReceiptImage,
-                    icon: const Icon(Icons.upload, size: 20),
-                    maxLines: 2,
-                    height: 56,
-                  ),
-                ),
               ],
             ),
-            const SizedBox(height: spacing.AppSpacing.gutterLg),
-            // Show receipt preview after image is selected
-            if (_receiptImage != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Image.asset(
-                        'assets/images/gcash_logo.png',
-                        width: 20,
-                        height: 20,
-                      ),
-                      const SizedBox(width: spacing.AppSpacing.gutterSm),
-                      Text(
-                        'Receipt Preview',
-                        style: AppTextStyles.labelSm.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: spacing.AppSpacing.gutterSm),
-                  Container(
-                    width: double.infinity,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceLow,
-                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                      border: Border.all(color: AppColors.surfaceContainerHighest),
-                    ),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                          child: Image.file(
-                            _receiptImage!,
-                            width: double.infinity,
-                            height: 150,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        Positioned(
-                          top: spacing.AppSpacing.gutterSm,
-                          right: spacing.AppSpacing.gutterSm,
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _receiptImage = null;
-                              });
-                            },
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: AppColors.error,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.close,
-                                color: AppColors.onError,
-                                size: spacing.AppSpacing.iconSm,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+            const SizedBox(height: spacing.AppSpacing.gutterMd),
+            Center(
+              child: Text(
+                'You can upload your GCash receipt after booking',
+                style: AppTextStyles.bodySm.copyWith(
+                  color: AppColors.secondary,
+                ),
+                textAlign: TextAlign.center,
               ),
+            ),
           ],
         ],
       ),
@@ -1035,11 +1076,12 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
 
   Widget _buildPaymentOption(String title, String subtitle) {
     final isSelected = _selectedPaymentMethod == (title == 'GCash' ? 'GCASH' : 'CASH');
+    final isGcash = title == 'GCash';
 
     return InkWell(
       onTap: () {
         setState(() {
-          _selectedPaymentMethod = title == 'GCash' ? 'GCASH' : 'CASH';
+          _selectedPaymentMethod = isGcash ? 'GCASH' : 'CASH';
         });
       },
       borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
@@ -1061,11 +1103,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               height: 40,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary
+                    ? (isGcash ? AppColors.surfaceLowest : AppColors.primary)
                     : AppColors.surfaceContainer,
                 borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
               ),
-              child: title == 'GCash'
+              child: isGcash
                   ? Image.asset(
                       'assets/images/gcash_logo.png',
                       width: 24,
@@ -1158,9 +1200,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   Future<void> _handleBookingConfirmation() async {
     if (_selectedDate == null) return;
 
-    setState(() {
-      _isCheckingRecord = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isCheckingRecord = true;
+      });
+    }
 
     try {
       // Check if patient has an existing record with this doctor
@@ -1168,9 +1212,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
         doctorId: widget.doctorId,
       );
 
-      setState(() {
-        _isCheckingRecord = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isCheckingRecord = false;
+        });
+      }
 
       if (response['success'] == true) {
         final hasRecord = response['data']?['hasRecord'] as bool? ?? false;
@@ -1188,7 +1234,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 'consultationFee': widget.consultationFee,
                 'selectedDate': _selectedDate,
                 'paymentMethod': _selectedPaymentMethod,
-                'receiptImage': _receiptImage,
+                'professionalPhotoUrl': widget.professionalPhotoUrl,
               },
             );
           }
@@ -1205,7 +1251,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 'consultationFee': widget.consultationFee,
                 'selectedDate': _selectedDate,
                 'paymentMethod': _selectedPaymentMethod,
-                'receiptImage': _receiptImage,
+                'professionalPhotoUrl': widget.professionalPhotoUrl,
               },
             );
           }
@@ -1224,9 +1270,11 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
         }
       }
     } catch (e) {
-      setState(() {
-        _isCheckingRecord = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isCheckingRecord = false;
+        });
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

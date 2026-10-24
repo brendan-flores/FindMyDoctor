@@ -18,15 +18,16 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
   const [schedules, setSchedules] = useState<any[]>([]);
 
-  // Load profile and schedules for setup progress
-  const refreshProfile = () => {
-    const token = localStorage.getItem('token');
+  // Load profile and schedules for setup progress. A forced refresh bypasses
+  // the short GET cache so saved changes appear immediately.
+  const refreshProfile = (force = false) => {
+    const token = apiClient.getStoredToken();
     if (!token) return;
 
     apiClient.setToken(token);
 
     // Load profile
-    doctorApi.getProfile().then(response => {
+    doctorApi.getProfile({ skipCache: force }).then(response => {
       if (response.success && response.data) {
         setProfile(response.data);
       }
@@ -35,7 +36,7 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
     });
 
     // Load schedules
-    doctorApi.getSchedules().then(response => {
+    doctorApi.getSchedules({ skipCache: force }).then(response => {
       if (response.success && response.data) {
         setSchedules(response.data);
       }
@@ -50,11 +51,12 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
 
   // Listen for profile/schedule save events to refresh the setup progress card immediately
   useEffect(() => {
-    window.addEventListener('profileUpdated', refreshProfile);
-    window.addEventListener('schedulesUpdated', refreshProfile);
+    const handleUpdate = () => refreshProfile(true);
+    window.addEventListener('profileUpdated', handleUpdate);
+    window.addEventListener('schedulesUpdated', handleUpdate);
     return () => {
-      window.removeEventListener('profileUpdated', refreshProfile);
-      window.removeEventListener('schedulesUpdated', refreshProfile);
+      window.removeEventListener('profileUpdated', handleUpdate);
+      window.removeEventListener('schedulesUpdated', handleUpdate);
     };
   }, []);
 
@@ -82,6 +84,8 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
       console.error('Logout error:', err);
     } finally {
       apiClient.clearToken();
+      localStorage.removeItem('doctor_refreshToken');
+      localStorage.removeItem('doctor_user');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       router.push('/doctor-login');

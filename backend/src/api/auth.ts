@@ -1,10 +1,164 @@
 import { Router, Request, Response } from 'express';
-import { register, registerDoctor, login, changePassword, verifyLoginOtp, sendLoginOtpForLogin, hashChallengeToken } from '../modules/auth/authService';
+import rateLimit from 'express-rate-limit';
+import {
+  register,
+  registerDoctor,
+  login,
+  changePassword,
+  verifyLoginOtp,
+  sendLoginOtpForLogin,
+  hashChallengeToken,
+  hashTrustedBrowserToken,
+  refreshAccessToken,
+  listTrustedBrowsers,
+  revokeTrustedBrowser,
+  revokeTrustedBrowserById,
+  revokeAllUserSessions,
+  trustCurrentBrowser,
+} from '../modules/auth/authService';
 import { success, error, ErrorCodes } from '../utils/response';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
+import { getSessionPolicy, buildSessionResponse } from '../modules/auth/sessionPolicy';
+import {
+  ROLE_PREFIXES,
+  clearSessionCookies,
+  clearTrustedBrowserCookie,
+  clearTrustedCookies,
+  cookieNamesForRole,
+  rolePrefixForRole,
+  setSessionCookies,
+  setTrustedBrowserCookie,
+} from '../modules/auth/cookies';
 import { query } from '../database/connection';
 
 const router = Router();
+
+// Token validation endpoints are rate limited independently of the global
+// limiter. Failures are logged without the token value.
+const tokenValidationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMIT', message: 'Too many attempts. Please try again later.' } },
+});
+
+function roleFromRequest(req: Request): string {
+  const bodyRole = typeof req.body?.role === 'string' ? req.body.role.toUpperCase() : '';
+  if (['DOCTOR', 'SECRETARY', 'ADMIN', 'SUPERADMIN', 'PATIENT'].includes(bodyRole)) {
+    return bodyRole;
+  }
+
+  const headerRole = String(req.headers['x-portal-role'] || '').toLowerCase();
+  const headerMap: Record<string, string> = {
+    doctor: 'DOCTOR',
+    secretary: 'SECRETARY',
+    admin: 'ADMIN',
+    patient: 'PATIENT',
+  };
+  if (headerMap[headerRole]) {
+    return headerMap[headerRole];
+  }
+
+  const path = (req.originalUrl || '').split('?')[0].toLowerCase();
+  if (path.includes('doctor')) return 'DOCTOR';
+  if (path.includes('secretary')) return 'SECRETARY';
+  if (path.includes('admin')) return 'ADMIN';
+  if (path.includes('patient')) return 'PATIENT';
+
+  return '';
+}
+
+function deviceInfoFromRequest(req: Request): string | undefined {
+  const userAgent = req.headers['user-agent'];
+  return typeof userAgent === 'string' ? userAgent.slice(0, 500) : undefined;
+}
+
+function trustedBrowserTokenFromRequest(req: Request, role: string): string | undefined {
+  // The trusted-browser token is only ever read from its HttpOnly cookie.
+  // It must never be accepted from a request body, localStorage, or JS.
+  const names = cookieNamesForRole(role);
+  const cookieToken = req.cookies?.[names.trustedBrowser] || req.cookies?.trustedBrowser;
+
+  return cookieToken && cookieToken !== 'undefined' && cookieToken !== 'null'
+    ? cookieToken
+    : undefined;
+}
+
+function refreshTokenFromRequest(req: Request, role: string): string | undefined {
+  const bodyToken =
+    typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : undefined;
+
+  if (bodyToken && bodyToken !== 'undefined' && bodyToken !== 'null') {
+    return bodyToken;
+  }
+
+  const cookieCandidates = role
+    ? [cookieNamesForRole(role).refreshToken]
+    : ROLE_PREFIXES.map((prefix) => `${prefix}_refreshToken`);
+
+  for (const cookieName of cookieCandidates) {
+    const cookieToken = req.cookies?.[cookieName];
+    if (cookieToken && cookieToken !== 'undefined' && cookieToken !== 'null') {
+      return cookieToken;
+    }
+  }
+
+  const globalCookieToken = req.cookies?.refreshToken;
+  return globalCookieToken && globalCookieToken !== 'undefined' && globalCookieToken !== 'null'
+    ? globalCookieToken
+    : undefined;
+}
+
+/**
+ * Apply the role policy cookies after a successful authentication. The trusted
+ * browser token is only ever sent back as an HttpOnly cookie.
+ */
+function applySessionCookies(
+  res: Response,
+  result: {
+    role: string;
+    rememberMe: boolean;
+    accessToken: string;
+    refreshToken: string;
+    trustedBrowserToken?: string | null;
+    trustedBrowserRevoked?: boolean;
+  }
+) {
+  const policy = getSessionPolicy(result.role, result.rememberMe);
+
+  setSessionCookies(
+    res,
+    result.role,
+    { accessToken: result.accessToken, refreshToken: result.refreshToken },
+    policy
+  );
+
+  if (result.trustedBrowserToken) {
+    setTrustedBrowserCookie(res, result.role, result.trustedBrowserToken);
+  } else if (!result.rememberMe || result.trustedBrowserRevoked) {
+    // An untrusted browser session must not keep a stale trusted-device cookie.
+    clearTrustedBrowserCookie(res, result.role);
+  }
+}
+
+function sessionPayload(result: {
+  role: string;
+  rememberMe: boolean;
+  accessToken: string;
+  refreshToken: string;
+  isTrustedBrowser?: boolean;
+  requiresTrustPrompt?: boolean;
+}) {
+  return {
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
+    rememberMe: result.rememberMe,
+    isTrustedBrowser: result.isTrustedBrowser === true,
+    requiresTrustPrompt: result.requiresTrustPrompt === true,
+    session: buildSessionResponse(result.role, result.rememberMe),
+  };
+}
 
 // Register new user
 router.post('/register', async (req: Request, res: Response) => {
@@ -95,9 +249,9 @@ router.post('/register/doctor', async (req: Request, res: Response) => {
 });
 
 // Login
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', tokenValidationLimiter, async (req: Request, res: Response) => {
   try {
-    const { email, password, expectedRole, rememberMe, trustedBrowserToken } = req.body;
+    const { email, password, expectedRole, trustedBrowserToken } = req.body;
 
     if (!email || !password || !['PATIENT', 'DOCTOR', 'SECRETARY', 'ADMIN'].includes(expectedRole)) {
       return res.status(400).json(
@@ -105,9 +259,15 @@ router.post('/login', async (req: Request, res: Response) => {
       );
     }
 
-    const result = await login({ email, password, expectedRole, rememberMe, trustedBrowserToken });
+    const result = await login({
+      email,
+      password,
+      expectedRole,
+      trustedBrowserToken: trustedBrowserTokenFromRequest(req, expectedRole),
+      deviceInfo: deviceInfoFromRequest(req),
+    });
 
-    // If OTP is required, send OTP and return challenge
+    // If OTP is required, send OTP and return the opaque challenge.
     if (result.requiresOtp) {
       try {
         await sendLoginOtpForLogin(email);
@@ -119,62 +279,43 @@ router.post('/login', async (req: Request, res: Response) => {
           throw otpErr;
         }
       }
+
       return res.json(
-        success({ requiresOtp: true, challengeId: result.challengeId }, 'OTP required')
+        success(
+          {
+            requiresOtp: true,
+            challengeId: result.challengeId,
+            rememberMe: result.rememberMe,
+            requiresTrustPrompt: result.requiresTrustPrompt,
+            session: buildSessionResponse(result.role, result.rememberMe),
+          },
+          'OTP required'
+        )
       );
     }
 
-    // Otherwise, normal login - set HttpOnly cookies
-    // Facebook-style: Always use persistent cookies regardless of Remember Me
-    const isProduction = process.env.NODE_ENV === 'production';
-    const cookieOptions = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax' as const,
-      path: '/',
+    const authResult = result as {
+      user: any;
+      accessToken: string;
+      refreshToken: string;
+      role: string;
+      rememberMe: boolean;
+      isTrustedBrowser: boolean;
+      requiresTrustPrompt: boolean;
+      trustedBrowserToken: string | null;
+      trustedBrowserRevoked: boolean;
     };
 
-    // Always use 7-day access token and 30-day refresh token (Facebook-style)
-    res.cookie('accessToken', result.accessToken, {
-      ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    res.cookie('refreshToken', result.refreshToken, {
-      ...cookieOptions,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
-
-    // Remember Me now only controls trusted-browser registration (OTP skip on trusted devices)
-    // If Remember Me is checked, register this browser as trusted
-    if (rememberMe) {
-      const { registerTrustedBrowser } = await import('../modules/auth/authService');
-      const userAgent = req.headers['user-agent'] || 'unknown';
-      const trustedBrowserToken = await registerTrustedBrowser(result.user.id, userAgent);
-      
-      res.cookie('trustedBrowser', trustedBrowserToken, {
-        ...cookieOptions,
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
-    } else if (trustedBrowserToken) {
-      // If Remember Me is unchecked and browser was previously trusted, revoke trust
-      const { revokeTrustedBrowser } = await import('../modules/auth/authService');
-      await revokeTrustedBrowser(result.user.id, trustedBrowserToken);
-      res.clearCookie('trustedBrowser', { path: '/' });
-    } else if (result.isTrustedBrowser && trustedBrowserToken) {
-      // Re-issue the trusted browser cookie for existing trusted browsers
-      res.cookie('trustedBrowser', trustedBrowserToken, {
-        ...cookieOptions,
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
-    }
+    applySessionCookies(res, authResult);
 
     res.json(
-      success({
-        user: result.user,
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-      }, 'Login successful')
+      success(
+        {
+          user: authResult.user,
+          ...sessionPayload(authResult),
+        },
+        'Login successful'
+      )
     );
   } catch (err: any) {
     const errorCode = err.code || ErrorCodes.SERVER_ERROR;
@@ -195,9 +336,9 @@ router.post('/login', async (req: Request, res: Response) => {
 });
 
 // Verify login OTP
-router.post('/verify-login-otp', async (req: Request, res: Response) => {
+router.post('/verify-login-otp', tokenValidationLimiter, async (req: Request, res: Response) => {
   try {
-    const { challengeId, otp, rememberMe } = req.body;
+    const { challengeId, otp } = req.body;
 
     if (!challengeId || !otp) {
       return res.status(400).json(
@@ -205,43 +346,20 @@ router.post('/verify-login-otp', async (req: Request, res: Response) => {
       );
     }
 
-    const result = await verifyLoginOtp(challengeId, otp, rememberMe);
+    const result = await verifyLoginOtp(challengeId, otp);
 
     console.log('🟢 Login OTP verified for user:', result.user.email);
 
-    // Set HttpOnly cookies
-    const isProduction = process.env.NODE_ENV === 'production';
-    const cookieOptions = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax' as const,
-      path: '/',
-    };
-
-    res.cookie('accessToken', result.accessToken, {
-      ...cookieOptions,
-      maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000,
-    });
-
-    res.cookie('refreshToken', result.refreshToken, {
-      ...cookieOptions,
-      maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined,
-    });
-
-    // If Remember Me is checked, register this browser as trusted
-    if (rememberMe && result.trustedBrowserToken) {
-      res.cookie('trustedBrowser', result.trustedBrowserToken, {
-        ...cookieOptions,
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      });
-    }
+    applySessionCookies(res, result);
 
     res.json(
-      success({
-        user: result.user,
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-      }, 'Login successful')
+      success(
+        {
+          user: result.user,
+          ...sessionPayload(result),
+        },
+        'Login successful'
+      )
     );
   } catch (err: any) {
     const errorCode = err.code || ErrorCodes.SERVER_ERROR;
@@ -358,42 +476,209 @@ router.post('/resend-login-otp', async (req: Request, res: Response) => {
 });
 
 // Refresh token
-router.post('/refresh', (req: Request, res: Response) => {
-  // For MVP, we'll just require re-login
-  // In production, implement proper refresh token validation
-  res.status(501).json(
-    error(ErrorCodes.SERVER_ERROR, 'Token refresh not implemented')
-  );
+router.post('/refresh', tokenValidationLimiter, async (req: Request, res: Response) => {
+  const role = roleFromRequest(req);
+
+  try {
+    const refreshToken = refreshTokenFromRequest(req, role);
+
+    if (!refreshToken) {
+      return res.status(400).json(
+        error(ErrorCodes.VALIDATION_ERROR, 'Refresh token is required')
+      );
+    }
+
+    const result = await refreshAccessToken(refreshToken);
+
+    const policy = getSessionPolicy(result.role, result.rememberMe);
+    setSessionCookies(
+      res,
+      result.role,
+      { accessToken: result.accessToken, refreshToken: result.refreshToken },
+      policy
+    );
+
+    res.json(
+      success(
+        {
+          user: result.user,
+          ...sessionPayload(result),
+        },
+        'Token refreshed successfully'
+      )
+    );
+  } catch (err: any) {
+    // Clear the stale cookies for this portal so the client stops retrying with
+    // a token that will never work again. Other portal sessions are untouched.
+    clearSessionCookies(res, role || undefined);
+
+    // The response deliberately does not reveal whether the token was revoked,
+    // expired, or otherwise invalid.
+    return res.status(401).json(
+      error(ErrorCodes.UNAUTHORIZED, 'Your session has expired. Please sign in again.')
+    );
+  }
 });
 
-// Logout
+// Logout (scoped to the current portal so other role sessions keep working)
 router.post('/logout', (req: Request, res: Response) => {
-  // Clear authentication cookies only
-  // Do NOT clear trustedBrowser cookie - trust should persist across logout/login cycles (like Facebook)
-  // Users stay logged in on trusted devices even after logging out
-  res.clearCookie('accessToken');
-  res.clearCookie('refreshToken');
-  res.json(
-    success(null, 'Logout successful')
-  );
+  const role = roleFromRequest(req);
+
+  clearSessionCookies(res, role || undefined);
+
+  // Trusted-browser cookies are intentionally preserved: trust is a device
+  // setting and persists across sign-out until it is revoked or expires.
+  res.json(success({ role: role || null }, 'Logout successful'));
 });
 
-// Revoke trusted browser (called when user unchecks Remember Me)
+// List the current user's trusted browsers
+router.get('/trusted-browsers', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    // Flag the row matching this request's trusted-browser cookie so the UI can
+    // label it "This browser". No token or hash value is exposed.
+    const role = roleFromRequest(req) || req.user!.role;
+    const trustedBrowserToken = trustedBrowserTokenFromRequest(req, role);
+    const browsers = await listTrustedBrowsers(
+      req.user!.id,
+      trustedBrowserToken ? hashTrustedBrowserToken(trustedBrowserToken) : undefined
+    );
+    return res.json(success({ browsers }, 'Trusted browsers loaded'));
+  } catch (err) {
+    return res.status(500).json(
+      error(ErrorCodes.SERVER_ERROR, 'Failed to load trusted browsers')
+    );
+  }
+});
+
+// Describe the browser/device making the current request. Used by the
+// post-login trust prompt. No token or secret is returned.
+router.get(
+  '/trusted-browsers/current-device',
+  authenticate,
+  authorize('DOCTOR', 'SECRETARY'),
+  (req: AuthRequest, res: Response) => {
+    return res.json(
+      success(
+        {
+          deviceInfo: deviceInfoFromRequest(req) || null,
+          capturedAt: new Date().toISOString(),
+        },
+        'Current device loaded'
+      )
+    );
+  }
+);
+
+// Trust the current browser after the user has fully authenticated. This
+// upgrades the current short session to the 30-day persistent policy and
+// registers/rotates the trusted-device cookie.
+router.post(
+  '/trusted-browsers/trust-current',
+  authenticate,
+  authorize('DOCTOR', 'SECRETARY'),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (req.user!.mustChangePassword) {
+        return res.status(403).json(
+          error(ErrorCodes.MUST_CHANGE_PASSWORD, 'Password change required')
+        );
+      }
+
+      const role = req.user!.role;
+      const sessionStartMs =
+        Number((req.user as any).sst) ||
+        Number((req.user as any).iat) * 1000 ||
+        Date.now();
+      const existingTrustedBrowserToken = trustedBrowserTokenFromRequest(req, role);
+
+      const result = await trustCurrentBrowser(
+        req.user!.id,
+        deviceInfoFromRequest(req),
+        sessionStartMs,
+        existingTrustedBrowserToken
+      );
+
+      applySessionCookies(res, result);
+
+      return res.json(
+        success(
+          {
+            user: result.user,
+            ...sessionPayload(result),
+          },
+          'Device trusted'
+        )
+      );
+    } catch (err: any) {
+      const errorCode = err.code || ErrorCodes.SERVER_ERROR;
+
+      if (errorCode === ErrorCodes.NOT_FOUND) {
+        return res.status(404).json(error(errorCode, err.message || 'User not found'));
+      }
+
+      if (errorCode === ErrorCodes.FORBIDDEN) {
+        return res.status(403).json(error(errorCode, err.message || 'Insufficient permissions'));
+      }
+
+      return res.status(500).json(
+        error(ErrorCodes.SERVER_ERROR, 'Failed to trust this device')
+      );
+    }
+  }
+);
+
+// Revoke one trusted browser by id
+router.delete('/trusted-browsers/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const revoked = await revokeTrustedBrowserById(req.user!.id, req.params.id);
+
+    if (!revoked) {
+      return res.status(404).json(
+        error(ErrorCodes.NOT_FOUND, 'Trusted browser not found')
+      );
+    }
+
+    return res.json(success({ revoked: true }, 'Trusted browser revoked'));
+  } catch (err) {
+    return res.status(500).json(
+      error(ErrorCodes.SERVER_ERROR, 'Failed to revoke trusted browser')
+    );
+  }
+});
+
+// Revoke every trusted browser and refresh token for the current user
+router.post('/trusted-browsers/revoke-all', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const role = req.user!.role;
+    await revokeAllUserSessions(req.user!.id);
+
+    // Sign this browser out too and drop its trusted-browser cookie.
+    clearSessionCookies(res, role);
+    clearTrustedCookies(res, role);
+
+    return res.json(success(null, 'Signed out of all devices'));
+  } catch (err) {
+    return res.status(500).json(
+      error(ErrorCodes.SERVER_ERROR, 'Failed to sign out of all devices')
+    );
+  }
+});
+
+// Revoke the current trusted browser (also used when the user declines trust)
 router.post('/revoke-trusted-browser', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const trustedBrowserToken = req.cookies.trustedBrowser;
+    const role = roleFromRequest(req) || req.user!.role;
+    const trustedBrowserToken = trustedBrowserTokenFromRequest(req, role);
 
     if (trustedBrowserToken) {
-      const { revokeTrustedBrowser } = await import('../modules/auth/authService');
       await revokeTrustedBrowser(userId, trustedBrowserToken);
     }
 
-    res.clearCookie('trustedBrowser');
-    res.json(
-      success(null, 'Trusted browser revoked')
-    );
-  } catch (err: any) {
+    clearTrustedCookies(res, role);
+
+    res.json(success(null, 'Trusted browser revoked'));
+  } catch (err) {
     res.status(500).json(
       error(ErrorCodes.SERVER_ERROR, 'Failed to revoke trusted browser')
     );
@@ -426,12 +711,45 @@ router.post('/change-password', authenticate, async (req: AuthRequest, res: Resp
       );
     }
 
-    const result = await changePassword(userId, currentPassword, newPassword, mustChangePassword);
+    const sessionStartMs =
+      Number((req.user as any).sst) || Number((req.user as any).iat) * 1000 || Date.now();
+    const session = {
+      rememberMe: req.user!.remember === true,
+      sessionStartMs,
+    };
+
+    const result = await changePassword(
+      userId,
+      currentPassword,
+      newPassword,
+      mustChangePassword,
+      session
+    );
+
+    // A password change revokes every trusted browser and refresh token. Issue a
+    // fresh pair for this browser and drop the now-invalid trust cookie.
+    const policy = getSessionPolicy(result.user.role, result.rememberMe);
+    setSessionCookies(
+      res,
+      result.user.role,
+      { accessToken: result.accessToken, refreshToken: result.refreshToken },
+      policy
+    );
+    clearTrustedCookies(res, result.user.role);
 
     res.json(
-      success({
-        accessToken: result.accessToken,
-      }, 'Password changed successfully')
+      success(
+        {
+          user: result.user,
+          ...sessionPayload({
+            role: result.user.role,
+            rememberMe: result.rememberMe,
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+          }),
+        },
+        'Password changed successfully'
+      )
     );
   } catch (err: any) {
     const errorCode = err.code || ErrorCodes.SERVER_ERROR;
@@ -443,6 +761,10 @@ router.post('/change-password', authenticate, async (req: AuthRequest, res: Resp
 
     if (errorCode === ErrorCodes.NOT_FOUND) {
       return res.status(404).json(error(errorCode, errorMessage));
+    }
+
+    if (errorCode === ErrorCodes.VALIDATION_ERROR) {
+      return res.status(400).json(error(errorCode, errorMessage));
     }
 
     res.status(500).json(error(errorCode, errorMessage));

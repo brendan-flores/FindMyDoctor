@@ -1,11 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import { config } from './config';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { authenticate } from './middleware/auth';
+import { apiLimiter, authLimiter } from './middleware/rateLimit';
 import { pool } from './database/connection';
 import path from 'path';
 
@@ -27,8 +27,10 @@ import visitsRouter from './api/visits';
 import prescriptionsRouter from './api/prescriptions';
 import notificationsRouter from './api/notifications';
 import adminRouter from './api/admin';
+import gcashQrRouter from './api/gcashQr';
 
 const app = express();
+const apiVersion = config.app.apiVersion;
 
 // Security middleware
 app.use(helmet());
@@ -40,12 +42,12 @@ app.use(cors({
 }));
 
 // Rate limiting
-const limiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.maxRequests,
-  message: 'Too many requests from this IP, please try again later.',
-});
-app.use('/api/', limiter);
+// 1. General API budget for normal dashboard navigation.
+// 2. Stricter budget for login/OTP/registration/password-change routes.
+// Health checks and static files are mounted outside /api, so they are not
+// counted against either budget.
+app.use('/api/', apiLimiter);
+app.use(`/api/${apiVersion}`, authLimiter);
 
 // Body parsing
 app.use(express.json());
@@ -100,7 +102,6 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
-const apiVersion = config.app.apiVersion;
 app.use(`/api/${apiVersion}/auth`, authRouter);
 app.use(`/api/${apiVersion}/auth/otp`, otpRouter);
 app.use(`/api/${apiVersion}/auth/patient/otp`, patientOtpRouter);
@@ -120,6 +121,7 @@ app.use(`/api/${apiVersion}/payments`, authenticate, paymentsRouter);
 app.use(`/api/${apiVersion}/visits`, authenticate, visitsRouter);
 app.use(`/api/${apiVersion}/prescriptions`, authenticate, prescriptionsRouter);
 app.use(`/api/${apiVersion}/notifications`, authenticate, notificationsRouter);
+app.use(`/api/${apiVersion}/gcash-qr`, authenticate, gcashQrRouter);
 app.use(`/api/${apiVersion}/admin`, authenticate, adminRouter);
 
 // Error handling
@@ -147,10 +149,11 @@ async function testDatabaseConnection() {
 // Start server only after database connection test
 testDatabaseConnection().then((connected) => {
   if (connected) {
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`FindMyDoctor API server running on port ${PORT}`);
       console.log(`Environment: ${config.app.env}`);
       console.log(`API version: ${apiVersion}`);
+      console.log(`Accepting connections from all network interfaces`);
     });
   } else {
     console.error('Server not started due to database connection failure');

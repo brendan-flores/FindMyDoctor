@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, type GetOptions } from './apiClient';
 
 // Patient interface (schema verified from 001_initial_schema.sql)
 export interface Patient {
@@ -165,8 +165,8 @@ export interface QueueEntry {
 
 export const secretaryApi = {
   // Get secretary profile (includes assigned doctor_id)
-  getProfile: async (): Promise<{ success: boolean; data?: SecretaryProfile; error?: string }> => {
-    return apiClient.get<SecretaryProfile>('/secretaries/me');
+  getProfile: async (options?: GetOptions): Promise<{ success: boolean; data?: SecretaryProfile; error?: string }> => {
+    return apiClient.get<SecretaryProfile>('/secretaries/me', options);
   },
 
   // Search patients (by email, phone, firstName, lastName)
@@ -253,7 +253,95 @@ export const secretaryApi = {
   markNotPresent: async (queueId: string): Promise<{ success: boolean; error?: string }> => {
     return apiClient.post<void>(`/queue/${queueId}/not-present`, {});
   },
+
+  // Payments: list payments for secretary (filtered by assigned doctor)
+  getPayments: async (status?: string): Promise<{ success: boolean; data?: Payment[]; error?: string }> => {
+    const queryParams = status ? `?status=${encodeURIComponent(status)}` : '';
+    return apiClient.get<Payment[]>(`/payments${queryParams}`);
+  },
+
+  // Payments: get payment by appointment ID
+  getPayment: async (appointmentId: string): Promise<{ success: boolean; data?: Payment; error?: string }> => {
+    return apiClient.get<Payment>(`/payments/${appointmentId}`);
+  },
+
+  // Payments: verify payment (by payment ID)
+  verifyPayment: async (id: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/payments/${id}/verify`, {});
+  },
+
+  // Payments: reject payment (by payment ID)
+  rejectPayment: async (id: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/payments/${id}/reject`, {});
+  },
+
+  // Payments: mark as paid (for cash payments, by payment ID)
+  markAsPaid: async (id: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/payments/${id}/mark-paid`, {});
+  },
+
+  // Payments: get signed receipt URL (by payment ID)
+  getSignedReceiptUrl: async (id: string): Promise<{ success: boolean; data?: { signedUrl: string }; error?: string }> => {
+    return apiClient.get<{ signedUrl: string }>(`/payments/${id}/receipt-url`);
+  },
+
+  // Payments: add charge to payment (by payment ID)
+  addCharge: async (paymentId: string, description: string, amount: number): Promise<{ success: boolean; data?: PaymentCharge; error?: string }> => {
+    return apiClient.post<PaymentCharge>(`/payments/${paymentId}/charges`, { description, amount });
+  },
+
+  // Payments: delete charge from payment (by payment ID and charge ID)
+  deleteCharge: async (paymentId: string, chargeId: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.delete<void>(`/payments/${paymentId}/charges/${chargeId}`);
+  },
+
+  // Get secretary dashboard summary
+  getDashboard: async (date?: string, options?: GetOptions): Promise<{ success: boolean; data?: SecretaryDashboard; error?: string }> => {
+    const queryParams = date ? `?date=${encodeURIComponent(date)}` : '';
+    return apiClient.get<SecretaryDashboard>(`/secretaries/me/dashboard${queryParams}`, options);
+  },
 };
+
+// Payment charge (from payment_charges table)
+export interface PaymentCharge {
+  id: string;
+  payment_id: string;
+  description: string;
+  amount: number;
+  created_at: string;
+  created_by?: string | null;
+  created_by_first_name?: string | null;
+  created_by_last_name?: string | null;
+}
+
+// Payment (from payments table with joined patient/appointment/verifier data)
+export interface Payment {
+  id: string;
+  appointment_id: string;
+  patient_id: string;
+  status: 'UNPAID' | 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED';
+  payment_method: string;
+  receipt_url?: string | null;
+  consultation_amount: number;
+  total_additional_charges: number;
+  total_amount: number;
+  created_at: string;
+  updated_at: string;
+  verified_by?: string | null;
+  verified_at?: string | null;
+  // Patient details (joined)
+  patient_first_name?: string;
+  patient_last_name?: string;
+  patient_phone?: string;
+  // Verifier details (joined)
+  verified_by_first_name?: string | null;
+  verified_by_last_name?: string | null;
+  // Appointment details (joined)
+  appointment_date?: string;
+  reason_for_visit?: string;
+  // Nested charges
+  charges?: PaymentCharge[];
+}
 
 // Conversation list entry (matches GET /conversations response shape)
 export interface Conversation {
@@ -354,3 +442,43 @@ export const conversationApi = {
     return apiClient.get<AppointmentSummary>(`/conversations/patient/${patientId}/appointment-summary`);
   },
 };
+
+export interface SecretaryDashboard {
+  date: string;
+  queueCounts: {
+    waiting: number;
+    inConsultation: number;
+    done: number;
+  };
+  capacity: {
+    remaining: number;
+    total: number;
+  };
+  pendingVerificationPayments: number;
+  unreadMessages: number;
+  todayQueue: Array<{
+    queueNumber: number;
+    patientName: string;
+    reason: string | null;
+    status: string;
+    appointmentId: string | null;
+    registrationSource: 'ONLINE' | 'WALK_IN';
+  }>;
+  paymentsNeedingAction: Array<{
+    id: string;
+    appointmentId: string;
+    status: string;
+    paymentMethod: string;
+    totalAmount: number;
+    patientName: string;
+    appointmentDate: string;
+    appointmentStatus: string;
+  }>;
+  recentConversations: Array<{
+    id: string | null;
+    patientId: string;
+    patientName: string;
+    unreadCount: number;
+    updatedAt: string | null;
+  }>;
+}
