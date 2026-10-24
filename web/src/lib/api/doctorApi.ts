@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, type GetOptions } from './apiClient';
 
 export interface DoctorProfile {
   id: string;
@@ -144,8 +144,8 @@ export interface Visit {
 
 export const doctorApi = {
   // Get current doctor's profile
-  getProfile: async (): Promise<{ success: boolean; data?: DoctorProfile; error?: string }> => {
-    return apiClient.get<DoctorProfile>('/doctors/me');
+  getProfile: async (options?: GetOptions): Promise<{ success: boolean; data?: DoctorProfile; error?: string }> => {
+    return apiClient.get<DoctorProfile>('/doctors/me', options);
   },
 
   // Update doctor's professional profile
@@ -159,8 +159,8 @@ export const doctorApi = {
   },
 
   // Get doctor's schedules
-  getSchedules: async (): Promise<{ success: boolean; data?: any[]; error?: string }> => {
-    return apiClient.get<any[]>('/doctors/me/schedules');
+  getSchedules: async (options?: GetOptions): Promise<{ success: boolean; data?: any[]; error?: string }> => {
+    return apiClient.get<any[]>('/doctors/me/schedules', options);
   },
 
   // Create a new schedule
@@ -214,9 +214,9 @@ export const doctorApi = {
   },
 
   // Get doctor dashboard summary
-  getDashboard: async (date?: string): Promise<{ success: boolean; data?: DoctorDashboard; error?: string }> => {
+  getDashboard: async (date?: string, options?: GetOptions): Promise<{ success: boolean; data?: DoctorDashboard; error?: string }> => {
     const queryParams = date ? `?date=${encodeURIComponent(date)}` : '';
-    return apiClient.get<DoctorDashboard>(`/doctors/me/dashboard${queryParams}`);
+    return apiClient.get<DoctorDashboard>(`/doctors/me/dashboard${queryParams}`, options);
   },
 };
 

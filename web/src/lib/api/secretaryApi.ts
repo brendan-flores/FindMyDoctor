@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, type GetOptions } from './apiClient';
 
 // Patient interface (schema verified from 001_initial_schema.sql)
 export interface Patient {
@@ -165,8 +165,8 @@ export interface QueueEntry {
 
 export const secretaryApi = {
   // Get secretary profile (includes assigned doctor_id)
-  getProfile: async (): Promise<{ success: boolean; data?: SecretaryProfile; error?: string }> => {
-    return apiClient.get<SecretaryProfile>('/secretaries/me');
+  getProfile: async (options?: GetOptions): Promise<{ success: boolean; data?: SecretaryProfile; error?: string }> => {
+    return apiClient.get<SecretaryProfile>('/secretaries/me', options);
   },
 
   // Search patients (by email, phone, firstName, lastName)
@@ -296,9 +296,9 @@ export const secretaryApi = {
   },
 
   // Get secretary dashboard summary
-  getDashboard: async (date?: string): Promise<{ success: boolean; data?: SecretaryDashboard; error?: string }> => {
+  getDashboard: async (date?: string, options?: GetOptions): Promise<{ success: boolean; data?: SecretaryDashboard; error?: string }> => {
     const queryParams = date ? `?date=${encodeURIComponent(date)}` : '';
-    return apiClient.get<SecretaryDashboard>(`/secretaries/me/dashboard${queryParams}`);
+    return apiClient.get<SecretaryDashboard>(`/secretaries/me/dashboard${queryParams}`, options);
   },
 };
 

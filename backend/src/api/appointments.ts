@@ -2,10 +2,22 @@ import { Router, Response } from 'express';
 import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requirePasswordChange } from '../middleware/auth';
-import { calculateAvailability } from '../modules/availability/availabilityService';
+import { calculateAvailability, invalidateAvailabilityCache } from '../modules/availability/availabilityService';
 import { toClinicDateString } from '../utils/date';
 
 const router = Router();
+
+// Creating, cancelling or rescheduling an appointment changes availability.
+router.use((req, res, next) => {
+  if (req.method !== 'GET') {
+    res.on('finish', () => {
+      if (res.statusCode < 400) {
+        invalidateAvailabilityCache();
+      }
+    });
+  }
+  next();
+});
 
 // Valid sex values
 const VALID_SEX_VALUES = ['MALE', 'FEMALE', 'OTHER', 'NOT_SPECIFIED'];
