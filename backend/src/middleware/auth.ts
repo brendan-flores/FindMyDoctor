@@ -10,7 +10,67 @@ export interface AuthRequest extends Request {
     email: string;
     role: string;
     mustChangePassword: boolean;
+    sessionVersion?: number;
+    remember?: boolean;
+    sst?: number;
+    iat?: number;
   };
+}
+
+const ROLE_PREFIX_TO_EXPECTED_ROLE: Record<string, string> = {
+  doctor: 'DOCTOR',
+  secretary: 'SECRETARY',
+  admin: 'ADMIN',
+  patient: 'PATIENT',
+};
+
+/**
+ * Resolve the portal role for this request from the API path or the
+ * X-Portal-Role header sent by the web client. This lets the middleware pick
+ * the correct role-scoped cookie when Doctor, Secretary, and Admin sessions
+ * coexist in one browser.
+ */
+function resolveRolePrefix(req: Request): string {
+  // Shared sub-resources under a role-named namespace are not portal-specific.
+  // /doctors/:id/availability is consumed by both PATIENT tokens (the mobile
+  // booking journey reads doctor availability) and DOCTOR tokens, so forcing
+  // the DOCTOR portal on that path would 401 valid patient tokens.
+  // Doctor-only routes remain protected by authorize('DOCTOR') downstream.
+  const fullPath = (req.originalUrl || req.baseUrl || req.path || '')
+    .split('?')[0]
+    .toLowerCase();
+  const sharedResource = fullPath.split('/').filter(Boolean).slice(2).join('/');
+  if (/^doctors?\/[^/]+\/availability$/.test(sharedResource)) {
+    return '';
+  }
+
+  // Role-namespaced API paths are authoritative, so a spoofed X-Portal-Role
+  // header cannot weaken the cross-role check. Shared resource paths such as
+  // /patients/:id, /prescriptions/patients/:id, and /visits/patient/:id are
+  // used by more than one portal, so they must use the client's header rather
+  // than assuming the PATIENT role from the path.
+  const candidates = [req.baseUrl || '', req.originalUrl || '', req.path || ''];
+  for (const candidate of candidates) {
+    const path = candidate.split('?')[0].toLowerCase();
+    if (path.startsWith('/api/')) {
+      // Role-namespaced mounts are authoritative. Anchor the role name to the
+      // mount namespace (the segment after the API version) so secretary-only
+      // sub-resource paths such as /gcash-qr/doctor/:id are not misread as the
+      // DOCTOR portal (that mismatch would 401 valid secretary tokens).
+      const segments = path.split('/').filter(Boolean);
+      const namespace = segments[2] ?? '';
+      if (/^doctors?$/.test(namespace)) return 'doctor';
+      if (/^secret(?:ary|aries)$/.test(namespace)) return 'secretary';
+      if (/^admin$/.test(namespace)) return 'admin';
+    }
+  }
+
+  const headerRole = String(req.headers['x-portal-role'] || '').toLowerCase();
+  if (['doctor', 'secretary', 'admin', 'patient'].includes(headerRole)) {
+    return headerRole;
+  }
+
+  return '';
 }
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
@@ -27,10 +87,27 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     }
 
     if (!token) {
-      // Fall back to cookie
-      const cookieToken = req.cookies?.accessToken;
-      if (cookieToken && cookieToken !== 'undefined' && cookieToken !== 'null') {
-        token = cookieToken;
+      const rolePrefix = resolveRolePrefix(req);
+
+      // Try the role-scoped cookie for this portal first.
+      const cookieNames = rolePrefix
+        ? [`${rolePrefix}_accessToken`]
+        : ['doctor_accessToken', 'secretary_accessToken', 'admin_accessToken', 'patient_accessToken'];
+
+      for (const cookieName of cookieNames) {
+        const cookieToken = req.cookies?.[cookieName];
+        if (cookieToken && cookieToken !== 'undefined' && cookieToken !== 'null') {
+          token = cookieToken;
+          break;
+        }
+      }
+
+      // Fallback to the legacy global cookie for backward compatibility.
+      if (!token) {
+        const globalCookieToken = req.cookies?.accessToken;
+        if (globalCookieToken && globalCookieToken !== 'undefined' && globalCookieToken !== 'null') {
+          token = globalCookieToken;
+        }
       }
     }
 
@@ -45,11 +122,34 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
       email: string;
       role: string;
       mustChangePassword: boolean;
+      sv?: number;
+      remember?: boolean;
     };
 
-    req.user = decoded;
+    // Never let a cookie from one portal authenticate another portal.
+    const rolePrefix = resolveRolePrefix(req);
+    const expectedRole = rolePrefix ? ROLE_PREFIX_TO_EXPECTED_ROLE[rolePrefix] : '';
+    if (expectedRole) {
+      const roleMatches = expectedRole === 'ADMIN'
+        ? decoded.role === 'ADMIN' || decoded.role === 'SUPERADMIN'
+        : decoded.role === expectedRole;
+      if (!roleMatches) {
+        console.warn('Rejected cross-role token', { path: req.originalUrl, ip: req.ip });
+        return res.status(401).json(
+          error(ErrorCodes.UNAUTHORIZED, 'Invalid or expired token')
+        );
+      }
+    }
+
+    req.user = {
+      ...decoded,
+      sessionVersion: decoded.sv,
+      remember: decoded.remember === true,
+    };
     next();
   } catch (err) {
+    // Never log the token value.
+    console.warn('Auth token validation failed', { path: req.originalUrl, ip: req.ip });
     return res.status(401).json(
       error(ErrorCodes.UNAUTHORIZED, 'Invalid or expired token')
     );

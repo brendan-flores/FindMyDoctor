@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import path from 'path';
 import { config } from '../config';
-import { toClinicDateString } from '../utils/date';
+import { toClinicDateString, getClinicDate } from '../utils/date';
 import { uploadDoctorPhoto, deleteDoctorPhoto, replaceDoctorPhoto, validateImageFile } from '../services/storageService';
 
 const router = Router();
@@ -523,17 +523,8 @@ router.get('/:id/availability', authenticate, async (req: AuthRequest, res: Resp
         patientId = patientResult.rows[0].id;
       }
 
-      // Restrict patients to current week only
-      const now = new Date();
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
-
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
-
-      // Override request parameters to this week
-      req.query.startDate = toClinicDateString(startOfWeek);
-      req.query.endDate = toClinicDateString(endOfWeek);
+      // Allow patients to see availability for the requested date range
+      // Don't restrict to current week - let them browse through weeks
     }
 
     if (date) {
@@ -543,22 +534,6 @@ router.get('/:id/availability', authenticate, async (req: AuthRequest, res: Resp
     } else if (startDate && endDate) {
       // Get availability for a date range
       const availabilityRange = await calculateAvailabilityRange(id, String(startDate), String(endDate), patientId);
-
-      // For patients, filter to only show 7 days (this week)
-      if (role === 'PATIENT' && availabilityRange.dates) {
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
-
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
-
-        // Filter dates to only include this week
-        availabilityRange.dates = availabilityRange.dates.filter((d: any) => {
-          const date = new Date(d.date);
-          return date >= startOfWeek && date <= endOfWeek;
-        });
-      }
 
       res.json(success(availabilityRange));
     } else {
@@ -1056,6 +1031,168 @@ router.put('/me/two-factor', authenticate, authorize('DOCTOR'), async (req: Auth
   } catch (err: any) {
     console.error('Doctor 2FA setting update error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update two-factor setting'));
+  }
+});
+
+// ============================================
+// DOCTOR DASHBOARD ENDPOINT
+// ============================================
+
+// Get doctor dashboard summary
+router.get('/me/dashboard', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { date } = req.query;
+    const userId = req.user!.id;
+
+    // Get doctor_id from authenticated user
+    const doctorResult = await query(
+      'SELECT id FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+
+    // Use provided date or default to clinic date
+    const targetDate = date ? String(date) : getClinicDate();
+
+    // Get capacity for today
+    const capacity = await calculateCapacity(doctorId, targetDate);
+
+    // Get today's appointment counts
+    const appointmentCountsResult = await query(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'COMPLETED') as completed,
+         COUNT(*) FILTER (WHERE status = 'SCHEDULED' OR status = 'CONFIRMED' OR status = 'IN_PROGRESS') as waiting,
+         COUNT(*) FILTER (WHERE status = 'CANCELLED') as cancelled
+       FROM appointments
+       WHERE doctor_id = $1 AND DATE(appointment_date) = $2`,
+      [doctorId, targetDate]
+    );
+
+    const appointmentCounts = appointmentCountsResult.rows[0];
+
+    // Get next patient (first waiting patient)
+    const nextPatientResult = await query(
+      `SELECT q.queue_number, p.first_name, p.last_name, q.appointment_id
+       FROM queue_entries q
+       JOIN patients p ON q.patient_id = p.id
+       WHERE q.doctor_id = $1 AND q.queue_date = $2 AND q.status = 'WAITING'
+       ORDER BY q.queue_number ASC
+       LIMIT 1`,
+      [doctorId, targetDate]
+    );
+
+    const nextPatient = nextPatientResult.rows.length > 0 ? nextPatientResult.rows[0] : null;
+
+    // Get today's queue
+    const queueResult = await query(
+      `SELECT q.queue_number, p.first_name, p.last_name, a.reason_for_visit, q.status, q.appointment_id
+       FROM queue_entries q
+       JOIN patients p ON q.patient_id = p.id
+       LEFT JOIN appointments a ON q.appointment_id = a.id
+       WHERE q.doctor_id = $1 AND q.queue_date = $2
+       ORDER BY q.queue_number ASC`,
+      [doctorId, targetDate]
+    );
+
+    // Get upcoming appointments (next 7 days, excluding today)
+    const upcomingDate = new Date(targetDate);
+    upcomingDate.setDate(upcomingDate.getDate() + 7);
+    const upcomingEndDate = toClinicDateString(upcomingDate);
+
+    const upcomingResult = await query(
+      `SELECT a.appointment_date, p.first_name, p.last_name, a.reason_for_visit, a.status, q.queue_number
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       LEFT JOIN queue_entries q ON a.id = q.appointment_id
+       WHERE a.doctor_id = $1
+         AND DATE(a.appointment_date) > $2
+         AND DATE(a.appointment_date) <= $3
+         AND a.status NOT IN ('CANCELLED', 'NO_SHOW')
+       ORDER BY a.appointment_date ASC`,
+      [doctorId, targetDate, upcomingEndDate]
+    );
+
+    // Get today's schedule (working hours, breaks, exceptions)
+    const scheduleDate = new Date(targetDate);
+    const dayOfWeek = scheduleDate.getDay();
+
+    const workingHoursResult = await query(
+      `SELECT start_time, end_time FROM doctor_schedules
+       WHERE doctor_id = $1 AND day_of_week = $2 AND is_active = true
+       ORDER BY start_time`,
+      [doctorId, dayOfWeek]
+    );
+
+    const breaksResult = await query(
+      `SELECT start_time, end_time FROM doctor_break_periods
+       WHERE doctor_id = $1 AND break_date = $2 AND is_active = true
+       ORDER BY start_time`,
+      [doctorId, targetDate]
+    );
+
+    const exceptionsResult = await query(
+      `SELECT start_date, end_date, reason FROM doctor_unavailability
+       WHERE doctor_id = $1 AND is_active = true
+         AND start_date <= $2 AND end_date >= $2`,
+      [doctorId, targetDate]
+    );
+
+    res.json(success({
+      date: targetDate,
+      appointmentCounts: {
+        completed: parseInt(appointmentCounts.completed) || 0,
+        waiting: parseInt(appointmentCounts.waiting) || 0,
+        cancelled: parseInt(appointmentCounts.cancelled) || 0,
+      },
+      capacity: {
+        used: capacity.registered_count,
+        total: capacity.final_capacity,
+        remaining: capacity.remaining_capacity,
+      },
+      nextPatient: nextPatient ? {
+        queueNumber: nextPatient.queue_number,
+        patientName: `${nextPatient.first_name} ${nextPatient.last_name}`,
+        appointmentId: nextPatient.appointment_id,
+      } : null,
+      todayQueue: queueResult.rows.map(row => ({
+        queueNumber: row.queue_number,
+        patientName: `${row.first_name} ${row.last_name}`,
+        reason: row.reason_for_visit,
+        status: row.status,
+        appointmentId: row.appointment_id,
+      })),
+      upcomingAppointments: upcomingResult.rows.map(row => ({
+        date: row.appointment_date,
+        patientName: `${row.first_name} ${row.last_name}`,
+        reason: row.reason_for_visit,
+        status: row.status,
+        queueNumber: row.queue_number,
+      })),
+      todaySchedule: {
+        workingHours: workingHoursResult.rows.map(row => ({
+          start: row.start_time,
+          end: row.end_time,
+        })),
+        breaks: breaksResult.rows.map(row => ({
+          start: row.start_time,
+          end: row.end_time,
+        })),
+        hasException: exceptionsResult.rows.length > 0,
+        exception: exceptionsResult.rows.length > 0 ? {
+          startDate: exceptionsResult.rows[0].start_date,
+          endDate: exceptionsResult.rows[0].end_date,
+          reason: exceptionsResult.rows[0].reason,
+        } : null,
+      },
+    }));
+  } catch (err: any) {
+    console.error('Doctor dashboard error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch doctor dashboard'));
   }
 });
 

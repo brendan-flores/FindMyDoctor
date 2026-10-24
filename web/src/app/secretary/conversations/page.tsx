@@ -36,7 +36,7 @@ export default function SecretaryConversations() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const userStr = localStorage.getItem('user');
+        const userStr = localStorage.getItem('secretary_user') || localStorage.getItem('user');
         if (userStr) {
           const user = JSON.parse(userStr);
           if (user?.id) {

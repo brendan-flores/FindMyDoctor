@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { secretaryApi, Payment, PaymentCharge } from '@/lib/api/secretaryApi';
+import Toast from '@/components/ui/Toast';
 
-type TabType = 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED';
+type TabType = 'UNPAID' | 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED';
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING_VERIFICATION: 'Pending',
@@ -21,11 +22,12 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function SecretaryPayments() {
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [activeTab, setActiveTab] = useState<TabType>('PENDING_VERIFICATION');
+  const [activeTab, setActiveTab] = useState<TabType>('UNPAID');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showVerifyDialog, setShowVerifyDialog] = useState(false);
@@ -35,7 +37,13 @@ export default function SecretaryPayments() {
   const [receiptImageError, setReceiptImageError] = useState(false);
   const [receiptSignedUrl, setReceiptSignedUrl] = useState<string | null>(null);
   const [isFetchingReceiptUrl, setIsFetchingReceiptUrl] = useState(false);
-  const [paymentCounts, setPaymentCounts] = useState({ pending: 0, verified: 0, rejected: 0 });
+  const [paymentCounts, setPaymentCounts] = useState({ unpaid: 0, pending: 0, verified: 0, rejected: 0 });
+  const [showAddChargeModal, setShowAddChargeModal] = useState(false);
+  const [showDeleteChargeDialog, setShowDeleteChargeDialog] = useState(false);
+  const [chargeToDelete, setChargeToDelete] = useState<PaymentCharge | null>(null);
+  const [chargeDescription, setChargeDescription] = useState('');
+  const [chargeAmount, setChargeAmount] = useState('');
+  const [chargeFormError, setChargeFormError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPayments();
@@ -44,24 +52,26 @@ export default function SecretaryPayments() {
 
   const fetchPayments = async () => {
     setLoading(true);
-    setError(null);
 
     const response = await secretaryApi.getPayments(activeTab);
     if (response.success && response.data) {
       setPayments(response.data);
     } else {
-      setError(response.error || 'Failed to fetch payments');
+      setToastMessage(response.error || 'Failed to fetch payments');
+      setToastType('error');
+      setShowToast(true);
     }
     setLoading(false);
   };
 
   const fetchPaymentCounts = async () => {
-    const statuses: TabType[] = ['PENDING_VERIFICATION', 'PAID', 'REJECTED'];
-    const counts = { pending: 0, verified: 0, rejected: 0 };
+    const statuses: TabType[] = ['UNPAID', 'PENDING_VERIFICATION', 'PAID', 'REJECTED'];
+    const counts = { unpaid: 0, pending: 0, verified: 0, rejected: 0 };
 
     for (const status of statuses) {
       const response = await secretaryApi.getPayments(status);
       if (response.success && response.data) {
+        if (status === 'UNPAID') counts.unpaid = response.data.length;
         if (status === 'PENDING_VERIFICATION') counts.pending = response.data.length;
         if (status === 'PAID') counts.verified = response.data.length;
         if (status === 'REJECTED') counts.rejected = response.data.length;
@@ -73,40 +83,161 @@ export default function SecretaryPayments() {
 
   const handleVerify = async (paymentId: string) => {
     setActionLoading(true);
-    setError(null);
-    setSuccess(null);
 
     const response = await secretaryApi.verifyPayment(paymentId);
 
     if (response.success) {
-      setSuccess('Payment verified successfully');
+      setToastMessage('Payment verified successfully');
+      setToastType('success');
+      setShowToast(true);
       setShowVerifyDialog(false);
       setShowDetailsModal(false);
       fetchPayments();
       fetchPaymentCounts();
     } else {
-      setError(response.error || 'Failed to verify payment');
+      setToastMessage(response.error || 'Failed to verify payment');
+      setToastType('error');
+      setShowToast(true);
     }
     setActionLoading(false);
   };
 
   const handleReject = async (paymentId: string) => {
     setActionLoading(true);
-    setError(null);
-    setSuccess(null);
 
     const response = await secretaryApi.rejectPayment(paymentId);
 
     if (response.success) {
-      setSuccess('Payment rejected successfully');
+      setToastMessage('Payment rejected successfully');
+      setToastType('success');
+      setShowToast(true);
       setShowRejectDialog(false);
       setShowDetailsModal(false);
       fetchPayments();
       fetchPaymentCounts();
     } else {
-      setError(response.error || 'Failed to reject payment');
+      setToastMessage(response.error || 'Failed to reject payment');
+      setToastType('error');
+      setShowToast(true);
     }
     setActionLoading(false);
+  };
+
+  const handleMarkAsPaid = async (paymentId: string) => {
+    setActionLoading(true);
+
+    const response = await secretaryApi.markAsPaid(paymentId);
+
+    if (response.success) {
+      setToastMessage('Payment marked as paid successfully');
+      setToastType('success');
+      setShowToast(true);
+      setShowDetailsModal(false);
+      fetchPayments();
+      fetchPaymentCounts();
+    } else {
+      setToastMessage(response.error || 'Failed to mark payment as paid');
+      setToastType('error');
+      setShowToast(true);
+    }
+    setActionLoading(false);
+  };
+
+  const handleAddCharge = async () => {
+    if (!selectedPayment) return;
+
+    // Validate inputs
+    const trimmedDescription = chargeDescription.trim();
+    if (!trimmedDescription) {
+      setChargeFormError('Description is required');
+      return;
+    }
+
+    const numAmount = parseFloat(chargeAmount);
+    if (isNaN(numAmount) || !isFinite(numAmount) || numAmount <= 0) {
+      setChargeFormError('Amount must be a valid positive number');
+      return;
+    }
+
+    setActionLoading(true);
+    setToastMessage('');
+    setToastType('success');
+    setChargeFormError(null);
+
+    try {
+      const response = await secretaryApi.addCharge(selectedPayment.id, trimmedDescription, numAmount);
+
+      if (response.success) {
+        setToastMessage('Charge added successfully');
+        setShowToast(true);
+        setShowAddChargeModal(false);
+        setChargeDescription('');
+        setChargeAmount('');
+
+        // Refresh payment list and counts with error handling
+        try {
+          await Promise.all([
+            fetchPayments(),
+            fetchPaymentCounts(),
+          ]);
+        } catch (refreshError) {
+          setToastMessage('Charge added but failed to refresh payment list and counts');
+          setToastType('error');
+          setShowToast(true);
+        }
+      } else {
+        setToastMessage(response.error || 'Failed to add charge');
+        setToastType('error');
+        setShowToast(true);
+      }
+    } catch (error) {
+      setToastMessage('Failed to add charge');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteCharge = async () => {
+    if (!selectedPayment || !chargeToDelete) return;
+
+    setActionLoading(true);
+    setToastMessage('');
+    setToastType('success');
+
+    try {
+      const response = await secretaryApi.deleteCharge(selectedPayment.id, chargeToDelete.id);
+
+      if (response.success) {
+        setToastMessage('Charge deleted successfully');
+        setShowToast(true);
+        setShowDeleteChargeDialog(false);
+        setChargeToDelete(null);
+
+        // Refresh payment list and counts with error handling
+        try {
+          await Promise.all([
+            fetchPayments(),
+            fetchPaymentCounts(),
+          ]);
+        } catch (refreshError) {
+          setToastMessage('Charge deleted but failed to refresh payment list and counts');
+          setToastType('error');
+          setShowToast(true);
+        }
+      } else {
+        setToastMessage(response.error || 'Failed to delete charge');
+        setToastType('error');
+        setShowToast(true);
+      }
+    } catch (error) {
+      setToastMessage('Failed to delete charge');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleViewReceipt = async (paymentId: string) => {
@@ -121,7 +252,9 @@ export default function SecretaryPayments() {
       setReceiptSignedUrl(response.data.signedUrl);
       setShowReceiptModal(true);
     } else {
-      setError(response.error || 'Failed to load receipt');
+      setToastMessage(response.error || 'Failed to load receipt');
+      setToastType('error');
+      setShowToast(true);
       setReceiptImageError(true);
     }
     setIsFetchingReceiptUrl(false);
@@ -148,6 +281,20 @@ export default function SecretaryPayments() {
     return `₱${numAmount.toFixed(2)}`;
   };
 
+  const calculateTotal = (payment: Payment) => {
+    const consultationFee = typeof payment.consultation_amount === 'string'
+      ? parseFloat(payment.consultation_amount)
+      : payment.consultation_amount;
+    const totalCharges = payment.charges?.reduce((sum, charge) => {
+      const chargeAmount = typeof charge.amount === 'string'
+        ? parseFloat(charge.amount)
+        : charge.amount;
+      return sum + (isNaN(chargeAmount) ? 0 : chargeAmount);
+    }, 0) || 0;
+    return consultationFee + totalCharges;
+  };
+
+  const unpaidCount = paymentCounts.unpaid;
   const pendingCount = paymentCounts.pending;
   const verifiedCount = paymentCounts.verified;
   const rejectedCount = paymentCounts.rejected;
@@ -156,27 +303,19 @@ export default function SecretaryPayments() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-        <h1 className="text-lg font-bold text-slate-900">Payments</h1>
-        <p className="text-xs text-slate-500 mt-0.5">Verify and manage patient payments</p>
-      </div>
-
-      {/* Error/Success Messages */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm">
-          {success}
-        </div>
-      )}
-
       {/* Tabs */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <nav className="flex overflow-x-auto gap-1 p-2 border-b border-slate-200">
+          <button
+            onClick={() => setActiveTab('UNPAID')}
+            className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors ${
+              activeTab === 'UNPAID'
+                ? 'bg-[#1b5eb8] text-white'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            Unpaid ({unpaidCount})
+          </button>
           <button
             onClick={() => setActiveTab('PENDING_VERIFICATION')}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors ${
@@ -233,7 +372,9 @@ export default function SecretaryPayments() {
               <span className="material-symbols-outlined text-5xl text-slate-300 mb-3">receipt_long</span>
               <p className="text-slate-600 font-medium">No {STATUS_LABELS[activeTab].toLowerCase()} payments</p>
               <p className="text-xs text-slate-500 mt-1">
-                {activeTab === 'PENDING_VERIFICATION'
+                {activeTab === 'UNPAID'
+                  ? 'Payments without receipts will appear here'
+                  : activeTab === 'PENDING_VERIFICATION'
                   ? 'Payments awaiting verification will appear here'
                   : activeTab === 'PAID'
                   ? 'Verified payments will appear here'
@@ -272,11 +413,11 @@ export default function SecretaryPayments() {
                         )}
                         <div className="flex items-center gap-2">
                           <span className="material-symbols-outlined text-[16px] text-slate-400">payments</span>
-                          <span>{payment.payment_method || 'GCash'}</span>
+                          <span>{payment.payment_method}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="material-symbols-outlined text-[16px] text-slate-400">schedule</span>
-                          <span>Uploaded {formatDate(payment.created_at)}</span>
+                          <span>{payment.status === 'UNPAID' ? 'Created' : 'Uploaded'} {formatDate(payment.created_at)}</span>
                         </div>
                       </div>
                     </div>
@@ -341,29 +482,51 @@ export default function SecretaryPayments() {
                       <span className="text-slate-900">{selectedPayment.reason_for_visit}</span>
                     </div>
                   )}
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Payment Method:</span>
+                    <span className="text-slate-900">{selectedPayment.payment_method}</span>
+                  </div>
                 </div>
               </div>
 
               {/* Receipt */}
-              {selectedPayment.receipt_url && (
+              {selectedPayment.payment_method === 'GCASH' ? (
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900 mb-3">Payment Receipt</h3>
                   <div className="bg-slate-50 rounded-lg p-4">
-                    <button
-                      onClick={() => handleViewReceipt(selectedPayment.id)}
-                      disabled={isFetchingReceiptUrl}
-                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">visibility</span>
-                      {isFetchingReceiptUrl ? 'Loading...' : 'View Receipt'}
-                    </button>
+                    {selectedPayment.receipt_url ? (
+                      <button
+                        onClick={() => handleViewReceipt(selectedPayment.id)}
+                        disabled={isFetchingReceiptUrl}
+                        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">visibility</span>
+                        {isFetchingReceiptUrl ? 'Loading...' : 'View Receipt'}
+                      </button>
+                    ) : (
+                      <p className="text-sm text-slate-600 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-amber-500">warning</span>
+                        No receipt uploaded yet
+                      </p>
+                    )}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Charges Breakdown */}
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-3">Charges Breakdown</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-slate-900">Charges Breakdown</h3>
+                  {(selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && (
+                    <button
+                      onClick={() => setShowAddChargeModal(true)}
+                      disabled={actionLoading}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                    >
+                      + Add Charge
+                    </button>
+                  )}
+                </div>
                 <div className="bg-slate-50 rounded-lg p-4 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-600">Consultation Fee:</span>
@@ -372,16 +535,39 @@ export default function SecretaryPayments() {
                   {selectedPayment.charges && selectedPayment.charges.length > 0 && (
                     <>
                       {selectedPayment.charges.map((charge: PaymentCharge) => (
-                        <div key={charge.id} className="flex justify-between">
-                          <span className="text-slate-600">{charge.description}:</span>
-                          <span className="text-slate-900">{formatAmount(charge.amount)}</span>
+                        <div key={charge.id} className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex justify-between">
+                              <span className="text-slate-600">{charge.description}:</span>
+                              <span className="text-slate-900">{formatAmount(charge.amount)}</span>
+                            </div>
+                            <div className="text-xs text-slate-500 mt-1">
+                              Added {formatDate(charge.created_at)}
+                              {charge.created_by_first_name && charge.created_by_last_name && (
+                                <> by {charge.created_by_first_name} {charge.created_by_last_name}</>
+                              )}
+                            </div>
+                          </div>
+                          {(selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && (
+                            <button
+                              onClick={() => {
+                                setChargeToDelete(charge);
+                                setShowDeleteChargeDialog(true);
+                              }}
+                              disabled={actionLoading}
+                              className="ml-2 text-red-600 hover:text-red-700 disabled:opacity-50"
+                              title="Delete charge"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
+                          )}
                         </div>
                       ))}
                     </>
                   )}
                   <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-semibold">
                     <span className="text-slate-900">Total:</span>
-                    <span className="text-slate-900">{formatAmount(selectedPayment.total_amount)}</span>
+                    <span className="text-slate-900">{formatAmount(calculateTotal(selectedPayment))}</span>
                   </div>
                 </div>
               </div>
@@ -428,7 +614,20 @@ export default function SecretaryPayments() {
                 </div>
               )}
 
-              {/* Actions for pending payments */}
+              {/* Actions for unpaid payments (cash) */}
+              {selectedPayment.status === 'UNPAID' && (
+                <div className="flex gap-3 pt-4 border-t border-slate-200">
+                  <button
+                    onClick={() => handleMarkAsPaid(selectedPayment.id)}
+                    disabled={actionLoading}
+                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  >
+                    {actionLoading ? 'Marking...' : 'Mark as Paid'}
+                  </button>
+                </div>
+              )}
+
+              {/* Actions for pending payments (GCash) */}
               {selectedPayment.status === 'PENDING_VERIFICATION' && (
                 <div className="flex gap-3 pt-4 border-t border-slate-200">
                   <button
@@ -458,7 +657,7 @@ export default function SecretaryPayments() {
           <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-slate-900 mb-2">Verify Payment</h3>
             <p className="text-sm text-slate-600 mb-4">
-              Are you sure you want to verify this payment of {formatAmount(selectedPayment.total_amount)} from{' '}
+              Are you sure you want to verify this payment of {formatAmount(calculateTotal(selectedPayment))} from{' '}
               {selectedPayment.patient_first_name} {selectedPayment.patient_last_name}?
             </p>
             <div className="flex gap-3">
@@ -487,7 +686,7 @@ export default function SecretaryPayments() {
           <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-slate-900 mb-2">Reject Payment</h3>
             <p className="text-sm text-slate-600 mb-4">
-              Are you sure you want to reject this payment of {formatAmount(selectedPayment.total_amount)} from{' '}
+              Are you sure you want to reject this payment of {formatAmount(calculateTotal(selectedPayment))} from{' '}
               {selectedPayment.patient_first_name} {selectedPayment.patient_last_name}?
             </p>
             <div className="flex gap-3">
@@ -550,6 +749,114 @@ export default function SecretaryPayments() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Add Charge Modal */}
+      {showAddChargeModal && selectedPayment && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Add Additional Charge</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={chargeDescription}
+                  onChange={(e) => {
+                    setChargeDescription(e.target.value);
+                    setChargeFormError(null);
+                  }}
+                  placeholder="e.g., Medicine, Additional services"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
+                  disabled={actionLoading}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Amount (₱)</label>
+                <input
+                  type="number"
+                  value={chargeAmount}
+                  onChange={(e) => {
+                    setChargeAmount(e.target.value);
+                    setChargeFormError(null);
+                  }}
+                  placeholder="0.00"
+                  step="0.01"
+                  min="0.01"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
+                  disabled={actionLoading}
+                />
+              </div>
+              {chargeFormError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+                  {chargeFormError}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowAddChargeModal(false);
+                  setChargeDescription('');
+                  setChargeAmount('');
+                  setChargeFormError(null);
+                }}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddCharge}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                {actionLoading ? 'Adding...' : 'Add Charge'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Charge Confirmation Dialog */}
+      {showDeleteChargeDialog && chargeToDelete && selectedPayment && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Delete Charge</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Are you sure you want to delete the charge "{chargeToDelete.description}" ({formatAmount(chargeToDelete.amount)})?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteChargeDialog(false);
+                  setChargeToDelete(null);
+                }}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteCharge}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                {actionLoading ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setShowToast(false)}
+          duration={3000}
+        />
       )}
     </div>
   );

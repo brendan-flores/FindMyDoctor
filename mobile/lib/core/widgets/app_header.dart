@@ -12,6 +12,8 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onBackPressed;
   final bool showNotifications;
   final bool showProfile;
+  final int? unreadCount;
+  final VoidCallback? onNotificationTap;
 
   const AppHeader({
     super.key,
@@ -23,6 +25,8 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     this.onBackPressed,
     this.showNotifications = true,
     this.showProfile = true,
+    this.unreadCount,
+    this.onNotificationTap,
   });
 
   @override
@@ -80,22 +84,37 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               Stack(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.notifications_outlined),
-                    onPressed: () {},
+                    icon: Icon(
+                      Icons.notifications_outlined,
+                      color: AppColors.onSurface,
+                    ),
+                    onPressed: onNotificationTap ?? () {},
                   ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: AppColors.error,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.surface, width: 2),
+                  if (unreadCount != null && unreadCount! > 0)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.surface, width: 2),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 14,
+                          minHeight: 14,
+                        ),
+                        child: Text(
+                          unreadCount! > 9 ? '9+' : unreadCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             if (showProfile) ...[

@@ -161,33 +161,31 @@ export default function AppointmentDetail() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <button
-              onClick={() => router.push('/doctor/appointments')}
-              className="text-blue-100 hover:text-white mb-2 flex items-center gap-2"
-            >
-              <span className="material-symbols-outlined">arrow_back</span>
-              Back to Appointments
-            </button>
-            <h1 className="text-2xl font-bold text-white">Appointment Details</h1>
-            <p className="text-blue-100 mt-1">{formatDateTime(appointment.appointment_date)}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span
-              className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                appointment.status
-              )}`}
-            >
-              {appointment.status.replace('_', ' ')}
+      <div className="flex items-center justify-between">
+        <div>
+          <button
+            onClick={() => router.push('/doctor/appointments')}
+            className="text-slate-600 hover:text-slate-900 mb-2 flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+            Back to Appointments
+          </button>
+          <h1 className="text-2xl font-bold text-slate-900">Appointment Details</h1>
+          <p className="text-slate-500 mt-1">{formatDateTime(appointment.appointment_date)}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span
+            className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+              appointment.status
+            )}`}
+          >
+            {appointment.status.replace('_', ' ')}
+          </span>
+          {appointment.queue_number && (
+            <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
+              Queue #{appointment.queue_number}
             </span>
-            {appointment.queue_number && (
-              <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
-                Queue #{appointment.queue_number}
-              </span>
-            )}
-          </div>
+          )}
         </div>
       </div>
 

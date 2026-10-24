@@ -5,6 +5,13 @@ import { query, getClient } from '../../database/connection';
 import { config } from '../../config';
 import { ErrorCodes } from '../../utils/response';
 import * as otpService from '../../services/otpService';
+import {
+  buildSessionResponse,
+  getSessionPolicy,
+  isAdminRole,
+  isStaffRole,
+  remainingAbsoluteSeconds,
+} from './sessionPolicy';
 
 export interface RegisterData {
   email: string;
@@ -18,8 +25,10 @@ export interface LoginData {
   email: string;
   password: string;
   expectedRole: 'PATIENT' | 'DOCTOR' | 'SECRETARY' | 'ADMIN';
+  /** @deprecated Remember Me was replaced by the explicit device-trust prompt. */
   rememberMe?: boolean;
   trustedBrowserToken?: string;
+  deviceInfo?: string;
 }
 
 export interface DoctorRegistrationData {
@@ -94,7 +103,7 @@ export async function register(data: RegisterData) {
 }
 
 export async function login(data: LoginData) {
-  const { email, password, expectedRole, rememberMe = false, trustedBrowserToken } = data;
+  const { email, password, expectedRole, trustedBrowserToken } = data;
 
   // Find user by email or username
   const userResult = await query(
@@ -150,83 +159,59 @@ export async function login(data: LoginData) {
     }
   }
 
-  // Server-side OTP requirement decision
-  // Admin: OTP is ALWAYS mandatory (no setting, no bypass)
-  // Doctor: OTP is optional - required only if two_factor_enabled = true
-  // Secretary: OTP is optional - required only if two_factor_enabled = true
-  // Facebook-style: Sessions persist regardless of Remember Me
-  // Remember Me only controls trusted-browser registration (OTP skip on trusted devices)
-  // UNLESS they have a valid trusted-browser credential
-  let requiresOtp = false;
+  // Trusted devices are only available to staff portals. Admin/SuperAdmin
+  // always require OTP and never use trusted devices. The trusted-device
+  // cookie is the single source of truth: a valid cookie skips OTP and grants a
+  // persistent 30-day session. New browsers receive a short session and are
+  // asked to trust the device only after authentication succeeds.
+  const staff = isStaffRole(user.role);
   let isTrustedBrowser = false;
+  let trustedBrowserTokenToSet: string | null = null;
 
-  if (user.role === 'ADMIN') {
-    // Admin always requires OTP unless trusted browser
-    if (trustedBrowserToken) {
-      const trustedBrowser = await checkTrustedBrowser(user.id, trustedBrowserToken);
-      if (trustedBrowser) {
-        isTrustedBrowser = true;
-        requiresOtp = false; // Skip OTP for trusted browser
-      } else {
-        requiresOtp = true; // Invalid or expired token, require OTP
-      }
-    } else {
-      requiresOtp = true; // No trusted browser token, require OTP
-    }
-  } else if (user.role === 'DOCTOR' || user.role === 'SECRETARY') {
-    // Doctor and Secretary require OTP only if two_factor_enabled = true
-    // Check two_factor_enabled from database
-    let twoFactorEnabled = false;
-    if (user.role === 'DOCTOR') {
-      const doctorResult = await query(
-        'SELECT two_factor_enabled FROM doctors WHERE user_id = $1',
-        [user.id]
-      );
-      if (doctorResult.rows.length > 0) {
-        twoFactorEnabled = doctorResult.rows[0].two_factor_enabled;
-      }
-    } else if (user.role === 'SECRETARY') {
-      const secretaryResult = await query(
-        'SELECT two_factor_enabled FROM secretaries WHERE user_id = $1',
-        [user.id]
-      );
-      if (secretaryResult.rows.length > 0) {
-        twoFactorEnabled = secretaryResult.rows[0].two_factor_enabled;
-      }
-    }
-
-    if (twoFactorEnabled) {
-      // 2FA is enabled, check trusted browser
-      if (trustedBrowserToken) {
-        const trustedBrowser = await checkTrustedBrowser(user.id, trustedBrowserToken);
-        if (trustedBrowser) {
-          isTrustedBrowser = true;
-          requiresOtp = false; // Skip OTP for trusted browser
-        } else {
-          requiresOtp = true; // Invalid or expired token, require OTP
-        }
-      } else {
-        requiresOtp = true; // No trusted browser token, require OTP
-      }
-    } else {
-      // 2FA is disabled, no OTP required
-      requiresOtp = false;
+  if (staff && trustedBrowserToken) {
+    // Rotate the trusted-device token on every successful use.
+    const trusted = await checkTrustedBrowser(user.id, trustedBrowserToken);
+    if (trusted) {
+      isTrustedBrowser = true;
+      trustedBrowserTokenToSet = trusted.token;
     }
   }
 
-  // If OTP is required, create challenge and return opaque token
+  const sessionRemember = staff ? isTrustedBrowser : false;
+  const requiresTrustPrompt = staff && !isTrustedBrowser;
+
+  // Server-side OTP requirement:
+  // - Admin/SuperAdmin: always mandatory.
+  // - Doctor/Secretary: only when 2FA is enabled and this is not a trusted device.
+  let requiresOtp = false;
+  if (isAdminRole(user.role)) {
+    requiresOtp = true;
+  } else if (staff) {
+    const twoFactorEnabled = await isTwoFactorEnabled(user);
+    requiresOtp = twoFactorEnabled && !isTrustedBrowser;
+  }
+
+  // OTP verification always issues a short staff session. The browser is
+  // trusted later through the explicit post-login prompt, so completing the
+  // current OTP can never be bypassed by choosing "trust this device".
   if (requiresOtp) {
-    const challengeToken = await createLoginOtpChallenge(user.id, user.email, rememberMe);
+    const challengeToken = await createLoginOtpChallenge(user.id, user.email, false);
 
     return {
       requiresOtp: true,
       challengeId: challengeToken,
+      role: user.role,
+      rememberMe: false,
+      isTrustedBrowser: false,
+      requiresTrustPrompt,
+      trustedBrowserRevoked: false,
     };
   }
 
-  // Otherwise, normal login without OTP (either SUPERADMIN or trusted browser)
-  const accessToken = generateAccessToken(user, rememberMe);
-  const refreshToken = generateRefreshToken(user, rememberMe);
+  // Normal login without OTP (2FA disabled, a trusted device, or a patient).
+  const session = { rememberMe: sessionRemember, sessionStartMs: Date.now() };
+  const accessToken = generateAccessToken(user, session);
+  const refreshToken = generateRefreshToken(user, session);
 
   return {
     user: {
@@ -237,11 +222,43 @@ export async function login(data: LoginData) {
     },
     accessToken,
     refreshToken,
+    role: user.role,
+    rememberMe: sessionRemember,
     isTrustedBrowser,
+    requiresTrustPrompt,
+    trustedBrowserToken: trustedBrowserTokenToSet,
+    trustedBrowserRevoked: false,
+    session: buildSessionResponse(user.role, sessionRemember),
   };
 }
 
-export async function changePassword(userId: string, currentPassword: string | undefined, newPassword: string, mustChangePassword: boolean = false) {
+async function isTwoFactorEnabled(user: any): Promise<boolean> {
+  if (user.role === 'DOCTOR') {
+    const result = await query(
+      'SELECT two_factor_enabled FROM doctors WHERE user_id = $1',
+      [user.id]
+    );
+    return result.rows.length > 0 && result.rows[0].two_factor_enabled === true;
+  }
+
+  if (user.role === 'SECRETARY') {
+    const result = await query(
+      'SELECT two_factor_enabled FROM secretaries WHERE user_id = $1',
+      [user.id]
+    );
+    return result.rows.length > 0 && result.rows[0].two_factor_enabled === true;
+  }
+
+  return false;
+}
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string | undefined,
+  newPassword: string,
+  mustChangePassword: boolean = false,
+  session?: SessionTokenContext
+) {
   // Get user
   const userResult = await query(
     'SELECT * FROM users WHERE id = $1',
@@ -254,8 +271,10 @@ export async function changePassword(userId: string, currentPassword: string | u
 
   const user = userResult.rows[0];
 
-  // Verify current password only if not a forced password change (walk-in first login)
-  if (!mustChangePassword) {
+  // Verify the current password unless this is a forced first-login change
+  // with no current password supplied (walk-in accounts). If a current password
+  // is supplied, it must always be correct.
+  if (!mustChangePassword || currentPassword) {
     if (!currentPassword) {
       throw { code: ErrorCodes.VALIDATION_ERROR, message: 'Current password is required' };
     }
@@ -276,6 +295,12 @@ export async function changePassword(userId: string, currentPassword: string | u
     [newPasswordHash, userId]
   );
 
+  // Invalidate every refresh token issued before this password change.
+  await query(
+    'UPDATE users SET session_version = session_version + 1 WHERE id = $1',
+    [userId]
+  );
+
   // Revoke all trusted browsers for this user (security best practice)
   await revokeAllTrustedBrowsers(userId);
 
@@ -291,12 +316,23 @@ export async function changePassword(userId: string, currentPassword: string | u
 
   const updatedUser = updatedUserResult.rows[0];
 
-  // Generate new access token with updated mustChangePassword state
-  const newAccessToken = generateAccessToken(updatedUser);
+  // Issue a fresh token pair for the current session. All other devices were
+  // invalidated by the session_version increment above.
+  const tokenContext = session || { rememberMe: false, sessionStartMs: Date.now() };
+  const newAccessToken = generateAccessToken(updatedUser, tokenContext);
+  const newRefreshToken = generateRefreshToken(updatedUser, tokenContext);
 
   return {
     success: true,
     accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+    user: {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      mustChangePassword: updatedUser.must_change_password,
+    },
+    rememberMe: tokenContext.rememberMe,
   };
 }
 
@@ -440,10 +476,29 @@ export async function registerDoctor(data: DoctorRegistrationData) {
   }
 }
 
-export function generateAccessToken(user: any, rememberMe: boolean = false) {
-  // Facebook-style: Always use 7-day timeout regardless of Remember Me
-  // Sessions persist across browser closes unless manually logged out
-  const expiresIn = '7d';
+export interface SessionTokenContext {
+  rememberMe: boolean;
+  sessionStartMs: number;
+}
+
+function lifetimeFor(policyLifetimeSec: number, policyAbsoluteSec: number | null, sessionStartMs: number) {
+  if (policyAbsoluteSec === null) {
+    return policyLifetimeSec;
+  }
+
+  const elapsedSec = Math.floor((Date.now() - sessionStartMs) / 1000);
+  const remainingSec = policyAbsoluteSec - elapsedSec;
+  return Math.max(1, Math.min(policyLifetimeSec, remainingSec));
+}
+
+export function generateAccessToken(user: any, session?: SessionTokenContext) {
+  const context = session || { rememberMe: false, sessionStartMs: Date.now() };
+  const policy = getSessionPolicy(user.role, context.rememberMe);
+  const expiresIn = lifetimeFor(
+    policy.accessExpiresInSec,
+    policy.absoluteTimeoutSec,
+    context.sessionStartMs
+  );
 
   return jwt.sign(
     {
@@ -451,25 +506,109 @@ export function generateAccessToken(user: any, rememberMe: boolean = false) {
       email: user.email,
       role: user.role,
       mustChangePassword: user.must_change_password,
+      typ: 'access',
+      sv: user.session_version ?? 0,
+      sst: context.sessionStartMs,
+      remember: context.rememberMe,
     },
     config.jwt.secret,
     { expiresIn } as any
   );
 }
 
-export function generateRefreshToken(user: any, rememberMe: boolean = false) {
-  // Facebook-style: Always use 30-day absolute lifetime regardless of Remember Me
-  // Sessions persist across browser closes unless manually logged out
-  const expiresIn = '30d';
+export function generateRefreshToken(user: any, session?: SessionTokenContext) {
+  const context = session || { rememberMe: false, sessionStartMs: Date.now() };
+  const policy = getSessionPolicy(user.role, context.rememberMe);
+  const expiresIn = lifetimeFor(
+    policy.refreshExpiresInSec,
+    policy.absoluteTimeoutSec,
+    context.sessionStartMs
+  );
 
   return jwt.sign(
     {
       id: user.id,
       email: user.email,
+      role: user.role,
+      typ: 'refresh',
+      sv: user.session_version ?? 0,
+      sst: context.sessionStartMs,
+      remember: context.rememberMe,
     },
     config.jwt.secret,
     { expiresIn } as any
   );
+}
+
+export async function refreshAccessToken(refreshToken: string) {
+  try {
+    // Verify the refresh token
+    const decoded = verifyToken(refreshToken) as any;
+
+    // Only refresh tokens may be used here. Access tokens are rejected.
+    if (decoded.typ && decoded.typ !== 'refresh') {
+      throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid refresh token' };
+    }
+
+    // Get the user from database
+    const userResult = await query(
+      `SELECT * FROM users WHERE id = $1 AND is_active = true`,
+      [decoded.id]
+    );
+
+    if (userResult.rows.length === 0) {
+      throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid refresh token' };
+    }
+
+    const user = userResult.rows[0];
+    const currentSessionVersion = Number(user.session_version ?? 0);
+    const tokenSessionVersion = decoded.sv === undefined ? null : Number(decoded.sv);
+
+    // Tokens issued before session versioning are only accepted while the
+    // user has never had a revocation event.
+    if (
+      (tokenSessionVersion === null && currentSessionVersion > 0) ||
+      (tokenSessionVersion !== null && tokenSessionVersion !== currentSessionVersion)
+    ) {
+      throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Revoked refresh token' };
+    }
+
+    const rememberMe = isStaffRole(user.role) ? decoded.remember === true : false;
+    const policy = getSessionPolicy(user.role, rememberMe);
+
+    if (policy.absoluteTimeoutSec !== null) {
+      const sessionStartMs = Number(decoded.sst) || (Number(decoded.iat) * 1000) || Date.now();
+      if (remainingAbsoluteSeconds(policy, sessionStartMs) <= 0) {
+        throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Session limit reached' };
+      }
+    }
+
+    const session: SessionTokenContext = {
+      rememberMe,
+      sessionStartMs: Number(decoded.sst) || (Number(decoded.iat) * 1000) || Date.now(),
+    };
+
+    // Generate new access and refresh tokens. For non-remembered staff this
+    // slides the 8-hour idle window forward on each refresh.
+    const newAccessToken = generateAccessToken(user, session);
+    const newRefreshToken = generateRefreshToken(user, session);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        mustChangePassword: user.must_change_password,
+      },
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+      role: user.role,
+      rememberMe,
+      session: buildSessionResponse(user.role, rememberMe),
+    };
+  } catch (error) {
+    throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid or expired refresh token' };
+  }
 }
 
 export function verifyToken(token: string) {
@@ -509,10 +648,14 @@ export function hashTrustedBrowserToken(token: string): string {
 }
 
 /**
- * Check if a browser is trusted for a given user
- * Returns the trusted browser record if valid, null otherwise
+ * Check if a browser is trusted for a given user.
+ * On success the token is rotated: the stored hash is replaced with a new
+ * random token that must be sent back to the client in the HttpOnly cookie.
  */
-export async function checkTrustedBrowser(userId: string, token: string): Promise<any | null> {
+export async function checkTrustedBrowser(
+  userId: string,
+  token: string
+): Promise<{ record: any; token: string } | null> {
   const tokenHash = hashTrustedBrowserToken(token);
 
   const result = await query(
@@ -528,33 +671,130 @@ export async function checkTrustedBrowser(userId: string, token: string): Promis
     return null;
   }
 
-  // Update last_used_at timestamp
-  await query(
+  // Rotate the token on every use. Only the new hash is stored.
+  const rotatedToken = generateTrustedBrowserToken();
+  const rotatedHash = hashTrustedBrowserToken(rotatedToken);
+
+  const updated = await query(
     `UPDATE trusted_browsers
-     SET last_used_at = CURRENT_TIMESTAMP
-     WHERE id = $1`,
-    [result.rows[0].id]
+     SET token_hash = $1, last_used_at = CURRENT_TIMESTAMP
+     WHERE id = $2 AND revoked_at IS NULL
+     RETURNING *`,
+    [rotatedHash, result.rows[0].id]
   );
 
-  return result.rows[0];
+  if (updated.rows.length === 0) {
+    return null;
+  }
+
+  return { record: updated.rows[0], token: rotatedToken };
 }
 
 /**
- * Register a browser as trusted for a user
- * Returns the raw token to be stored in an HttpOnly cookie
+ * Register a browser as trusted for a user.
+ * Returns the raw token to be stored in an HttpOnly cookie.
+ * Only the SHA-256 hash is persisted.
  */
 export async function registerTrustedBrowser(userId: string, deviceInfo?: string): Promise<string> {
   const token = generateTrustedBrowserToken();
   const tokenHash = hashTrustedBrowserToken(token);
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+  const safeDeviceInfo = deviceInfo ? deviceInfo.slice(0, 500) : null;
 
   await query(
     `INSERT INTO trusted_browsers (user_id, token_hash, device_info, expires_at)
      VALUES ($1, $2, $3, $4)`,
-    [userId, tokenHash, deviceInfo || null, expiresAt]
+    [userId, tokenHash, safeDeviceInfo, expiresAt]
   );
 
   return token;
+}
+
+/**
+ * Trust the current browser after the user has fully authenticated.
+ *
+ * This issues a fresh 30-day persistent token pair for the current browser and
+ * registers (or rotates) its trusted-device record. It must only be called from
+ * an authenticated staff session; it never bypasses the login-time OTP.
+ */
+export async function trustCurrentBrowser(
+  userId: string,
+  deviceInfo: string | undefined,
+  sessionStartMs: number,
+  existingTrustedBrowserToken?: string
+) {
+  const userResult = await query(
+    `SELECT * FROM users WHERE id = $1 AND is_active = true`,
+    [userId]
+  );
+
+  if (userResult.rows.length === 0) {
+    throw { code: ErrorCodes.NOT_FOUND, message: 'User not found' };
+  }
+
+  const user = userResult.rows[0];
+
+  if (!isStaffRole(user.role)) {
+    throw {
+      code: ErrorCodes.FORBIDDEN,
+      message: 'Trusted devices are only available to doctors and secretaries',
+    };
+  }
+
+  let trustedBrowserToken: string;
+
+  if (existingTrustedBrowserToken) {
+    const trusted = await checkTrustedBrowser(user.id, existingTrustedBrowserToken);
+    trustedBrowserToken = trusted
+      ? trusted.token
+      : await registerTrustedBrowser(user.id, deviceInfo);
+  } else {
+    trustedBrowserToken = await registerTrustedBrowser(user.id, deviceInfo);
+  }
+
+  const session = { rememberMe: true, sessionStartMs };
+  const accessToken = generateAccessToken(user, session);
+  const refreshToken = generateRefreshToken(user, session);
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      mustChangePassword: user.must_change_password,
+    },
+    accessToken,
+    refreshToken,
+    role: user.role,
+    rememberMe: true,
+    isTrustedBrowser: true,
+    requiresTrustPrompt: false,
+    trustedBrowserToken,
+    session: buildSessionResponse(user.role, true),
+  };
+}
+
+/**
+ * List a user's active trusted browsers (never returns token hashes).
+ * When the hash of the making request's trusted-browser token is provided, the
+ * matching row is flagged `is_current` so the UI can label "This browser".
+ */
+export async function listTrustedBrowsers(
+  userId: string,
+  currentTokenHash?: string
+): Promise<any[]> {
+  const result = await query(
+    `SELECT id, device_info, created_at, last_used_at, expires_at,
+            (token_hash = $2) AS is_current
+     FROM trusted_browsers
+     WHERE user_id = $1
+     AND revoked_at IS NULL
+     AND expires_at > CURRENT_TIMESTAMP
+     ORDER BY last_used_at DESC NULLS LAST, created_at DESC`,
+    [userId, currentTokenHash ?? null]
+  );
+
+  return result.rows;
 }
 
 /**
@@ -574,6 +814,24 @@ export async function revokeTrustedBrowser(userId: string, token: string): Promi
 }
 
 /**
+ * Revoke a specific browser row by id, scoped to the owner.
+ * Returns true when an active row was revoked.
+ */
+export async function revokeTrustedBrowserById(userId: string, browserId: string): Promise<boolean> {
+  const result = await query(
+    `UPDATE trusted_browsers
+     SET revoked_at = CURRENT_TIMESTAMP
+     WHERE id = $1
+     AND user_id = $2
+     AND revoked_at IS NULL
+     RETURNING id`,
+    [browserId, userId]
+  );
+
+  return result.rows.length > 0;
+}
+
+/**
  * Revoke all trusted browsers for a user (e.g., on password change)
  */
 export async function revokeAllTrustedBrowsers(userId: string): Promise<void> {
@@ -584,6 +842,19 @@ export async function revokeAllTrustedBrowsers(userId: string): Promise<void> {
      AND revoked_at IS NULL`,
     [userId]
   );
+}
+
+/**
+ * Revoke every session for a user: all trusted browsers and all refresh
+ * tokens. Access tokens expire naturally on their own short lifetime.
+ */
+export async function revokeAllUserSessions(userId: string): Promise<void> {
+  await query(
+    'UPDATE users SET session_version = session_version + 1 WHERE id = $1',
+    [userId]
+  );
+
+  await revokeAllTrustedBrowsers(userId);
 }
 
 /**
@@ -631,7 +902,12 @@ export async function sendLoginOtpForLogin(email: string): Promise<void> {
  * Verify login OTP and issue authenticated session
  * This is called after the user submits challengeId + OTP
  */
-export async function verifyLoginOtp(challengeId: string, otp: string, rememberMe?: boolean) {
+export async function verifyLoginOtp(
+  challengeId: string,
+  otp: string,
+  _rememberMe?: boolean,
+  _deviceInfo?: string
+) {
   const challengeTokenHash = hashChallengeToken(challengeId);
 
   // First, verify OTP with Supabase (before consuming challenge)
@@ -650,9 +926,6 @@ export async function verifyLoginOtp(challengeId: string, otp: string, rememberM
   }
 
   const challenge = challengeResult.rows[0];
-
-  // Use rememberMe from challenge if not provided in parameter
-  const shouldRemember = rememberMe !== undefined ? rememberMe : (challenge.remember_me || false);
 
   // Verify OTP with Supabase
   const otpVerification = await otpService.verifyLoginOtp(challenge.email, otp);
@@ -680,28 +953,25 @@ export async function verifyLoginOtp(challengeId: string, otp: string, rememberM
     throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Login challenge already used' };
   }
 
-  // Get user and generate tokens
+  // Get user and generate tokens. The account must still be active.
   const userResult = await query(
-    `SELECT * FROM users WHERE id = $1`,
+    `SELECT * FROM users WHERE id = $1 AND is_active = true`,
     [challenge.user_id]
   );
 
   if (userResult.rows.length === 0) {
-    throw { code: ErrorCodes.NOT_FOUND, message: 'User not found' };
+    throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid or expired login challenge' };
   }
 
   const user = userResult.rows[0];
 
-  // Generate FindMyDoctor tokens with appropriate expiration based on rememberMe
-  const accessToken = generateAccessToken(user, shouldRemember);
-  const refreshToken = generateRefreshToken(user, shouldRemember);
-
-  // If Remember Me is checked, register this browser as trusted
-  let trustedBrowserToken = null;
-  if (shouldRemember) {
-    const userAgent = 'unknown'; // Could extract from request headers in the API layer
-    trustedBrowserToken = await registerTrustedBrowser(user.id, userAgent);
-  }
+  // OTP verification always issues a short staff session. The browser becomes
+  // trusted only through the explicit post-login trust prompt, so a password
+  // plus OTP can never silently create a trusted device.
+  const staff = isStaffRole(user.role);
+  const session = { rememberMe: false, sessionStartMs: Date.now() };
+  const accessToken = generateAccessToken(user, session);
+  const refreshToken = generateRefreshToken(user, session);
 
   return {
     user: {
@@ -712,6 +982,11 @@ export async function verifyLoginOtp(challengeId: string, otp: string, rememberM
     },
     accessToken,
     refreshToken,
-    trustedBrowserToken,
+    role: user.role,
+    rememberMe: false,
+    isTrustedBrowser: false,
+    requiresTrustPrompt: staff,
+    trustedBrowserToken: null,
+    session: buildSessionResponse(user.role, false),
   };
 }

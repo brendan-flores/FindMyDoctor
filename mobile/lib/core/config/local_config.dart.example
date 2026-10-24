@@ -1,0 +1,15 @@
+// Local development configuration template
+// Copy this file to local_config.dart and update with your values
+// This file (local_config.dart.example) is tracked in git
+// The actual local_config.dart is gitignored
+
+class LocalConfig {
+  // Your computer's local network IP address for real device testing
+  // Find your IP by running 'ipconfig' (Windows) or 'ifconfig' (Mac/Linux)
+  // Use the IPv4 address from your active network adapter (Wi-Fi or Ethernet)
+  // Example: 'http://192.168.1.100:3000/api/v1'
+  static const String deviceBaseUrl = 'http://YOUR_IP_HERE:3000/api/v1';
+  
+  // Set to true when running on Android emulator, false for real device
+  static const bool useEmulator = false;
+}

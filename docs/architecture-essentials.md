@@ -713,6 +713,9 @@ login_otp_challenges (for login OTP challenge state)
 - `017_modify_pending_doctor_signup_for_basic_flow.sql` - Adds contact_number field to pending_doctor_signups for basic registration flow (professional fields remain in table for compatibility)
 - `028_add_device_tokens.sql` - Creates the `device_tokens` table associating FCM/APNs push tokens with their owning user (one active owner per token, unique on provider+token)
 - `029_add_gcash_qr_url.sql` - Adds `gcash_qr_url` column to `doctors` table for storing doctor-specific GCash QR code URLs
+- `033_add_gcash_qr_updated_at.sql` - Adds `doctors.gcash_qr_updated_at` for the QR upload timestamp shown in secretary settings (cleared on QR deletion); `doctors.updated_at` cannot serve this role because profile/photo edits also bump it. Applied via `npm run migrate:gcash-qr-updated-at`.
+- `022_add_trusted_browsers.sql` - Creates the `trusted_browsers` table for trusted-device sessions (hashed tokens, device info, 30-day expiry, revocation timestamps)
+- `032_add_session_version.sql` - Adds `users.session_version` for account-wide refresh-token revocation on password change/reset, deactivation, and "Sign out of all devices"
 
 ---
 
@@ -1159,47 +1162,54 @@ Do not:
 - Allow frontend to override backend OTP requirement decision
 - Skip backend role check when determining OTP requirement
 
-### Remember Me and Trusted Browser Authentication
+### Device Trust, Trusted Browsers, and Session Lifetime
 
-The web application implements Remember Me for Doctor and Secretary accounts using trusted-browser credentials:
+Session behavior is defined once in `backend/src/modules/auth/sessionPolicy.ts`. The internal `rememberMe` claim/session-policy flag is retained for compatibility but now means an explicit trusted-device session.
 
-**Remember Me Behavior:**
-- Doctor and Secretary login forms include a Remember Me checkbox
-- **Facebook-style Session Persistence:** Sessions persist across browser closes regardless of Remember Me checkbox
-- Access tokens always have 7-day expiration (no 15-minute timeout)
-- Refresh tokens always have 30-day expiration (no session cookies)
-- Users are only logged out when they manually log out or tokens expire
-- **Remember Me CHECKED:**
-  - Browser is registered as trusted for 30 days
-  - Subsequent logins from the same trusted browser skip OTP (if 2FA is enabled) but still require password
-  - Trusted-browser credential stored in HttpOnly cookie with 30-day expiration
-- **Remember Me UNCHECKED:**
-  - Browser is NOT registered as trusted
-  - OTP is required on every login (if 2FA is enabled)
-  - Session still persists across browser closes (tokens are long-lived)
-  - If browser was previously trusted, trust is revoked
-- Trusted-browser recognition uses SHA-256 hashed tokens stored in PostgreSQL `trusted_browsers` table
-- Password change or reset revokes all trusted-browser credentials
-- New browser/device always requires OTP (if 2FA enabled)
-- Logout does NOT revoke trusted-browser status (trust persists across logout/login cycles like Facebook)
-- Users must manually uncheck Remember Me during login to revoke trust, or revoke via dedicated endpoint
+**Doctor and Secretary:**
+- **Untrusted browser or trust declined:** 7-hour access token, 8-hour refresh token, 8-hour idle timeout, browser-session cookies, no trusted browser, OTP on every login when 2FA is enabled.
+- **Trusted device:** 7-day access token, 30-day refresh token/session, persistent cookies, trusted browser for 30 days. OTP is skipped on later logins from that browser when 2FA is enabled; the password is always required.
+- Login forms do not include a Remember Me checkbox.
+- After full authentication, an untrusted browser is shown a device-trust page with browser/OS details and "Trust this device" / "Do not trust this device". Trusting registers the browser and upgrades the current session; declining keeps the short session.
+- The trust decision never bypasses the OTP required for the current login. `verify-login-otp` always issues a short untrusted session and the trust prompt is shown afterwards.
+- A valid trusted-device cookie skips OTP and the prompt on later logins.
 
-**Security Requirements:**
-- Trusted-browser tokens stored as SHA-256 hashes in PostgreSQL
-- HttpOnly cookies with Secure flag and SameSite=lax policy
-- Trusted-browser status never overrides account restrictions (suspended, rejected, unauthorized)
-- Backend generates tokens with fixed expiration (7-day access, 30-day refresh) regardless of Remember Me
-- Remember Me works independently of 2FA status; users can have Remember Me enabled with or without 2FA
+**Admin and SuperAdmin:**
+- OTP is mandatory on every login; no device-trust prompt and no trusted browser.
+- 90-minute access token, 2-hour refresh token, 2-hour idle timeout, 8-hour absolute maximum, browser-session cookies.
+- Logout clears the Admin/SuperAdmin session.
 
-**Database Schema:**
-- `trusted_browsers` table (migration 022_add_trusted_browsers.sql)
-- Columns: id, user_id, token_hash (SHA-256), device_info, expires_at (30 days), created_at, revoked_at, last_used_at
-- `login_otp_challenges` table includes `remember_me` column
+**Patient:** existing 7-day access / 30-day refresh behavior is unchanged.
+
+**Trusted Browser Storage:**
+- High-entropy random tokens stored only as SHA-256 hashes in PostgreSQL `trusted_browsers` (`user_id`, `token_hash`, `device_info`, `expires_at`, `created_at`, `revoked_at`, `last_used_at`).
+- Token is sent only in an HttpOnly/Secure/SameSite=lax cookie, rotated each use, and never exposed to JavaScript, localStorage, or response bodies.
+- Trust expires after 30 days; new browsers, expired tokens, or cleared cookies require OTP again when 2FA is enabled.
+
+**Trust Endpoints:**
+- `GET /api/v1/auth/trusted-browsers/current-device` — current browser/OS details for the trust page.
+- `POST /api/v1/auth/trusted-browsers/trust-current` — registers/rotates the device and issues the 30-day persistent session; Doctor/Secretary only.
+- `POST /api/v1/auth/revoke-trusted-browser` — declines/revokes the current browser's trust.
+
+**Revocation and Settings:**
+- Password change, password reset, account deactivation, and "Sign out of all devices" revoke all trusted browsers and refresh tokens (via `users.session_version`, migration `032_add_session_version.sql`).
+- `/doctor/settings` and `/secretary/settings` list trusted browsers (device, created, last used, expiry) with per-browser Revoke and "Sign out of all devices" in an Account section. `GET /api/v1/auth/trusted-browsers` flags the row matching the request's trust cookie with `is_current` (never exposing hashes) so the UI labels it "This browser"; more than five rows show the five most recent with a "View all" toggle. Confirming revocation of the current browser warns that the next sign-in requires a verification code; "Sign out of all devices" confirms "Sign out everywhere? You will need to sign in again on every device." TrustedBrowsersCard takes `confirmDialogs` (default true for the doctor page); `/secretary/settings` passes false so Revoke and "Sign out of all devices" act immediately without dialog confirmations.
+- `/secretary/settings` groups cards into "Account" (2FA, Change password, Trusted Browsers) and "Clinic" (Clinic Payment Settings with GCash QR thumbnail, Active/Not uploaded status, last-updated date from `doctors.gcash_qr_updated_at`, and Manage QR Code action) plus display-only "Coming soon" placeholder cards for Invoice details and GCash account details; placeholders have no logic, storage, or endpoints waiting on the invoice feature and the patient payments view.
+- Logout ends only the current portal session; trust persists.
+- A non-blocking dashboard banner recommends enabling 2FA when it is off; it never blocks access.
+
+**Cookies and Isolation:**
+- Role-scoped cookies (`doctor_`, `secretary_`, `admin_`, `patient_`) with path `/`; access/refresh HttpOnly and Secure in production, trusted-browser always HttpOnly.
+- A non-sensitive `<prefix>_sessionActive` browser-session hint lets `apiClient` discard a non-persistent session after a browser restart.
+- Multiple portal sessions may coexist; middleware treats `/doctors`, `/secretaries`, and `/admin` paths as authoritative, uses `X-Portal-Role` for shared resource paths (for example `/patients/:id`), checks matching cookies with a global fallback, and rejects cross-role use. Shared sub-resources are exempt from the namespace check: `/doctors/:id/availability` accepts PATIENT tokens (the mobile patient booking journey) and DOCTOR tokens, while all doctor-portal-only routes remain guarded by `authorize('DOCTOR')`.
+- Only a 400/401 refresh response clears the session; transient rate-limit, server, and network failures leave it intact.
+- Device trust never bypasses password, account status, role, or approval checks; failures stay generic.
 
 Do not:
-- Store trusted-browser tokens in plaintext
-- Allow Remember Me to bypass account status restrictions
-- Implement Remember Me for Admin/SuperAdmin (not applicable)
+- Store trusted-browser tokens in plaintext, localStorage, or a response body.
+- Let device trust bypass account status restrictions or the current login's OTP.
+- Implement device trust or trusted browsers for Admin/SuperAdmin.
+- Persist an untrusted staff session across browser restarts.
 
 ### Supabase Storage for Doctor Photos
 

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -10,6 +9,7 @@ import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/utils/json_parsers.dart';
 
 class BookingConfirmationPage extends StatefulWidget {
   final String? doctorId;
@@ -19,7 +19,6 @@ class BookingConfirmationPage extends StatefulWidget {
   final String? consultationFee;
   final DateTime? selectedDate;
   final String? paymentMethod;
-  final File? receiptImage;
   final String? professionalPhotoUrl;
 
   const BookingConfirmationPage({
@@ -31,7 +30,6 @@ class BookingConfirmationPage extends StatefulWidget {
     this.consultationFee,
     this.selectedDate,
     this.paymentMethod,
-    this.receiptImage,
     this.professionalPhotoUrl,
   });
 
@@ -69,24 +67,17 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
         doctorId: widget.doctorId!,
         appointmentDate: appointmentDate,
         reasonForVisit: 'Regular consultation',
+        paymentMethod: widget.paymentMethod,
       );
 
       if (response['success'] == true) {
         setState(() {
           _queueNumber = response['data']?['queueNumber']?.toString();
-          final totalPatientsRaw = response['data']?['totalPatients'];
-          _totalPatients = totalPatientsRaw != null
-              ? (totalPatientsRaw is String ? int.tryParse(totalPatientsRaw) : totalPatientsRaw as int?)
-              : null;
+          _totalPatients = parseInt(response['data']?['totalPatients']);
           _appointmentId = response['data']?['appointmentId']?.toString();
           _isSuccess = true;
           _isSubmitting = false;
         });
-
-        // If GCash payment method selected and receipt uploaded, upload the receipt
-        if (widget.paymentMethod == 'GCASH' && widget.receiptImage != null && _appointmentId != null) {
-          await _uploadReceipt();
-        }
       } else {
         setState(() {
           _errorMessage = response['error']?['message'] ?? 'Failed to book appointment';
@@ -101,45 +92,7 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
     }
   }
 
-  Future<void> _uploadReceipt() async {
-    if (widget.receiptImage == null || _appointmentId == null) return;
 
-    try {
-      final response = await _apiService.uploadPaymentReceipt(
-        appointmentId: _appointmentId!,
-        receiptFile: widget.receiptImage!,
-      );
-
-      if (response['success'] == true) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Receipt uploaded successfully'),
-              backgroundColor: AppColors.primary,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response['error']?['message'] ?? 'Failed to upload receipt'),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to upload receipt: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
 
   @override
   void initState() {
@@ -152,13 +105,23 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // A confirmed booking must not be escaped back into the pre-filled
+    // booking form. Once the success state is showing, both the header back
+    // button and the system back gesture route to the appointments list.
+    return PopScope(
+      canPop: !_isSuccess,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _isSuccess) {
+          _goToAppointments();
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
           AppHeader(
             showBackButton: true,
-            onBackPressed: () => Navigator.of(context).pop(),
+            onBackPressed: _isSuccess ? _goToAppointments : () => Navigator.of(context).pop(),
             showNotifications: false,
             showProfile: false,
           ),
@@ -183,7 +146,18 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
           ),
           if (_isSuccess) _buildBottomButton(context),
         ],
+        ),
       ),
+    );
+  }
+
+  /// Replaces the whole navigation stack below home with the appointments tab
+  /// (same destination as the "View in Appointments" success button) so the
+  /// already-consumed booking form can never be surfaced again.
+  void _goToAppointments() {
+    Navigator.of(context).pushReplacementNamed(
+      '/home',
+      arguments: {'initialTab': 2},
     );
   }
 
@@ -241,6 +215,8 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
         const SizedBox(height: spacing.AppSpacing.gutterLg),
         _buildQueueSlip(),
         const SizedBox(height: spacing.AppSpacing.gutterLg),
+        if (widget.paymentMethod?.toUpperCase() == 'GCASH') _buildUploadReceiptButton(),
+        if (widget.paymentMethod?.toUpperCase() == 'GCASH') const SizedBox(height: spacing.AppSpacing.gutterLg),
         _buildSecretaryChat(),
         const SizedBox(height: spacing.AppSpacing.gutterLg),
         _buildLocationCard(),
@@ -628,6 +604,67 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUploadReceiptButton() {
+    return Container(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      decoration: BoxDecoration(
+        color: AppColors.primaryFixed.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.receipt_long,
+                color: AppColors.primary,
+                size: spacing.AppSpacing.iconMd,
+              ),
+              const SizedBox(width: spacing.AppSpacing.gutterSm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Upload Receipt',
+                      style: AppTextStyles.bodyMdMedium.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    Text(
+                      'Upload your payment receipt for verification',
+                      style: AppTextStyles.labelSm.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          PrimaryButton(
+            text: 'Upload Receipt',
+            onPressed: () {
+              Navigator.of(context).pushNamed(
+                '/payment',
+                arguments: {
+                  'appointmentId': _appointmentId,
+                  'doctorName': widget.doctorName,
+                  'consultationFee': widget.consultationFee,
+                  'appointmentDate': widget.selectedDate,
+                  'doctorId': widget.doctorId,
+                },
+              );
+            },
+            icon: const Icon(Icons.upload, size: 20),
           ),
         ],
       ),

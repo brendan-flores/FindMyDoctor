@@ -13,14 +13,26 @@ interface SecretaryLayoutProps {
 export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const isTrustPage = pathname === '/secretary/trust-device';
   const [userName, setUserName] = useState('Secretary');
   const [userRole, setUserRole] = useState('Secretary');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check authentication
-    const token = localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
+    // Check authentication - prefer role-scoped HttpOnly cookies, fall back to localStorage
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) {
+        return parts.pop()?.split(';').shift() || null;
+      }
+      return null;
+    };
+
+    // Try role-scoped cookie first, then fallback to global cookie
+    const cookieToken = getCookie('secretary_accessToken') || getCookie('accessToken');
+    const token = cookieToken || localStorage.getItem('secretary_token') || localStorage.getItem('token');
+    const userStr = localStorage.getItem('secretary_user') || localStorage.getItem('user');
 
     let shouldRedirect = false;
     let redirectPath = '';
@@ -35,6 +47,8 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
       if (user.role !== 'SECRETARY') {
         // Cross-role access denied, redirect to appropriate login
         apiClient.clearToken();
+        localStorage.removeItem('secretary_refreshToken');
+        localStorage.removeItem('secretary_user');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         shouldRedirect = true;
@@ -46,8 +60,13 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
           shouldRedirect = true;
           redirectPath = '/secretary/change-password';
         } else {
-          // Check if profile completion is required (only after password change)
-          if (user.mustChangePassword === false && !pathname.includes('/complete-profile')) {
+          // Check if profile completion is required (only after password change).
+          // The device-trust prompt is allowed before profile completion.
+          if (
+            user.mustChangePassword === false &&
+            !pathname.includes('/complete-profile') &&
+            !isTrustPage
+          ) {
             asyncLoadNeeded = true;
             // Fetch secretary profile to check completion status and get real name
             apiClient.get('/users/me')
@@ -104,7 +123,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
     if (!asyncLoadNeeded) {
       setIsLoading(false);
     }
-  }, [router, pathname]);
+  }, [router, pathname, isTrustPage]);
 
   if (isLoading) {
     return (
@@ -112,6 +131,10 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
         <div className="text-slate-600">Loading...</div>
       </div>
     );
+  }
+
+  if (isTrustPage) {
+    return <>{children}</>;
   }
 
   return (

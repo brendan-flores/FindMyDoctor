@@ -1409,24 +1409,27 @@ class _DoctorsPageState extends State<DoctorsPage> {
             horizontal: spacing.AppSpacing.screenPadding,
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Hospitals & Medical Centers',
-                    style: AppTextStyles.headlineSm.copyWith(
-                      fontWeight: FontWeight.bold,
+              // Expanded lets the title/subtitle wrap on narrow screens
+              // instead of overflowing the row by a few pixels.
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hospitals & Medical Centers',
+                      style: AppTextStyles.headlineSm.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  Text(
-                    'Accredited clinics with real-time digital queue',
-                    style: AppTextStyles.bodyMd.copyWith(
-                      color: AppColors.onSurfaceVariant,
+                    Text(
+                      'Accredited clinics with real-time digital queue',
+                      style: AppTextStyles.bodyMd.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               TextButton(
                 onPressed: () {

@@ -3,6 +3,7 @@ import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 import { calculateCapacity, calculateCapacityRange } from '../modules/capacity/capacityService';
+import { getClinicDate, toClinicDateString } from '../utils/date';
 
 const router = Router();
 
@@ -782,6 +783,175 @@ router.delete('/managed-doctors/break-periods/:id', authenticate, authorize('SEC
   } catch (err: any) {
     console.error('Break period deletion error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete break period'));
+  }
+});
+
+// ============================================
+// SECRETARY DASHBOARD ENDPOINT
+// ============================================
+
+// Get secretary dashboard summary
+router.get('/me/dashboard', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { date } = req.query;
+    const userId = req.user!.id;
+
+    // Get secretary's assigned doctor
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [userId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    // Use provided date or default to clinic date
+    const targetDate = date ? String(date) : getClinicDate();
+
+    // Get today's queue counts by status
+    const queueCountsResult = await query(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'WAITING') as waiting,
+         COUNT(*) FILTER (WHERE status = 'IN_CHECKUP') as inConsultation,
+         COUNT(*) FILTER (WHERE status = 'COMPLETED') as done
+       FROM queue_entries
+       WHERE doctor_id = $1 AND queue_date = $2`,
+      [assignedDoctorId, targetDate]
+    );
+
+    const queueCounts = queueCountsResult.rows[0];
+
+    // Get capacity for today
+    const capacity = await calculateCapacity(assignedDoctorId, targetDate);
+
+    // Get pending verification payments count
+    const pendingPaymentsResult = await query(
+      `SELECT COUNT(*) as count
+       FROM payments p
+       JOIN appointments a ON p.appointment_id = a.id
+       WHERE a.doctor_id = $1 AND p.status = 'PENDING_VERIFICATION'`,
+      [assignedDoctorId]
+    );
+
+    const pendingPaymentsCount = parseInt(pendingPaymentsResult.rows[0].count) || 0;
+
+    // Get unread messages count (sum of unread_count from conversations)
+    const unreadMessagesResult = await query(
+      `SELECT COALESCE(SUM(
+         CASE WHEN c.id IS NULL THEN 0 ELSE
+           (SELECT COUNT(*) FROM messages m
+             WHERE m.conversation_id = c.id
+               AND m.read_at IS NULL
+               AND m.sender_user_id <> $1)
+         END
+       ), 0) as total_unread
+       FROM patients p
+       JOIN doctors d ON d.id = $2
+       LEFT JOIN conversations c ON c.patient_id = p.id AND c.doctor_id = d.id
+       WHERE EXISTS (
+         SELECT 1 FROM appointments a
+         WHERE a.patient_id = p.id AND a.doctor_id = d.id
+       )`,
+      [userId, assignedDoctorId]
+    );
+
+    const unreadMessagesCount = parseInt(unreadMessagesResult.rows[0].total_unread) || 0;
+
+    // Get today's queue
+    const queueResult = await query(
+      `SELECT q.queue_number, p.first_name, p.last_name, a.reason_for_visit, q.status, q.appointment_id, COALESCE(q.registration_source, 'ONLINE') as registration_source
+       FROM queue_entries q
+       JOIN patients p ON q.patient_id = p.id
+       LEFT JOIN appointments a ON q.appointment_id = a.id
+       WHERE q.doctor_id = $1 AND q.queue_date = $2
+       ORDER BY q.queue_number ASC`,
+      [assignedDoctorId, targetDate]
+    );
+
+    // Get payments needing action (PENDING_VERIFICATION first, then UNPAID completed visits)
+    const paymentsResult = await query(
+      `SELECT p.id, p.appointment_id, p.status, p.payment_method, p.total_amount,
+              p.created_at, pat.first_name as patient_first_name, pat.last_name as patient_last_name,
+              a.appointment_date, a.status as appointment_status
+       FROM payments p
+       JOIN patients pat ON p.patient_id = pat.id
+       JOIN appointments a ON p.appointment_id = a.id
+       WHERE a.doctor_id = $1
+         AND (p.status = 'PENDING_VERIFICATION' OR (p.status = 'UNPAID' AND a.status = 'COMPLETED'))
+       ORDER BY
+         CASE WHEN p.status = 'PENDING_VERIFICATION' THEN 0 ELSE 1 END,
+         p.created_at ASC
+       LIMIT 10`,
+      [assignedDoctorId]
+    );
+
+    // Get recent conversations (latest 5)
+    const conversationsResult = await query(
+      `SELECT c.id, c.patient_id, p.first_name as patient_first_name, p.last_name as patient_last_name,
+              c.updated_at,
+              CASE WHEN c.id IS NULL THEN 0 ELSE
+                (SELECT COUNT(*) FROM messages m
+                  WHERE m.conversation_id = c.id
+                    AND m.read_at IS NULL
+                    AND m.sender_user_id <> $1)
+              END AS unread_count
+       FROM patients p
+       JOIN doctors d ON d.id = $2
+       LEFT JOIN conversations c ON c.patient_id = p.id AND c.doctor_id = d.id
+       WHERE EXISTS (
+         SELECT 1 FROM appointments a
+         WHERE a.patient_id = p.id AND a.doctor_id = d.id
+       )
+       ORDER BY COALESCE(c.updated_at, (SELECT MAX(a2.appointment_date) FROM appointments a2 WHERE a2.patient_id = p.id AND a2.doctor_id = d.id)) DESC
+       LIMIT 5`,
+      [userId, assignedDoctorId]
+    );
+
+    res.json(success({
+      date: targetDate,
+      queueCounts: {
+        waiting: parseInt(queueCounts.waiting) || 0,
+        inConsultation: parseInt(queueCounts.inConsultation) || 0,
+        done: parseInt(queueCounts.done) || 0,
+      },
+      capacity: {
+        remaining: capacity.remaining_capacity,
+        total: capacity.final_capacity,
+      },
+      pendingVerificationPayments: pendingPaymentsCount,
+      unreadMessages: unreadMessagesCount,
+      todayQueue: queueResult.rows.map(row => ({
+        queueNumber: row.queue_number,
+        patientName: `${row.first_name} ${row.last_name}`,
+        reason: row.reason_for_visit,
+        status: row.status,
+        appointmentId: row.appointment_id,
+        registrationSource: row.registration_source,
+      })),
+      paymentsNeedingAction: paymentsResult.rows.map(row => ({
+        id: row.id,
+        appointmentId: row.appointment_id,
+        status: row.status,
+        paymentMethod: row.payment_method,
+        totalAmount: row.total_amount,
+        patientName: `${row.patient_first_name} ${row.patient_last_name}`,
+        appointmentDate: row.appointment_date,
+        appointmentStatus: row.appointment_status,
+      })),
+      recentConversations: conversationsResult.rows.map(row => ({
+        id: row.id,
+        patientId: row.patient_id,
+        patientName: `${row.patient_first_name} ${row.patient_last_name}`,
+        unreadCount: parseInt(row.unread_count) || 0,
+        updatedAt: row.updated_at,
+      })),
+    }));
+  } catch (err: any) {
+    console.error('Secretary dashboard error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch secretary dashboard'));
   }
 });
 

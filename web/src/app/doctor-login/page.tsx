@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
@@ -12,20 +12,11 @@ export default function DoctorLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showOtp, setShowOtp] = useState(false);
   const [challengeId, setChallengeId] = useState('');
   const router = useRouter();
-
-  // Check for session expired parameter
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('session') === 'expired') {
-      setError('Your session has expired. Please log in again.');
-    }
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,18 +24,12 @@ export default function DoctorLogin() {
     setError('');
 
     try {
-      // Get trusted browser token from cookies
-      const trustedBrowserToken = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('trustedBrowser='))
-        ?.split('=')[1];
-
       const response = await authApi.login({
         email,
         password,
         expectedRole: 'DOCTOR',
-        rememberMe,
-        trustedBrowserToken,
+        // The trusted-device token is an HttpOnly cookie and is sent
+        // automatically by the browser; it is never read from JavaScript.
       });
 
       if (response.success && response.data) {
@@ -57,17 +42,27 @@ export default function DoctorLogin() {
         }
 
         // Type guard: this is now AuthResponse (not LoginOtpRequiredResponse)
-        const authData = response.data as { user: any; accessToken: string; refreshToken: string };
+        const authData = response.data as {
+          user: any;
+          accessToken: string;
+          refreshToken: string;
+          requiresTrustPrompt?: boolean;
+          session?: any;
+        };
 
-        apiClient.setToken(authData.accessToken, authData.refreshToken);
-        localStorage.setItem('user', JSON.stringify(authData.user));
+        // Store the user profile and start the session watchdog.
+        localStorage.setItem('doctor_user', JSON.stringify(authData.user));
+        apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null);
 
         if (authData.user.role === 'DOCTOR') {
-          await routeBasedOnApprovalStatus();
+          if (authData.requiresTrustPrompt) {
+            router.push('/doctor/trust-device');
+          } else {
+            await routeBasedOnApprovalStatus();
+          }
         } else {
           setError('Invalid username or password.');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
+          localStorage.removeItem('doctor_user');
           apiClient.clearToken();
         }
       } else {
@@ -82,15 +77,17 @@ export default function DoctorLogin() {
 
   const handleOtpVerifySuccess = async (data: any) => {
     if (data.user.role === 'DOCTOR') {
-      apiClient.setToken(data.accessToken, data.refreshToken);
-      // Store user data in localStorage
-      localStorage.setItem('user', JSON.stringify(data.user));
-      
-      await routeBasedOnApprovalStatus();
+      localStorage.setItem('doctor_user', JSON.stringify(data.user));
+      apiClient.setToken(data.accessToken, data.refreshToken, data.session || null);
+
+      if (data.requiresTrustPrompt) {
+        router.push('/doctor/trust-device');
+      } else {
+        await routeBasedOnApprovalStatus();
+      }
     } else {
       setError('Invalid username or password.');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      localStorage.removeItem('doctor_user');
       apiClient.clearToken();
     }
   };
@@ -124,30 +121,22 @@ export default function DoctorLogin() {
           // PENDING should not normally reach here since backend blocks login
           // Handle defensively
           setError('Your account is awaiting administrator approval');
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
+          localStorage.removeItem('doctor_user');
           apiClient.clearToken();
         } else {
           setError('Invalid account status');
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
+          localStorage.removeItem('doctor_user');
           apiClient.clearToken();
         }
       } else {
         setError('Failed to fetch profile');
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
+        localStorage.removeItem('doctor_user');
         apiClient.clearToken();
       }
     } catch (err) {
       console.error('Error fetching profile:', err);
       setError('An error occurred while fetching your profile');
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      localStorage.removeItem('doctor_user');
       apiClient.clearToken();
     }
   };
@@ -259,19 +248,6 @@ export default function DoctorLogin() {
               </div>
             </div>
 
-            <div className="flex items-center pt-1">
-              <label className="flex items-center cursor-pointer select-none" htmlFor="remember-me">
-                <input
-                  id="remember-me"
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-5 w-5 rounded-md border-[#CBD5E1] text-[#0D3B75] focus:ring-[#0D3B75] focus:ring-offset-0 transition duration-150 cursor-pointer"
-                />
-                <span className="ml-2.5 text-[15px] font-normal text-[#64748B]">Remember me</span>
-              </label>
-            </div>
-
             <div className="pt-2">
               <button
                 type="submit"
@@ -290,7 +266,6 @@ export default function DoctorLogin() {
             onVerifyError={handleOtpVerifyError}
             onCancel={handleOtpCancel}
             onChallengeIdUpdate={handleChallengeIdUpdate}
-            rememberMe={rememberMe}
           />
         )}
 

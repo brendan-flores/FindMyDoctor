@@ -9,6 +9,10 @@ export default function SecretaryManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [selectedSecretary, setSelectedSecretary] = useState<Secretary | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordResult, setPasswordResult] = useState<{ email: string; temporaryPassword: string } | null>(null);
 
   useEffect(() => {
     loadSecretaries();
@@ -16,20 +20,9 @@ export default function SecretaryManagement() {
 
   const loadSecretaries = async () => {
     try {
-      const response = await adminApi.getAllUsers();
+      const response = await adminApi.getAllSecretaries();
       if (response.success && response.data) {
-        const secretaryUsers = response.data.filter(u => u.role === 'SECRETARY');
-        // Note: This is a simplified approach. In production, we'd need a dedicated endpoint
-        // that returns full secretary profiles with their doctor associations
-        const secretaryProfiles: Secretary[] = secretaryUsers.map(user => ({
-          id: user.id,
-          userId: user.id,
-          firstName: 'Secretary',
-          lastName: 'Name',
-          doctorId: 'doctor-id-placeholder',
-          isApproved: true,
-        }));
-        setSecretaries(secretaryProfiles);
+        setSecretaries(response.data);
       }
     } catch (error) {
       console.error('Failed to load secretaries:', error);
@@ -50,19 +43,64 @@ export default function SecretaryManagement() {
   };
 
   const filteredSecretaries = secretaries.filter(secretary => {
-    const matchesSearch = `${secretary.firstName} ${secretary.lastName}`
+    const matchesSearch = `${secretary.firstName} ${secretary.lastName} ${secretary.email}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' ||
-      (statusFilter === 'Active' && secretary.isApproved) ||
-      (statusFilter === 'Inactive' && !secretary.isApproved);
+      (statusFilter === 'Active' && secretary.isActive) ||
+      (statusFilter === 'Inactive' && !secretary.isActive);
     return matchesSearch && matchesStatus;
   });
 
   const stats = {
     total: secretaries.length,
-    active: secretaries.filter(s => s.isApproved).length,
-    inactive: secretaries.filter(s => !s.isApproved).length,
+    active: secretaries.filter(s => s.isActive).length,
+    inactive: secretaries.filter(s => !s.isActive).length,
+    unassigned: secretaries.filter(s => !s.doctorId).length,
+  };
+
+  const handleDeactivateSecretary = (secretary: Secretary) => {
+    setSelectedSecretary(secretary);
+    setShowDeactivateModal(true);
+  };
+
+  const confirmDeactivateSecretary = async () => {
+    if (!selectedSecretary) return;
+
+    try {
+      const response = await adminApi.deactivateSecretary(selectedSecretary.id);
+      if (response.success) {
+        loadSecretaries();
+        setShowDeactivateModal(false);
+        setSelectedSecretary(null);
+      }
+    } catch (error) {
+      console.error('Failed to deactivate secretary:', error);
+    }
+  };
+
+  const handleReactivateSecretary = async (secretaryId: string) => {
+    try {
+      const response = await adminApi.reactivateSecretary(secretaryId);
+      if (response.success) {
+        loadSecretaries();
+      }
+    } catch (error) {
+      console.error('Failed to reactivate secretary:', error);
+    }
+  };
+
+  const handleResetPassword = async (secretary: Secretary) => {
+    setSelectedSecretary(secretary);
+    try {
+      const response = await adminApi.resetSecretaryPassword(secretary.id);
+      if (response.success && response.data) {
+        setPasswordResult(response.data);
+        setShowPasswordModal(true);
+      }
+    } catch (error) {
+      console.error('Failed to reset password:', error);
+    }
   };
 
   if (isLoading) {
@@ -75,28 +113,6 @@ export default function SecretaryManagement() {
 
   return (
     <div className="space-y-6">
-      {/* Secretary Management Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#1b5eb8] shrink-0">
-            <span className="material-symbols-outlined text-[26px]">badge</span>
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-slate-900">Secretary Management</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Manage secretary accounts and doctor associations</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2.5 text-xs font-semibold text-white bg-[#1b5eb8] hover:bg-[#14468f] rounded-lg transition-colors shadow-sm shadow-blue-600/20 flex items-center gap-2 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[18px]">person_add</span>
-            <span>+ Add Secretary</span>
-          </button>
-        </div>
-      </div>
-
       {/* Summary Metric Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Card 1: TOTAL SECRETARIES */}
@@ -187,8 +203,8 @@ export default function SecretaryManagement() {
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/50">
                 <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Secretary</th>
+                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Email</th>
                 <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Associated Doctor</th>
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">User ID</th>
                 <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Status</th>
                 <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Actions</th>
               </tr>
@@ -206,48 +222,66 @@ export default function SecretaryManagement() {
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-sm">
-                          {secretary.firstName[0]}{secretary.lastName[0]}
+                          {(secretary.firstName || 'S')[0]}{(secretary.lastName || '')[0]}
                         </div>
                         <div>
                           <div className="text-sm font-semibold text-slate-900">
-                            {secretary.firstName} {secretary.lastName}
+                            {secretary.firstName || 'N/A'} {secretary.lastName || 'N/A'}
                           </div>
                           <div className="text-xs text-slate-500">ID: {secretary.id.slice(0, 8)}...</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="text-sm text-slate-700">Dr. {secretary.doctorId.slice(0, 8)}...</div>
-                      <div className="text-xs text-slate-500">Doctor ID: {secretary.doctorId.slice(0, 8)}...</div>
+                      <span className="text-sm text-slate-700">{secretary.email}</span>
                     </td>
                     <td className="px-5 py-4">
-                      <span className="text-sm font-mono text-slate-600">{secretary.userId.slice(0, 8)}...</span>
+                      {secretary.doctorId ? (
+                        <div>
+                          <div className="text-sm text-slate-700">
+                            Dr. {secretary.doctorFirstName} {secretary.doctorLastName}
+                          </div>
+                          <div className="text-xs text-slate-500">{secretary.doctorSpecialty}</div>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-amber-600 font-medium">Unassigned</span>
+                      )}
                     </td>
                     <td className="px-5 py-4">
-                      {secretary.isApproved ? (
+                      {secretary.isActive ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                           Active
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                          <span className="material-symbols-outlined text-[14px]">warning</span>
-                          Pending
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                          <span className="material-symbols-outlined text-[14px]">block</span>
+                          Inactive
                         </span>
                       )}
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        {!secretary.isApproved && (
+                        {secretary.isActive ? (
                           <button
-                            onClick={() => handleApproveSecretary(secretary.id)}
+                            onClick={() => handleDeactivateSecretary(secretary)}
+                            className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                          >
+                            Deactivate
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleReactivateSecretary(secretary.id)}
                             className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
                           >
-                            Approve
+                            Reactivate
                           </button>
                         )}
-                        <button className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors">
-                          View
+                        <button
+                          onClick={() => handleResetPassword(secretary)}
+                          className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+                        >
+                          Reset Password
                         </button>
                       </div>
                     </td>
@@ -280,6 +314,83 @@ export default function SecretaryManagement() {
               </button>
               <button className="px-4 py-2 text-sm font-semibold text-white bg-[#1b5eb8] hover:bg-[#14468f] rounded-lg transition-colors">
                 Create Secretary
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateModal && selectedSecretary && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-xl">
+            <div className="p-6 border-b border-slate-200">
+              <h2 className="text-lg font-bold text-slate-900">Deactivate Secretary Account</h2>
+              <p className="text-sm text-slate-500 mt-1">Are you sure you want to deactivate this secretary?</p>
+            </div>
+            <div className="p-6">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <p className="text-sm text-amber-800 font-medium mb-2">This action will:</p>
+                <ul className="text-sm text-amber-700 list-disc list-inside space-y-1">
+                  <li>Prevent the Secretary from logging in</li>
+                  <li>Invalidate all existing sessions and tokens</li>
+                  <li>Remove all registered push device tokens</li>
+                  <li>NOT delete any appointments, queue entries, or records</li>
+                </ul>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowDeactivateModal(false);
+                  setSelectedSecretary(null);
+                }}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeactivateSecretary}
+                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Deactivate Account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Reset Result Modal */}
+      {showPasswordModal && passwordResult && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-xl">
+            <div className="p-6 border-b border-slate-200">
+              <h2 className="text-lg font-bold text-slate-900">Temporary Credentials Generated</h2>
+              <p className="text-sm text-slate-500 mt-1">New password for the secretary account</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</label>
+                <p className="text-sm font-medium text-slate-900 mt-1">{passwordResult.email}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Temporary Password</label>
+                <div className="mt-1 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="text-lg font-mono font-bold text-slate-900">{passwordResult.temporaryPassword}</p>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">The secretary must change this password on first login.</p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setPasswordResult(null);
+                  setSelectedSecretary(null);
+                }}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>

@@ -45,3 +45,5 @@ Application Version Management: Always read `/docs/CURRENT_VERSION.md` before ma
 - Non-breaking API additions
 
 Maintain one system-wide version covering the web application, mobile application, and backend API. Do not change the version files without user approval.
+
+Code Cleanup: When creating temporary files for testing or debugging (e.g., .js test files, scratch scripts, temporary config files), remove them immediately after the issue is resolved or the feature is complete. Do not commit temporary test files to the repository. Keep the codebase clean and free of debugging artifacts.

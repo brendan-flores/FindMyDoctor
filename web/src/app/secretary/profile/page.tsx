@@ -164,17 +164,8 @@ export default function SecretaryProfile() {
 
   return (
     <div className="space-y-6">
-      {/* Profile Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#1b5eb8] shrink-0">
-            <span className="material-symbols-outlined text-[26px]">account_circle</span>
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-slate-900">My Profile</h1>
-            <p className="text-xs text-slate-500 mt-0.5">View and manage your secretary profile information</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
         {!isEditing && (
           <button
             onClick={handleEdit}

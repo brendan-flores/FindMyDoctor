@@ -22,6 +22,7 @@ export default function AdminSidebar({ userName = 'Eleanor Vance', userRole = 'S
     { id: 'dashboard', label: 'Dashboard', icon: 'grid_view' },
     { id: 'doctors', label: 'Doctors', icon: 'stethoscope' },
     { id: 'secretaries', label: 'Secretaries', icon: 'badge' },
+    { id: 'audit-log', label: 'Audit Log', icon: 'history' },
     // Only show Admin and Users tabs for SUPERADMIN
     ...(userRole === 'SUPERADMIN' ? [
       { id: 'admin', label: 'Admin', icon: 'admin_panel_settings' },
@@ -39,8 +40,11 @@ export default function AdminSidebar({ userName = 'Eleanor Vance', userRole = 'S
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await apiClient.post('/auth/logout', {});
     apiClient.clearToken();
+    localStorage.removeItem('admin_refreshToken');
+    localStorage.removeItem('admin_user');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     router.push('/admin/login');

@@ -91,24 +91,17 @@ export default function DoctorSecretary() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 shadow-lg">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-white">Secretary Management</h1>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="h-12 px-6 rounded-xl bg-white hover:bg-blue-50 text-blue-600 font-semibold text-sm flex items-center gap-2 shadow-md transition-all transform hover:scale-105"
-          >
-            <span className="material-symbols-outlined text-[20px]">add_circle</span>
-            <span>Add Secretary</span>
-          </button>
-        </div>
-      </div>
-
       {/* Secretaries List */}
       <div className="bg-white rounded-2xl shadow-md border border-slate-100">
-        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex items-center justify-between">
           <h3 className="text-xl font-bold text-slate-800">Your Secretaries</h3>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="h-10 px-4 rounded-xl bg-white hover:bg-blue-50 text-blue-600 font-semibold text-sm flex items-center gap-2 shadow-md transition-all transform hover:scale-105 border border-blue-200"
+          >
+            <span className="material-symbols-outlined text-[18px]">add_circle</span>
+            <span>Add Secretary</span>
+          </button>
         </div>
         {listError ? (
           <div className="p-8 text-center text-red-700">

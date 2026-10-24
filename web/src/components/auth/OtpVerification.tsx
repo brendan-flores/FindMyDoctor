@@ -11,18 +11,25 @@ interface OtpVerificationProps {
   onVerifyError: (error: string) => void;
   onCancel?: () => void;
   onChallengeIdUpdate?: (newChallengeId: string) => void;
-  rememberMe?: boolean;
 }
 
 interface AuthResponse {
   user: any;
   accessToken: string;
   refreshToken: string;
+  isTrustedBrowser?: boolean;
+  requiresTrustPrompt?: boolean;
+  session?: {
+    rememberMe: boolean;
+    persistent: boolean;
+    idleTimeoutMinutes: number;
+    maxSessionMinutes: number | null;
+  };
 }
 
 const OTP_PATTERN = /^\d{6}$/;
 
-export default function OtpVerification({ email, challengeId, onVerifySuccess, onVerifyError, onCancel, onChallengeIdUpdate, rememberMe = false }: OtpVerificationProps) {
+export default function OtpVerification({ email, challengeId, onVerifySuccess, onVerifyError, onCancel, onChallengeIdUpdate }: OtpVerificationProps) {
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [otpError, setOtpError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -147,16 +154,15 @@ export default function OtpVerification({ email, challengeId, onVerifySuccess, o
       const response = await apiClient.post('/auth/verify-login-otp', {
         challengeId: currentChallengeId,
         otp: getOtpValue(),
-        rememberMe,
       });
 
       if (response.success && response.data) {
         // Type guard: this is AuthResponse
         const authData = response.data as AuthResponse;
         
-        // Tokens are now stored in HttpOnly cookies by the backend
-        // No need to store them in localStorage
-        apiClient.setToken(authData.accessToken);
+        // Tokens are also set as HttpOnly cookies by the backend. Keep the
+        // client copy in sync and start the idle watchdog with the server policy.
+        apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null);
         
         onVerifySuccess(authData);
       } else {

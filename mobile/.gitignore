@@ -51,3 +51,6 @@ app.*.map.json
 **/flutter/generated_plugin_registrant.*
 **/flutter/generated_plugins.*
 **/Flutter/GeneratedPluginRegistrant.*
+
+# Local development configuration (each developer sets their own IP)
+lib/core/config/local_config.dart

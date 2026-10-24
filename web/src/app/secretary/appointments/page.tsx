@@ -90,12 +90,6 @@ export default function SecretaryAppointments() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-purple-700 rounded-2xl p-6 shadow-lg">
-        <h1 className="text-2xl font-bold text-white">Appointments</h1>
-        <p className="text-purple-100 mt-1">View and manage doctor's appointments</p>
-      </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
