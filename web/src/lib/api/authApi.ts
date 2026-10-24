@@ -264,15 +264,32 @@ export interface PasswordResetResponse {
   message?: string;
 }
 
-export interface ResetPasswordRequest {
+export interface VerifyResetCodeRequest {
   email: string;
   otp: string;
+}
+
+export interface VerifyResetCodeResponse {
+  success: boolean;
+  data?: { resetToken: string; message: string } | null;
+  error?: string;
+  errorCode?: string;
+  message?: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  resetToken: string;
   newPassword: string;
 }
 
 export const passwordResetApi = {
   requestPasswordReset: async (payload: PasswordResetRequest): Promise<PasswordResetResponse> => {
     return apiClient.post<{ message: string }>('/auth/password-reset/request', payload);
+  },
+
+  verifyResetCode: async (payload: VerifyResetCodeRequest): Promise<VerifyResetCodeResponse> => {
+    return apiClient.post<{ resetToken: string; message: string }>('/auth/password-reset/verify', payload);
   },
 
   resetPassword: async (payload: ResetPasswordRequest): Promise<PasswordResetResponse> => {
