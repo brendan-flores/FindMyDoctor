@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { passwordResetApi } from '@/lib/api/authApi';
 import Toast from '@/components/ui/Toast';
+import OtpInput from '@/components/ui/OtpInput';
 
 export default function SecretaryResetPassword() {
   const searchParams = useSearchParams();
@@ -213,34 +214,13 @@ export default function SecretaryResetPassword() {
         {!isVerified ? (
           /* Step 1: Verification code only */
           <form onSubmit={handleVerifyCode} className="w-full space-y-5">
-            <div className="space-y-2">
-              <label htmlFor="otp" className="block text-[15px] font-bold text-[#1A202C]">
-                Verification Code
-              </label>
-              <div className="relative rounded-2xl shadow-sm">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.8"
-                    ></path>
-                  </svg>
-                </div>
-                <input
-                  id="otp"
-                  type="text"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="Enter 6-digit code"
-                  required
-                  disabled={isVerifying}
-                  maxLength={6}
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
+            <OtpInput
+              value={otp}
+              onChange={setOtp}
+              onComplete={handleVerifyCode}
+              disabled={isVerifying}
+              error={!!error}
+            />
 
             {/* Resend Code Button */}
             <div className="text-center">
