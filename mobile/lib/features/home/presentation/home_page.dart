@@ -17,6 +17,7 @@ import '../../../features/auth/presentation/change_password_page.dart';
 import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
 import '../../conversations/models/conversation.dart';
+import '../../../core/constants/ai_constants.dart';
 
 class HomePage extends StatefulWidget {
   final int? initialTab;
@@ -48,6 +49,7 @@ class _HomePageState extends State<HomePage> {
   String? _userName;
   String? _userEmail;
   bool _accountInfoFailed = false;
+  String _chatSegment = 'clinic'; // M1: Segmented control state
 
   // Profile "About" and "Notifications" section state.
   String? _appVersion;
@@ -241,6 +243,30 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       bottomNavigationBar: _buildBottomNavigation(),
+      // M2: Floating "Ask MediGuide" shortcut in patient shell
+      // HomePage is only shown to patients (secretaries get SecretaryHomePage)
+      // Hide on Chat tab (index 3) and Profile/Settings tab (index 4)
+      floatingActionButton: _currentIndex == 3 || _currentIndex == 4
+          ? null
+          : FloatingActionButton(
+              tooltip: AiConstants.shortcutLabel,
+              onPressed: () {
+                setState(() {
+                  _currentIndex = 3; // Chat tab
+                  _chatSegment = 'ai'; // Switch to AI segment
+                });
+              },
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: SizedBox(
+                width: 100,
+                height: 100,
+                child: Image.asset(
+                  'assets/images/mediguide_badge.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
     );
   }
 
@@ -322,31 +348,148 @@ class _HomePageState extends State<HomePage> {
             Navigator.of(context).pushNamed('/notifications');
           },
         ),
+        // M1: Segmented control for Clinic | AI Assistant
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: spacing.AppSpacing.screenPadding,
+            vertical: spacing.AppSpacing.gutterMd,
+          ),
+          child: SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                value: 'clinic',
+                label: Text('Clinic'),
+                icon: Icon(Icons.chat_bubble_outline),
+              ),
+              ButtonSegment(
+                value: 'ai',
+                label: Text(AiConstants.shortName),
+                icon: Icon(Icons.smart_toy),
+              ),
+            ],
+            selected: {_chatSegment},
+            onSelectionChanged: (value) {
+              setState(() {
+                _chatSegment = value.first;
+              });
+            },
+          ),
+        ),
         Expanded(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  Text('Secretary Chat', style: AppTextStyles.headlineLg),
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  ChatTabContent(
-                    isLoading: _isLoadingConversations,
-                    conversations: _conversations,
-                    onRefresh: () {
-                      if (mounted) {
-                        _loadConversations();
-                      }
-                    },
+          child: _chatSegment == 'clinic'
+              ? SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: spacing.AppSpacing.gutterLg),
+                        Text('Secretary Chat', style: AppTextStyles.headlineLg),
+                        const SizedBox(height: spacing.AppSpacing.gutterLg),
+                        ChatTabContent(
+                          isLoading: _isLoadingConversations,
+                          conversations: _conversations,
+                          onRefresh: () {
+                            if (mounted) {
+                              _loadConversations();
+                            }
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                )
+              : SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: spacing.AppSpacing.gutterLg),
+                        Text('AI Assistant', style: AppTextStyles.headlineLg),
+                        const SizedBox(height: spacing.AppSpacing.gutterLg),
+                        _buildAiQuickActions(),
+                        const SizedBox(height: spacing.AppSpacing.gutterLg),
+                        _buildAiConversationsList(),
+                      ],
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  // M3: AI quick actions in Chat tab
+  Widget _buildAiQuickActions() {
+    return AppCard(
+      onTap: () {
+        Navigator.of(context).pushNamed('/ai-conversation');
+      },
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/mediguide_badge.png',
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
               ),
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: spacing.AppSpacing.gutterMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Start AI Conversation',
+                  style: AppTextStyles.bodyMdMedium,
+                ),
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
+                Text(
+                  'Ask health questions',
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.secondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right, color: AppColors.outline),
+        ],
+      ),
+    );
+  }
+
+  // M4: AI conversations list
+  Widget _buildAiConversationsList() {
+    return AppCard(
+      onTap: () {
+        Navigator.of(context).pushNamed('/ai-conversation-history');
+      },
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      child: Row(
+        children: [
+          Icon(Icons.history, color: AppColors.outline),
+          const SizedBox(width: spacing.AppSpacing.gutterSm),
+          Expanded(
+            child: Text(
+              'Conversation history',
+              style: AppTextStyles.bodyMd,
+            ),
+          ),
+          Icon(Icons.chevron_right, color: AppColors.outline),
+        ],
+      ),
     );
   }
 
@@ -1115,6 +1258,19 @@ class _HomePageState extends State<HomePage> {
           setState(() {
             _selectedSpecialtyFromHome = null;
             _currentIndex = 1;
+          });
+        } else if (title == 'My Appointments') {
+          setState(() {
+            _currentIndex = 2;
+          });
+        } else if (title == 'Secretary Chat') {
+          setState(() {
+            _currentIndex = 3;
+            _chatSegment = 'clinic';
+          });
+        } else if (title == 'My Profile') {
+          setState(() {
+            _currentIndex = 4;
           });
         }
       },
