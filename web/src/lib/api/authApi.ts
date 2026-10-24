@@ -250,3 +250,32 @@ export const otpApi = {
     return apiClient.get<OtpStatusData>(`/auth/otp/status/${encodeURIComponent(email)}`);
   },
 };
+
+// Password Reset API
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetResponse {
+  success: boolean;
+  data?: { message: string } | null;
+  error?: string;
+  errorCode?: string;
+  message?: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  otp: string;
+  newPassword: string;
+}
+
+export const passwordResetApi = {
+  requestPasswordReset: async (payload: PasswordResetRequest): Promise<PasswordResetResponse> => {
+    return apiClient.post<{ message: string }>('/auth/password-reset/request', payload);
+  },
+
+  resetPassword: async (payload: ResetPasswordRequest): Promise<PasswordResetResponse> => {
+    return apiClient.post<{ message: string }>('/auth/password-reset/reset', payload);
+  },
+};

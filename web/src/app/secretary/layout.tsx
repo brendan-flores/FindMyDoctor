@@ -14,6 +14,10 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const isTrustPage = pathname === '/secretary/trust-device';
+  const isPublicPage =
+    pathname === '/secretary/forgot-password' ||
+    pathname === '/secretary/reset-password' ||
+    isTrustPage;
   const [userName, setUserName] = useState('Secretary');
   const [userRole, setUserRole] = useState('Secretary');
   const [isLoading, setIsLoading] = useState(true);
@@ -37,6 +41,12 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
     let shouldRedirect = false;
     let redirectPath = '';
     let asyncLoadNeeded = false;
+
+    // Forgot-password and reset-password are public pages; skip auth check.
+    if (isPublicPage) {
+      setIsLoading(false);
+      return;
+    }
 
     if (!token) {
       shouldRedirect = true;
@@ -133,7 +143,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
     );
   }
 
-  if (isTrustPage) {
+  if (isPublicPage) {
     return <>{children}</>;
   }
 
