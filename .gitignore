@@ -52,6 +52,7 @@ mobile/.packages
 mobile/.pub-cache/
 mobile/.pub/
 mobile/build/
+mobile/lib/core/config/local_config.dart
 
 # Web specific
 web/.next/

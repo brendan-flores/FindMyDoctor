@@ -572,7 +572,7 @@ The backend enforces a single session policy in `backend/src/modules/auth/sessio
 - All cookies use path `/`. Access/refresh cookies are HttpOnly and Secure in production; the trusted-browser cookie is always HttpOnly.
 - A non-sensitive `<prefix>_sessionActive` browser-session hint cookie (JavaScript-readable, no credentials) is set for non-persistent sessions so `apiClient` can discard localStorage tokens after a browser restart.
 - Multiple portal sessions may coexist. Middleware treats role-namespaced paths (`/doctors`, `/secretaries`, `/admin`) as authoritative, uses `X-Portal-Role` for shared resource paths such as `/patients/:id`, `/prescriptions/patients/:id`, and `/visits/patient/:id`, checks the matching role cookies with a global fallback, and rejects cross-role token use. Shared sub-resources are exempt from the namespace check: `/doctors/:id/availability` accepts both PATIENT tokens (the mobile patient booking journey) and DOCTOR tokens; doctor-portal-only routes remain guarded by `authorize('DOCTOR')`.
-- The web `apiClient` sends `X-Portal-Role`, retries once after a successful refresh, coordinates concurrent refreshes, runs an idle/absolute watchdog, and clears expired sessions with "Your session has expired. Please log in again." Only a 400/401 refresh response clears the session; transient rate-limit, server, and network failures do not.
+- The web `apiClient` sends `X-Portal-Role`, retries once after a successful refresh, coordinates concurrent refreshes, runs an idle/absolute watchdog, and clears expired sessions with "Your session has expired. Please log in again." Only a 400/401 refresh response clears the session; transient rate-limit, server, and network failures do not. Safe `GET` reads are also cached for 15 seconds per role and retried on `429` with bounded backoff; mutations are never cached or retried (see "API Rate Limiting, Retries, and Read Caching").
 
 **Trusted Browser API Endpoints:**
 - `POST /api/v1/auth/login` — recognizes a valid trusted-device cookie, returns `isTrustedBrowser`/`requiresTrustPrompt` and session metadata, and does not set session cookies until OTP succeeds when OTP is required.
@@ -2262,6 +2262,44 @@ Since Tailwind CSS is already configured, shadcn/ui components can be added as n
 - **Web**: npm
 - **Mobile**: pub (Flutter)
 - **Backend**: npm
+
+## API Rate Limiting, Retries, and Read Caching
+
+Dashboard navigation must not exhaust rate limits or duplicate reads. The behavior is intentionally small and dependency-free.
+
+### Backend Rate Limits
+
+- `backend/src/middleware/rateLimit.ts` exports `createRateLimiter`, `apiLimiter`, and `authLimiter`.
+- General API: `RATE_LIMIT_MAX_REQUESTS` (default `300`) per `RATE_LIMIT_WINDOW_MS` (default `60000`) per IP, mounted on `/api/`.
+- Sensitive authentication: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default `30`) per `AUTH_RATE_LIMIT_WINDOW_MS` (default `900000`) per IP, mounted on `/api/v1` and skipped for non-auth paths. Covered paths: `/auth/login`, `/auth/verify-login-otp`, `/auth/resend-login-otp`, `/auth/otp`, `/auth/patient/otp`, `/auth/register`, `/auth/change-password`.
+- Sensitive routes count against both budgets, so the stricter auth budget applies.
+- `429` responses carry `Retry-After` (seconds) and `{ success: false, error: { code: "RATE_LIMIT", message } }`.
+- `OPTIONS` requests do not consume either budget.
+- Rate limiting is additive to authentication/authorization; protected routes still validate token and role on every request.
+
+### Server Availability Cache
+
+- `backend/src/modules/availability/availabilityService.ts` wraps availability range computation in a `TtlCache` (`backend/src/utils/ttlCache.ts`).
+- TTL: `AVAILABILITY_CACHE_TTL_MS` (default `20000`). Key: `availability:<doctorId>:<start>:<end>`.
+- The cache is bypassed whenever `patientId` is provided, so patient-specific results are never reused.
+- Successful non-`GET` requests through the doctors, secretaries, appointments, and walk-ins routers invalidate the cache.
+
+### Backend Query Batching
+
+- `calculateCapacityRange` fetches schedules, breaks, exceptions, and appointments in four queries total instead of four per date.
+- The Doctor dashboard executes its independent reads with `Promise.all` and reuses the loaded schedule/break/exception rows through `buildCapacityResult`.
+- The Secretary dashboard reads concurrently and computes unread messages with one aggregate query.
+- The payments list loads charges with one `payment_id = ANY($1::uuid[])` query and groups them in memory.
+
+### Web Client
+
+- `web/src/lib/api/requestPolicy.ts` defines the retry policy: only `GET` is retried on `429`, three total attempts, 500 ms base exponential backoff, jitter up to 250 ms, 5 s maximum wait, and `Retry-After` precedence.
+- `web/src/lib/api/ttlCache.ts` is an in-memory TTL cache. `apiClient` keys entries as `<role>|<endpoint>` and caches only successful `GET` responses for 15 seconds.
+- Concurrent identical non-abortable reads share one in-flight request.
+- The cache is cleared on token/role change, logout/session expiry, and after any successful mutation. A cache generation counter prevents requests started before a clear from repopulating stale data.
+- `apiClient.get` accepts `{ signal, skipCache, cacheTtlMs }`. Dashboard pages abort on unmount; save-event refreshes use `skipCache`.
+- Mutations are never retried and never served from cache. Server authorization still runs on every cache miss.
+- Web tests use Node's built-in test runner (`npm test` in `/web`); no new dependency was added.
 
 ## Security Considerations
 

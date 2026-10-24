@@ -1,4 +1,25 @@
+import { ClientTtlCache } from './ttlCache';
+import {
+  DEFAULT_GET_CACHE_TTL_MS,
+  MAX_GET_RETRY_ATTEMPTS,
+  computeRetryDelayMs,
+  parseRetryAfterMs,
+  shouldRetryResponse,
+} from './requestPolicy';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+
+/** Error code returned when the caller aborted a request. */
+export const REQUEST_ABORTED_ERROR_CODE = 'REQUEST_ABORTED';
+
+export interface GetOptions {
+  /** Abort the request (and any retry backoff) when the caller unmounts. */
+  signal?: AbortSignal;
+  /** Skip the cache read. The fresh response still refreshes the cache. */
+  skipCache?: boolean;
+  /** Per-request cache lifetime. Use 0 to disable caching entirely. */
+  cacheTtlMs?: number;
+}
 
 interface ApiResponse<T> {
   success: boolean;
@@ -86,6 +107,10 @@ class ApiClient {
   private idleTimer: ReturnType<typeof setInterval> | null = null;
   private lastActivityWrite = 0;
   private activityBound = false;
+  private getCache = new ClientTtlCache<ApiResponse<unknown>>();
+  private inFlightGets = new Map<string, Promise<ApiResponse<unknown>>>();
+  /** Bumped whenever cached data must not be reused (token/role change, mutation). */
+  private cacheGeneration = 0;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -296,6 +321,9 @@ class ApiClient {
       this.clearToken();
       return;
     }
+
+    const previousToken = this.token;
+    const previousRole = this.role;
     this.token = token;
     if (typeof window !== 'undefined') {
       // Re-detect role from current path to ensure correct scoping
@@ -310,6 +338,11 @@ class ApiClient {
       }
     }
 
+    // Never serve data cached for a different session or portal.
+    if (previousToken !== token || previousRole !== this.role) {
+      this.clearGetCache();
+    }
+
     if (session) {
       this.setSession(session, preserveSessionStart);
     } else if (this.session) {
@@ -321,6 +354,7 @@ class ApiClient {
     this.token = null;
     this.refreshToken = null;
     this.session = null;
+    this.clearGetCache();
     this.stopIdleWatch();
     if (typeof window !== 'undefined') {
       localStorage.removeItem(this.storageKey('token'));
@@ -524,22 +558,99 @@ class ApiClient {
     return headers;
   }
 
-  async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-    try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'GET',
-        headers: this.getHeaders(),
-        credentials: 'include',
-      });
+  private getCacheKey(endpoint: string): string {
+    // The role prefix keeps data from different portals from ever mixing.
+    return `${this.role || 'guest'}|${endpoint}`;
+  }
 
-      if (response.status === 401 && this.shouldRefreshOn401(endpoint)) {
-        const newToken = await this.refreshAccessToken();
-        if (newToken) {
-          // Retry the request with new token
+  /**
+   * Drop every cached GET response. The generation bump also stops a request
+   * that is still in flight from writing stale data into the fresh cache.
+   */
+  private clearGetCache() {
+    this.cacheGeneration += 1;
+    this.getCache.invalidate();
+    // Do not let a request started under a previous session be joined by a
+    // caller from the current session.
+    this.inFlightGets.clear();
+  }
+
+  private cacheGetResponse<T>(
+    cacheKey: string,
+    ttlMs: number,
+    generation: number,
+    response: ApiResponse<T>
+  ) {
+    if (ttlMs <= 0 || generation !== this.cacheGeneration) return;
+    if (!response || response.success !== true) return;
+    this.getCache.set(cacheKey, response as ApiResponse<unknown>, ttlMs);
+  }
+
+  private abortedResponse<T>(): ApiResponse<T> {
+    return {
+      success: false,
+      error: 'Request cancelled',
+      errorCode: REQUEST_ABORTED_ERROR_CODE,
+    };
+  }
+
+  /** Abort-aware delay used between rate-limit retries. */
+  private waitForRetry(ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new Error('aborted'));
+        return;
+      }
+
+      const onAbort = () => {
+        clearTimeout(timer);
+        reject(new Error('aborted'));
+      };
+
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  private async performGet<T>(
+    endpoint: string,
+    cacheKey: string,
+    ttlMs: number,
+    generation: number,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<T>> {
+    for (let attempt = 1; attempt <= MAX_GET_RETRY_ATTEMPTS; attempt += 1) {
+      if (signal?.aborted) return this.abortedResponse<T>();
+
+      try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+          method: 'GET',
+          headers: this.getHeaders(),
+          credentials: 'include',
+          signal,
+        });
+
+        if (response.status === 401 && this.shouldRefreshOn401(endpoint)) {
+          const newToken = await this.refreshAccessToken();
+          if (!newToken) {
+            return {
+              success: false,
+              error: 'Session expired',
+              httpStatus: 401,
+            };
+          }
+
+          // Retry once with the refreshed token. Only GETs reach this path, so
+          // the retry is always safe.
           const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
             method: 'GET',
             headers: this.getHeaders(),
             credentials: 'include',
+            signal,
           });
 
           if (!retryResponse.ok) {
@@ -548,28 +659,81 @@ class ApiClient {
           }
 
           const data = await retryResponse.json();
-          return normalizeApiResponse<T>(data);
+          const normalized = normalizeApiResponse<T>(data);
+          this.cacheGetResponse(cacheKey, ttlMs, generation, normalized);
+          return normalized;
         }
+
+        if (!response.ok) {
+          // Rate limiting on a safe read is transient: honour Retry-After and
+          // back off instead of surfacing a 429 to the page.
+          const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'));
+          if (shouldRetryResponse('GET', response.status) && attempt < MAX_GET_RETRY_ATTEMPTS) {
+            await this.waitForRetry(computeRetryDelayMs(attempt, retryAfterMs), signal);
+            continue;
+          }
+
+          const errorText = await response.text();
+          return parseErrorResponse<T>(response.status, errorText);
+        }
+
+        const data = await response.json();
+        const normalized = normalizeApiResponse<T>(data);
+        this.cacheGetResponse(cacheKey, ttlMs, generation, normalized);
+        return normalized;
+      } catch (error) {
+        if (signal?.aborted) return this.abortedResponse<T>();
+
+        // Mutations are never retried, but a failed safe read is not
+        // destructive either; keep the existing single-attempt behaviour for
+        // network errors and only special-case rate limits.
         return {
           success: false,
-          error: 'Session expired',
-          httpStatus: 401,
+          error: 'Network error occurred',
         };
       }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        return parseErrorResponse<T>(response.status, errorText);
-      }
-
-      const data = await response.json();
-      return normalizeApiResponse<T>(data);
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Network error occurred',
-      };
     }
+
+    return {
+      success: false,
+      error: 'Too many requests. Please wait a moment and try again.',
+      errorCode: 'RATE_LIMIT_EXCEEDED',
+      httpStatus: 429,
+    };
+  }
+
+  async get<T>(endpoint: string, options: GetOptions = {}): Promise<ApiResponse<T>> {
+    const { signal } = options;
+    const ttlMs = options.cacheTtlMs ?? DEFAULT_GET_CACHE_TTL_MS;
+    const cacheKey = this.getCacheKey(endpoint);
+
+    if (ttlMs > 0 && !options.skipCache) {
+      const cached = this.getCache.get(cacheKey);
+      if (cached) return cached as ApiResponse<T>;
+    }
+
+    // Collapse concurrent identical reads (for example a sidebar and a page
+    // loading the same profile on first paint). Abortable callers manage their
+    // own request so an abort never cancels another caller's data.
+    if (!signal && !options.skipCache && ttlMs > 0) {
+      const pending = this.inFlightGets.get(cacheKey);
+      if (pending) return pending as Promise<ApiResponse<T>>;
+    }
+
+    const generation = this.cacheGeneration;
+    const request = this.performGet<T>(endpoint, cacheKey, ttlMs, generation, signal);
+
+    if (!signal) {
+      this.inFlightGets.set(cacheKey, request as Promise<ApiResponse<unknown>>);
+      const cleanup = () => {
+        if (this.inFlightGets.get(cacheKey) === request) {
+          this.inFlightGets.delete(cacheKey);
+        }
+      };
+      request.then(cleanup, cleanup);
+    }
+
+    return request;
   }
 
   async post<T>(endpoint: string, body: any = {}, options?: { isFormData?: boolean; headers?: HeadersInit }): Promise<ApiResponse<T>> {
@@ -632,7 +796,9 @@ class ApiClient {
           }
 
           const data = await retryResponse.json();
-          return normalizeApiResponse<T>(data);
+          const normalized = normalizeApiResponse<T>(data);
+          this.clearGetCache();
+          return normalized;
         }
         return {
           success: false,
@@ -647,7 +813,9 @@ class ApiClient {
       }
 
       const data = await response.json();
-      return normalizeApiResponse<T>(data);
+      const normalized = normalizeApiResponse<T>(data);
+      this.clearGetCache();
+      return normalized;
     } catch (error) {
       return {
         success: false,
@@ -682,7 +850,9 @@ class ApiClient {
           }
 
           const data = await retryResponse.json();
-          return normalizeApiResponse<T>(data);
+          const normalized = normalizeApiResponse<T>(data);
+          this.clearGetCache();
+          return normalized;
         }
         return {
           success: false,
@@ -697,7 +867,9 @@ class ApiClient {
       }
 
       const data = await response.json();
-      return normalizeApiResponse<T>(data);
+      const normalized = normalizeApiResponse<T>(data);
+      this.clearGetCache();
+      return normalized;
     } catch (error) {
       return {
         success: false,
@@ -732,7 +904,9 @@ class ApiClient {
           }
 
           const data = await retryResponse.json();
-          return normalizeApiResponse<T>(data);
+          const normalized = normalizeApiResponse<T>(data);
+          this.clearGetCache();
+          return normalized;
         }
         return {
           success: false,
@@ -747,7 +921,9 @@ class ApiClient {
       }
 
       const data = await response.json();
-      return normalizeApiResponse<T>(data);
+      const normalized = normalizeApiResponse<T>(data);
+      this.clearGetCache();
+      return normalized;
     } catch (error) {
       return {
         success: false,
@@ -780,7 +956,9 @@ class ApiClient {
           }
 
           const data = await retryResponse.json();
-          return normalizeApiResponse<T>(data);
+          const normalized = normalizeApiResponse<T>(data);
+          this.clearGetCache();
+          return normalized;
         }
         return {
           success: false,
@@ -795,7 +973,9 @@ class ApiClient {
       }
 
       const data = await response.json();
-      return normalizeApiResponse<T>(data);
+      const normalized = normalizeApiResponse<T>(data);
+      this.clearGetCache();
+      return normalized;
     } catch (error) {
       return {
         success: false,

@@ -1,5 +1,102 @@
 # Changes
 
+## Dashboard 429 elimination: rate limits, read caching, and query batching (2026-10-24)
+
+**Scope:** Web Doctor/Secretary/Admin dashboard navigation, backend rate limiting, availability reads, and dashboard/payment query patterns. No API contract, schema, role, or authorization change.
+**Status:** Implemented, type-checked, and tested. **Not committed or pushed.**
+
+### Root cause
+
+- `backend/.env` configured `RATE_LIMIT_WINDOW_MS=900000` (15 minutes) with a general `RATE_LIMIT_MAX_REQUESTS` of 100 or less, and the single limiter was mounted on all `/api/` traffic.
+- Each client-side route change re-mounted layouts/sidebars that re-fetched `/doctors/me`, `/doctors/me/schedules`, `/secretaries/me`, `/users/me`, and `/conversations`, while dashboard pages also re-fetched their summary endpoints. Normal navigation therefore consumed the small 15-minute budget and returned `429`.
+- The web client had no GET cache, no in-flight de-duplication, and no 429 backoff, so every navigation produced fresh requests and surfaced the 429 immediately.
+- Some dashboard endpoints also issued avoidable queries: the Doctor dashboard re-queried schedule/break/exception rows already loaded for capacity, the Secretary dashboard serialized independent reads and used a correlated unread subquery, and the payments list loaded charges one payment at a time (N+1).
+
+### Changes
+
+**Backend rate limiting**
+- New `backend/src/middleware/rateLimit.ts` with `createRateLimiter`, `apiLimiter`, and `authLimiter`.
+- General budget: `300` requests per `60,000 ms` per IP (`RATE_LIMIT_MAX_REQUESTS`, `RATE_LIMIT_WINDOW_MS`).
+- Sensitive auth budget: `30` requests per `900,000 ms` per IP (`AUTH_RATE_LIMIT_MAX_REQUESTS`, `AUTH_RATE_LIMIT_WINDOW_MS`) for `/auth/login`, `/auth/verify-login-otp`, `/auth/resend-login-otp`, `/auth/otp`, `/auth/patient/otp`, `/auth/register`, and `/auth/change-password`. Sensitive routes count against both budgets, so the stricter limit wins.
+- `429` responses now always include `Retry-After` and the standard `{ success: false, error: { code: "RATE_LIMIT", message } }` envelope. `OPTIONS` pre-flight requests are skipped.
+- Rate limiting is additive to authentication/role checks; no protected route became public.
+- Updated `backend/.env` in place (non-secret rate-limit values) and documented the variables in `backend/.env.example` and `backend/src/config/index.ts`.
+
+**Server-side read caching**
+- New `backend/src/utils/ttlCache.ts` (`TtlCache` with TTL, prefix invalidation, and in-flight sharing).
+- `backend/src/modules/availability/availabilityService.ts` now caches availability ranges for `AVAILABILITY_CACHE_TTL_MS` (default `20,000 ms`), keyed by doctor + start + end. Patient-specific reads (`patientId` present) always bypass the cache.
+- Successful non-`GET` requests through the doctors, secretaries, appointments, and walk-ins routers invalidate the cache.
+- Availability range reads now load schedules, breaks, exceptions, capacity, and appointments in batched queries instead of per-date work.
+
+**Query batching**
+- `capacityService.calculateCapacityRange` uses 4 batched queries and exports `buildCapacityResult` / `calculateCapacityWithContext` for callers that already hold schedule rows.
+- Doctor dashboard: 8 independent reads run in one `Promise.all`; capacity reuses the loaded schedule/break/exception/capacity rows.
+- Secretary dashboard: independent reads run concurrently; the per-patient correlated unread subquery was replaced with one aggregate over `messages`/`conversations` guarded by `EXISTS appointments`.
+- Payments list: charges are loaded with one `payment_id = ANY($1::uuid[])` query and grouped in memory.
+
+**Web client**
+- New `web/src/lib/api/requestPolicy.ts`: GET-only retry on 429, 3 total attempts, 500 ms base exponential backoff, jitter up to 250 ms, 5 s cap, and `Retry-After` precedence.
+- New `web/src/lib/api/ttlCache.ts` and `web/src/lib/api/apiClient.ts` integration:
+  - Successful GET responses are cached in memory for 15 seconds under `<portalRole>|<endpoint>`.
+  - Concurrent identical non-abortable reads share one in-flight request.
+  - The cache is cleared on token/role change, logout/session expiry, and after any successful `POST`/`PUT`/`PATCH`/`DELETE`. A generation counter prevents pre-clear requests from repopulating stale data.
+  - `apiClient.get` accepts `{ signal, skipCache, cacheTtlMs }`; mutations are never cached or retried.
+  - Dashboard pages abort reads on unmount; Doctor sidebar save-event refreshes use `skipCache: true`.
+- API wrappers (`doctorApi`, `secretaryApi`, `adminApi`) accept the new options for profile, schedules, dashboard, stats, and audit-log reads.
+
+### Before/after measurements
+
+Counts are derived from the code paths (no live server or database was used; see limitations). "Round trips" means sequential await batches.
+
+| Scenario | Before | After |
+| --- | --- | --- |
+| Doctor dashboard first load (HTTP) | 4 GETs (sidebar profile + schedules, page profile + dashboard) | 4 GETs (cache is empty on first load) |
+| Doctor dashboard re-navigation within 15 s (HTTP) | 4 GETs | 0 GETs (all cached) |
+| Doctor dashboard endpoint (DB) | 12 queries, 12 sequential round trips | 9 queries in 2 round trips |
+| Secretary dashboard first load (HTTP) | 4 GETs (layout `/users/me`, sidebar `/conversations`, dashboard + profile) | 4 GETs |
+| Secretary dashboard re-navigation within 15 s (HTTP) | 4 GETs | 0 GETs (30 s badge poll still refreshes) |
+| Secretary dashboard endpoint (DB) | 10 queries, 10 sequential round trips after the secretary lookup | 10 queries in one parallel batch after the lookup |
+| Secretary unread count (DB) | Correlated subquery per patient conversation | 1 aggregate query |
+| Payments list with N payments (DB) | 1 list query + N charge queries | 1 list query + 1 charge query |
+| Availability range cache hit (DB) | 5 batched queries | 0 queries within the 20 s TTL |
+| General rate-limit budget | ≤100 requests / 15 min | 300 requests / 60 s |
+| Auth rate-limit budget | Shared general budget | 30 requests / 15 min |
+| GET 429 handling | Immediate error | 3 attempts with `Retry-After`/backoff, capped at 5 s |
+
+### Verification
+
+- Backend `npx tsc --noEmit` — **pass**.
+- Web `npx tsc --noEmit` — **pass**.
+- Web unit tests (`cd web && npm test`, Node built-in runner): **10/10 pass** (`requestPolicy.test.ts`, `ttlCache.test.ts`).
+- New backend tests:
+  - `backend/src/middleware/rateLimit.test.ts` — limit enforcement, `Retry-After` + error envelope, OPTIONS skip, strict auth scoping.
+  - `backend/src/utils/ttlCache.test.ts` — TTL, prefix invalidation, in-flight sharing.
+  - `backend/src/modules/availability/availabilityCache.test.ts` — cache reuse, invalidation, patient-specific bypass.
+  - `backend/src/modules/capacity/capacityService.test.ts` — batched range calculation.
+  - `backend/src/api/payments.test.ts` — batched charges test.
+- Full backend Jest run — **357 passed, 26 failed, 383 total**. All 26 failures are in the five previously documented pre-existing suites (`date`, `conversations`, `payments`, `appointments`, `queue`); no new test or new code path fails. `payments.test.ts` has 14 pre-existing verify/reject/receipt failures on routes untouched by this change; the new batched-charges test passes.
+
+### Assumptions and limitations
+
+- The live reproduction (rapid clicking in a signed-in dashboard against a running backend) was **not** performed: no test credentials were provided, and the configured database is remote/production and was intentionally not touched.
+- Request/query counts above are code-derived. Absolute latency and real 429 timing depend on deployment (`trust proxy`, number of API instances, database latency).
+- Rate-limit counters are in-process (the default `express-rate-limit` memory store). Multiple API instances or a restart reset the budget per instance. If the API is later scaled horizontally, use a shared store without changing the documented budgets.
+- The client cache is per browser tab and per session. It is not shared across tabs and does not survive reload. Data changed in another tab can be up to 15 seconds stale.
+- No database migration or index was added, per the constraint not to modify the remote database. If dashboard queries remain slow at real data volumes, add indexes through a normal migration (for example on `appointments(doctor_id, appointment_date)`, `queue_entries(doctor_id, queue_date)`, and `messages(conversation_id, read_at)`).
+
+### Documentation and version
+
+- Updated `docs/prd.md` (new `FR-002-B`), `docs/architecture.md`, `docs/architecture-essentials.md`, and `docs/SYSTEM_STATE.md`.
+- `docs/CURRENT_VERSION.md` remains **01.21** and `docs/VERSION_HISTORY.md` was not changed because version changes require explicit approval.
+
+### Follow-ups
+
+- Add a shared rate-limit store (for example PostgreSQL/Redis already approved for the stack) only if the API is deployed with multiple instances.
+- Consider metrics for 429 counts and dashboard endpoint latency to confirm the budgets in production.
+- Consider a slightly longer cache TTL for rarely changing reference data if navigation still produces unnecessary reads; keep mutations invalidating it.
+
+---
+
 ## Post-login device trust replaces Remember Me (2026-10-23)
 
 **Scope:** Doctor and Secretary web authentication/session UX. Admin, SuperAdmin, and Patient behavior is unchanged.

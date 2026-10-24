@@ -26,6 +26,8 @@ export default function DoctorDashboard() {
   const [secretarySuccess, setSecretarySuccess] = useState('');
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const checkApprovalStatus = async () => {
       const token = apiClient.getStoredToken();
 
@@ -41,7 +43,9 @@ export default function DoctorDashboard() {
       apiClient.setToken(token);
 
       try {
-        const response = await doctorApi.getProfile();
+        const response = await doctorApi.getProfile({ signal: controller.signal });
+
+        if (controller.signal.aborted) return;
 
         if (response.success && response.data) {
           const approvalStatus = response.data.approval_status;
@@ -50,7 +54,7 @@ export default function DoctorDashboard() {
             setProfile(response.data);
             setIsLoadingAuth(false);
             // Load dashboard data from backend
-            loadDashboardData();
+            loadDashboardData(controller.signal);
           } else if (approvalStatus === 'REJECTED') {
             router.push('/doctor-profile');
           } else if (approvalStatus === 'PENDING') {
@@ -74,6 +78,7 @@ export default function DoctorDashboard() {
           router.push('/doctor-login');
         }
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error('Error checking approval status:', err);
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
@@ -84,24 +89,30 @@ export default function DoctorDashboard() {
     };
 
     checkApprovalStatus();
+
+    return () => controller.abort();
   }, [router]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (signal?: AbortSignal) => {
     setIsLoadingDashboard(true);
     setDashboardError('');
 
     try {
-      const response = await doctorApi.getDashboard();
+      const response = await doctorApi.getDashboard(undefined, { signal });
+      if (signal?.aborted) return;
       if (response.success && response.data) {
         setDashboardData(response.data);
       } else {
         setDashboardError(response.error || 'Failed to load dashboard data');
       }
     } catch (err) {
+      if (signal?.aborted) return;
       console.error('Error loading dashboard:', err);
       setDashboardError('Failed to load dashboard data');
     } finally {
-      setIsLoadingDashboard(false);
+      if (!signal?.aborted) {
+        setIsLoadingDashboard(false);
+      }
     }
   };
 
@@ -174,7 +185,7 @@ export default function DoctorDashboard() {
           <p className="text-lg font-semibold text-slate-800 mb-2">Failed to load dashboard</p>
           <p className="text-sm text-slate-600 mb-4">{dashboardError}</p>
           <button
-            onClick={loadDashboardData}
+            onClick={() => loadDashboardData()}
             className="px-4 py-2 bg-[#1A62CD] text-white rounded-lg hover:bg-[#1555b8] transition-colors"
           >
             Retry

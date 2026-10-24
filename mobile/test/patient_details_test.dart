@@ -89,15 +89,14 @@ void main() {
       expect(patientDetailsPage.selectedDate, DateTime(2026, 10, 20));
     });
 
-    testWidgets('Payment method and receipt image parameters are preserved in widget', (WidgetTester tester) async {
-      // This test verifies paymentMethod and receiptImage are properly passed through navigation
+    testWidgets('Payment method parameter is preserved in widget', (WidgetTester tester) async {
+      // This test verifies paymentMethod is properly passed through navigation
       await tester.pumpWidget(
         MaterialApp(
           home: PatientDetailsPage(
             doctorId: 'test-doctor-id',
             doctorName: 'Dr. Test',
             paymentMethod: 'GCASH',
-            receiptImage: null, // File cannot be tested directly in widget test
           ),
         ),
       );
@@ -105,7 +104,6 @@ void main() {
       final patientDetailsPage = tester.widget<PatientDetailsPage>(find.byType(PatientDetailsPage));
 
       expect(patientDetailsPage.paymentMethod, 'GCASH');
-      expect(patientDetailsPage.receiptImage, isNull);
     });
 
     testWidgets('Error state can be displayed', (WidgetTester tester) async {

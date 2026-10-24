@@ -1,12 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
-import { config } from './config/index.js';
-import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-import { authenticate } from './middleware/auth.js';
-import { pool } from './database/connection.js';
+import { config } from './config';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { authenticate } from './middleware/auth';
+import { apiLimiter, authLimiter } from './middleware/rateLimit';
+import { pool } from './database/connection';
 import path from 'path';
 
 // Import routers
@@ -31,6 +31,7 @@ import adminRouter from './api/admin.js';
 import gcashQrRouter from './api/gcashQr.js';
 
 const app = express();
+const apiVersion = config.app.apiVersion;
 
 // Security middleware
 app.use(helmet());
@@ -42,12 +43,12 @@ app.use(cors({
 }));
 
 // Rate limiting
-const limiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.maxRequests,
-  message: 'Too many requests from this IP, please try again later.',
-});
-app.use('/api/', limiter);
+// 1. General API budget for normal dashboard navigation.
+// 2. Stricter budget for login/OTP/registration/password-change routes.
+// Health checks and static files are mounted outside /api, so they are not
+// counted against either budget.
+app.use('/api/', apiLimiter);
+app.use(`/api/${apiVersion}`, authLimiter);
 
 // Body parsing
 app.use(express.json());
@@ -102,7 +103,6 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
-const apiVersion = config.app.apiVersion;
 app.use(`/api/${apiVersion}/auth`, authRouter);
 app.use(`/api/${apiVersion}/auth/otp`, otpRouter);
 app.use(`/api/${apiVersion}/auth/patient/otp`, patientOtpRouter);

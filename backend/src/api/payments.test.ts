@@ -112,6 +112,42 @@ describe('Secretary Payment Verification UI', () => {
       expect(response.body.data[0].patient_first_name).toBe('John');
     });
 
+    it('should fetch charges for all payments in a single batched query', async () => {
+      const chargesQueries: any[][] = [];
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('WHERE a.doctor_id =')) {
+          return Promise.resolve({
+            rows: [
+              { id: 'payment-1', status: 'UNPAID' },
+              { id: 'payment-2', status: 'PAID' },
+            ],
+          });
+        }
+        if (sql.includes('FROM payment_charges')) {
+          chargesQueries.push(params);
+          return Promise.resolve({
+            rows: [
+              { id: 'charge-1', payment_id: 'payment-1', description: 'Medicine', amount: 100 },
+              { id: 'charge-2', payment_id: 'payment-2', description: 'Service', amount: 50 },
+            ],
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app).get('/api/v1/payments');
+
+      expect(response.status).toBe(200);
+      expect(chargesQueries).toHaveLength(1);
+      expect(chargesQueries[0][0]).toEqual(['payment-1', 'payment-2']);
+      expect(response.body.data[0].charges).toHaveLength(1);
+      expect(response.body.data[1].charges[0].description).toBe('Service');
+    });
+
     it('should filter payments by status', async () => {
       query.mockImplementation((sql: string, params: any[]) => {
         if (sql.includes('SELECT doctor_id FROM secretaries')) {

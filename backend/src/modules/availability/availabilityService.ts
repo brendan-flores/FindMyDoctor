@@ -1,4 +1,6 @@
 import { query } from '../../database/connection';
+import { config } from '../../config';
+import { TtlCache } from '../../utils/ttlCache';
 
 const CONSULTATION_DURATION_MINUTES = 30;
 
@@ -33,6 +35,15 @@ export interface AvailabilityRange {
 interface TimeRange {
   start: string;
   end: string;
+}
+
+// Cached date-range availability. Keyed by doctor + dates only (never by
+// patient) so one user's booking state cannot leak to another user.
+const availabilityRangeCache = new TtlCache<AvailabilityRange>();
+
+/** Drop cached availability for a doctor, or every doctor when omitted. */
+export function invalidateAvailabilityCache(doctorId?: string): void {
+  availabilityRangeCache.invalidate(doctorId ? `availability:${doctorId}:` : 'availability:');
 }
 
 /**
@@ -286,7 +297,7 @@ export async function calculateAvailability(
   
   // Check for full-day unavailability
   const unavailabilityResult = await query(
-    `SELECT * FROM doctor_unavailability
+    `SELECT start_date, end_date FROM doctor_unavailability
      WHERE doctor_id = $1 AND is_active = true
      AND start_date <= $2 AND end_date >= $2`,
     [doctorId, date]
@@ -420,8 +431,32 @@ export async function calculateAvailability(
 
 /**
  * Calculate availability for a date range (optimized with batched queries)
+ *
+ * Results are cached for a very short time when no patient is supplied.
+ * Patient-specific results are never shared because they include the
+ * caller's own ALREADY_BOOKED state and must stay scoped to one patient.
+ * Any successful write through the doctor, secretary, or appointment routers
+ * clears this cache (see `invalidateAvailabilityCache`).
  */
 export async function calculateAvailabilityRange(
+  doctorId: string,
+  startDate: string,
+  endDate: string,
+  patientId?: string | null
+): Promise<AvailabilityRange> {
+  if (patientId) {
+    return calculateAvailabilityRangeUncached(doctorId, startDate, endDate, patientId);
+  }
+
+  const cacheKey = `availability:${doctorId}:${startDate}:${endDate}`;
+  return availabilityRangeCache.getOrLoad(
+    cacheKey,
+    config.cache.availabilityTtlMs,
+    () => calculateAvailabilityRangeUncached(doctorId, startDate, endDate, null)
+  );
+}
+
+async function calculateAvailabilityRangeUncached(
   doctorId: string,
   startDate: string,
   endDate: string,

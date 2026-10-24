@@ -47,9 +47,30 @@ export const config = {
   },
 
   // Rate Limiting
+  //
+  // The general limit is sized for normal dashboard navigation, including a
+  // reasonable burst when a user clicks through several pages quickly:
+  //   - With client-side request de-duplication/caching a page navigation
+  //     costs roughly 1-3 API calls.
+  //   - 300 requests per minute allows a burst of ~100 page views in one
+  //     minute, which is well above normal navigation, while still stopping
+  //     scripted abuse (thousands of requests per minute).
+  // Sensitive authentication endpoints keep a separate, much stricter
+  // budget (login, OTP, registration, password change).
   rateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute
-    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '5000'), // Increased for development
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'),
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '300'),
+    authWindowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || '900000'),
+    authMaxRequests: parseInt(process.env.AUTH_RATE_LIMIT_MAX_REQUESTS || '30'),
+  },
+
+  // Short-lived server-side caches for read-heavy, rarely changing data.
+  cache: {
+    // Availability queries are expensive (batched schedule/capacity lookups)
+    // and only change when schedules, breaks or appointments change. Any write
+    // through the scheduling/appointment routers clears this cache explicitly,
+    // so the TTL only acts as a backstop for writes made outside the API.
+    availabilityTtlMs: parseInt(process.env.AVAILABILITY_CACHE_TTL_MS || '20000'),
   },
 
   // CORS
