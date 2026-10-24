@@ -13,18 +13,22 @@ export default function SecretaryDashboard() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadDashboardData();
+    const controller = new AbortController();
+    loadDashboardData(controller.signal);
+    return () => controller.abort();
   }, []);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (signal?: AbortSignal) => {
     setIsLoading(true);
     setError('');
 
     try {
       const [dashboardResponse, profileResponse] = await Promise.all([
-        secretaryApi.getDashboard(),
-        secretaryApi.getProfile(),
+        secretaryApi.getDashboard(undefined, { signal }),
+        secretaryApi.getProfile({ signal }),
       ]);
+
+      if (signal?.aborted) return;
 
       if (profileResponse.success && profileResponse.data) {
         setTwoFactorEnabled(profileResponse.data.two_factor_enabled ?? false);
@@ -36,10 +40,13 @@ export default function SecretaryDashboard() {
         setError(dashboardResponse.error || 'Failed to load dashboard data');
       }
     } catch (err) {
+      if (signal?.aborted) return;
       console.error('Error loading dashboard:', err);
       setError('Failed to load dashboard data');
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -62,7 +69,7 @@ export default function SecretaryDashboard() {
           <p className="text-lg font-semibold text-slate-800 mb-2">Failed to load dashboard</p>
           <p className="text-sm text-slate-600 mb-4">{error}</p>
           <button
-            onClick={loadDashboardData}
+            onClick={() => loadDashboardData()}
             className="px-4 py-2 bg-[#1A62CD] text-white rounded-lg hover:bg-[#1555b8] transition-colors"
           >
             Retry

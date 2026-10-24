@@ -124,29 +124,39 @@ router.get('/', authenticate, requireSecretaryPasswordChange, requireSecretaryPr
 
     const result = await query(queryText, params);
 
-    // Get charges for each payment (excluding deleted charges)
-    const payments = await Promise.all(
-      result.rows.map(async (payment) => {
-        const chargesResult = await query(
-          `SELECT
-            pc.id,
-            pc.description,
-            pc.amount,
-            pc.created_at,
-            pc.created_by,
-            s.first_name as created_by_first_name,
-            s.last_name as created_by_last_name
-           FROM payment_charges pc
-           LEFT JOIN secretaries s ON pc.created_by = s.id
-           WHERE pc.payment_id = $1 AND pc.deleted_at IS NULL`,
-          [payment.id]
-        );
-        return {
-          ...payment,
-          charges: chargesResult.rows,
-        };
-      })
-    );
+    // Fetch charges for all returned payments in one query instead of one
+    // query per payment (the previous N+1 behaviour).
+    const chargesByPayment = new Map<string, any[]>();
+    const paymentIds = result.rows.map(payment => payment.id);
+
+    if (paymentIds.length > 0) {
+      const chargesResult = await query(
+        `SELECT
+          pc.id,
+          pc.payment_id,
+          pc.description,
+          pc.amount,
+          pc.created_at,
+          pc.created_by,
+          s.first_name as created_by_first_name,
+          s.last_name as created_by_last_name
+         FROM payment_charges pc
+         LEFT JOIN secretaries s ON pc.created_by = s.id
+         WHERE pc.payment_id = ANY($1::uuid[]) AND pc.deleted_at IS NULL`,
+        [paymentIds]
+      );
+
+      for (const charge of chargesResult.rows) {
+        const list = chargesByPayment.get(charge.payment_id) || [];
+        list.push(charge);
+        chargesByPayment.set(charge.payment_id, list);
+      }
+    }
+
+    const payments = result.rows.map(payment => ({
+      ...payment,
+      charges: chargesByPayment.get(payment.id) || [],
+    }));
 
     res.json(success(payments));
   } catch (err: any) {

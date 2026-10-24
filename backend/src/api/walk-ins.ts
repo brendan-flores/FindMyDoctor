@@ -2,10 +2,23 @@ import { Router, Response } from 'express';
 import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, requireSecretaryProfileCompletion } from '../middleware/auth';
+import { invalidateAvailabilityCache } from '../modules/availability/availabilityService';
 import { getClinicDate, getClinicDateTime, toClinicDateString } from '../utils/date';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
+
+// Walk-in registration creates appointments and consumes capacity.
+router.use((req, res, next) => {
+  if (req.method !== 'GET') {
+    res.on('finish', () => {
+      if (res.statusCode < 400) {
+        invalidateAvailabilityCache();
+      }
+    });
+  }
+  next();
+});
 
 // Valid sex values
 const VALID_SEX_VALUES = ['MALE', 'FEMALE', 'OTHER', 'NOT_SPECIFIED'];

@@ -1203,6 +1203,7 @@ Session behavior is defined once in `backend/src/modules/auth/sessionPolicy.ts`.
 - A non-sensitive `<prefix>_sessionActive` browser-session hint lets `apiClient` discard a non-persistent session after a browser restart.
 - Multiple portal sessions may coexist; middleware treats `/doctors`, `/secretaries`, and `/admin` paths as authoritative, uses `X-Portal-Role` for shared resource paths (for example `/patients/:id`), checks matching cookies with a global fallback, and rejects cross-role use. Shared sub-resources are exempt from the namespace check: `/doctors/:id/availability` accepts PATIENT tokens (the mobile patient booking journey) and DOCTOR tokens, while all doctor-portal-only routes remain guarded by `authorize('DOCTOR')`.
 - Only a 400/401 refresh response clears the session; transient rate-limit, server, and network failures leave it intact.
+- Safe `GET` reads use a 15-second role-scoped in-memory cache and a bounded 429 retry; mutations are never cached or retried. See "API Rate Limiting, Retries, and Read Caching".
 - Device trust never bypasses password, account status, role, or approval checks; failures stay generic.
 
 Do not:
@@ -1210,6 +1211,36 @@ Do not:
 - Let device trust bypass account status restrictions or the current login's OTP.
 - Implement device trust or trusted browsers for Admin/SuperAdmin.
 - Persist an untrusted staff session across browser restarts.
+
+### API Rate Limiting, Retries, and Read Caching
+
+**Backend budgets** (`backend/src/middleware/rateLimit.ts`, mounted in `backend/src/index.ts`):
+- General API: `RATE_LIMIT_MAX_REQUESTS` (default 300) per `RATE_LIMIT_WINDOW_MS` (default 60,000 ms) per IP, mounted on `/api/`.
+- Sensitive authentication: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default 30) per `AUTH_RATE_LIMIT_WINDOW_MS` (default 900,000 ms) per IP, mounted on `/api/v1` and skipped for non-auth paths. It covers `/auth/login`, `/auth/verify-login-otp`, `/auth/resend-login-otp`, `/auth/otp`, `/auth/patient/otp`, `/auth/register`, and `/auth/change-password`.
+- Sensitive routes are counted by both limiters, so the stricter auth budget is the effective one.
+- Every `429` includes `Retry-After` (seconds) and the standard error envelope with code `RATE_LIMIT`. `OPTIONS` pre-flight requests are skipped.
+- Rate limiting never replaces authentication or authorization; protected routes still validate the token and role on every request.
+
+**Web read reliability** (`web/src/lib/api/apiClient.ts`, `requestPolicy.ts`, `ttlCache.ts`):
+- Successful `GET` responses are cached in memory for 15 seconds. Keys include the portal role and endpoint, so two roles can never share an entry.
+- The cache stores full response objects only when `success === true`. Authorization still happens on the server for every cache miss.
+- The cache is cleared when the token or role changes, on logout/session expiry, and after any successful `POST`/`PUT`/`PATCH`/`DELETE`. A generation counter stops an in-flight request started before a clear from writing stale data afterwards.
+- Concurrent identical non-abortable reads share one request (dashboard page plus sidebar on first paint).
+- Only `GET` is retried on `429`, up to 3 total attempts, honoring `Retry-After` and otherwise using exponential backoff (500 ms base) plus at most 250 ms jitter, capped at 5 seconds. Mutations are never retried.
+- Callers may pass `AbortSignal` to cancel on unmount; aborting returns `errorCode: 'REQUEST_ABORTED'`. Sidebar profile/schedule refreshes triggered by save events use `skipCache: true` so edits appear immediately.
+- Client-side list search/filtering is already local; it must not add a network request per keystroke.
+- `web/src/lib/api/*.test.ts` covers the retry/backoff policy and the cache with `npm test` (Node's built-in test runner; no new dependency).
+
+**Server-side read caching and query batching:**
+- `backend/src/modules/availability/availabilityService.ts` caches availability range results for `AVAILABILITY_CACHE_TTL_MS` (default 20,000 ms), keyed by doctor + start + end. The cache is never used when a `patientId` is present. Successful non-`GET` requests through the doctors, secretaries, appointments, or walk-ins routers call `invalidateAvailabilityCache()`.
+- `capacityService.calculateCapacityRange` loads schedules, breaks, exceptions, and appointments in four batched queries rather than four per date.
+- The Doctor dashboard runs its independent reads concurrently and reuses already-loaded schedule/break/exception rows via `buildCapacityResult`; the Secretary dashboard also reads concurrently and computes unread messages with one aggregate query; the payments list loads all charges with one `payment_id = ANY(...)` query.
+
+Do not:
+- Cache role-scoped or patient-specific data across different users or roles.
+- Cache failed responses or serve cached data after a mutation.
+- Retry data-changing requests automatically.
+- Disable rate limiting to work around dashboard traffic.
 
 ### Supabase Storage for Doctor Photos
 

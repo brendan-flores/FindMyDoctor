@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, type GetOptions } from './apiClient';
 
 export interface User {
   id: string;
@@ -191,8 +191,8 @@ export const adminApi = {
   },
 
   // Dashboard Statistics
-  getDashboardStats: async () => {
-    return apiClient.get<DashboardStats>('/admin/dashboard/stats');
+  getDashboardStats: async (options?: GetOptions) => {
+    return apiClient.get<DashboardStats>('/admin/dashboard/stats', options);
   },
 
   // Doctor Account Status Controls
@@ -225,7 +225,7 @@ export const adminApi = {
     endDate?: string;
     page?: number;
     limit?: number;
-  }) => {
+  }, options?: GetOptions) => {
     const queryParams = new URLSearchParams();
     if (params?.action) queryParams.append('action', params.action);
     if (params?.actorId) queryParams.append('actorId', params.actorId);
@@ -235,6 +235,6 @@ export const adminApi = {
     if (params?.limit) queryParams.append('limit', params.limit.toString());
 
     const queryString = queryParams.toString();
-    return apiClient.get<AuditLogResponse>(`/admin/audit-log${queryString ? `?${queryString}` : ''}`);
+    return apiClient.get<AuditLogResponse>(`/admin/audit-log${queryString ? `?${queryString}` : ''}`, options);
   },
 };

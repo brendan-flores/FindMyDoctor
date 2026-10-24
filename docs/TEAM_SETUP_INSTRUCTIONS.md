@@ -1,5 +1,7 @@
 # Mobile App Setup Instructions for Team Members
 
+**Important:** The `mobile/lib/core/config/local_config.dart` file must be added to `.gitignore` so each developer can have their own local configuration without committing it to the repository.
+
 ## One-Click AI Setup (Recommended)
 
 Just copy this prompt and give it to AI - it will do everything for you:
@@ -16,7 +18,9 @@ I need to set up local development configuration for a Flutter mobile app. Pleas
 
 3. Create a new file at: mobile/lib/core/config/local_config.dart
 
-4. Add this content to the file, replacing YOUR_IP_HERE with my actual IPv4 address:
+4. Add this file to .gitignore so it's not committed to the repository
+
+5. Add this content to the file, replacing YOUR_IP_HERE with my actual IPv4 address:
 ```dart
 // Local development configuration
 // This file is gitignored - each developer should set their own values
@@ -24,13 +28,13 @@ I need to set up local development configuration for a Flutter mobile app. Pleas
 class LocalConfig {
   // Your computer's local network IP address for real device testing
   static const String deviceBaseUrl = 'http://YOUR_IP_HERE:3000/api/v1';
-  
+
   // Set to true when running on Android emulator, false for real device
   static const bool useEmulator = false;
 }
 ```
 
-5. Make sure the format is correct: http://[IP]:3000/api/v1
+6. Make sure the format is correct: http://[IP]:3000/api/v1
    For example: http://192.168.1.100:3000/api/v1
 
 Please show me the final file content and confirm it's saved correctly.
@@ -46,6 +50,8 @@ Create a new file at this location:
 ```
 mobile/lib/core/config/local_config.dart
 ```
+
+**Important:** This file must be added to `.gitignore` so each developer can have their own local configuration without committing it to the repository.
 
 ### Step 2: Find Your IP Address
 

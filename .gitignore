@@ -55,6 +55,7 @@ mobile/build/
 mobile/macos/Flutter/GeneratedPluginRegistrant.swift
 mobile/windows/flutter/generated_plugin_registrant.cc
 mobile/windows/flutter/generated_plugins.cmake
+mobile/lib/core/config/local_config.dart
 
 # Web specific
 web/.next/

@@ -11,15 +11,19 @@ export default function AdminDashboard() {
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
   useEffect(() => {
-    loadDashboardData();
+    const controller = new AbortController();
+    loadDashboardData(controller.signal);
+    return () => controller.abort();
   }, []);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (signal?: AbortSignal) => {
     try {
       const [statsResponse, auditResponse] = await Promise.all([
-        adminApi.getDashboardStats(),
-        adminApi.getAuditLog({ page: 1, limit: 5 })
+        adminApi.getDashboardStats({ signal }),
+        adminApi.getAuditLog({ page: 1, limit: 5 }, { signal })
       ]);
+
+      if (signal?.aborted) return;
 
       if (statsResponse.success && statsResponse.data) {
         setStats(statsResponse.data);
@@ -29,9 +33,12 @@ export default function AdminDashboard() {
         setRecentActivity(auditResponse.data.entries);
       }
     } catch (error) {
+      if (signal?.aborted) return;
       console.error('Failed to load dashboard data:', error);
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   };
 
