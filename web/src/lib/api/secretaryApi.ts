@@ -443,42 +443,28 @@ export const conversationApi = {
   },
 };
 
-export interface SecretaryDashboard {
-  date: string;
-  queueCounts: {
-    waiting: number;
-    inConsultation: number;
-    done: number;
-  };
-  capacity: {
-    remaining: number;
-    total: number;
-  };
-  pendingVerificationPayments: number;
-  unreadMessages: number;
-  todayQueue: Array<{
-    queueNumber: number;
-    patientName: string;
-    reason: string | null;
-    status: string;
-    appointmentId: string | null;
-    registrationSource: 'ONLINE' | 'WALK_IN';
-  }>;
-  paymentsNeedingAction: Array<{
-    id: string;
-    appointmentId: string;
-    status: string;
-    paymentMethod: string;
-    totalAmount: number;
-    patientName: string;
-    appointmentDate: string;
-    appointmentStatus: string;
-  }>;
-  recentConversations: Array<{
-    id: string | null;
-    patientId: string;
-    patientName: string;
-    unreadCount: number;
-    updatedAt: string | null;
-  }>;
+// Notification interface (from notifications table)
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  related_entity_type?: string | null;
+  related_entity_id?: string | null;
 }
+
+// Notifications API
+export const notificationApi = {
+  // Get all notifications for current user
+  getNotifications: async (): Promise<{ success: boolean; data?: Notification[]; error?: string }> => {
+    return apiClient.get<Notification[]>('/notifications');
+  },
+
+  // Mark notification as read
+  markAsRead: async (notificationId: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/notifications/${notificationId}/read`, {});
+  },
+};

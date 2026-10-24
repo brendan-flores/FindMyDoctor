@@ -10,24 +10,25 @@ import { pool } from './database/connection';
 import path from 'path';
 
 // Import routers
-import authRouter from './api/auth';
-import otpRouter from './api/otp';
-import patientOtpRouter from './api/patientOtp';
-import usersRouter from './api/users';
-import patientsRouter from './api/patients';
-import doctorsRouter from './api/doctors';
-import secretariesRouter from './api/secretaries';
-import appointmentsRouter from './api/appointments';
-import queueRouter from './api/queue';
-import walkInsRouter from './api/walk-ins';
-import conversationsRouter from './api/conversations';
-import aiChatRouter from './api/ai-chat';
-import paymentsRouter, { publicPaymentsRouter } from './api/payments';
-import visitsRouter from './api/visits';
-import prescriptionsRouter from './api/prescriptions';
-import notificationsRouter from './api/notifications';
-import adminRouter from './api/admin';
-import gcashQrRouter from './api/gcashQr';
+import authRouter from './api/auth.js';
+import otpRouter from './api/otp.js';
+import patientOtpRouter from './api/patientOtp.js';
+import passwordResetRouter from './api/passwordReset.js';
+import usersRouter from './api/users.js';
+import patientsRouter from './api/patients.js';
+import doctorsRouter from './api/doctors.js';
+import secretariesRouter from './api/secretaries.js';
+import appointmentsRouter from './api/appointments.js';
+import queueRouter from './api/queue.js';
+import walkInsRouter from './api/walk-ins.js';
+import conversationsRouter from './api/conversations.js';
+import aiChatRouter from './api/ai-chat.js';
+import paymentsRouter, { publicPaymentsRouter } from './api/payments.js';
+import visitsRouter from './api/visits.js';
+import prescriptionsRouter from './api/prescriptions.js';
+import notificationsRouter from './api/notifications.js';
+import adminRouter from './api/admin.js';
+import gcashQrRouter from './api/gcashQr.js';
 
 const app = express();
 const apiVersion = config.app.apiVersion;
@@ -77,6 +78,8 @@ const SENSITIVE_FIELDS = new Set([
   'accessToken',
   'refreshToken',
   'authorization',
+  'aiApiKey',
+  'AI_API_KEY',
 ]);
 
 function redactSensitiveValues(payload: Record<string, any>): Record<string, any> {
@@ -105,6 +108,7 @@ app.get('/health', (req, res) => {
 app.use(`/api/${apiVersion}/auth`, authRouter);
 app.use(`/api/${apiVersion}/auth/otp`, otpRouter);
 app.use(`/api/${apiVersion}/auth/patient/otp`, patientOtpRouter);
+app.use(`/api/${apiVersion}/auth/password-reset`, passwordResetRouter);
 app.use(`/api/${apiVersion}/users`, authenticate, usersRouter);
 app.use(`/api/${apiVersion}/patients`, authenticate, patientsRouter);
 app.use(`/api/${apiVersion}/doctors`, doctorsRouter);

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
+import { notificationApi, Notification } from '@/lib/api/secretaryApi';
 
 interface SecretaryHeaderProps {
   userName?: string;
@@ -11,8 +12,12 @@ interface SecretaryHeaderProps {
 
 export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Secretary' }: SecretaryHeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const getInitials = (name: string) => {
     return name
@@ -41,11 +46,14 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
   const formattedDate = dateFormatter.format(now);
   const formattedTime = timeFormatter.format(now);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setIsNotificationOpen(false);
       }
     };
 
@@ -54,6 +62,95 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Fetch notifications on mount
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  const loadNotifications = async () => {
+    try {
+      const response = await notificationApi.getNotifications();
+      if (response.success && response.data) {
+        setNotifications(response.data);
+        setUnreadCount(response.data.filter(n => !n.is_read).length);
+      }
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
+    }
+  };
+
+  const handleNotificationClick = () => {
+    setIsNotificationOpen(!isNotificationOpen);
+    if (!isNotificationOpen) {
+      loadNotifications();
+    }
+  };
+
+  const handleNotificationItemClick = async (notification: Notification) => {
+    if (!notification.is_read) {
+      try {
+        await notificationApi.markAsRead(notification.id);
+        // Update local state
+        setNotifications(prev =>
+          prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      } catch (error) {
+        console.error('Failed to mark notification as read:', error);
+      }
+    }
+    setIsNotificationOpen(false);
+
+    // Navigate based on notification type
+    if (notification.type === 'PAYMENT_VERIFIED' || notification.type === 'PAYMENT_REJECTED') {
+      router.push('/secretary/payments');
+    } else if (notification.type === 'NEW_PATIENT_MESSAGE' || notification.type === 'NEW_SECRETARY_MESSAGE') {
+      router.push('/secretary/conversations');
+    }
+  };
+
+  const formatTimestamp = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const getTypeBadgeColor = (type: string) => {
+    switch (type) {
+      case 'PAYMENT_VERIFIED':
+        return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+      case 'PAYMENT_REJECTED':
+        return 'bg-rose-50 text-rose-600 border-rose-100';
+      case 'NEW_SECRETARY_MESSAGE':
+      case 'NEW_PATIENT_MESSAGE':
+        return 'bg-blue-50 text-blue-600 border-blue-100';
+      default:
+        return 'bg-slate-50 text-slate-600 border-slate-100';
+    }
+  };
+
+  const getTypeBadgeText = (type: string) => {
+    switch (type) {
+      case 'PAYMENT_VERIFIED':
+      case 'PAYMENT_REJECTED':
+        return 'Payment';
+      case 'NEW_SECRETARY_MESSAGE':
+      case 'NEW_PATIENT_MESSAGE':
+        return 'Message';
+      default:
+        return 'Notification';
+    }
+  };
 
   const handleProfileClick = () => {
     setIsDropdownOpen(!isDropdownOpen);
@@ -103,10 +200,60 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
           <span className="text-[11px] font-mono text-slate-400">{formattedTime}</span>
         </div>
 
-        {/* Notification Bell */}
-        <button className="relative w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
-          <span className="material-symbols-outlined text-[20px]">notifications</span>
-        </button>
+        {/* Notification Bell with Badge */}
+        <div className="relative" ref={notificationRef}>
+          <button
+            onClick={handleNotificationClick}
+            className="relative w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[20px]">notifications</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Notification Dropdown */}
+          {isNotificationOpen && (
+            <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg border border-slate-200 shadow-lg py-2 z-50 max-h-96 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="px-4 py-8 text-center text-slate-500 text-sm">
+                  <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">notifications_none</span>
+                  <p>No notifications</p>
+                </div>
+              ) : (
+                notifications.map((notification) => (
+                  <button
+                    key={notification.id}
+                    onClick={() => handleNotificationItemClick(notification)}
+                    className="w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border ${getTypeBadgeColor(
+                          notification.type
+                        )}`}
+                      >
+                        {getTypeBadgeText(notification.type)}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-slate-800 truncate">{notification.title}</p>
+                          {!notification.is_read && (
+                            <span className="w-2 h-2 bg-blue-500 rounded-full shrink-0"></span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 truncate mt-0.5">{notification.message}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">{formatTimestamp(notification.created_at)}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Secretary Avatar with Dropdown */}
         <div className="relative" ref={dropdownRef}>

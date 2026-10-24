@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { authApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
 import OtpVerification from '@/components/auth/OtpVerification';
@@ -176,9 +177,9 @@ export default function SecretaryLogin() {
                 <label htmlFor="password" className="block text-[15px] font-bold text-[#1A202C]">
                   Password
                 </label>
-                <a href="#" className="text-[14px] font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors">
+                <Link href="/secretary/forgot-password" className="text-[14px] font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors">
                   Forgot Password?
-                </a>
+                </Link>
               </div>
               <div className="relative rounded-2xl shadow-sm">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">

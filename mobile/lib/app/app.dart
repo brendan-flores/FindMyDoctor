@@ -19,6 +19,8 @@ import '../features/patients/presentation/patient_details_page.dart';
 import '../features/patients/presentation/patient_profile_page.dart';
 import '../features/settings/presentation/privacy_notice_page.dart';
 import '../features/conversations/presentation/conversation_thread_page.dart';
+import '../features/conversations/presentation/ai_conversation_page.dart';
+import '../features/conversations/presentation/ai_conversation_history_page.dart';
 import '../features/payments/presentation/payment_screen.dart';
 import '../features/notifications/presentation/notifications_page.dart';
 import '../features/secretary/presentation/secretary_home_page.dart';
@@ -178,6 +180,8 @@ class MyAppState extends State<MyApp> {
           case '/payment':
           case '/notifications':
           case '/conversation-thread':
+          case '/ai-conversation':
+          case '/ai-conversation-history':
             // Protect all authenticated routes - enforce password change requirement
             if (!_isAuthenticated) {
               return MaterialPageRoute(builder: (context) => const LoginPage());
@@ -255,6 +259,43 @@ class MyAppState extends State<MyApp> {
                     conversationId: args?['conversationId'] ?? '',
                     counterpartName: args?['counterpartName'] as String?,
                   ),
+                );
+              case '/ai-conversation':
+                // M9: Patient-only route guard for AI assistant
+                if (!_isAuthenticated) {
+                  return MaterialPageRoute(builder: (context) => const LoginPage());
+                }
+                if (_mustChangePassword) {
+                  return MaterialPageRoute(
+                    builder: (context) => const ChangePasswordPage(),
+                  );
+                }
+                // M9: Secretaries cannot access AI assistant
+                if (_isSecretary) {
+                  return MaterialPageRoute(
+                    builder: (context) => const SecretaryHomePage(),
+                  );
+                }
+                return MaterialPageRoute(
+                  builder: (context) => const AiConversationPage(),
+                );
+              case '/ai-conversation-history':
+                // M9: Patient-only route guard for AI conversation history
+                if (!_isAuthenticated) {
+                  return MaterialPageRoute(builder: (context) => const LoginPage());
+                }
+                if (_mustChangePassword) {
+                  return MaterialPageRoute(
+                    builder: (context) => const ChangePasswordPage(),
+                  );
+                }
+                if (_isSecretary) {
+                  return MaterialPageRoute(
+                    builder: (context) => const SecretaryHomePage(),
+                  );
+                }
+                return MaterialPageRoute(
+                  builder: (context) => const AiConversationHistoryPage(),
                 );
               case '/patient-profile':
                 return MaterialPageRoute(

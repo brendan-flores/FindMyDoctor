@@ -17,6 +17,8 @@ import '../../../features/auth/presentation/change_password_page.dart';
 import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
 import '../../conversations/models/conversation.dart';
+import '../../notifications/models/notification.dart' as notif_model;
+import '../../../core/constants/ai_constants.dart';
 
 class HomePage extends StatefulWidget {
   final int? initialTab;
@@ -48,6 +50,7 @@ class _HomePageState extends State<HomePage> {
   String? _userName;
   String? _userEmail;
   bool _accountInfoFailed = false;
+  String _chatSegment = 'clinic'; // M1: Segmented control state
 
   // Profile "About" and "Notifications" section state.
   String? _appVersion;
@@ -226,6 +229,24 @@ class _HomePageState extends State<HomePage> {
     Navigator.of(context).pushReplacementNamed('/login');
   }
 
+  void _handleNotificationItemTap(notif_model.Notification notification) {
+    // Reload notification unread count to update badge
+    _loadNotificationUnreadCount();
+
+    // Navigate based on notification type
+    if (notification.isPaymentRelated) {
+      // Navigate to appointments tab (payments are accessed via appointments)
+      setState(() {
+        _currentIndex = 2;
+      });
+    } else if (notification.isMessageRelated) {
+      // Navigate to chat tab
+      setState(() {
+        _currentIndex = 3;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -241,6 +262,30 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       bottomNavigationBar: _buildBottomNavigation(),
+      // M2: Floating "Ask MediGuide" shortcut in patient shell
+      // HomePage is only shown to patients (secretaries get SecretaryHomePage)
+      // Hide on Chat tab (index 3) and Profile/Settings tab (index 4)
+      floatingActionButton: _currentIndex == 3 || _currentIndex == 4
+          ? null
+          : FloatingActionButton(
+              tooltip: AiConstants.shortcutLabel,
+              onPressed: () {
+                setState(() {
+                  _currentIndex = 3; // Chat tab
+                  _chatSegment = 'ai'; // Switch to AI segment
+                });
+              },
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: SizedBox(
+                width: 100,
+                height: 100,
+                child: Image.asset(
+                  'assets/images/mediguide_badge.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
     );
   }
 
@@ -251,7 +296,13 @@ class _HomePageState extends State<HomePage> {
           showNotifications: true,
           showProfile: true,
           unreadCount: _notificationUnreadCount,
-          onNotificationTap: () {
+          onNotificationItemTap: (notif_model.Notification notification) {
+            _handleNotificationItemTap(notification);
+          },
+          onUnreadCountUpdate: () {
+            _loadNotificationUnreadCount();
+          },
+          onViewAll: () {
             Navigator.of(context).pushNamed('/notifications');
           },
         ),
@@ -318,36 +369,296 @@ class _HomePageState extends State<HomePage> {
           showNotifications: true,
           showProfile: true,
           unreadCount: _notificationUnreadCount,
-          onNotificationTap: () {
+          onNotificationItemTap: (notif_model.Notification notification) {
+            _handleNotificationItemTap(notification);
+          },
+          onUnreadCountUpdate: () {
+            _loadNotificationUnreadCount();
+          },
+          onViewAll: () {
             Navigator.of(context).pushNamed('/notifications');
           },
         ),
-        Expanded(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  Text('Secretary Chat', style: AppTextStyles.headlineLg),
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  ChatTabContent(
-                    isLoading: _isLoadingConversations,
-                    conversations: _conversations,
-                    onRefresh: () {
-                      if (mounted) {
-                        _loadConversations();
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
+        // M1: Segmented control for Clinic | AI Assistant
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: spacing.AppSpacing.screenPadding,
+            vertical: spacing.AppSpacing.gutterMd,
           ),
+          child: SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                value: 'clinic',
+                label: Text('Clinic'),
+                icon: Icon(Icons.chat_bubble_outline),
+              ),
+              ButtonSegment(
+                value: 'ai',
+                label: Text(AiConstants.shortName),
+                icon: Icon(Icons.smart_toy),
+              ),
+            ],
+            selected: {_chatSegment},
+            onSelectionChanged: (value) {
+              setState(() {
+                _chatSegment = value.first;
+              });
+            },
+          ),
+        ),
+        Expanded(
+          child: _chatSegment == 'clinic'
+              ? SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: spacing.AppSpacing.gutterLg),
+                        Text('Secretary Chat', style: AppTextStyles.headlineLg),
+                        const SizedBox(height: spacing.AppSpacing.gutterLg),
+                        ChatTabContent(
+                          isLoading: _isLoadingConversations,
+                          conversations: _conversations,
+                          onRefresh: () {
+                            if (mounted) {
+                              _loadConversations();
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: spacing.AppSpacing.gutterLg),
+                        Text('AI Assistant', style: AppTextStyles.headlineLg),
+                        const SizedBox(height: spacing.AppSpacing.gutterLg),
+                        _buildAiQuickActions(),
+                        const SizedBox(height: spacing.AppSpacing.gutterLg),
+                        _buildAiConversationsList(),
+                      ],
+                    ),
+                  ),
+                ),
         ),
       ],
     );
+  }
+
+  // M3: AI quick actions in Chat tab
+  Widget _buildAiQuickActions() {
+    return AppCard(
+      onTap: () {
+        Navigator.of(context).pushNamed('/ai-conversation');
+      },
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/mediguide_badge.png',
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Start AI Conversation',
+                  style: AppTextStyles.bodyMdMedium,
+                ),
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
+                Text(
+                  'Ask health questions',
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.secondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right, color: AppColors.outline),
+        ],
+      ),
+    );
+  }
+
+  // M4: AI conversations list
+  Widget _buildAiConversationsList() {
+    return AppCard(
+      onTap: () {
+        Navigator.of(context).pushNamed('/ai-conversation-history');
+      },
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      child: Row(
+        children: [
+          Icon(Icons.history, color: AppColors.outline),
+          const SizedBox(width: spacing.AppSpacing.gutterSm),
+          Expanded(
+            child: Text(
+              'Conversation history',
+              style: AppTextStyles.bodyMd,
+            ),
+          ),
+          Icon(Icons.chevron_right, color: AppColors.outline),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConversationCard(Conversation conversation) {
+    return AppCard(
+      onTap: () async {
+        await Navigator.of(context).pushNamed(
+          '/conversation-thread',
+          arguments: {'conversationId': conversation.id},
+        );
+        // Reload conversations when returning to update unread count
+        if (mounted) {
+          _loadConversations();
+        }
+      },
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainer,
+              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+            ),
+            child: Icon(
+              Icons.person,
+              color: AppColors.outline,
+              size: spacing.AppSpacing.iconLg,
+            ),
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      conversation.secretaryName,
+                      style: AppTextStyles.bodyMdMedium.copyWith(
+                        fontWeight: conversation.unreadCount > 0
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                    if (conversation.practiceName != null) ...[
+                      const SizedBox(width: spacing.AppSpacing.gutterXs),
+                      Text(
+                        '•',
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.outline,
+                        ),
+                      ),
+                      const SizedBox(width: spacing.AppSpacing.gutterXs),
+                      Expanded(
+                        child: Text(
+                          conversation.practiceName!,
+                          style: AppTextStyles.labelSm,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
+                Text(
+                  conversation.lastMessagePreview ?? 'No messages yet',
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.secondary,
+                    fontWeight: conversation.unreadCount > 0
+                        ? FontWeight.w700
+                        : FontWeight.w400,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterSm),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (conversation.lastMessageSentAt != null)
+                Text(
+                  _formatTimestamp(conversation.lastMessageSentAt!),
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.outline,
+                  ),
+                ),
+              if (conversation.unreadCount > 0) ...[
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.AppSpacing.gutterSm,
+                    vertical: spacing.AppSpacing.gutterXs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 20,
+                    minHeight: 20,
+                  ),
+                  child: Text(
+                    conversation.unreadCount > 99 ? '99+' : conversation.unreadCount.toString(),
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.onError,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    }
   }
 
   Widget _buildProfileContent() {
@@ -357,7 +668,13 @@ class _HomePageState extends State<HomePage> {
           showNotifications: true,
           showProfile: true,
           unreadCount: _notificationUnreadCount,
-          onNotificationTap: () {
+          onNotificationItemTap: (notif_model.Notification notification) {
+            _handleNotificationItemTap(notification);
+          },
+          onUnreadCountUpdate: () {
+            _loadNotificationUnreadCount();
+          },
+          onViewAll: () {
             Navigator.of(context).pushNamed('/notifications');
           },
         ),
@@ -1116,6 +1433,19 @@ class _HomePageState extends State<HomePage> {
             _selectedSpecialtyFromHome = null;
             _currentIndex = 1;
           });
+        } else if (title == 'My Appointments') {
+          setState(() {
+            _currentIndex = 2;
+          });
+        } else if (title == 'Secretary Chat') {
+          setState(() {
+            _currentIndex = 3;
+            _chatSegment = 'clinic';
+          });
+        } else if (title == 'My Profile') {
+          setState(() {
+            _currentIndex = 4;
+          });
         }
       },
       padding: EdgeInsets.symmetric(
@@ -1446,12 +1776,7 @@ class _HomePageState extends State<HomePage> {
               _buildNavItem(Icons.home, 'Home', 0),
               _buildNavItem(Icons.local_hospital, 'Doctors', 1),
               _buildNavItem(Icons.calendar_month, 'Appointments', 2),
-              _buildNavItem(
-                Icons.chat_bubble,
-                'Chat',
-                3,
-                unreadCount: _totalUnreadCount,
-              ),
+              _buildNavItem(Icons.chat_bubble, 'Chat', 3, unreadCount: _totalUnreadCount),
               _buildNavItem(Icons.account_circle, 'Profile', 4),
             ],
           ),

@@ -34,9 +34,17 @@ export const config = {
 
   // AI
   ai: {
+    name: 'MediGuide',
+    fullName: 'MediGuide, FindMyDoctor\'s AI health information assistant',
     apiKey: process.env.AI_API_KEY || '',
     apiUrl: process.env.AI_API_URL || 'https://api.openai.com/v1/chat/completions',
     model: process.env.AI_MODEL || 'gpt-3.5-turbo',
+    dailyLimit: parseInt(process.env.AI_DAILY_LIMIT || '20'), // Messages per patient per day (Asia/Manila)
+    rateLimitWindowMs: parseInt(process.env.AI_RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute
+    rateLimitMaxRequests: parseInt(process.env.AI_RATE_LIMIT_MAX_REQUESTS || '10'), // 10 requests per minute
+    maxMessageLength: parseInt(process.env.AI_MAX_MESSAGE_LENGTH || '2000'), // Max characters per message
+    maxTokens: parseInt(process.env.AI_MAX_TOKENS || '1000'), // Max tokens in AI response (increased for reasoning-capable models)
+    contextWindowMessages: parseInt(process.env.AI_CONTEXT_WINDOW_MESSAGES || '5'), // Number of recent messages for context
   },
 
   // File Upload

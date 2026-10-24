@@ -4,6 +4,26 @@ This document contains the current system state for the FindMyDoctor project. It
 
 Current System State (October 2026):
 
+## AI Chatbot (Patient-Only)
+- MediGuide is an AI health information assistant available only to patients in the mobile app; doctors, secretaries, and admins have no AI access
+- MediGuide provides general health education, self-care tips, test/term explanations, and urgent-care guidance
+- MediGuide refuses diagnosis requests and directs patients with serious issues to see a doctor
+- MediGuide helps patients prepare for visits and points to app features (booking, doctors tab, secretary contact)
+- MediGuide can list available doctors by specialty and date: AI extracts specialty/date from patient message, backend runs availability query, app shows doctor cards with "Book visit" button
+- Doctor names, IDs, schedules, and availability results are never sent to the external AI provider
+- Only active, approved doctors are returned from doctor lookup
+- Conversation history is scoped per patient with "New conversation" and history list
+- Patient identifiers (name, email, phone, user IDs, patient IDs, doctor IDs) are stripped before sending to AI provider
+- AI API key is backend-only via environment variable (AI_API_KEY), never exposed to mobile or web
+- AI routes are PATIENT-only: POST /ai/chat, GET /ai/conversations, GET /ai/conversations/:id, GET /ai/conversations/:id/messages
+- Free-tier controls: per-patient daily message limit (Asia/Manila calendar day), per-patient rate limit, message length cap, max_tokens cap, short context window
+- When daily limit reached, return friendly limit-reached response without calling provider
+- Provider errors (429, quota, timeout) handled gracefully with friendly responses
+- Backend starts normally when AI_API_KEY is not set; /ai/chat returns "MediGuide unavailable" (HTTP 503) without calling provider
+- Missing key does not count against daily message limit
+- Redacted logging of AI prompts and responses following existing redaction patterns
+- Database table `ai_daily_limits` tracks per-patient daily message counters with unique constraint on (patient_id, message_date)
+
 ## Clinic Date Handling and Timezone
 - Clinic date calculations use the configured timezone (Asia/Manila by default) via the TIMEZONE environment variable
 - Backend date utility functions (`getClinicDate`, `toClinicDateString`, `getClinicDateTime`) use Intl.DateTimeFormat with the configured timezone to ensure correct clinic dates
@@ -144,6 +164,31 @@ Current System State (October 2026):
 - Doctor and Secretary login forms no longer include a Remember Me checkbox.
 - After a Doctor or Secretary successfully completes authentication (password and, when 2FA is enabled, OTP), an untrusted browser is shown `/doctor/trust-device` or `/secretary/trust-device`. The page displays the detected browser and operating system and offers "Trust this device" and "Do not trust this device".
 - **Trust this device:** registers the browser for 30 days, upgrades the current session to the 30-day persistent policy, and skips OTP on later logins from that browser when 2FA is enabled. The password is always required.
+
+## Password Reset via Email OTP
+
+- Users can reset their password through a secure two-step email OTP verification flow without authentication
+- Password reset email delivery uses Supabase Auth with `auth_flow: 'password_reset'` where the email contains only the verification code
+- Two-step verification sequence across all clients (Mobile Patient, Web Doctor, Web Secretary):
+  1. User enters their email address and requests a password reset (`POST /api/v1/auth/password-reset/request`).
+  2. System sends an email containing only the verification code.
+  3. After the email is sent, the UI displays only the verification code input field and the "Verify Code" button (plus resend button with 60-second cooldown). New password and confirm password fields are strictly hidden.
+  4. User enters the 6-digit verification code and submits it to backend verification (`POST /api/v1/auth/password-reset/verify`).
+  5. Upon successful code verification, backend returns a cryptographically signed `resetToken` (15-minute expiry, bound to user, email, and current `session_version`).
+  6. The UI reveals the new password field, confirm password field, password requirement indicators (8+ characters, number, uppercase), and the "Reset Password" button.
+  7. User enters and confirms their new password, which is submitted with the `resetToken` to `POST /api/v1/auth/password-reset/reset`.
+  8. Backend validates the `resetToken` and matching `session_version`, updates `password_hash`, increments `session_version` (preventing token reuse and invalidating old sessions), and clears `must_change_password`.
+- Backend API endpoints for password reset:
+  - `POST /api/v1/auth/password-reset/request`: rate-limited to 3 requests per 10 minutes per email; sends OTP via Supabase Auth without revealing whether email exists
+  - `POST /api/v1/auth/password-reset/verify`: rate-limited to 5 requests per 10 minutes; verifies 6-digit OTP and returns signed `resetToken`
+  - `POST /api/v1/auth/password-reset/reset`: validates `resetToken` against user's current `session_version`, hashes new password with bcrypt, updates PostgreSQL `users`, increments `session_version`, and clears `must_change_password`
+- Backend enforcement: Resetting passwords without a valid `resetToken` obtained from `/verify` is strictly rejected (cannot bypass verification by submitting to `/reset` directly)
+- Mobile forgot password page (`forgot_password_page.dart`) and reset password page (`reset_password_page.dart`) follow established design patterns with two-step UI progression
+- Web Doctor forgot password page (`/doctor/forgot-password`) and reset password page (`/doctor/reset-password`) follow established design patterns with two-step UI progression
+- Web Secretary forgot password page (`/secretary/forgot-password`) and reset password page (`/secretary/reset-password`) follow established design patterns with two-step UI progression
+- Web password reset API client in `authApi.ts`: `requestPasswordReset()`, `verifyResetCode()`, and `resetPassword()`
+- Mobile API service in `api_service.dart`: `requestPasswordReset()`, `verifyPasswordResetOtp()`, and `resetPassword()`
+- Password reset is available to all user roles (PATIENT, DOCTOR, SECRETARY, ADMIN, SUPERADMIN) through the same flow
 - **Do not trust this device:** keeps browser-session cookies, 8-hour idle timeout, 7-hour access token, 8-hour refresh token, and no trusted browser. OTP is required on every login when 2FA is enabled, and any stale trust cookie is cleared.
 - Trusting a device never bypasses the OTP required for the current login. `POST /api/v1/auth/verify-login-otp` always issues a short untrusted session; only the explicit trust endpoint upgrades it.
 - A browser that is already trusted skips OTP and the trust page on later logins.

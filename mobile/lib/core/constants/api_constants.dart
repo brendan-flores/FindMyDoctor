@@ -97,4 +97,9 @@ class ApiConstants {
   static const String patientOtpSend = '/auth/patient/otp/send';
   static const String patientOtpVerify = '/auth/patient/otp/verify';
   static const String patientOtpResend = '/auth/patient/otp/resend';
+
+  // Password reset endpoints
+  static const String passwordResetRequest = '/auth/password-reset/request';
+  static const String passwordResetVerify = '/auth/password-reset/verify';
+  static const String passwordResetReset = '/auth/password-reset/reset';
 }

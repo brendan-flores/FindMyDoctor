@@ -992,6 +992,14 @@ router.post('/secretaries', authenticate, authorize('DOCTOR'), async (req: AuthR
 
     await client.query('COMMIT');
 
+    // Ensure Secretary has Supabase Auth identity for optional 2FA and password reset OTP
+    try {
+      const { ensureSecretarySupabaseIdentity } = await import('../services/otpService');
+      await ensureSecretarySupabaseIdentity(email);
+    } catch (supabaseErr) {
+      console.error('Failed to ensure Supabase identity for newly created secretary:', supabaseErr);
+    }
+
     res.status(201).json(
       success({
         secretary: secretaryResult.rows[0],

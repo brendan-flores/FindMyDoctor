@@ -54,6 +54,9 @@ dependencies:
   # UI Components
   flutter_screenutil: ^5.9.0
 
+  # Markdown rendering
+  flutter_markdown: ^0.6.14
+
   # URL Launcher
   url_launcher: ^6.2.2
 
@@ -83,7 +86,7 @@ dependencies:
 
   # Reads the app version from pubspec.yaml at runtime for the Profile
   # "About" section (no other version source exists in the app).
-  package_info_plus: ^8.0.0
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_test:

@@ -14,6 +14,10 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const isTrustPage = pathname === '/doctor/trust-device';
+  const isPublicPage =
+    pathname === '/doctor/forgot-password' ||
+    pathname === '/doctor/reset-password' ||
+    isTrustPage;
   const [userName, setUserName] = useState('Dr. Smith');
   const [userRole, setUserRole] = useState('Doctor');
   const [isLoading, setIsLoading] = useState(true);
@@ -36,6 +40,12 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
 
     let shouldRedirect = false;
     let redirectPath = '';
+
+    // Forgot-password and reset-password are public pages; skip auth check.
+    if (isPublicPage) {
+      setIsLoading(false);
+      return;
+    }
 
     if (!token) {
       shouldRedirect = true;
@@ -74,7 +84,7 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
     );
   }
 
-  if (isTrustPage) {
+  if (isPublicPage) {
     return <>{children}</>;
   }
 

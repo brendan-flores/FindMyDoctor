@@ -4,6 +4,104 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.24 (October 24, 2026)
+
+**Purpose:** Enforce two-step verification sequence in the forgot password flow across Mobile Patient, Web Doctor, and Web Secretary platforms, ensuring passwords cannot be reset without prior valid code verification.
+
+**Significant Features:**
+- Two-step Forgot Password verification flow:
+  1. User submits email to request a reset code (`POST /api/v1/auth/password-reset/request`).
+  2. The email sent contains only the verification code (no magic links or other reset controls).
+  3. UI displays only the verification code (OTP) input field and the "Verify Code" button (with resend button on cooldown).
+  4. New password, confirm password, and password reset controls remain hidden until the code is verified.
+  5. Upon successful code verification (`POST /api/v1/auth/password-reset/verify`), backend returns a signed `resetToken` (15-minute expiry, bound to user and current `session_version`).
+  6. UI reveals new password, confirm password, and "Reset Password" button.
+  7. User resets password using the `resetToken` (`POST /api/v1/auth/password-reset/reset`).
+- Added backend endpoint `POST /api/v1/auth/password-reset/verify` to verify 6-digit OTP with Supabase Auth and issue signed `resetToken`.
+- Updated backend endpoint `POST /api/v1/auth/password-reset/reset` to require and validate `resetToken` against user's current `session_version`, preventing bypass and replay attacks.
+- Updated Web Doctor reset password page (`/doctor/reset-password`) to follow the two-step verification sequence.
+- Updated Web Secretary reset password page (`/secretary/reset-password`) to follow the two-step verification sequence.
+- Updated Mobile Patient reset password page (`reset_password_page.dart`) to follow the two-step verification sequence.
+- Updated Web API client `authApi.ts` with `verifyResetCode()` and updated `resetPassword()` to send `resetToken`.
+- Updated Mobile `api_service.dart` with `verifyPasswordResetOtp()` and updated `resetPassword()` to send `resetToken`.
+- Documented `password_reset` flow in `supabase-email-template-configuration.md` with template rendering only the verification code.
+- Added comprehensive unit tests in `backend/src/api/passwordReset.test.ts` and widget tests in `mobile/test/reset_password_page_test.dart`.
+
+**Improvements:**
+- Backend-enforced security: password reset requests without a valid `resetToken` obtained from successful verification are rejected.
+- Single-use reset tokens: `session_version` increment prevents token reuse and replay attacks.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:**
+- Removed simultaneous display of OTP and new password fields immediately upon opening the reset password page.
+
+**Breaking Changes:** None (backward compatibility preserved; clients updated simultaneously across Web and Mobile).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md`, `VERSION_HISTORY.md`, `SYSTEM_STATE.md`, and `supabase-email-template-configuration.md`.
+
+---
+
+### 01.23 (October 24, 2026)
+
+**Purpose:** Extend the forgot password feature to the web Doctor and Secretary portals for consistent user experience across all platforms.
+
+**Significant Features:**
+- Web Doctor Portal forgot password flow: Doctor Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Doctor Login with success message
+- Web Secretary Portal forgot password flow: Secretary Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Secretary Login with success message
+- Web Doctor forgot password page (`/web/src/app/doctor/forgot-password/page.tsx`) with email input form, following the same design patterns as the login page (colors, spacing, card styling, buttons)
+- Web Doctor reset password page (`/web/src/app/doctor/reset-password/page.tsx`) with OTP field (6 digits), new password field, confirm password field, password requirements indicators (8+ chars, number, uppercase), resend code button with 60-second cooldown, error banner, and loading state
+- Web Secretary forgot password page (`/web/src/app/secretary/forgot-password/page.tsx`) with email input form, following the same design patterns as the secretary login page
+- Web Secretary reset password page (`/web/src/app/secretary/reset-password/page.tsx`) with OTP field, new password field, confirm password field, password requirements indicators, resend code button with 60-second cooldown, error banner, and loading state
+- Added password reset API client functions to web `authApi.ts`: `requestPasswordReset()` and `resetPassword()` methods calling the existing backend endpoints
+- Updated Doctor login page to link to `/doctor/forgot-password` via the "Forgot Password?" link
+- Updated Secretary login page to link to `/secretary/forgot-password` via the "Forgot Password?" link
+- Web pages reuse the existing backend endpoints (`POST /api/v1/auth/password-reset/request` and `POST /api/v1/auth/password-reset/reset`) which already support both doctor and secretary users via email lookup
+- Match the mobile behavior: email validation, OTP sending, password requirements, success/error states, and 60-second resend cooldown for OTP
+- Web pages follow the existing web login page design patterns (shadcn/ui components, Tailwind styling)
+- Include password strength indicators matching the mobile implementation
+- Use the same error messages and success notifications as mobile
+
+**Improvements:** None
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (all changes are additive; backend endpoints already existed; no schema changes; existing authentication flows untouched)
+
+**Documentation Updates:** Version files synced.
+
+---
+
+### 01.22 (October 24, 2026)
+
+**Purpose:** Add a secure password reset feature allowing users to reset their password via email OTP verification without authentication.
+
+**Significant Features:**
+- Mobile password reset flow: Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Login with success message
+- Backend API endpoints for password reset: `POST /api/v1/auth/password-reset/request` (send OTP) and `POST /api/v1/auth/password-reset/reset` (verify OTP and update password)
+- Mobile forgot password page (`forgot_password_page.dart`) with email input form, following the same design patterns as login and signup pages (background with soft blobs, back button, logo, white form card, custom text fields, primary button, trust footer)
+- Mobile reset password page (`reset_password_page.dart`) with OTP field (6 digits), new password field, confirm password field, password requirements indicators (8+ chars, number, uppercase), resend code button with 60-second cooldown, error banner, and loading state
+- Password reset request endpoint validates email, checks if user exists in PostgreSQL, and sends OTP via Supabase Auth with rate limiting (3 requests per 10 minutes per email)
+- Password reset endpoint validates the 6-digit OTP with Supabase Auth, hashes the new password with bcrypt, updates the PostgreSQL users table, clears the `must_change_password` flag if present, and increments `session_version` to invalidate all existing refresh tokens and trusted browser sessions
+- OTP service functions `sendPasswordResetOtp()` and `verifyPasswordResetOtp()` in `otpService.ts` use Supabase Auth with `shouldCreateUser: false` to prevent creating Supabase users; PostgreSQL remains the source of truth for application accounts
+- Password reset is available to all user roles (PATIENT, DOCTOR, SECRETARY, ADMIN, SUPERADMIN) through the same flow
+- For security, the request endpoint returns a success message even if the email is not registered (does not reveal email existence)
+
+**Improvements:**
+- Added password reset API constants to mobile `api_constants.dart`
+- Added `requestPasswordReset()` and `resetPassword()` methods to mobile `api_service.dart`
+- Wired the "Forgot Password?" button in mobile `login_page.dart` to navigate to the forgot password page
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (all changes are additive; no schema changes; existing authentication flows untouched)
+
+**Documentation Updates:** `SYSTEM_STATE.md` updated with password reset flow details; version files synced.
+
+---
+
 ### 01.21 (October 23, 2026)
 
 **Purpose:** Fix the mobile Secretary Chat tab rendering a completely blank page (no list, no empty state, no spinner) whenever the patient actually had conversations.
