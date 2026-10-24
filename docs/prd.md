@@ -606,9 +606,9 @@ The secretary web chat and the secretary mobile chat deliver conversation notifi
 
 ---
 
-# 17. AI Medical Chatbot
+# 17. MediGuide — AI Health Information Assistant
 
-FindMyDoctor shall provide an AI chatbot for general medical information.
+FindMyDoctor shall provide MediGuide, an AI health information assistant, for general medical information.
 
 Patients may ask about:
 
@@ -622,6 +622,8 @@ The AI should:
 
 - Provide general informational responses.
 - Explain limitations.
+- Clearly state it is MediGuide, FindMyDoctor's AI health information assistant, not a doctor when asked.
+- Suggest professional care when appropriate.
 - Encourage professional medical consultation where appropriate.
 - Encourage emergency care for potentially urgent situations.
 
@@ -1018,13 +1020,13 @@ Patients and authorized secretaries shall be able to exchange messages through t
 
 Patients shall not be able to directly chat with doctors.
 
-## FR-033 — AI Chatbot
+## FR-033 — MediGuide (AI Health Information Assistant)
 
-Patients shall be able to communicate with the AI chatbot.
+Patients shall be able to communicate with MediGuide for general medical information.
 
-## FR-034 — AI Safety
+## FR-034 — MediGuide Safety
 
-The AI chatbot shall not claim to diagnose, prescribe, or replace professional care.
+MediGuide shall not claim to diagnose, prescribe, or replace professional care.
 
 ## FR-035 — Consultation History
 
