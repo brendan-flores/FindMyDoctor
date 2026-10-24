@@ -4,6 +4,38 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.23 (October 24, 2026)
+
+**Purpose:** Extend the forgot password feature to the web Doctor and Secretary portals for consistent user experience across all platforms.
+
+**Significant Features:**
+- Web Doctor Portal forgot password flow: Doctor Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Doctor Login with success message
+- Web Secretary Portal forgot password flow: Secretary Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Secretary Login with success message
+- Web Doctor forgot password page (`/web/src/app/doctor/forgot-password/page.tsx`) with email input form, following the same design patterns as the login page (colors, spacing, card styling, buttons)
+- Web Doctor reset password page (`/web/src/app/doctor/reset-password/page.tsx`) with OTP field (6 digits), new password field, confirm password field, password requirements indicators (8+ chars, number, uppercase), resend code button with 60-second cooldown, error banner, and loading state
+- Web Secretary forgot password page (`/web/src/app/secretary/forgot-password/page.tsx`) with email input form, following the same design patterns as the secretary login page
+- Web Secretary reset password page (`/web/src/app/secretary/reset-password/page.tsx`) with OTP field, new password field, confirm password field, password requirements indicators, resend code button with 60-second cooldown, error banner, and loading state
+- Added password reset API client functions to web `authApi.ts`: `requestPasswordReset()` and `resetPassword()` methods calling the existing backend endpoints
+- Updated Doctor login page to link to `/doctor/forgot-password` via the "Forgot Password?" link
+- Updated Secretary login page to link to `/secretary/forgot-password` via the "Forgot Password?" link
+- Web pages reuse the existing backend endpoints (`POST /api/v1/auth/password-reset/request` and `POST /api/v1/auth/password-reset/reset`) which already support both doctor and secretary users via email lookup
+- Match the mobile behavior: email validation, OTP sending, password requirements, success/error states, and 60-second resend cooldown for OTP
+- Web pages follow the existing web login page design patterns (shadcn/ui components, Tailwind styling)
+- Include password strength indicators matching the mobile implementation
+- Use the same error messages and success notifications as mobile
+
+**Improvements:** None
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (all changes are additive; backend endpoints already existed; no schema changes; existing authentication flows untouched)
+
+**Documentation Updates:** Version files synced.
+
+---
+
 ### 01.22 (October 24, 2026)
 
 **Purpose:** Add a secure password reset feature allowing users to reset their password via email OTP verification without authentication.

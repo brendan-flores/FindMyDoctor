@@ -149,6 +149,8 @@ Current System State (October 2026):
 
 - Users can reset their password through a secure email OTP flow without authentication
 - Mobile password reset flow: Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Login with success message
+- Web Doctor Portal password reset flow: Doctor Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Doctor Login with success message
+- Web Secretary Portal password reset flow: Secretary Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Secretary Login with success message
 - Backend API endpoints for password reset: `POST /api/v1/auth/password-reset/request` (send OTP) and `POST /api/v1/auth/password-reset/reset` (verify OTP and update password)
 - Password reset request endpoint validates email, checks if user exists in PostgreSQL, and sends OTP via Supabase Auth
 - For security, the request endpoint returns a success message even if the email is not registered (does not reveal email existence)
@@ -157,8 +159,16 @@ Current System State (October 2026):
 - Password reset also increments the `session_version` in the users table to invalidate all existing refresh tokens and trusted browser sessions
 - Mobile forgot password page (`forgot_password_page.dart`) follows the same design patterns as login and signup pages: background with soft blobs, back button, logo, white form card, custom text fields, primary button, and trust footer
 - Mobile reset password page (`reset_password_page.dart`) includes OTP field (6 digits), new password field, confirm password field, password requirements indicators (8+ chars, number, uppercase), resend code button with 60-second cooldown, error banner, and loading state
+- Web Doctor forgot password page (`/web/src/app/doctor/forgot-password/page.tsx`) with email input form, following the same design patterns as the login page (colors, spacing, card styling, buttons)
+- Web Doctor reset password page (`/web/src/app/doctor/reset-password/page.tsx`) with OTP field (6 digits), new password field, confirm password field, password requirements indicators (8+ chars, number, uppercase), resend code button with 60-second cooldown, error banner, and loading state
+- Web Secretary forgot password page (`/web/src/app/secretary/forgot-password/page.tsx`) with email input form, following the same design patterns as the secretary login page
+- Web Secretary reset password page (`/web/src/app/secretary/reset-password/page.tsx`) with OTP field, new password field, confirm password field, password requirements indicators, resend code button with 60-second cooldown, error banner, and loading state
+- Web password reset API client functions in `authApi.ts`: `requestPasswordReset()` and `resetPassword()` methods calling the existing backend endpoints
+- Doctor login page links to `/doctor/forgot-password` via the "Forgot Password?" link
+- Secretary login page links to `/secretary/forgot-password` via the "Forgot Password?" link
 - OTP service functions `sendPasswordResetOtp()` and `verifyPasswordResetOtp()` in `otpService.ts` use Supabase Auth with `shouldCreateUser: false` to prevent creating Supabase users; PostgreSQL remains the source of truth for application accounts
 - Password reset is available to all user roles (PATIENT, DOCTOR, SECRETARY, ADMIN, SUPERADMIN) through the same flow
+- Web pages follow the existing web login page design patterns (shadcn/ui components, Tailwind styling) and include password strength indicators matching the mobile implementation
 - **Do not trust this device:** keeps browser-session cookies, 8-hour idle timeout, 7-hour access token, 8-hour refresh token, and no trusted browser. OTP is required on every login when 2FA is enabled, and any stale trust cookie is cleared.
 - Trusting a device never bypasses the OTP required for the current login. `POST /api/v1/auth/verify-login-otp` always issues a short untrusted session; only the explicit trust endpoint upgrades it.
 - A browser that is already trusted skips OTP and the trust page on later logins.
