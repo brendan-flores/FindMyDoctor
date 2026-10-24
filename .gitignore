@@ -53,6 +53,9 @@ mobile/.pub-cache/
 mobile/.pub/
 mobile/build/
 mobile/lib/core/config/local_config.dart
+mobile/macos/Flutter/GeneratedPluginRegistrant.swift
+mobile/windows/flutter/generated_plugin_registrant.cc
+mobile/windows/flutter/generated_plugins.cmake
 
 # Web specific
 web/.next/
