@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart' as spacing;
 import '../theme/app_text_styles.dart';
@@ -19,6 +20,7 @@ class AppHeader extends StatefulWidget implements PreferredSizeWidget {
   final Function(notif_model.Notification)? onNotificationItemTap;
   final VoidCallback? onUnreadCountUpdate;
   final VoidCallback? onViewAll;
+  final ApiService? apiService;
 
   const AppHeader({
     super.key,
@@ -35,6 +37,7 @@ class AppHeader extends StatefulWidget implements PreferredSizeWidget {
     this.onNotificationItemTap,
     this.onUnreadCountUpdate,
     this.onViewAll,
+    this.apiService,
   });
 
   @override
@@ -45,22 +48,315 @@ class AppHeader extends StatefulWidget implements PreferredSizeWidget {
 }
 
 class _AppHeaderState extends State<AppHeader> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService = widget.apiService ?? ApiService();
   bool _isDropdownOpen = false;
   List<notif_model.Notification> _notifications = [];
   bool _isLoadingNotifications = false;
+  final GlobalKey _dropdownKey = GlobalKey();
+  double _dropdownHeight = 400;
+  OverlayEntry? _overlayEntry;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _calculateDropdownHeight();
+    });
+  }
+
+  @override
+  void dispose() {
+    _overlayEntry?.remove();
+    super.dispose();
+  }
+
+  void _calculateDropdownHeight() {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final availableHeight =
+        screenHeight - 100; // Reserve space for header and bottom padding
+    _dropdownHeight = availableHeight.clamp(200, 400).toDouble();
+  }
+
+  void _showDropdown() {
+    _overlayEntry?.remove();
+    _overlayEntry = _createOverlayEntry();
+    Overlay.of(context).insert(_overlayEntry!);
+    setState(() {
+      _isDropdownOpen = true;
+    });
+    _loadNotifications();
+  }
+
+  void _closeDropdown() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    setState(() {
+      _isDropdownOpen = false;
+    });
+  }
+
+  // The dropdown lives in an OverlayEntry, so it does not rebuild when this
+  // State calls setState. Without this, the dropdown would keep showing the
+  // loading spinner (or stale notifications) forever.
+  void _rebuildDropdown() {
+    final entry = _overlayEntry;
+    if (entry != null && entry.mounted) {
+      entry.markNeedsBuild();
+    }
+  }
+
+  OverlayEntry _createOverlayEntry() {
+    return OverlayEntry(
+      builder: (context) => GestureDetector(
+        onTap: _closeDropdown,
+        behavior: HitTestBehavior.translucent,
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.3),
+          child: Stack(
+            children: [
+              Positioned(
+                right: spacing.AppSpacing.screenPadding,
+                top: 70, // Offset from top to account for header
+                child: GestureDetector(
+                  onTap: () {},
+                  // The overlay is inserted above the app's Material widgets, so
+                  // the dropdown needs its own Material ancestor for InkWell.
+                  child: Material(
+                    color: AppColors.surface,
+                    elevation: 8,
+                    borderRadius: BorderRadius.circular(
+                      spacing.AppSpacing.radiusLg,
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: SizedBox(
+                      width: 320,
+                      height: _dropdownHeight,
+                      child: Column(
+                        children: [
+                          if (_isLoadingNotifications)
+                            const Expanded(
+                              child: Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(32.0),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                            )
+                          else if (_notifications.isEmpty)
+                            Expanded(
+                              child: Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(
+                                    spacing.AppSpacing.gutterXl,
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.notifications_none,
+                                        size: 48,
+                                        color: AppColors.secondary,
+                                      ),
+                                      const SizedBox(
+                                        height: spacing.AppSpacing.gutterMd,
+                                      ),
+                                      Text(
+                                        'No notifications',
+                                        style: AppTextStyles.bodyMd.copyWith(
+                                          color: AppColors.secondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            Expanded(
+                              child: ListView.separated(
+                                padding: EdgeInsets.zero,
+                                itemCount: _notifications.length,
+                                separatorBuilder: (context, index) => Divider(
+                                  height: 1,
+                                  thickness: 1,
+                                  color: AppColors.slate200,
+                                ),
+                                itemBuilder: (context, index) {
+                                  final notification = _notifications[index];
+                                  return InkWell(
+                                    onTap: () {
+                                      _handleNotificationItemClick(
+                                        notification,
+                                      );
+                                      _closeDropdown();
+                                    },
+                                    child: Padding(
+                                      padding: EdgeInsets.all(
+                                        spacing.AppSpacing.gutterMd,
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal:
+                                                  spacing.AppSpacing.gutterSm,
+                                              vertical:
+                                                  spacing.AppSpacing.gutterXs,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: _getTypeBadgeColor(
+                                                notification.type,
+                                              ).withValues(alpha: 0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                    spacing.AppSpacing.radiusMd,
+                                                  ),
+                                            ),
+                                            child: Text(
+                                              _getTypeBadgeText(
+                                                notification.type,
+                                              ),
+                                              style: AppTextStyles.labelSm
+                                                  .copyWith(
+                                                    color: _getTypeBadgeColor(
+                                                      notification.type,
+                                                    ),
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                            ),
+                                          ),
+                                          const SizedBox(
+                                            width: spacing.AppSpacing.gutterMd,
+                                          ),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        notification.title,
+                                                        style: AppTextStyles
+                                                            .bodyMdMedium
+                                                            .copyWith(
+                                                              fontWeight:
+                                                                  notification
+                                                                      .isRead
+                                                                  ? FontWeight
+                                                                        .w500
+                                                                  : FontWeight
+                                                                        .w700,
+                                                            ),
+                                                      ),
+                                                    ),
+                                                    if (!notification.isRead)
+                                                      Container(
+                                                        width: 8,
+                                                        height: 8,
+                                                        decoration:
+                                                            BoxDecoration(
+                                                              color: AppColors
+                                                                  .primary,
+                                                              shape: BoxShape
+                                                                  .circle,
+                                                            ),
+                                                      ),
+                                                  ],
+                                                ),
+                                                const SizedBox(
+                                                  height: spacing
+                                                      .AppSpacing
+                                                      .gutterXs,
+                                                ),
+                                                Text(
+                                                  notification.message,
+                                                  style: AppTextStyles.labelSm
+                                                      .copyWith(
+                                                        color:
+                                                            AppColors.secondary,
+                                                      ),
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(
+                                                  height: spacing
+                                                      .AppSpacing
+                                                      .gutterXs,
+                                                ),
+                                                Text(
+                                                  _formatTimestamp(
+                                                    notification.createdAt,
+                                                  ),
+                                                  style: AppTextStyles.labelSm
+                                                      .copyWith(
+                                                        color:
+                                                            AppColors.outline,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          if (!_isLoadingNotifications &&
+                              _notifications.isNotEmpty)
+                            Container(
+                              width: double.infinity,
+                              padding: EdgeInsets.all(
+                                spacing.AppSpacing.gutterMd,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  top: BorderSide(color: AppColors.slate200),
+                                ),
+                              ),
+                              child: InkWell(
+                                onTap: () {
+                                  _closeDropdown();
+                                  if (widget.onViewAll != null) {
+                                    widget.onViewAll!();
+                                  }
+                                },
+                                child: Text(
+                                  'View All',
+                                  style: AppTextStyles.labelMd.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _loadNotifications() async {
     if (_isLoadingNotifications) return;
-    
+
     setState(() {
       _isLoadingNotifications = true;
     });
+    _rebuildDropdown();
 
     try {
       final response = await _apiService.getNotifications();
@@ -76,6 +372,7 @@ class _AppHeaderState extends State<AppHeader> {
             _notifications = notifications;
             _isLoadingNotifications = false;
           });
+          _rebuildDropdown();
         }
       } else {
         if (mounted) {
@@ -83,6 +380,7 @@ class _AppHeaderState extends State<AppHeader> {
             _notifications = [];
             _isLoadingNotifications = false;
           });
+          _rebuildDropdown();
         }
       }
     } catch (e) {
@@ -91,6 +389,7 @@ class _AppHeaderState extends State<AppHeader> {
           _notifications = [];
           _isLoadingNotifications = false;
         });
+        _rebuildDropdown();
       }
     }
   }
@@ -100,7 +399,9 @@ class _AppHeaderState extends State<AppHeader> {
       await _apiService.markNotificationAsRead(notification.id);
       if (mounted) {
         setState(() {
-          final index = _notifications.indexWhere((n) => n.id == notification.id);
+          final index = _notifications.indexWhere(
+            (n) => n.id == notification.id,
+          );
           if (index != -1) {
             _notifications[index] = notif_model.Notification(
               id: notification.id,
@@ -115,6 +416,7 @@ class _AppHeaderState extends State<AppHeader> {
             );
           }
         });
+        _rebuildDropdown();
         // Notify parent to update unread count
         if (widget.onUnreadCountUpdate != null) {
           widget.onUnreadCountUpdate!();
@@ -129,12 +431,11 @@ class _AppHeaderState extends State<AppHeader> {
     if (widget.onNotificationTap != null) {
       widget.onNotificationTap!();
     } else {
-      setState(() {
-        _isDropdownOpen = !_isDropdownOpen;
-        if (_isDropdownOpen) {
-          _loadNotifications();
-        }
-      });
+      if (_isDropdownOpen) {
+        _closeDropdown();
+      } else {
+        _showDropdown();
+      }
     }
   }
 
@@ -142,10 +443,6 @@ class _AppHeaderState extends State<AppHeader> {
     if (!notification.isRead) {
       _markAsRead(notification);
     }
-
-    setState(() {
-      _isDropdownOpen = false;
-    });
 
     if (widget.onNotificationItemTap != null) {
       widget.onNotificationItemTap!(notification);
@@ -225,7 +522,9 @@ class _AppHeaderState extends State<AppHeader> {
                 if (widget.showBackButton)
                   IconButton(
                     icon: const Icon(Icons.arrow_back_ios_new),
-                    onPressed: widget.onBackPressed ?? () => Navigator.of(context).pop(),
+                    onPressed:
+                        widget.onBackPressed ??
+                        () => Navigator.of(context).pop(),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   )
@@ -253,6 +552,7 @@ class _AppHeaderState extends State<AppHeader> {
                   Stack(
                     children: [
                       IconButton(
+                        key: _dropdownKey,
                         icon: Icon(
                           Icons.notifications_outlined,
                           color: AppColors.onSurface,
@@ -264,18 +564,26 @@ class _AppHeaderState extends State<AppHeader> {
                           top: 6,
                           right: 6,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 1,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.error,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.surface, width: 2),
+                              border: Border.all(
+                                color: AppColors.surface,
+                                width: 2,
+                              ),
                             ),
                             constraints: const BoxConstraints(
                               minWidth: 14,
                               minHeight: 14,
                             ),
                             child: Text(
-                              widget.unreadCount! > 9 ? '9+' : widget.unreadCount.toString(),
+                              widget.unreadCount! > 9
+                                  ? '9+'
+                                  : widget.unreadCount.toString(),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 9,
@@ -293,7 +601,9 @@ class _AppHeaderState extends State<AppHeader> {
                     height: 32,
                     decoration: BoxDecoration(
                       color: AppColors.surfaceContainer,
-                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                      borderRadius: BorderRadius.circular(
+                        spacing.AppSpacing.radiusFull,
+                      ),
                     ),
                     child: Icon(
                       Icons.person,
@@ -310,193 +620,6 @@ class _AppHeaderState extends State<AppHeader> {
             ),
           ),
         ),
-        if (_isDropdownOpen)
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _isDropdownOpen = false;
-              });
-            },
-            behavior: HitTestBehavior.translucent,
-            child: Container(
-              color: Colors.transparent,
-              width: double.infinity,
-              child: Stack(
-                children: [
-                  Positioned(
-                    right: spacing.AppSpacing.screenPadding,
-                    top: 8,
-                    child: GestureDetector(
-                      onTap: () {},
-                      child: Container(
-                        width: 320,
-                        constraints: const BoxConstraints(maxHeight: 400),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.slate800.withValues(alpha: 0.15),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_isLoadingNotifications)
-                              const Padding(
-                                padding: EdgeInsets.all(32.0),
-                                child: CircularProgressIndicator(),
-                              )
-                            else if (_notifications.isEmpty)
-                              Container(
-                                padding: EdgeInsets.all(spacing.AppSpacing.gutterXl),
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      Icons.notifications_none,
-                                      size: 48,
-                                      color: AppColors.secondary,
-                                    ),
-                                    const SizedBox(height: spacing.AppSpacing.gutterMd),
-                                    Text(
-                                      'No notifications',
-                                      style: AppTextStyles.bodyMd.copyWith(
-                                        color: AppColors.secondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            else
-                              Flexible(
-                                child: ListView.separated(
-                                  shrinkWrap: true,
-                                  itemCount: _notifications.length,
-                                  separatorBuilder: (context, index) => Divider(
-                                    height: 1,
-                                    thickness: 1,
-                                    color: AppColors.slate200,
-                                  ),
-                                  itemBuilder: (context, index) {
-                                    final notification = _notifications[index];
-                                    return InkWell(
-                                      onTap: () => _handleNotificationItemClick(notification),
-                                      child: Padding(
-                                        padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-                                        child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Container(
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: spacing.AppSpacing.gutterSm,
-                                                vertical: spacing.AppSpacing.gutterXs,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: _getTypeBadgeColor(notification.type).withValues(alpha: 0.1),
-                                                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                                              ),
-                                              child: Text(
-                                                _getTypeBadgeText(notification.type),
-                                                style: AppTextStyles.labelSm.copyWith(
-                                                  color: _getTypeBadgeColor(notification.type),
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: spacing.AppSpacing.gutterMd),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    children: [
-                                                      Expanded(
-                                                        child: Text(
-                                                          notification.title,
-                                                          style: AppTextStyles.bodyMdMedium.copyWith(
-                                                            fontWeight: notification.isRead
-                                                                ? FontWeight.w500
-                                                                : FontWeight.w700,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      if (!notification.isRead)
-                                                        Container(
-                                                          width: 8,
-                                                          height: 8,
-                                                          decoration: BoxDecoration(
-                                                            color: AppColors.primary,
-                                                            shape: BoxShape.circle,
-                                                          ),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: spacing.AppSpacing.gutterXs),
-                                                  Text(
-                                                    notification.message,
-                                                    style: AppTextStyles.labelSm.copyWith(
-                                                      color: AppColors.secondary,
-                                                    ),
-                                                    maxLines: 2,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                  const SizedBox(height: spacing.AppSpacing.gutterXs),
-                                                  Text(
-                                                    _formatTimestamp(notification.createdAt),
-                                                    style: AppTextStyles.labelSm.copyWith(
-                                                      color: AppColors.outline,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            if (!_isLoadingNotifications && _notifications.isNotEmpty)
-                              Container(
-                                width: double.infinity,
-                                padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-                                decoration: BoxDecoration(
-                                  border: Border(
-                                    top: BorderSide(color: AppColors.slate200),
-                                  ),
-                                ),
-                                child: InkWell(
-                                  onTap: () {
-                                    setState(() {
-                                      _isDropdownOpen = false;
-                                    });
-                                    if (widget.onViewAll != null) {
-                                      widget.onViewAll!();
-                                    }
-                                  },
-                                  child: Text(
-                                    'View All',
-                                    style: AppTextStyles.labelMd.copyWith(
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
       ],
     );
   }
