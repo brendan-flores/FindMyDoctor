@@ -289,17 +289,18 @@ export async function ensureAdminSupabaseIdentity(email: string): Promise<{ succ
     }
 
     const users = data?.users || [];
-    const existingUser = users.find((user: any) => user.email === email);
+    const normalizedEmail = email.toLowerCase().trim();
+    const existingUser = users.find((user: any) => user.email?.toLowerCase().trim() === normalizedEmail);
 
     if (existingUser) {
-      console.log('Supabase Auth user already exists for:', email);
+      console.log('Supabase Auth user already exists for:', normalizedEmail);
       return { success: true, message: 'Supabase identity already exists' };
     }
 
     // Create Supabase Auth user without password (passwordless OTP only)
     // We use admin.createUser to create the user without sending an email
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       email_confirm: true, // Auto-confirm email so OTP can be sent immediately
       user_metadata: {
         role: 'ADMIN',
@@ -359,17 +360,18 @@ export async function ensureSecretarySupabaseIdentity(email: string): Promise<{ 
     }
 
     const users = data?.users || [];
-    const existingUser = users.find((user: any) => user.email === email);
+    const normalizedEmail = email.toLowerCase().trim();
+    const existingUser = users.find((user: any) => user.email?.toLowerCase().trim() === normalizedEmail);
 
     if (existingUser) {
-      console.log('Supabase Auth user already exists for:', email);
+      console.log('Supabase Auth user already exists for:', normalizedEmail);
       return { success: true, message: 'Supabase identity already exists' };
     }
 
     // Create Supabase Auth user without password (passwordless OTP only)
     // We use admin.createUser to create the user without sending an email
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       email_confirm: true, // Auto-confirm email so OTP can be sent immediately
       user_metadata: {
         role: 'SECRETARY',
@@ -429,17 +431,18 @@ export async function ensureDoctorSupabaseIdentity(email: string): Promise<{ suc
     }
 
     const users = data?.users || [];
-    const existingUser = users.find((user: any) => user.email === email);
+    const normalizedEmail = email.toLowerCase().trim();
+    const existingUser = users.find((user: any) => user.email?.toLowerCase().trim() === normalizedEmail);
 
     if (existingUser) {
-      console.log('Supabase Auth user already exists for:', email);
+      console.log('Supabase Auth user already exists for:', normalizedEmail);
       return { success: true, message: 'Supabase identity already exists' };
     }
 
     // Create Supabase Auth user without password (passwordless OTP only)
     // We use admin.createUser to create the user without sending an email
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       email_confirm: true, // Auto-confirm email so OTP can be sent immediately
       user_metadata: {
         role: 'DOCTOR',
@@ -473,17 +476,18 @@ export async function ensureDoctorSupabaseIdentity(email: string): Promise<{ suc
  * PostgreSQL users table remains the source of truth for application accounts.
  * Supabase is used only for OTP delivery and verification.
  */
-export async function sendPasswordResetOtp(email: string): Promise<{ success: boolean; message: string }> {
+export async function sendPasswordResetOtp(email: string, role?: string): Promise<{ success: boolean; message: string }> {
   try {
     if (!supabaseAdmin) {
       throw { code: ErrorCodes.SERVER_ERROR, message: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to backend/.env.' };
     }
 
-    console.log('Sending password reset OTP via Supabase Auth to:', email);
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log('Sending password reset OTP via Supabase Auth to:', normalizedEmail);
 
     // Use Supabase only for OTP delivery - do NOT create Supabase user
-    const { data, error } = await supabaseAdmin.auth.signInWithOtp({
-      email,
+    let { data, error } = await supabaseAdmin.auth.signInWithOtp({
+      email: normalizedEmail,
       options: {
         emailRedirectTo: undefined, // No redirect
         shouldCreateUser: false, // CRITICAL: Do not create Supabase user for password reset
@@ -493,6 +497,29 @@ export async function sendPasswordResetOtp(email: string): Promise<{ success: bo
       }
     });
 
+    // If Supabase rejected with "Signups not allowed for otp" or similar,
+    // the user exists in PostgreSQL but has no Supabase Auth identity yet.
+    // Ensure the identity exists and retry once.
+    if (error && (error.message?.toLowerCase().includes('signup') || error.message?.toLowerCase().includes('not allowed'))) {
+      console.log('User not found in Supabase Auth for password reset OTP. Ensuring identity now for:', normalizedEmail);
+      try {
+        await ensureUserSupabaseIdentity(normalizedEmail, role);
+        const retryResult = await supabaseAdmin.auth.signInWithOtp({
+          email: normalizedEmail,
+          options: {
+            emailRedirectTo: undefined,
+            shouldCreateUser: false,
+            data: {
+              auth_flow: 'password_reset'
+            }
+          }
+        });
+        error = retryResult.error;
+      } catch (ensureErr) {
+        console.error('Failed to ensure identity during OTP send fallback:', ensureErr);
+      }
+    }
+
     if (error) {
       console.error('Supabase Auth OTP send error:', error);
       if (error.message?.includes('security purposes') || error.status === 429 || error.message?.includes('rate limit')) {
@@ -501,7 +528,7 @@ export async function sendPasswordResetOtp(email: string): Promise<{ success: bo
       throw { code: ErrorCodes.SERVER_ERROR, message: error.message || 'Failed to send OTP' };
     }
 
-    console.log('Password reset OTP sent successfully via Supabase Auth to:', email);
+    console.log('Password reset OTP sent successfully via Supabase Auth to:', normalizedEmail);
     return {
       success: true,
       message: 'OTP sent successfully. Please check your email.',
@@ -524,11 +551,12 @@ export async function verifyPasswordResetOtp(email: string, token: string): Prom
       return { verified: false, error: 'Supabase is not configured' };
     }
 
-    console.log('Verifying password reset OTP via Supabase Auth for:', email);
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log('Verifying password reset OTP via Supabase Auth for:', normalizedEmail);
 
     // Verify with Supabase
     const { data, error } = await supabaseAdmin.auth.verifyOtp({
-      email,
+      email: normalizedEmail,
       token,
       type: 'email'
     });
@@ -581,17 +609,18 @@ export async function ensurePatientSupabaseIdentity(email: string): Promise<{ su
     }
 
     const users = data?.users || [];
-    const existingUser = users.find((user: any) => user.email === email);
+    const normalizedEmail = email.toLowerCase().trim();
+    const existingUser = users.find((user: any) => user.email?.toLowerCase().trim() === normalizedEmail);
 
     if (existingUser) {
-      console.log('Supabase Auth user already exists for:', email);
+      console.log('Supabase Auth user already exists for:', normalizedEmail);
       return { success: true, message: 'Supabase identity already exists' };
     }
 
     // Create Supabase Auth user without password (passwordless OTP only)
     // We use admin.createUser to create the user without sending an email
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       email_confirm: true, // Auto-confirm email so OTP can be sent immediately
       user_metadata: {
         role: 'PATIENT',
@@ -603,16 +632,35 @@ export async function ensurePatientSupabaseIdentity(email: string): Promise<{ su
       console.error('Supabase Auth createUser error:', createError);
       // If error is "duplicate key" or similar, user already exists (race condition)
       if (createError.message?.includes('duplicate') || createError.message?.includes('already exists')) {
-        console.log('Supabase Auth user already exists (race condition):', email);
+        console.log('Supabase Auth user already exists (race condition):', normalizedEmail);
         return { success: true, message: 'Supabase identity already exists' };
       }
       throw { code: ErrorCodes.SERVER_ERROR, message: createError.message || 'Failed to create Supabase identity' };
     }
 
-    console.log('Supabase Auth identity created for Patient:', email);
+    console.log('Supabase Auth identity created for Patient:', normalizedEmail);
     return { success: true, message: 'Supabase identity created successfully' };
   } catch (err: any) {
     console.error('Error ensuring Supabase identity:', err);
     throw err;
+  }
+}
+
+/**
+ * Ensure user of any role has a Supabase Auth identity for OTP delivery
+ */
+export async function ensureUserSupabaseIdentity(email: string, role?: string): Promise<{ success: boolean; message: string }> {
+  const normalizedRole = role?.toUpperCase();
+  switch (normalizedRole) {
+    case 'ADMIN':
+    case 'SUPERADMIN':
+      return ensureAdminSupabaseIdentity(email);
+    case 'DOCTOR':
+      return ensureDoctorSupabaseIdentity(email);
+    case 'SECRETARY':
+      return ensureSecretarySupabaseIdentity(email);
+    case 'PATIENT':
+    default:
+      return ensurePatientSupabaseIdentity(email);
   }
 }

@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { success, error, ErrorCodes } from '../utils/response';
 import { query } from '../database/connection';
 import bcrypt from 'bcrypt';
-import { sendPasswordResetOtp, verifyPasswordResetOtp, ensurePatientSupabaseIdentity } from '../services/otpService';
+import { sendPasswordResetOtp, verifyPasswordResetOtp, ensureUserSupabaseIdentity } from '../services/otpService';
 
 const router = Router();
 
@@ -54,20 +54,17 @@ router.post('/request', passwordResetLimiter, async (req: Request, res: Response
 
     const user = userResult.rows[0];
 
-    // Ensure user has Supabase Auth identity for password reset
-    // This is especially important for patients who may not have been created with one
-    if (user.role === 'PATIENT') {
-      try {
-        await ensurePatientSupabaseIdentity(email);
-      } catch (err) {
-        console.error('Failed to ensure Supabase identity for patient:', err);
-        // Don't fail the password reset request if Supabase identity creation fails
-        // The user may already have an identity, or we can try again on the next request
-      }
+    // Ensure user has Supabase Auth identity for password reset across all roles
+    // (Secretary, Doctor, Patient, Admin, SuperAdmin)
+    try {
+      await ensureUserSupabaseIdentity(email, user.role);
+    } catch (err) {
+      console.error(`Failed to ensure Supabase identity for ${user.role}:`, err);
+      // Fallback inside sendPasswordResetOtp will also attempt identity creation if needed
     }
 
     // Send OTP via Supabase
-    await sendPasswordResetOtp(email);
+    await sendPasswordResetOtp(email, user.role);
 
     console.log('🟢 Password reset OTP sent to:', email);
 
