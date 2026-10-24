@@ -2,8 +2,8 @@ import { Router, Response } from 'express';
 import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
-import { calculateCapacity, calculateCapacityRange } from '../modules/capacity/capacityService';
-import { calculateAvailability, calculateAvailabilityRange } from '../modules/availability/availabilityService';
+import { calculateCapacity, calculateCapacityRange, buildCapacityResult } from '../modules/capacity/capacityService';
+import { calculateAvailability, calculateAvailabilityRange, invalidateAvailabilityCache } from '../modules/availability/availabilityService';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import path from 'path';
@@ -12,6 +12,20 @@ import { toClinicDateString, getClinicDate } from '../utils/date';
 import { uploadDoctorPhoto, deleteDoctorPhoto, replaceDoctorPhoto, validateImageFile } from '../services/storageService';
 
 const router = Router();
+
+// Any successful write through this router (schedules, exceptions, breaks,
+// capacity, profile) may change availability, so clear cached date ranges.
+// GET requests never clear it; failed writes do not either.
+router.use((req, res, next) => {
+  if (req.method !== 'GET') {
+    res.on('finish', () => {
+      if (res.statusCode < 400) {
+        invalidateAvailabilityCache();
+      }
+    });
+  }
+  next();
+});
 
 // Configure multer for photo upload (memory storage for Supabase)
 const storage = multer.memoryStorage();
@@ -1059,88 +1073,106 @@ router.get('/me/dashboard', authenticate, authorize('DOCTOR'), async (req: AuthR
     // Use provided date or default to clinic date
     const targetDate = date ? String(date) : getClinicDate();
 
-    // Get capacity for today
-    const capacity = await calculateCapacity(doctorId, targetDate);
+    const scheduleDate = new Date(targetDate);
+    const dayOfWeek = scheduleDate.getDay();
 
-    // Get today's appointment counts
-    const appointmentCountsResult = await query(
-      `SELECT
-         COUNT(*) FILTER (WHERE status = 'COMPLETED') as completed,
-         COUNT(*) FILTER (WHERE status = 'SCHEDULED' OR status = 'CONFIRMED' OR status = 'IN_PROGRESS') as waiting,
-         COUNT(*) FILTER (WHERE status = 'CANCELLED') as cancelled
-       FROM appointments
-       WHERE doctor_id = $1 AND DATE(appointment_date) = $2`,
-      [doctorId, targetDate]
-    );
-
-    const appointmentCounts = appointmentCountsResult.rows[0];
-
-    // Get next patient (first waiting patient)
-    const nextPatientResult = await query(
-      `SELECT q.queue_number, p.first_name, p.last_name, q.appointment_id
-       FROM queue_entries q
-       JOIN patients p ON q.patient_id = p.id
-       WHERE q.doctor_id = $1 AND q.queue_date = $2 AND q.status = 'WAITING'
-       ORDER BY q.queue_number ASC
-       LIMIT 1`,
-      [doctorId, targetDate]
-    );
-
-    const nextPatient = nextPatientResult.rows.length > 0 ? nextPatientResult.rows[0] : null;
-
-    // Get today's queue
-    const queueResult = await query(
-      `SELECT q.queue_number, p.first_name, p.last_name, a.reason_for_visit, q.status, q.appointment_id
-       FROM queue_entries q
-       JOIN patients p ON q.patient_id = p.id
-       LEFT JOIN appointments a ON q.appointment_id = a.id
-       WHERE q.doctor_id = $1 AND q.queue_date = $2
-       ORDER BY q.queue_number ASC`,
-      [doctorId, targetDate]
-    );
-
-    // Get upcoming appointments (next 7 days, excluding today)
     const upcomingDate = new Date(targetDate);
     upcomingDate.setDate(upcomingDate.getDate() + 7);
     const upcomingEndDate = toClinicDateString(upcomingDate);
 
-    const upcomingResult = await query(
-      `SELECT a.appointment_date, p.first_name, p.last_name, a.reason_for_visit, a.status, q.queue_number
-       FROM appointments a
-       JOIN patients p ON a.patient_id = p.id
-       LEFT JOIN queue_entries q ON a.id = q.appointment_id
-       WHERE a.doctor_id = $1
-         AND DATE(a.appointment_date) > $2
-         AND DATE(a.appointment_date) <= $3
-         AND a.status NOT IN ('CANCELLED', 'NO_SHOW')
-       ORDER BY a.appointment_date ASC`,
-      [doctorId, targetDate, upcomingEndDate]
-    );
+    // These reads are independent: run them together to keep the dashboard to
+    // two database round trips instead of one per query.
+    const [
+      appointmentCountsResult,
+      nextPatientResult,
+      queueResult,
+      upcomingResult,
+      workingHoursResult,
+      breaksResult,
+      exceptionsResult,
+      dailyCapacityResult,
+    ] = await Promise.all([
+      query(
+        `SELECT
+           COUNT(*) FILTER (WHERE status = 'COMPLETED') as completed,
+           COUNT(*) FILTER (WHERE status = 'SCHEDULED' OR status = 'CONFIRMED' OR status = 'IN_PROGRESS') as waiting,
+           COUNT(*) FILTER (WHERE status = 'CANCELLED') as cancelled
+         FROM appointments
+         WHERE doctor_id = $1 AND DATE(appointment_date) = $2`,
+        [doctorId, targetDate]
+      ),
+      query(
+        `SELECT q.queue_number, p.first_name, p.last_name, q.appointment_id
+         FROM queue_entries q
+         JOIN patients p ON q.patient_id = p.id
+         WHERE q.doctor_id = $1 AND q.queue_date = $2 AND q.status = 'WAITING'
+         ORDER BY q.queue_number ASC
+         LIMIT 1`,
+        [doctorId, targetDate]
+      ),
+      query(
+        `SELECT q.queue_number, p.first_name, p.last_name, a.reason_for_visit, q.status, q.appointment_id
+         FROM queue_entries q
+         JOIN patients p ON q.patient_id = p.id
+         LEFT JOIN appointments a ON q.appointment_id = a.id
+         WHERE q.doctor_id = $1 AND q.queue_date = $2
+         ORDER BY q.queue_number ASC`,
+        [doctorId, targetDate]
+      ),
+      query(
+        `SELECT a.appointment_date, p.first_name, p.last_name, a.reason_for_visit, a.status, q.queue_number
+         FROM appointments a
+         JOIN patients p ON a.patient_id = p.id
+         LEFT JOIN queue_entries q ON a.id = q.appointment_id
+         WHERE a.doctor_id = $1
+           AND DATE(a.appointment_date) > $2
+           AND DATE(a.appointment_date) <= $3
+           AND a.status NOT IN ('CANCELLED', 'NO_SHOW')
+         ORDER BY a.appointment_date ASC`,
+        [doctorId, targetDate, upcomingEndDate]
+      ),
+      query(
+        `SELECT start_time, end_time FROM doctor_schedules
+         WHERE doctor_id = $1 AND day_of_week = $2 AND is_active = true
+         ORDER BY start_time`,
+        [doctorId, dayOfWeek]
+      ),
+      query(
+        `SELECT start_time, end_time FROM doctor_break_periods
+         WHERE doctor_id = $1 AND break_date = $2 AND is_active = true
+         ORDER BY start_time`,
+        [doctorId, targetDate]
+      ),
+      query(
+        `SELECT start_date, end_date, reason FROM doctor_unavailability
+         WHERE doctor_id = $1 AND is_active = true
+           AND start_date <= $2 AND end_date >= $2`,
+        [doctorId, targetDate]
+      ),
+      query(
+        `SELECT configured_capacity, registered_count FROM daily_capacities
+         WHERE doctor_id = $1 AND date = $2`,
+        [doctorId, targetDate]
+      ),
+    ]);
 
-    // Get today's schedule (working hours, breaks, exceptions)
-    const scheduleDate = new Date(targetDate);
-    const dayOfWeek = scheduleDate.getDay();
+    const appointmentCounts = appointmentCountsResult.rows[0];
 
-    const workingHoursResult = await query(
-      `SELECT start_time, end_time FROM doctor_schedules
-       WHERE doctor_id = $1 AND day_of_week = $2 AND is_active = true
-       ORDER BY start_time`,
-      [doctorId, dayOfWeek]
-    );
+    const nextPatient = nextPatientResult.rows.length > 0 ? nextPatientResult.rows[0] : null;
 
-    const breaksResult = await query(
-      `SELECT start_time, end_time FROM doctor_break_periods
-       WHERE doctor_id = $1 AND break_date = $2 AND is_active = true
-       ORDER BY start_time`,
-      [doctorId, targetDate]
-    );
+    const workingRanges = workingHoursResult.rows.map(row => ({
+      start: row.start_time,
+      end: row.end_time,
+    }));
+    const breakRanges = breaksResult.rows.map(row => ({
+      start: row.start_time,
+      end: row.end_time,
+    }));
 
-    const exceptionsResult = await query(
-      `SELECT start_date, end_date, reason FROM doctor_unavailability
-       WHERE doctor_id = $1 AND is_active = true
-         AND start_date <= $2 AND end_date >= $2`,
-      [doctorId, targetDate]
-    );
+    // Reuse the schedule rows above instead of re-querying them for capacity.
+    const capacity = exceptionsResult.rows.length > 0
+      ? buildCapacityResult(targetDate, [], [], null)
+      : buildCapacityResult(targetDate, workingRanges, breakRanges, dailyCapacityResult.rows[0] || null);
 
     res.json(success({
       date: targetDate,
