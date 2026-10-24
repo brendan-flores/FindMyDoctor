@@ -17,7 +17,7 @@ import '../../../features/auth/presentation/change_password_page.dart';
 import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
 import '../../conversations/models/conversation.dart';
-import '../../notifications/presentation/notifications_screen.dart';
+import '../../notifications/models/notification.dart' as notif_model;
 
 class HomePage extends StatefulWidget {
   final int? initialTab;
@@ -227,6 +227,24 @@ class _HomePageState extends State<HomePage> {
     Navigator.of(context).pushReplacementNamed('/login');
   }
 
+  void _handleNotificationItemTap(notif_model.Notification notification) {
+    // Reload notification unread count to update badge
+    _loadNotificationUnreadCount();
+
+    // Navigate based on notification type
+    if (notification.isPaymentRelated) {
+      // Navigate to appointments tab (payments are accessed via appointments)
+      setState(() {
+        _currentIndex = 2;
+      });
+    } else if (notification.isMessageRelated) {
+      // Navigate to chat tab
+      setState(() {
+        _currentIndex = 3;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -238,7 +256,6 @@ class _HomePageState extends State<HomePage> {
           _buildDoctorsContent(),
           _buildAppointmentsContent(),
           _buildChatContent(),
-          _buildNotificationsContent(),
           _buildProfileContent(),
         ],
       ),
@@ -253,7 +270,13 @@ class _HomePageState extends State<HomePage> {
           showNotifications: true,
           showProfile: true,
           unreadCount: _notificationUnreadCount,
-          onNotificationTap: () {
+          onNotificationItemTap: (notif_model.Notification notification) {
+            _handleNotificationItemTap(notification);
+          },
+          onUnreadCountUpdate: () {
+            _loadNotificationUnreadCount();
+          },
+          onViewAll: () {
             Navigator.of(context).pushNamed('/notifications');
           },
         ),
@@ -320,7 +343,13 @@ class _HomePageState extends State<HomePage> {
           showNotifications: true,
           showProfile: true,
           unreadCount: _notificationUnreadCount,
-          onNotificationTap: () {
+          onNotificationItemTap: (notif_model.Notification notification) {
+            _handleNotificationItemTap(notification);
+          },
+          onUnreadCountUpdate: () {
+            _loadNotificationUnreadCount();
+          },
+          onViewAll: () {
             Navigator.of(context).pushNamed('/notifications');
           },
         ),
@@ -489,11 +518,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Widget _buildNotificationsContent() {
-    return const NotificationsScreen();
-  }
-
-
   Widget _buildProfileContent() {
     return Column(
       children: [
@@ -501,7 +525,13 @@ class _HomePageState extends State<HomePage> {
           showNotifications: true,
           showProfile: true,
           unreadCount: _notificationUnreadCount,
-          onNotificationTap: () {
+          onNotificationItemTap: (notif_model.Notification notification) {
+            _handleNotificationItemTap(notification);
+          },
+          onUnreadCountUpdate: () {
+            _loadNotificationUnreadCount();
+          },
+          onViewAll: () {
             Navigator.of(context).pushNamed('/notifications');
           },
         ),
@@ -1591,8 +1621,7 @@ class _HomePageState extends State<HomePage> {
               _buildNavItem(Icons.local_hospital, 'Doctors', 1),
               _buildNavItem(Icons.calendar_month, 'Appointments', 2),
               _buildNavItem(Icons.chat_bubble, 'Chat', 3, unreadCount: _totalUnreadCount),
-              _buildNavItem(Icons.notifications, 'Notifications', 4),
-              _buildNavItem(Icons.account_circle, 'Profile', 5),
+              _buildNavItem(Icons.account_circle, 'Profile', 4),
             ],
           ),
         ),
