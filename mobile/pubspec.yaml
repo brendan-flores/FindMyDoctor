@@ -83,7 +83,7 @@ dependencies:
 
   # Reads the app version from pubspec.yaml at runtime for the Profile
   # "About" section (no other version source exists in the app).
-  package_info_plus: ^8.0.0
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_test:
