@@ -708,6 +708,40 @@ class ApiService {
         'message': message,
         if (conversationId != null) 'conversationId': conversationId,
       },
+      requireAuth: true,
+    );
+  }
+
+  Future<Map<String, dynamic>> getAiConversations() async {
+    return await get(
+      ApiConstants.aiConversations,
+    );
+  }
+
+  Future<Map<String, dynamic>> getAiConversation(String id) async {
+    return await get(
+      '${ApiConstants.aiConversations}/$id',
+    );
+  }
+
+  Future<Map<String, dynamic>> getAiConversationMessages(String id) async {
+    return await get(
+      '${ApiConstants.aiConversations}/$id${ApiConstants.aiMessages}',
+    );
+  }
+
+  Future<Map<String, dynamic>> deleteAiConversation(String id) async {
+    return await delete(
+      '${ApiConstants.aiConversations}/$id',
+      requireAuth: true,
+    );
+  }
+
+  Future<Map<String, dynamic>> renameAiConversation(String id, String title) async {
+    return await patch(
+      '${ApiConstants.aiConversations}/$id',
+      body: {'title': title},
+      requireAuth: true,
     );
   }
 

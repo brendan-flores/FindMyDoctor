@@ -678,7 +678,7 @@ Queue
 Chat
  └── Secretary Conversations
 
-AI Assistant
+MediGuide (AI Health Information Assistant)
 
 Waitlist
 

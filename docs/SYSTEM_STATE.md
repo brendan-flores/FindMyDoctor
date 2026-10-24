@@ -4,6 +4,26 @@ This document contains the current system state for the FindMyDoctor project. It
 
 Current System State (October 2026):
 
+## AI Chatbot (Patient-Only)
+- MediGuide is an AI health information assistant available only to patients in the mobile app; doctors, secretaries, and admins have no AI access
+- MediGuide provides general health education, self-care tips, test/term explanations, and urgent-care guidance
+- MediGuide refuses diagnosis requests and directs patients with serious issues to see a doctor
+- MediGuide helps patients prepare for visits and points to app features (booking, doctors tab, secretary contact)
+- MediGuide can list available doctors by specialty and date: AI extracts specialty/date from patient message, backend runs availability query, app shows doctor cards with "Book visit" button
+- Doctor names, IDs, schedules, and availability results are never sent to the external AI provider
+- Only active, approved doctors are returned from doctor lookup
+- Conversation history is scoped per patient with "New conversation" and history list
+- Patient identifiers (name, email, phone, user IDs, patient IDs, doctor IDs) are stripped before sending to AI provider
+- AI API key is backend-only via environment variable (AI_API_KEY), never exposed to mobile or web
+- AI routes are PATIENT-only: POST /ai/chat, GET /ai/conversations, GET /ai/conversations/:id, GET /ai/conversations/:id/messages
+- Free-tier controls: per-patient daily message limit (Asia/Manila calendar day), per-patient rate limit, message length cap, max_tokens cap, short context window
+- When daily limit reached, return friendly limit-reached response without calling provider
+- Provider errors (429, quota, timeout) handled gracefully with friendly responses
+- Backend starts normally when AI_API_KEY is not set; /ai/chat returns "MediGuide unavailable" (HTTP 503) without calling provider
+- Missing key does not count against daily message limit
+- Redacted logging of AI prompts and responses following existing redaction patterns
+- Database table `ai_daily_limits` tracks per-patient daily message counters with unique constraint on (patient_id, message_date)
+
 ## Clinic Date Handling and Timezone
 - Clinic date calculations use the configured timezone (Asia/Manila by default) via the TIMEZONE environment variable
 - Backend date utility functions (`getClinicDate`, `toClinicDateString`, `getClinicDateTime`) use Intl.DateTimeFormat with the configured timezone to ensure correct clinic dates
