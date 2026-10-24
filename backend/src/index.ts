@@ -77,6 +77,8 @@ const SENSITIVE_FIELDS = new Set([
   'accessToken',
   'refreshToken',
   'authorization',
+  'aiApiKey',
+  'AI_API_KEY',
 ]);
 
 function redactSensitiveValues(payload: Record<string, any>): Record<string, any> {
