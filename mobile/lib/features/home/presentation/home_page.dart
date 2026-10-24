@@ -352,7 +352,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-<<<<<<< HEAD
   Widget _buildConversationCard(Conversation conversation) {
     return AppCard(
       onTap: () async {
@@ -494,8 +493,7 @@ class _HomePageState extends State<HomePage> {
     return const NotificationsScreen();
   }
 
-=======
->>>>>>> dev
+
   Widget _buildProfileContent() {
     return Column(
       children: [
@@ -1592,19 +1590,9 @@ class _HomePageState extends State<HomePage> {
               _buildNavItem(Icons.home, 'Home', 0),
               _buildNavItem(Icons.local_hospital, 'Doctors', 1),
               _buildNavItem(Icons.calendar_month, 'Appointments', 2),
-<<<<<<< HEAD
               _buildNavItem(Icons.chat_bubble, 'Chat', 3, unreadCount: _totalUnreadCount),
               _buildNavItem(Icons.notifications, 'Notifications', 4),
               _buildNavItem(Icons.account_circle, 'Profile', 5),
-=======
-              _buildNavItem(
-                Icons.chat_bubble,
-                'Chat',
-                3,
-                unreadCount: _totalUnreadCount,
-              ),
-              _buildNavItem(Icons.account_circle, 'Profile', 4),
->>>>>>> dev
             ],
           ),
         ),
