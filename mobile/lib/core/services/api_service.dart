@@ -712,6 +712,21 @@ class ApiService {
   }
 
   // ===========================
+  // NOTIFICATIONS METHODS
+  // ===========================
+
+  Future<Map<String, dynamic>> getNotifications() async {
+    return await get(ApiConstants.notifications, requireAuth: true);
+  }
+
+  Future<Map<String, dynamic>> markNotificationAsRead(String id) async {
+    return await patch(
+      '${ApiConstants.notifications}/$id${ApiConstants.notificationRead}',
+      requireAuth: true,
+    );
+  }
+
+  // ===========================
   // PUSH DEVICE TOKEN METHODS
   // ===========================
 
@@ -738,14 +753,6 @@ class ApiService {
       '${ApiConstants.notificationsDeviceTokens}/$id',
       requireAuth: true,
     );
-  }
-
-  // ===========================
-  // NOTIFICATIONS METHODS
-  // ===========================
-
-  Future<Map<String, dynamic>> getNotifications() async {
-    return await get(ApiConstants.notifications, requireAuth: true);
   }
 
   Future<Map<String, dynamic>> getUnreadNotificationCount() async {

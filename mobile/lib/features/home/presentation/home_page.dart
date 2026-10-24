@@ -17,6 +17,7 @@ import '../../../features/auth/presentation/change_password_page.dart';
 import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
 import '../../conversations/models/conversation.dart';
+import '../../notifications/models/notification.dart' as notif_model;
 
 class HomePage extends StatefulWidget {
   final int? initialTab;
@@ -226,6 +227,24 @@ class _HomePageState extends State<HomePage> {
     Navigator.of(context).pushReplacementNamed('/login');
   }
 
+  void _handleNotificationItemTap(notif_model.Notification notification) {
+    // Reload notification unread count to update badge
+    _loadNotificationUnreadCount();
+
+    // Navigate based on notification type
+    if (notification.isPaymentRelated) {
+      // Navigate to appointments tab (payments are accessed via appointments)
+      setState(() {
+        _currentIndex = 2;
+      });
+    } else if (notification.isMessageRelated) {
+      // Navigate to chat tab
+      setState(() {
+        _currentIndex = 3;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -251,7 +270,13 @@ class _HomePageState extends State<HomePage> {
           showNotifications: true,
           showProfile: true,
           unreadCount: _notificationUnreadCount,
-          onNotificationTap: () {
+          onNotificationItemTap: (notif_model.Notification notification) {
+            _handleNotificationItemTap(notification);
+          },
+          onUnreadCountUpdate: () {
+            _loadNotificationUnreadCount();
+          },
+          onViewAll: () {
             Navigator.of(context).pushNamed('/notifications');
           },
         ),
@@ -318,7 +343,13 @@ class _HomePageState extends State<HomePage> {
           showNotifications: true,
           showProfile: true,
           unreadCount: _notificationUnreadCount,
-          onNotificationTap: () {
+          onNotificationItemTap: (notif_model.Notification notification) {
+            _handleNotificationItemTap(notification);
+          },
+          onUnreadCountUpdate: () {
+            _loadNotificationUnreadCount();
+          },
+          onViewAll: () {
             Navigator.of(context).pushNamed('/notifications');
           },
         ),
@@ -350,6 +381,143 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildConversationCard(Conversation conversation) {
+    return AppCard(
+      onTap: () async {
+        await Navigator.of(context).pushNamed(
+          '/conversation-thread',
+          arguments: {'conversationId': conversation.id},
+        );
+        // Reload conversations when returning to update unread count
+        if (mounted) {
+          _loadConversations();
+        }
+      },
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainer,
+              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+            ),
+            child: Icon(
+              Icons.person,
+              color: AppColors.outline,
+              size: spacing.AppSpacing.iconLg,
+            ),
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      conversation.secretaryName,
+                      style: AppTextStyles.bodyMdMedium.copyWith(
+                        fontWeight: conversation.unreadCount > 0
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                    if (conversation.practiceName != null) ...[
+                      const SizedBox(width: spacing.AppSpacing.gutterXs),
+                      Text(
+                        '•',
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.outline,
+                        ),
+                      ),
+                      const SizedBox(width: spacing.AppSpacing.gutterXs),
+                      Expanded(
+                        child: Text(
+                          conversation.practiceName!,
+                          style: AppTextStyles.labelSm,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
+                Text(
+                  conversation.lastMessagePreview ?? 'No messages yet',
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.secondary,
+                    fontWeight: conversation.unreadCount > 0
+                        ? FontWeight.w700
+                        : FontWeight.w400,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterSm),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (conversation.lastMessageSentAt != null)
+                Text(
+                  _formatTimestamp(conversation.lastMessageSentAt!),
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.outline,
+                  ),
+                ),
+              if (conversation.unreadCount > 0) ...[
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.AppSpacing.gutterSm,
+                    vertical: spacing.AppSpacing.gutterXs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 20,
+                    minHeight: 20,
+                  ),
+                  child: Text(
+                    conversation.unreadCount > 99 ? '99+' : conversation.unreadCount.toString(),
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.onError,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    }
+  }
+
   Widget _buildProfileContent() {
     return Column(
       children: [
@@ -357,7 +525,13 @@ class _HomePageState extends State<HomePage> {
           showNotifications: true,
           showProfile: true,
           unreadCount: _notificationUnreadCount,
-          onNotificationTap: () {
+          onNotificationItemTap: (notif_model.Notification notification) {
+            _handleNotificationItemTap(notification);
+          },
+          onUnreadCountUpdate: () {
+            _loadNotificationUnreadCount();
+          },
+          onViewAll: () {
             Navigator.of(context).pushNamed('/notifications');
           },
         ),
@@ -1446,12 +1620,7 @@ class _HomePageState extends State<HomePage> {
               _buildNavItem(Icons.home, 'Home', 0),
               _buildNavItem(Icons.local_hospital, 'Doctors', 1),
               _buildNavItem(Icons.calendar_month, 'Appointments', 2),
-              _buildNavItem(
-                Icons.chat_bubble,
-                'Chat',
-                3,
-                unreadCount: _totalUnreadCount,
-              ),
+              _buildNavItem(Icons.chat_bubble, 'Chat', 3, unreadCount: _totalUnreadCount),
               _buildNavItem(Icons.account_circle, 'Profile', 4),
             ],
           ),
