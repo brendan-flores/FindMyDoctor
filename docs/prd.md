@@ -855,6 +855,21 @@ The system shall let Doctor and Secretary accounts explicitly trust a browser af
 16. Multiple portal sessions in different roles may coexist in the same browser; middleware resolves the session from the role implied by the request path and rejects cross-role use.
 17. Token validation shall be rate-limited, failures shall be logged without token values, and expired sessions shall be cleared with the message "Your session has expired. Please log in again."
 
+## FR-002-B — API Rate Limiting and Read Reliability
+
+The system shall keep dashboard navigation responsive without weakening authentication limits or authorization checks.
+
+1. The API shall enforce two per-IP rate-limit budgets: a general budget of 300 requests per 60-second window for normal dashboard traffic, and a stricter budget of 30 requests per 15-minute window for login, login-OTP verification/resend, registration, patient OTP, and password change.
+2. Rate-limited (`429`) responses shall include a `Retry-After` header and the standard `{ success: false, error: { code: "RATE_LIMIT", message } }` envelope. Pre-flight `OPTIONS` requests shall not consume either budget.
+3. Rate limiting shall never replace authentication or role authorization; every API request shall still be authenticated and authorized as before.
+4. The web client may automatically retry only idempotent `GET` requests, up to three total attempts, with exponential backoff and jitter capped at 5 seconds. A server-provided `Retry-After` value shall take precedence when present.
+5. The web client shall never automatically retry `POST`, `PUT`, `PATCH`, or `DELETE` requests.
+6. The web client may cache successful `GET` responses in memory for at most 15 seconds, scoped to the current portal role. The cache shall be cleared when the session token or role changes, after any successful data-changing request, and on logout.
+7. Role-scoped or patient-specific data shall not be served from a cache shared across different users or roles.
+8. Server-side availability range caching may reuse results for at most 20 seconds, keyed by doctor and date range, only for reads without a patient identity. Any successful data-changing request through the doctors, secretaries, appointments, or walk-ins modules shall invalidate it.
+9. Dashboard endpoints shall aggregate data in a bounded number of queries rather than per-row queries.
+10. Client-side list filtering shall be performed locally and shall not issue a network request per keystroke.
+
 ## FR-003 — Role-Based Access
 
 The system shall enforce role-based permissions.
