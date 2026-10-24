@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/otp_input.dart';
 import '../../../core/services/api_service.dart';
 
 class ResetPasswordPage extends StatefulWidget {
@@ -21,7 +23,6 @@ class ResetPasswordPage extends StatefulWidget {
 
 class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final _formKey = GlobalKey<FormState>();
-  final _otpController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -29,6 +30,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   bool _isLoading = false;
   bool _isSuccess = false;
   String? _errorMessage;
+  String _otpCode = '';
 
   // Two-step verification state
   bool _isCodeVerified = false;
@@ -53,7 +55,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   @override
   void dispose() {
-    _otpController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     _resendTimer?.cancel();
@@ -138,8 +139,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       });
     }
 
-    final otp = _otpController.text.trim();
-    if (otp.length != 6) {
+    if (_otpCode.length != 6) {
       setState(() {
         _errorMessage = 'Please enter a valid 6-digit code';
       });
@@ -153,7 +153,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     try {
       final response = await _apiService.verifyPasswordResetOtp(
         email: widget.email,
-        otp: otp,
+        otp: _otpCode,
       );
 
       if (mounted) {
@@ -574,26 +574,62 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   }
 
   Widget _buildOtpField() {
-    return CustomTextField(
-      label: 'Verification Code',
-      hint: 'Enter 6-digit code',
-      controller: _otpController,
-      keyboardType: TextInputType.number,
-      textInputAction: TextInputAction.done,
-      prefixIcon: Icons.lock_outlined,
-      enabled: !_isVerifying,
-      borderRadius: AppSpacing.radiusXl,
-      maxLength: 6,
-      onSubmitted: (_) => _handleVerifyCode(),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Please enter the verification code';
-        }
-        if (value.length != 6) {
-          return 'Please enter a valid 6-digit code';
-        }
-        return null;
-      },
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Enter the 6-digit code',
+                style: AppTextStyles.inputLabel,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _isVerifying ? null : () {
+                Clipboard.getData(Clipboard.kTextPlain).then((clipboardData) {
+                  if (clipboardData != null && clipboardData.text != null) {
+                    final pastedText = clipboardData.text!.trim();
+                    if (pastedText.length == 6 && RegExp(r'^\d{6}$').hasMatch(pastedText)) {
+                      setState(() {
+                        _otpCode = pastedText;
+                      });
+                      if (_otpCode.length == 6) {
+                        _handleVerifyCode();
+                      }
+                    }
+                  }
+                });
+              },
+              icon: const Icon(Icons.content_paste, size: 15),
+              label: const Text('Paste'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.brandPrimary,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutterSm),
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: AppTextStyles.labelMd.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.gutterMd),
+        OtpInput(
+          length: 6,
+          onChanged: (value) {
+            setState(() {
+              _otpCode = value;
+              _errorMessage = null;
+            });
+          },
+          onCompleted: (value) {
+            _handleVerifyCode();
+          },
+          enabled: !_isVerifying,
+          errorMessage: _errorMessage,
+        ),
+      ],
     );
   }
 
