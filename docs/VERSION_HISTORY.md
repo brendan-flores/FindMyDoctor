@@ -4,6 +4,42 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.25 (October 25, 2026)
+
+**Purpose:** Enable secretaries to record payments for walk-in patients immediately after consultation completion, improving cash flow tracking and reducing manual paperwork.
+
+**Significant Features:**
+- Walk-in payment recording flow:
+  - New backend endpoint `POST /api/v1/payments/walk-in` (SECRETARY only) that accepts payment details (appointmentId, paymentMethod, consultationFee, additionalCharges).
+  - Payment modal opens automatically after completing a walk-in patient's checkup (registration_source = WALK_IN).
+  - Modal is mandatory for walk-in patients; secretary must record payment to complete the flow.
+  - Payment methods: CASH (status PAID immediately) or GCASH (status UNPAID, patient uploads receipt later).
+  - Additional charges can be added during payment recording (reusing existing charge management UI from payments page).
+  - Total amount = consultation fee + sum of additional charges.
+  - Backend validates walk-in registration source, checks for duplicate payments, and verifies doctor assignment.
+  - Backend uses transaction to ensure atomicity of payment and charge creation.
+  - CASH payments trigger notification to patient (PAID status).
+  - GCASH payments do not trigger notification (UNPAID status, patient will upload receipt later).
+- Frontend WalkInPaymentModal component with payment method dropdown, pre-filled consultation fee, additional charges management, and total calculation.
+- Payment recording integrated into secretary queue page at `/secretary/queue`.
+- Queue endpoint `GET /api/v1/queue/:date` updated to include doctor's consultation_fee for payment modal.
+- Web API client `secretaryApi.ts` updated with `recordWalkInPayment` method and QueueEntry interface now includes consultation_fee.
+
+**Improvements:**
+- Streamlined payment recording at point of service for walk-in patients.
+- Real-time total calculation with additional charges.
+- Reusable charge management UI pattern from existing payments page.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature only; existing payment flows unchanged).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md`, `VERSION_HISTORY.md`, and `SYSTEM_STATE.md`.
+
+---
+
 ### 01.24 (October 24, 2026)
 
 **Purpose:** Enforce two-step verification sequence in the forgot password flow across Mobile Patient, Web Doctor, and Web Secretary platforms, ensuring passwords cannot be reset without prior valid code verification.

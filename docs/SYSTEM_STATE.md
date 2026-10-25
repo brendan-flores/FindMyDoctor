@@ -275,6 +275,23 @@ Current System State (October 2026):
 - SECRETARY authorization SQL: `WHERE patients.id = $1 AND (EXISTS association with secretary's assigned doctor OR EXISTS appointment with secretary's assigned doctor)`
 - Authorization subqueries include `patient_id = $1` in each EXISTS clause to prevent bypass attacks
 - Unauthorized patient update attempts return unified 404 response (non-disclosing, no information leakage)
+
+## Walk-in Payment Recording
+- Secretaries can record payments for walk-in patients immediately after consultation completion
+- Payment recording modal opens automatically after completing a walk-in patient's checkup (registration_source = WALK_IN)
+- Modal is mandatory for walk-in patients; secretary must record payment to complete the flow
+- New backend endpoint: POST /api/v1/payments/walk-in (SECRETARY only)
+- Payment methods: CASH (status PAID immediately) or GCASH (status UNPAID, patient uploads receipt later)
+- Additional charges can be added during payment recording (reusing existing charge management UI)
+- Total amount = consultation fee + sum of additional charges
+- If payment already exists for the appointment, an error is shown and the modal closes
+- Payment recording is integrated into the secretary queue page at /secretary/queue
+- Queue endpoint GET /api/v1/queue/:date now includes doctor's consultation_fee for payment modal
+- Backend validates that the appointment belongs to the secretary's assigned doctor
+- Backend validates that the queue entry has registration_source = WALK_IN
+- Backend uses transaction to ensure atomicity of payment and charge creation
+- CASH payments trigger notification to patient (PAID status)
+- GCASH payments do not trigger notification (UNPAID status, patient will upload receipt later)
 - Patient update endpoint requires six required fields on every update: firstName, lastName, dateOfBirth, sex, phone, address
 - Optional fields (middleName, emergencyContactName, emergencyContactPhone, medicalHistory, allergies, currentMedications) support explicit clearing via null or empty string
 - Optional field presence is tracked using boolean flags derived from request field presence (using 'in' operator), not from validated values
