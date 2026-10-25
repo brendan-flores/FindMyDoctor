@@ -5,6 +5,7 @@ import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, r
 import { invalidateAvailabilityCache } from '../modules/availability/availabilityService';
 import { getClinicDate, getClinicDateTime, toClinicDateString } from '../utils/date';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -288,6 +289,12 @@ router.post('/', authenticate, requireSecretaryPasswordChange, requireSecretaryP
     }
 
     const doctor = doctorResult.rows[0];
+
+    // Ensure consultation_fee is set
+    if (!doctor.consultation_fee || doctor.consultation_fee <= 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Doctor consultation fee is not configured. Please set the consultation fee before registering patients.'));
+    }
 
     // Check capacity
     const appointmentDateOnly = toClinicDateString(new Date(appointmentDate));
@@ -729,10 +736,15 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
 
     if (secretaryResult.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found. Please contact an administrator.'));
     }
 
     const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    if (!assignedDoctorId) {
+      await client.query('ROLLBACK');
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You are not assigned to a doctor. Please contact an administrator.'));
+    }
 
     // Verify doctor exists and is approved
     const doctorResult = await client.query(
@@ -742,7 +754,15 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
 
     if (doctorResult.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Assigned doctor not found or not approved'));
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Assigned doctor not found or not approved. Please contact an administrator.'));
+    }
+
+    const doctor = doctorResult.rows[0];
+
+    // Ensure consultation_fee is set
+    if (!doctor.consultation_fee || doctor.consultation_fee <= 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Doctor consultation fee is not configured. Please set the consultation fee before registering patients.'));
     }
 
     // Check if email already exists (prevent duplicate accounts)
@@ -822,7 +842,6 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
     const appointmentDate = getClinicDateTime();
 
     // Generate cryptographically secure random temporary password with letters and numbers
-    const crypto = require('crypto');
     const generateSecurePassword = (): string => {
       const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
       const numbers = '0123456789';
@@ -889,14 +908,52 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
     }
 
     // Check capacity
-    const capacityResult = await client.query(
+    let capacityResult = await client.query(
       'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2 FOR UPDATE',
       [assignedDoctorId, appointmentDateOnly]
     );
 
+    // Auto-create daily capacity if it doesn't exist (based on doctor's schedule)
     if (capacityResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(400).json(error(ErrorCodes.APPOINTMENT_SLOT_UNAVAILABLE, 'No capacity configured for this date'));
+      // Get doctor's schedule for today's day of week
+      const dayOfWeek = new Date(appointmentDateOnly).getDay(); // 0 = Sunday, 6 = Saturday
+      const scheduleResult = await client.query(
+        `SELECT start_time, end_time
+         FROM doctor_schedules
+         WHERE doctor_id = $1 AND day_of_week = $2 AND is_active = true`,
+        [assignedDoctorId, dayOfWeek]
+      );
+
+      if (scheduleResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json(error(ErrorCodes.APPOINTMENT_SLOT_UNAVAILABLE, 'No schedule configured for this doctor on this date. Please configure working hours first.'));
+      }
+
+      const schedule = scheduleResult.rows[0];
+      const startMinutes = parseInt(schedule.start_time.split(':')[0]) * 60 + parseInt(schedule.start_time.split(':')[1]);
+      const endMinutes = parseInt(schedule.end_time.split(':')[0]) * 60 + parseInt(schedule.end_time.split(':')[1]);
+      const workingMinutes = endMinutes - startMinutes;
+
+      if (workingMinutes <= 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json(error(ErrorCodes.APPOINTMENT_SLOT_UNAVAILABLE, 'Invalid schedule configuration for this date.'));
+      }
+
+      // Calculate capacity based on 30-minute consultation duration
+      const calculatedCapacity = Math.floor(workingMinutes / 30);
+
+      // Create daily capacity record
+      await client.query(
+        `INSERT INTO daily_capacities (doctor_id, date, calculated_capacity, final_capacity, registered_count)
+         VALUES ($1, $2, $3, $3, 0)`,
+        [assignedDoctorId, appointmentDateOnly, calculatedCapacity]
+      );
+
+      // Re-fetch the newly created capacity
+      capacityResult = await client.query(
+        'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
+        [assignedDoctorId, appointmentDateOnly]
+      );
     }
 
     const capacity = capacityResult.rows[0];
@@ -985,6 +1042,13 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
   } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('Direct walk-in registration error:', err);
+    console.error('Error details:', {
+      message: err.message,
+      code: err.code,
+      constraint: err.constraint,
+      detail: err.detail,
+      stack: err.stack
+    });
 
     // Handle unique constraint violations
     if (err.code === '23505') {
@@ -994,7 +1058,9 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
       return res.status(409).json(error(ErrorCodes.CONFLICT, 'Duplicate entry detected'));
     }
 
-    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to register walk-in patient'));
+    // Return more specific error message if available
+    const errorMessage = err.message || 'Failed to register walk-in patient';
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, errorMessage));
   } finally {
     client.release();
   }
