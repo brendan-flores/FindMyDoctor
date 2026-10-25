@@ -161,6 +161,7 @@ export interface QueueEntry {
   patient_email?: string;
   doctor_first_name: string;
   doctor_last_name: string;
+  consultation_fee?: number;
 }
 
 export const secretaryApi = {
@@ -293,6 +294,16 @@ export const secretaryApi = {
   // Payments: delete charge from payment (by payment ID and charge ID)
   deleteCharge: async (paymentId: string, chargeId: string): Promise<{ success: boolean; error?: string }> => {
     return apiClient.delete<void>(`/payments/${paymentId}/charges/${chargeId}`);
+  },
+
+  // Payments: record walk-in payment
+  recordWalkInPayment: async (payload: {
+    appointmentId: string;
+    paymentMethod: 'CASH' | 'GCASH';
+    consultationFee: number;
+    additionalCharges: Array<{ description: string; amount: number }>;
+  }): Promise<{ success: boolean; data?: { paymentId: string }; error?: string }> => {
+    return apiClient.post<{ paymentId: string }>('/payments/walk-in', payload);
   },
 
   // Get secretary dashboard summary

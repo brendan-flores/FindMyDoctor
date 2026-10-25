@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { secretaryApi, QueueEntry, SecretaryProfile } from '@/lib/api/secretaryApi';
 import Toast from '@/components/ui/Toast';
+import WalkInPaymentModal from '@/components/WalkInPaymentModal';
 
 
 
@@ -52,6 +53,12 @@ export default function SecretaryQueue() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentModalData, setPaymentModalData] = useState<{
+    appointmentId: string;
+    consultationFee: number;
+    patientName: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchSecretaryProfile();
@@ -129,12 +136,36 @@ export default function SecretaryQueue() {
     const response = await secretaryApi.completeCheckup(queueId);
 
     if (response.success) {
-      setSuccess('Checkup completed successfully');
-      fetchQueue();
+      // Find the queue entry to check if it's a walk-in patient
+      const queueEntry = queueEntries.find(entry => entry.id === queueId);
+
+      if (queueEntry && queueEntry.registration_source === 'WALK_IN' && queueEntry.appointment_id) {
+        // Show payment modal for walk-in patients
+        // Use consultation_fee if available, otherwise default to 0
+        const consultationFee = queueEntry.consultation_fee !== null && queueEntry.consultation_fee !== undefined
+          ? queueEntry.consultation_fee
+          : 0;
+
+        setPaymentModalData({
+          appointmentId: queueEntry.appointment_id,
+          consultationFee: consultationFee,
+          patientName: `${queueEntry.patient_first_name} ${queueEntry.patient_last_name}`,
+        });
+        setShowPaymentModal(true);
+      } else {
+        // For online patients or if data is missing, show success message
+        setSuccess('Checkup completed successfully');
+        fetchQueue();
+      }
     } else {
       setError(response.error || 'Failed to complete checkup');
     }
     setActionLoading(false);
+  };
+
+  const handlePaymentSuccess = () => {
+    setSuccess('Payment recorded successfully');
+    fetchQueue();
   };
 
   const handleSkip = async (queueId: string) => {
@@ -690,6 +721,18 @@ export default function SecretaryQueue() {
           type="success"
           message={success}
           onClose={() => setSuccess(null)}
+        />
+      )}
+
+      {/* Walk-in Payment Modal */}
+      {showPaymentModal && paymentModalData && (
+        <WalkInPaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          appointmentId={paymentModalData.appointmentId}
+          consultationFee={paymentModalData.consultationFee}
+          patientName={paymentModalData.patientName}
+          onSuccess={handlePaymentSuccess}
         />
       )}
     </div>
