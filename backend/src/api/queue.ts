@@ -18,6 +18,7 @@ router.get('/:date', authenticate, requireSecretaryPasswordChange, requireSecret
              p.first_name as patient_first_name, p.last_name as patient_last_name,
              u.email as patient_email,
              d.first_name as doctor_first_name, d.last_name as doctor_last_name,
+             d.consultation_fee,
              COALESCE(q.registration_source, 'ONLINE') as registration_source
       FROM queue_entries q
       JOIN patients p ON q.patient_id = p.id
