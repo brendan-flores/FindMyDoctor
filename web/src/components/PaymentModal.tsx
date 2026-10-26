@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { secretaryApi } from '@/lib/api/secretaryApi';
 import Toast from './ui/Toast';
 
-interface WalkInPaymentModalProps {
+interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   appointmentId: string;
   consultationFee: number;
   patientName: string;
   onSuccess: () => void;
+  initialPaymentMethod?: 'CASH' | 'GCASH'; // Optional initial payment method for booked patients
+  isWalkIn?: boolean; // True for walk-in patients, false for booked patients
 }
 
 interface AdditionalCharge {
@@ -19,14 +21,16 @@ interface AdditionalCharge {
   amount: number;
 }
 
-export default function WalkInPaymentModal({
+export default function PaymentModal({
   isOpen,
   onClose,
   appointmentId,
   consultationFee,
   patientName,
   onSuccess,
-}: WalkInPaymentModalProps) {
+  initialPaymentMethod,
+  isWalkIn = true,
+}: PaymentModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'GCASH'>('CASH');
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([]);
   const [newChargeDescription, setNewChargeDescription] = useState('');
@@ -40,14 +44,14 @@ export default function WalkInPaymentModal({
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setPaymentMethod('CASH');
+      setPaymentMethod(initialPaymentMethod || 'CASH');
       setAdditionalCharges([]);
       setNewChargeDescription('');
       setNewChargeAmount('');
       setChargeFormError(null);
       setIsSubmitting(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialPaymentMethod]);
 
   const handleAddCharge = () => {
     const trimmedDescription = newChargeDescription.trim();
@@ -78,20 +82,23 @@ export default function WalkInPaymentModal({
     setAdditionalCharges(additionalCharges.filter(charge => charge.id !== chargeId));
   };
 
-  const calculateTotal = () => {
-    const totalCharges = additionalCharges.reduce((sum, charge) => sum + charge.amount, 0);
+  const totalAmount = useMemo(() => {
     const validConsultationFee = (consultationFee !== null && consultationFee !== undefined && !isNaN(consultationFee) && isFinite(consultationFee))
-      ? consultationFee
+      ? parseFloat(consultationFee)
       : 0;
+    const totalCharges = additionalCharges.reduce((sum, charge) => {
+      const chargeAmount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
+      return sum + (isNaN(chargeAmount) ? 0 : chargeAmount);
+    }, 0);
     return validConsultationFee + totalCharges;
-  };
+  }, [additionalCharges, consultationFee]);
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
     setChargeFormError(null);
 
     try {
-      const response = await secretaryApi.recordWalkInPayment({
+      const response = await secretaryApi.recordPayment({
         appointmentId,
         paymentMethod,
         consultationFee,
@@ -108,11 +115,13 @@ export default function WalkInPaymentModal({
         onSuccess();
         onClose();
       } else {
+        setChargeFormError(response.error || 'Failed to record payment');
         setToastMessage(response.error || 'Failed to record payment');
         setToastType('error');
         setShowToast(true);
       }
     } catch (error) {
+      setChargeFormError('Failed to record payment. Please try again.');
       setToastMessage('Failed to record payment');
       setToastType('error');
       setShowToast(true);
@@ -121,11 +130,12 @@ export default function WalkInPaymentModal({
     }
   };
 
-  const formatAmount = (amount: number | null | undefined) => {
-    if (amount === null || amount === undefined || isNaN(amount) || !isFinite(amount)) {
+  const formatAmount = (amount: number | string | null | undefined) => {
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    if (numAmount === null || numAmount === undefined || isNaN(numAmount) || !isFinite(numAmount)) {
       return '₱0.00';
     }
-    return `₱${amount.toFixed(2)}`;
+    return `₱${numAmount.toFixed(2)}`;
   };
 
   if (!isOpen) return null;
@@ -135,10 +145,19 @@ export default function WalkInPaymentModal({
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6 border-b border-slate-200">
-            <h2 className="text-lg font-bold text-slate-900">Record Walk-in Payment</h2>
+            <h2 className="text-lg font-bold text-slate-900">
+              {isWalkIn ? 'Record Walk-in Payment' : 'Record Payment'}
+            </h2>
           </div>
 
           <div className="p-6 space-y-6">
+            {/* Form Error */}
+            {chargeFormError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-700">{chargeFormError}</p>
+              </div>
+            )}
+
             {/* Patient Information */}
             <div>
               <h3 className="text-sm font-semibold text-slate-900 mb-3">Patient Information</h3>
@@ -246,7 +265,7 @@ export default function WalkInPaymentModal({
             <div className="bg-purple-50 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-purple-900">Total Amount</span>
-                <span className="text-2xl font-bold text-purple-900">{formatAmount(calculateTotal())}</span>
+                <span className="text-2xl font-bold text-purple-900">{formatAmount(totalAmount)}</span>
               </div>
             </div>
           </div>

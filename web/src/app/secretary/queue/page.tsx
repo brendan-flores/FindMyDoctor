@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { secretaryApi, QueueEntry, SecretaryProfile } from '@/lib/api/secretaryApi';
 import Toast from '@/components/ui/Toast';
-import WalkInPaymentModal from '@/components/WalkInPaymentModal';
+import PaymentModal from '@/components/PaymentModal';
 
 
 
@@ -58,6 +58,8 @@ export default function SecretaryQueue() {
     appointmentId: string;
     consultationFee: number;
     patientName: string;
+    initialPaymentMethod?: 'CASH' | 'GCASH';
+    isWalkIn: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -136,24 +138,47 @@ export default function SecretaryQueue() {
     const response = await secretaryApi.completeCheckup(queueId);
 
     if (response.success) {
-      // Find the queue entry to check if it's a walk-in patient
+      // Find the queue entry to check if it's a walk-in or booked patient
       const queueEntry = queueEntries.find(entry => entry.id === queueId);
 
-      if (queueEntry && queueEntry.registration_source === 'WALK_IN' && queueEntry.appointment_id) {
-        // Show payment modal for walk-in patients
-        // Use consultation_fee if available, otherwise default to 0
+      if (queueEntry && queueEntry.appointment_id) {
+        // Show payment modal for both walk-in and booked patients
         const consultationFee = queueEntry.consultation_fee !== null && queueEntry.consultation_fee !== undefined
-          ? queueEntry.consultation_fee
+          ? parseFloat(queueEntry.consultation_fee)
           : 0;
 
-        setPaymentModalData({
-          appointmentId: queueEntry.appointment_id,
-          consultationFee: consultationFee,
-          patientName: `${queueEntry.patient_first_name} ${queueEntry.patient_last_name}`,
-        });
-        setShowPaymentModal(true);
+        if (consultationFee > 0) {
+          const isWalkIn = queueEntry.registration_source === 'WALK_IN';
+          let initialPaymentMethod: 'CASH' | 'GCASH' | undefined;
+
+          // For booked patients, fetch their initial payment method
+          if (!isWalkIn) {
+            try {
+              const paymentResponse = await secretaryApi.getPayment(queueEntry.appointment_id);
+              if (paymentResponse.success && paymentResponse.data) {
+                initialPaymentMethod = paymentResponse.data.payment_method as 'CASH' | 'GCASH';
+              }
+            } catch (e) {
+              // If payment fetch fails, default to no initial payment method
+              console.error('Failed to fetch payment for booked patient:', e);
+            }
+          }
+
+          setPaymentModalData({
+            appointmentId: queueEntry.appointment_id,
+            consultationFee: consultationFee,
+            patientName: `${queueEntry.patient_first_name} ${queueEntry.patient_last_name}`,
+            initialPaymentMethod,
+            isWalkIn,
+          });
+          setShowPaymentModal(true);
+        } else {
+          // Consultation fee not configured - show error
+          setError('Cannot record payment: Doctor consultation fee is not configured. Please contact administrator.');
+          fetchQueue();
+        }
       } else {
-        // For online patients or if data is missing, show success message
+        // If data is missing, show success message
         setSuccess('Checkup completed successfully');
         fetchQueue();
       }
@@ -205,6 +230,18 @@ export default function SecretaryQueue() {
     const [year, month, day] = dateString.split('-').map(Number);
     const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const isToday = (dateString: string) => {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const today = formatter.format(now);
+    return dateString === today;
   };
 
   const getDaysInMonth = (year: number, month: number) => {
@@ -368,8 +405,9 @@ export default function SecretaryQueue() {
         <div className="flex gap-3">
           <button
             onClick={handleCallNext}
-            disabled={actionLoading || waitingInLobby === 0}
+            disabled={actionLoading || waitingInLobby === 0 || !isToday(selectedDate)}
             className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+            title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
           >
             <span className="material-symbols-outlined text-[18px]">notifications_active</span>
             Call Next Patient
@@ -389,7 +427,9 @@ export default function SecretaryQueue() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Queue Today</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              {isToday(selectedDate) ? 'Total Queue Today' : 'Total Queue'}
+            </span>
             <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
               <span className="material-symbols-outlined text-[18px]">groups</span>
             </div>
@@ -541,6 +581,16 @@ export default function SecretaryQueue() {
 
       {/* Queue Data Table */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        {!isToday(selectedDate) && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-3">
+            <div className="flex items-center gap-2 text-amber-700 text-sm">
+              <span className="material-symbols-outlined text-[18px]">info</span>
+              <span className="font-medium">View Only Mode</span>
+              <span>•</span>
+              <span>Actions are disabled for past and future dates</span>
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="p-8 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
@@ -621,8 +671,9 @@ export default function SecretaryQueue() {
                           {entry.status === 'IN_CHECKUP' && (
                             <button
                               onClick={() => handleCompleteCheckup(entry.id)}
-                              disabled={actionLoading}
+                              disabled={actionLoading || !isToday(selectedDate)}
                               className="px-3 py-1.5 bg-[#1b5eb8] text-white rounded-lg hover:bg-[#1550a0] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                              title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                             >
                               Complete Checkup
                             </button>
@@ -631,15 +682,17 @@ export default function SecretaryQueue() {
                             <>
                               <button
                                 onClick={() => handleStartCheckup(entry.id)}
-                                disabled={actionLoading}
+                                disabled={actionLoading || !isToday(selectedDate)}
                                 className="px-3 py-1.5 bg-[#1b5eb8] text-white rounded-lg hover:bg-[#1550a0] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                                title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                               >
                                 Start Checkup
                               </button>
                               <button
                                 onClick={() => handleNotPresent(entry.id)}
-                                disabled={actionLoading}
+                                disabled={actionLoading || !isToday(selectedDate)}
                                 className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                                title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                               >
                                 Skip / Not Present
                               </button>
@@ -649,15 +702,17 @@ export default function SecretaryQueue() {
                             <>
                               <button
                                 onClick={() => handleCallNext()}
-                                disabled={actionLoading}
+                                disabled={actionLoading || !isToday(selectedDate)}
                                 className="px-3 py-1.5 bg-[#1b5eb8] text-white rounded-lg hover:bg-[#1550a0] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                                title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                               >
                                 Call Next Patient
                               </button>
                               <button
                                 onClick={() => handleSkip(entry.id)}
-                                disabled={actionLoading}
+                                disabled={actionLoading || !isToday(selectedDate)}
                                 className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                                title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                               >
                                 Skip / Not Present
                               </button>
@@ -666,8 +721,9 @@ export default function SecretaryQueue() {
                           {entry.status === 'SKIPPED' && (
                             <button
                               onClick={() => handleStartCheckup(entry.id)}
-                              disabled={actionLoading}
+                              disabled={actionLoading || !isToday(selectedDate)}
                               className="px-3 py-1.5 bg-[#1b5eb8] text-white rounded-lg hover:bg-[#1550a0] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                              title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                             >
                               Start Checkup
                             </button>
@@ -724,14 +780,16 @@ export default function SecretaryQueue() {
         />
       )}
 
-      {/* Walk-in Payment Modal */}
+      {/* Payment Modal */}
       {showPaymentModal && paymentModalData && (
-        <WalkInPaymentModal
+        <PaymentModal
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
           appointmentId={paymentModalData.appointmentId}
           consultationFee={paymentModalData.consultationFee}
           patientName={paymentModalData.patientName}
+          initialPaymentMethod={paymentModalData.initialPaymentMethod}
+          isWalkIn={paymentModalData.isWalkIn}
           onSuccess={handlePaymentSuccess}
         />
       )}

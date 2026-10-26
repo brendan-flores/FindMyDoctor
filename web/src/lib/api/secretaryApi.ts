@@ -261,6 +261,11 @@ export const secretaryApi = {
     return apiClient.get<Payment[]>(`/payments${queryParams}`);
   },
 
+  // Payments: get payment counts by status
+  getPaymentCounts: async (): Promise<{ success: boolean; data?: { UNPAID: number; PENDING_VERIFICATION: number; PAID: number; REJECTED: number; CANCELLED: number }; error?: string }> => {
+    return apiClient.get<{ UNPAID: number; PENDING_VERIFICATION: number; PAID: number; REJECTED: number; CANCELLED: number }>('/payments/counts');
+  },
+
   // Payments: get payment by appointment ID
   getPayment: async (appointmentId: string): Promise<{ success: boolean; data?: Payment; error?: string }> => {
     return apiClient.get<Payment>(`/payments/${appointmentId}`);
@@ -296,7 +301,17 @@ export const secretaryApi = {
     return apiClient.delete<void>(`/payments/${paymentId}/charges/${chargeId}`);
   },
 
-  // Payments: record walk-in payment
+  // Payments: record payment (works for both walk-in and booked patients)
+  recordPayment: async (payload: {
+    appointmentId: string;
+    paymentMethod: 'CASH' | 'GCASH';
+    consultationFee: number;
+    additionalCharges: Array<{ description: string; amount: number }>;
+  }): Promise<{ success: boolean; data?: { paymentId: string }; error?: string }> => {
+    return apiClient.post<{ paymentId: string }>('/payments/record', payload);
+  },
+
+  // Payments: record walk-in payment (deprecated - use recordPayment instead)
   recordWalkInPayment: async (payload: {
     appointmentId: string;
     paymentMethod: 'CASH' | 'GCASH';
@@ -330,7 +345,7 @@ export interface Payment {
   id: string;
   appointment_id: string;
   patient_id: string;
-  status: 'UNPAID' | 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED';
+  status: 'UNPAID' | 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED' | 'CANCELLED';
   payment_method: string;
   receipt_url?: string | null;
   consultation_amount: number;
