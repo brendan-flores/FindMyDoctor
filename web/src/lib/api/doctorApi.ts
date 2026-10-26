@@ -80,6 +80,10 @@ export interface Prescription {
   notes?: string | null;
   doctor_first_name?: string;
   doctor_last_name?: string;
+  patient_first_name?: string;
+  patient_last_name?: string;
+  visit_date?: string;
+  has_pdf?: boolean;
   items?: PrescriptionItem[];
 }
 
@@ -217,6 +221,36 @@ export const doctorApi = {
   getDashboard: async (date?: string, options?: GetOptions): Promise<{ success: boolean; data?: DoctorDashboard; error?: string }> => {
     const queryParams = date ? `?date=${encodeURIComponent(date)}` : '';
     return apiClient.get<DoctorDashboard>(`/doctors/me/dashboard${queryParams}`, options);
+  },
+
+  // Create a new prescription
+  createPrescription: async (payload: {
+    visitId: string;
+    items: Array<{
+      medicationName: string;
+      dosage?: string;
+      frequency?: string;
+      duration?: string;
+      instructions?: string;
+    }>;
+    notes?: string;
+  }): Promise<{ success: boolean; data?: Prescription; error?: string }> => {
+    return apiClient.post<Prescription>('/prescriptions', payload);
+  },
+
+  // Get prescription by ID
+  getPrescriptionById: async (prescriptionId: string): Promise<{ success: boolean; data?: Prescription; error?: string }> => {
+    return apiClient.get<Prescription>(`/prescriptions/${prescriptionId}`);
+  },
+
+  // Generate prescription PDF
+  generatePrescriptionPdf: async (prescriptionId: string): Promise<{ success: boolean; data?: { signedUrl: string }; error?: string }> => {
+    return apiClient.get<{ signedUrl: string }>(`/prescriptions/${prescriptionId}/pdf`);
+  },
+
+  // Get signed URL for existing prescription PDF
+  getPrescriptionPdfUrl: async (prescriptionId: string): Promise<{ success: boolean; data?: { signedUrl: string }; error?: string }> => {
+    return apiClient.get<{ signedUrl: string }>(`/prescriptions/${prescriptionId}/pdf-url`);
   },
 };
 
