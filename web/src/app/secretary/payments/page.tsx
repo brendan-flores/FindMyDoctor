@@ -27,6 +27,7 @@ export default function SecretaryPayments() {
   const [activeTab, setActiveTab] = useState<TabType>('UNPAID');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [paymentDetailsLoading, setPaymentDetailsLoading] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
@@ -46,18 +47,22 @@ export default function SecretaryPayments() {
   const [chargeDescription, setChargeDescription] = useState('');
   const [chargeAmount, setChargeAmount] = useState('');
   const [chargeFormError, setChargeFormError] = useState<string | null>(null);
+  const [chargeType, setChargeType] = useState<'ADDITIONAL' | 'MEDICINE'>('ADDITIONAL');
+  const [medicineName, setMedicineName] = useState('');
+  const [medicineQuantity, setMedicineQuantity] = useState('');
+  const [medicineUnitPrice, setMedicineUnitPrice] = useState('');
 
   useEffect(() => {
     fetchPayments();
     fetchPaymentCounts();
   }, [activeTab]);
 
-  // Auto-refresh payments every 30 seconds
+  // Auto-refresh payments every 60 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       fetchPayments();
       fetchPaymentCounts();
-    }, 30000);
+    }, 60000);
     return () => clearInterval(interval);
   }, [activeTab]);
 
@@ -153,26 +158,67 @@ export default function SecretaryPayments() {
   const handleAddCharge = async () => {
     if (!selectedPayment) return;
 
-    // Validate inputs
-    const trimmedDescription = chargeDescription.trim();
-    if (!trimmedDescription) {
-      setChargeFormError('Description is required');
-      return;
-    }
-
-    const numAmount = parseFloat(chargeAmount);
-    if (isNaN(numAmount) || !isFinite(numAmount) || numAmount <= 0) {
-      setChargeFormError('Amount must be a valid positive number');
-      return;
-    }
-
     setActionLoading(true);
     setToastMessage('');
     setToastType('success');
     setChargeFormError(null);
 
     try {
-      const response = await secretaryApi.addCharge(selectedPayment.id, trimmedDescription, numAmount);
+      let payload: any;
+
+      if (chargeType === 'MEDICINE') {
+        // Medicine charge validation
+        const trimmedName = medicineName.trim();
+        if (!trimmedName) {
+          setChargeFormError('Medicine name is required');
+          setActionLoading(false);
+          return;
+        }
+
+        const numQuantity = parseFloat(medicineQuantity);
+        if (isNaN(numQuantity) || !isFinite(numQuantity) || numQuantity <= 0) {
+          setChargeFormError('Quantity must be a valid positive number');
+          setActionLoading(false);
+          return;
+        }
+
+        const numUnitPrice = parseFloat(medicineUnitPrice);
+        if (isNaN(numUnitPrice) || !isFinite(numUnitPrice) || numUnitPrice <= 0) {
+          setChargeFormError('Unit price must be a valid positive number');
+          setActionLoading(false);
+          return;
+        }
+
+        payload = {
+          chargeType: 'MEDICINE',
+          name: trimmedName,
+          quantity: numQuantity,
+          unitPrice: numUnitPrice
+        };
+      } else {
+        // Additional charge validation
+        const trimmedDescription = chargeDescription.trim();
+        if (!trimmedDescription) {
+          setChargeFormError('Description is required');
+          setActionLoading(false);
+          return;
+        }
+
+        const numAmount = parseFloat(chargeAmount);
+        if (isNaN(numAmount) || !isFinite(numAmount) || numAmount <= 0) {
+          setChargeFormError('Amount must be a valid positive number');
+          setActionLoading(false);
+          return;
+        }
+
+        payload = {
+          chargeType: 'ADDITIONAL',
+          description: trimmedDescription,
+          amount: numAmount
+        };
+      }
+
+      const response = await secretaryApi.addCharge(selectedPayment.id, payload);
 
       if (response.success) {
         setToastMessage('Charge added successfully');
@@ -180,15 +226,27 @@ export default function SecretaryPayments() {
         setShowAddChargeModal(false);
         setChargeDescription('');
         setChargeAmount('');
+        setMedicineName('');
+        setMedicineQuantity('');
+        setMedicineUnitPrice('');
+        setChargeType('ADDITIONAL');
 
-        // Refresh payment list and counts with error handling
+        // Refresh payment list, counts, and the selected payment details
         try {
           await Promise.all([
             fetchPayments(),
             fetchPaymentCounts(),
           ]);
+          
+          // Re-fetch the specific payment to update selectedPayment state
+          if (selectedPayment) {
+            const paymentResponse = await secretaryApi.getPayment(selectedPayment.appointment_id);
+            if (paymentResponse.success && paymentResponse.data) {
+              setSelectedPayment(paymentResponse.data);
+            }
+          }
         } catch (refreshError) {
-          setToastMessage('Charge added but failed to refresh payment list and counts');
+          setToastMessage('Charge added but failed to refresh payment data');
           setToastType('error');
           setShowToast(true);
         }
@@ -222,14 +280,20 @@ export default function SecretaryPayments() {
         setShowDeleteChargeDialog(false);
         setChargeToDelete(null);
 
-        // Refresh payment list and counts with error handling
+        // Refresh payment list, counts, and the selected payment details
         try {
           await Promise.all([
             fetchPayments(),
             fetchPaymentCounts(),
           ]);
+
+          // Re-fetch the specific payment to update selectedPayment state
+          const paymentResponse = await secretaryApi.getPayment(selectedPayment.appointment_id);
+          if (paymentResponse.success && paymentResponse.data) {
+            setSelectedPayment(paymentResponse.data);
+          }
         } catch (refreshError) {
-          setToastMessage('Charge deleted but failed to refresh payment list and counts');
+          setToastMessage('Charge deleted but failed to refresh payment data');
           setToastType('error');
           setShowToast(true);
         }
@@ -288,19 +352,6 @@ export default function SecretaryPayments() {
     return `₱${numAmount.toFixed(2)}`;
   };
 
-  const calculateTotal = (payment: Payment) => {
-    const consultationFee = typeof payment.consultation_amount === 'string'
-      ? parseFloat(payment.consultation_amount)
-      : payment.consultation_amount;
-    const totalCharges = payment.charges?.reduce((sum, charge) => {
-      const chargeAmount = typeof charge.amount === 'string'
-        ? parseFloat(charge.amount)
-        : charge.amount;
-      return sum + (isNaN(chargeAmount) ? 0 : chargeAmount);
-    }, 0) || 0;
-    return consultationFee + totalCharges;
-  };
-
   const unpaidCount = paymentCounts.unpaid;
   const pendingCount = paymentCounts.pending;
   const paidCount = paymentCounts.paid;
@@ -310,20 +361,21 @@ export default function SecretaryPayments() {
   const filteredPayments = payments.filter(p => p.status === activeTab);
 
   // Group payments by appointment date
-  const groupPaymentsByDate = (payments: Payment[]) => {
-    const grouped: Record<string, Payment[]> = {};
+  const groupPaymentsByDate = (payments: Payment[]): Record<string, { payments: Payment[]; originalDate: string }> => {
+    const grouped: Record<string, { payments: Payment[]; originalDate: string }> = {};
     payments.forEach(payment => {
       if (payment.appointment_date) {
-        const date = new Date(payment.appointment_date).toLocaleDateString('en-US', {
+        const originalDate = payment.appointment_date;
+        const displayDate = new Date(originalDate).toLocaleDateString('en-US', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
           day: 'numeric'
         });
-        if (!grouped[date]) {
-          grouped[date] = [];
+        if (!grouped[displayDate]) {
+          grouped[displayDate] = { payments: [], originalDate };
         }
-        grouped[date].push(payment);
+        grouped[displayDate].payments.push(payment);
       }
     });
     return grouped;
@@ -332,7 +384,7 @@ export default function SecretaryPayments() {
   const groupedPayments = groupPaymentsByDate(filteredPayments);
   const sortedDates = Object.keys(groupedPayments).sort((a, b) => {
     // Sort dates in ascending order (oldest first, newest last)
-    return new Date(a).getTime() - new Date(b).getTime();
+    return new Date(groupedPayments[a].originalDate).getTime() - new Date(groupedPayments[b].originalDate).getTime();
   });
 
   return (
@@ -440,13 +492,23 @@ export default function SecretaryPayments() {
 
                   {/* Payments for this date */}
                   <div className="grid gap-4">
-                    {groupedPayments[date].map((payment) => (
+                    {groupedPayments[date].payments.map((payment) => (
                       <div
                         key={payment.id}
-                        className="bg-white border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors cursor-pointer"
-                        onClick={() => {
-                          setSelectedPayment(payment);
-                          setShowDetailsModal(true);
+                        className={`bg-white border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors cursor-pointer ${paymentDetailsLoading ? 'opacity-50 pointer-events-none' : ''}`}
+                        onClick={async () => {
+                          setPaymentDetailsLoading(true);
+                          // Fetch fresh payment details with charges
+                          const paymentResponse = await secretaryApi.getPayment(payment.appointment_id);
+                          setPaymentDetailsLoading(false);
+                          if (paymentResponse.success && paymentResponse.data) {
+                            setSelectedPayment(paymentResponse.data);
+                            setShowDetailsModal(true);
+                          } else {
+                            setToastMessage(paymentResponse.error || 'Failed to load payment details');
+                            setToastType('error');
+                            setShowToast(true);
+                          }
                         }}
                       >
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -482,7 +544,15 @@ export default function SecretaryPayments() {
                             <span className={`px-3 py-1 rounded-full text-xs font-medium border ${STATUS_COLORS[payment.status]}`}>
                               {STATUS_LABELS[payment.status]}
                             </span>
-                            <span className="text-lg font-bold text-slate-900">{formatAmount(payment.total_amount)}</span>
+                            <span className="text-lg font-bold text-slate-900">
+                              {formatAmount(
+                                (typeof payment.consultation_amount === 'string' ? parseFloat(payment.consultation_amount) : (payment.consultation_amount || 0)) +
+                                (payment.charges?.reduce((sum, charge) => {
+                                  const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
+                                  return sum + (amount || 0);
+                                }, 0) || 0)
+                              )}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -627,7 +697,20 @@ export default function SecretaryPayments() {
                   )}
                   <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-semibold">
                     <span className="text-slate-900">Total:</span>
-                    <span className="text-slate-900">{formatAmount(calculateTotal(selectedPayment))}</span>
+                    <span className="text-slate-900">
+                      {(() => {
+                        const consultationAmount = typeof selectedPayment.consultation_amount === 'string'
+                          ? parseFloat(selectedPayment.consultation_amount)
+                          : (selectedPayment.consultation_amount || 0);
+                        const charges = selectedPayment.charges || [];
+                        const chargesTotal = charges.reduce((sum, charge) => {
+                          const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
+                          return sum + (amount || 0);
+                        }, 0);
+                        const total = consultationAmount + chargesTotal;
+                        return formatAmount(total);
+                      })()}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -717,7 +800,13 @@ export default function SecretaryPayments() {
           <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-slate-900 mb-2">Verify Payment</h3>
             <p className="text-sm text-slate-600 mb-4">
-              Are you sure you want to verify this payment of {formatAmount(calculateTotal(selectedPayment))} from{' '}
+              Are you sure you want to verify this payment of {formatAmount(
+                (typeof selectedPayment.consultation_amount === 'string' ? parseFloat(selectedPayment.consultation_amount) : (selectedPayment.consultation_amount || 0)) +
+                (selectedPayment.charges?.reduce((sum, charge) => {
+                  const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
+                  return sum + (amount || 0);
+                }, 0) || 0)
+              )} from{' '}
               {selectedPayment.patient_first_name} {selectedPayment.patient_last_name}?
             </p>
             <div className="flex gap-3">
@@ -746,7 +835,13 @@ export default function SecretaryPayments() {
           <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-slate-900 mb-2">Reject Payment</h3>
             <p className="text-sm text-slate-600 mb-4">
-              Are you sure you want to reject this payment of {formatAmount(calculateTotal(selectedPayment))} from{' '}
+              Are you sure you want to reject this payment of {formatAmount(
+                (typeof selectedPayment.consultation_amount === 'string' ? parseFloat(selectedPayment.consultation_amount) : (selectedPayment.consultation_amount || 0)) +
+                (selectedPayment.charges?.reduce((sum, charge) => {
+                  const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
+                  return sum + (amount || 0);
+                }, 0) || 0)
+              )} from{' '}
               {selectedPayment.patient_first_name} {selectedPayment.patient_last_name}?
             </p>
             <div className="flex gap-3">
@@ -815,38 +910,137 @@ export default function SecretaryPayments() {
       {showAddChargeModal && selectedPayment && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Add Additional Charge</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Add Charge</h3>
             <div className="space-y-4">
+              {/* Charge Type Selector */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                <input
-                  type="text"
-                  value={chargeDescription}
-                  onChange={(e) => {
-                    setChargeDescription(e.target.value);
-                    setChargeFormError(null);
-                  }}
-                  placeholder="e.g., Medicine, Additional services"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
-                  disabled={actionLoading}
-                />
+                <label className="block text-sm font-medium text-slate-700 mb-2">Charge Type</label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChargeType('ADDITIONAL');
+                      setChargeFormError(null);
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      chargeType === 'ADDITIONAL'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                    disabled={actionLoading}
+                  >
+                    Additional
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChargeType('MEDICINE');
+                      setChargeFormError(null);
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      chargeType === 'MEDICINE'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                    disabled={actionLoading}
+                  >
+                    Medicine
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Amount (₱)</label>
-                <input
-                  type="number"
-                  value={chargeAmount}
-                  onChange={(e) => {
-                    setChargeAmount(e.target.value);
-                    setChargeFormError(null);
-                  }}
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0.01"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
-                  disabled={actionLoading}
-                />
-              </div>
+
+              {chargeType === 'ADDITIONAL' ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                    <input
+                      type="text"
+                      value={chargeDescription}
+                      onChange={(e) => {
+                        setChargeDescription(e.target.value);
+                        setChargeFormError(null);
+                      }}
+                      placeholder="e.g., Lab tests, Additional services"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
+                      disabled={actionLoading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Amount (₱)</label>
+                    <input
+                      type="number"
+                      value={chargeAmount}
+                      onChange={(e) => {
+                        setChargeAmount(e.target.value);
+                        setChargeFormError(null);
+                      }}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0.01"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
+                      disabled={actionLoading}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Medicine Name</label>
+                    <input
+                      type="text"
+                      value={medicineName}
+                      onChange={(e) => {
+                        setMedicineName(e.target.value);
+                        setChargeFormError(null);
+                      }}
+                      placeholder="e.g., Paracetamol 500mg"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
+                      disabled={actionLoading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Quantity</label>
+                    <input
+                      type="number"
+                      value={medicineQuantity}
+                      onChange={(e) => {
+                        setMedicineQuantity(e.target.value);
+                        setChargeFormError(null);
+                      }}
+                      placeholder="1"
+                      step="1"
+                      min="1"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
+                      disabled={actionLoading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Unit Price (₱)</label>
+                    <input
+                      type="number"
+                      value={medicineUnitPrice}
+                      onChange={(e) => {
+                        setMedicineUnitPrice(e.target.value);
+                        setChargeFormError(null);
+                      }}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0.01"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
+                      disabled={actionLoading}
+                    />
+                  </div>
+                  {medicineQuantity && medicineUnitPrice && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                      <span className="text-slate-600">Total: </span>
+                      <span className="font-semibold text-slate-900">
+                        ₱{(parseFloat(medicineQuantity) * parseFloat(medicineUnitPrice)).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+
               {chargeFormError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
                   {chargeFormError}
@@ -859,6 +1053,10 @@ export default function SecretaryPayments() {
                   setShowAddChargeModal(false);
                   setChargeDescription('');
                   setChargeAmount('');
+                  setMedicineName('');
+                  setMedicineQuantity('');
+                  setMedicineUnitPrice('');
+                  setChargeType('ADDITIONAL');
                   setChargeFormError(null);
                 }}
                 disabled={actionLoading}

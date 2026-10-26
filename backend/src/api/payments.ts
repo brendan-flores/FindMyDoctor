@@ -134,8 +134,12 @@ router.get('/', authenticate, requireSecretaryPasswordChange, requireSecretaryPr
         `SELECT
           pc.id,
           pc.payment_id,
+          pc.charge_type,
           pc.description,
           pc.amount,
+          pc.quantity,
+          pc.unit_price,
+          pc.prescription_item_id,
           pc.created_at,
           pc.created_by,
           s.first_name as created_by_first_name,
@@ -282,8 +286,12 @@ router.get('/:appointmentId', authenticate, requireSecretaryPasswordChange, requ
     const chargesResult = await query(
       `SELECT
         pc.id,
+        pc.charge_type,
         pc.description,
         pc.amount,
+        pc.quantity,
+        pc.unit_price,
+        pc.prescription_item_id,
         pc.created_at,
         pc.created_by,
         s.first_name as created_by_first_name,
@@ -721,29 +729,71 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
   const client = await getClient();
   try {
     const { id } = req.params;
-    const { description, amount } = req.body;
+    const { chargeType, description, amount, name, quantity, unitPrice, prescriptionItemId } = req.body;
     const userId = req.user!.id;
 
-    // Validate description and amount
-    if (!description || typeof description !== 'string' || description.trim() === '') {
+    // Determine charge type (default to ADDITIONAL for backward compatibility)
+    const finalChargeType = chargeType || 'ADDITIONAL';
+
+    // Validate charge type
+    if (!['ADDITIONAL', 'MEDICINE'].includes(finalChargeType)) {
       client.release();
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Description is required and must be valid'));
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid charge type. Must be ADDITIONAL or MEDICINE'));
     }
 
-    if (amount === undefined || amount === null) {
-      client.release();
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Amount is required'));
-    }
+    let chargeAmount: number;
+    let chargeDescription: string;
 
-    const numericAmount = Number(amount);
-    if (isNaN(numericAmount) || !isFinite(numericAmount)) {
-      client.release();
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Amount must be a valid number'));
-    }
+    if (finalChargeType === 'MEDICINE') {
+      // Medicine charge validation
+      if (!name || typeof name !== 'string' || name.trim() === '') {
+        client.release();
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Medicine name is required for medicine charges'));
+      }
 
-    if (numericAmount <= 0) {
-      client.release();
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Amount must be greater than zero'));
+      const numericQuantity = Number(quantity);
+      if (isNaN(numericQuantity) || !isFinite(numericQuantity) || numericQuantity <= 0) {
+        client.release();
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Quantity must be a valid positive number'));
+      }
+
+      const numericUnitPrice = Number(unitPrice);
+      if (isNaN(numericUnitPrice) || !isFinite(numericUnitPrice) || numericUnitPrice <= 0) {
+        client.release();
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Unit price must be a valid positive number'));
+      }
+
+      // Calculate amount on server (never trust client-supplied medicine total)
+      chargeAmount = numericQuantity * numericUnitPrice;
+      chargeDescription = name.trim();
+
+      // Round to 2 decimal places for monetary precision
+      chargeAmount = Math.round(chargeAmount * 100) / 100;
+    } else {
+      // Additional charge validation (backward compatible)
+      if (!description || typeof description !== 'string' || description.trim() === '') {
+        client.release();
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Description is required and must be valid'));
+      }
+
+      if (amount === undefined || amount === null) {
+        client.release();
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Amount is required'));
+      }
+
+      const numericAmount = Number(amount);
+      if (isNaN(numericAmount) || !isFinite(numericAmount)) {
+        client.release();
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Amount must be a valid number'));
+      }
+
+      if (numericAmount <= 0) {
+        client.release();
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Amount must be greater than zero'));
+      }
+
+      chargeAmount = numericAmount;
+      chargeDescription = description.trim();
     }
 
     await client.query('BEGIN');
@@ -765,7 +815,7 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
 
     // Get payment with doctor assignment check (lock row for update)
     const paymentResult = await client.query(
-      `SELECT p.*, a.doctor_id, pat.user_id as patient_user_id
+      `SELECT p.*, a.doctor_id, a.id as appointment_id, pat.user_id as patient_user_id, pat.id as patient_id
        FROM payments p
        JOIN appointments a ON p.appointment_id = a.id
        JOIN patients pat ON p.patient_id = pat.id
@@ -802,12 +852,61 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot add charges to a rejected payment'));
     }
 
-    // Insert charge
-    await client.query(
-      `INSERT INTO payment_charges (payment_id, description, amount, created_by)
-       VALUES ($1, $2, $3, $4)`,
-      [id, description.trim(), numericAmount, secretaryRecordId]
-    );
+    // Validate prescription item if provided (medicine charges only)
+    if (finalChargeType === 'MEDICINE' && prescriptionItemId) {
+      const prescriptionItemResult = await client.query(
+        `SELECT pi.*, p.prescription_id, p.patient_id, p.doctor_id, v.appointment_id
+         FROM prescription_items pi
+         JOIN prescriptions p ON pi.prescription_id = p.id
+         JOIN visits v ON p.visit_id = v.id
+         WHERE pi.id = $1`,
+        [prescriptionItemId]
+      );
+
+      if (prescriptionItemResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Prescription item not found'));
+      }
+
+      const prescriptionItem = prescriptionItemResult.rows[0];
+
+      // Verify prescription item belongs to the same patient as the payment
+      if (prescriptionItem.patient_id !== payment.patient_id) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Prescription item does not belong to the payment patient'));
+      }
+
+      // Verify prescription item belongs to the same appointment/visit as the payment
+      if (prescriptionItem.appointment_id !== payment.appointment_id) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Prescription item does not belong to the payment appointment'));
+      }
+
+      // Verify prescription item belongs to the same doctor as the payment
+      if (prescriptionItem.doctor_id !== payment.doctor_id) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Prescription item does not belong to the payment doctor'));
+      }
+    }
+
+    // Insert charge with appropriate fields based on type
+    if (finalChargeType === 'MEDICINE') {
+      await client.query(
+        `INSERT INTO payment_charges (payment_id, charge_type, description, amount, quantity, unit_price, prescription_item_id, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [id, 'MEDICINE', chargeDescription, chargeAmount, Number(quantity), Number(unitPrice), prescriptionItemId || null, secretaryRecordId]
+      );
+    } else {
+      await client.query(
+        `INSERT INTO payment_charges (payment_id, charge_type, description, amount, created_by)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [id, 'ADDITIONAL', chargeDescription, chargeAmount, secretaryRecordId]
+      );
+    }
 
     // Recalculate total from authoritative charge records (excluding deleted charges)
     const chargesResult = await client.query(
@@ -818,6 +917,10 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
     const totalCharges = parseFloat(chargesResult.rows[0].total_charges);
     const newTotal = payment.consultation_amount + totalCharges;
 
+    console.log('[Add Charge] Current consultation_amount:', payment.consultation_amount);
+    console.log('[Add Charge] Total charges from DB:', totalCharges);
+    console.log('[Add Charge] New total:', newTotal);
+
     // Update payment totals
     await client.query(
       `UPDATE payments
@@ -827,7 +930,7 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
     );
 
     // Insert notification for patient with charge amount
-    const notificationMessage = `An additional charge of ₱${numericAmount.toFixed(2)} has been added to your payment.`;
+    const notificationMessage = `An additional charge of ₱${chargeAmount.toFixed(2)} has been added to your payment.`;
     await client.query(
       `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
        VALUES ($1, 'ADDITIONAL_CHARGE_ADDED', 'Additional Charge Added', $2, 'payment', $3)`,
@@ -845,7 +948,7 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
         data: {
           type: 'ADDITIONAL_CHARGE_ADDED',
           paymentId: id,
-          amount: numericAmount.toString(),
+          amount: chargeAmount.toString(),
         },
       });
     } catch (pushErr) {
@@ -1041,8 +1144,12 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     const chargesResult = await query(
       `SELECT
         pc.id,
+        pc.charge_type,
         pc.description,
         pc.amount,
+        pc.quantity,
+        pc.unit_price,
+        pc.prescription_item_id,
         pc.created_at,
         pc.created_by,
         s.first_name as created_by_first_name,

@@ -109,7 +109,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // Get patient's prescriptions
-router.get('/patients/:id', authenticate, authorize('PATIENT', 'DOCTOR'), async (req: AuthRequest, res: Response) => {
+router.get('/patients/:id', authenticate, authorize('PATIENT', 'DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;
@@ -147,11 +147,55 @@ router.get('/patients/:id', authenticate, authorize('PATIENT', 'DOCTOR'), async 
         ORDER BY p.prescription_date DESC
       `;
       params.push(userId);
+    } else if (role === 'SECRETARY') {
+      // Secretary can only access prescriptions for their assigned doctor's patients
+      const secretaryResult = await query(
+        'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+        [userId]
+      );
+
+      if (secretaryResult.rows.length === 0) {
+        return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+      }
+
+      const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+      queryText = `
+        SELECT p.*, 
+               d.first_name as doctor_first_name, d.last_name as doctor_last_name
+        FROM prescriptions p
+        JOIN doctors d ON p.doctor_id = d.id
+        WHERE p.patient_id = $1 AND p.doctor_id = $2
+        ORDER BY p.prescription_date DESC
+      `;
+      params.push(assignedDoctorId);
     } else {
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Invalid role'));
     }
 
     const result = await query(queryText, params);
+
+    // Include prescription items for secretary role (needed for medicine charge linking)
+    if (role === 'SECRETARY' && result.rows.length > 0) {
+      const prescriptionIds = result.rows.map((p: any) => p.id);
+      const itemsResult = await query(
+        'SELECT * FROM prescription_items WHERE prescription_id = ANY($1::uuid[])',
+        [prescriptionIds]
+      );
+
+      // Group items by prescription_id
+      const itemsByPrescription = new Map<string, any[]>();
+      for (const item of itemsResult.rows) {
+        const list = itemsByPrescription.get(item.prescription_id) || [];
+        list.push(item);
+        itemsByPrescription.set(item.prescription_id, list);
+      }
+
+      // Attach items to each prescription
+      result.rows.forEach((prescription: any) => {
+        prescription.items = itemsByPrescription.get(prescription.id) || [];
+      });
+    }
 
     res.json(success(result.rows));
   } catch (err: any) {
