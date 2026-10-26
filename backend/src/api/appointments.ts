@@ -516,6 +516,28 @@ router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATI
       [id]
     );
 
+    // Handle payment based on payment method
+    const paymentResult = await client.query(
+      'SELECT id, payment_method, status FROM payments WHERE appointment_id = $1',
+      [id]
+    );
+
+    if (paymentResult.rows.length > 0) {
+      const payment = paymentResult.rows[0];
+
+      if (payment.payment_method === 'CASH') {
+        // Delete CASH payments on cancellation (no refund needed)
+        await client.query('DELETE FROM payment_charges WHERE payment_id = $1', [payment.id]);
+        await client.query('DELETE FROM payments WHERE id = $1', [payment.id]);
+      } else if (payment.payment_method === 'GCASH') {
+        // Mark GCASH payments as CANCELLED (for refund proof)
+        await client.query(
+          "UPDATE payments SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+          [payment.id]
+        );
+      }
+    }
+
     // Delete the queue entry to free the queue slot (prevents unique constraint violation during renumbering)
     // The appointment record remains for audit purposes
     await client.query(
