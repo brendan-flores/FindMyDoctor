@@ -82,8 +82,8 @@ router.get('/', authenticate, requireSecretaryPasswordChange, requireSecretaryPr
     const assignedDoctorId = secretaryResult.rows[0].doctor_id;
 
     // Validate status filter if provided
-    if (status && !['UNPAID', 'PENDING_VERIFICATION', 'PAID', 'REJECTED'].includes(status as string)) {
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid status filter. Valid values: UNPAID, PENDING_VERIFICATION, PAID, REJECTED'));
+    if (status && !['UNPAID', 'PENDING_VERIFICATION', 'PAID', 'REJECTED', 'CANCELLED'].includes(status as string)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid status filter. Valid values: UNPAID, PENDING_VERIFICATION, PAID, REJECTED, CANCELLED'));
     }
 
     // Build query with optional status filter
@@ -161,6 +161,57 @@ router.get('/', authenticate, requireSecretaryPasswordChange, requireSecretaryPr
     res.json(success(payments));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch payments'));
+  }
+});
+
+// Get payment counts by status (secretary only)
+router.get('/counts', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get secretary's assigned doctor
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [userId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    // Get counts for all statuses in a single query
+    const result = await query(
+      `SELECT
+        p.status,
+        COUNT(*) as count
+      FROM payments p
+      JOIN appointments a ON p.appointment_id = a.id
+      WHERE a.doctor_id = $1
+      GROUP BY p.status`,
+      [assignedDoctorId]
+    );
+
+    // Initialize counts with 0 for all statuses
+    const counts = {
+      UNPAID: 0,
+      PENDING_VERIFICATION: 0,
+      PAID: 0,
+      REJECTED: 0,
+      CANCELLED: 0,
+    };
+
+    // Update counts from query result
+    for (const row of result.rows) {
+      if (row.status in counts) {
+        counts[row.status as keyof typeof counts] = parseInt(row.count);
+      }
+    }
+
+    res.json(success(counts));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch payment counts'));
   }
 });
 
@@ -1066,7 +1117,213 @@ router.get('/:id/receipt-url', authenticate, requireSecretaryPasswordChange, req
   }
 });
 
-// Record walk-in payment (secretary only)
+// Record payment (secretary only) - works for both walk-in and booked patients
+router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    const { appointmentId, paymentMethod, consultationFee, additionalCharges } = req.body;
+    const userId = req.user!.id;
+
+    // Validate required fields
+    if (!appointmentId) {
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'appointmentId is required'));
+    }
+
+    if (!paymentMethod || !['CASH', 'GCASH'].includes(paymentMethod)) {
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'paymentMethod must be CASH or GCASH'));
+    }
+
+    if (consultationFee === undefined || consultationFee === null || isNaN(consultationFee) || consultationFee <= 0) {
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'consultationFee must be a positive number'));
+    }
+
+    // Validate additional charges if provided
+    if (additionalCharges && Array.isArray(additionalCharges)) {
+      for (const charge of additionalCharges) {
+        if (!charge.description || typeof charge.description !== 'string' || charge.description.trim() === '') {
+          client.release();
+          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a non-empty description'));
+        }
+        if (charge.amount === undefined || charge.amount === null || isNaN(charge.amount) || charge.amount <= 0) {
+          client.release();
+          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a positive amount'));
+        }
+      }
+    }
+
+    await client.query('BEGIN');
+
+    // Get secretary record and assigned doctor
+    const secretaryResult = await client.query(
+      'SELECT id, doctor_id FROM secretaries WHERE user_id = $1',
+      [userId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const secretaryRecordId = secretaryResult.rows[0].id;
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    // Get appointment with doctor assignment check
+    const appointmentResult = await client.query(
+      `SELECT a.*, q.registration_source, p.user_id as patient_user_id
+       FROM appointments a
+       JOIN queue_entries q ON a.id = q.appointment_id
+       JOIN patients p ON a.patient_id = p.id
+       WHERE a.id = $1`,
+      [appointmentId]
+    );
+
+    if (appointmentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Appointment not found'));
+    }
+
+    const appointment = appointmentResult.rows[0];
+
+    // Verify appointment belongs to secretary's assigned doctor
+    if (appointment.doctor_id !== assignedDoctorId) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only record payments for your assigned doctor'));
+    }
+
+    // Check if payment already exists for this appointment
+    const existingPaymentResult = await client.query(
+      'SELECT id, payment_method, status FROM payments WHERE appointment_id = $1',
+      [appointmentId]
+    );
+
+    const isWalkIn = appointment.registration_source === 'WALK_IN';
+
+    // For walk-in patients, payment should not exist yet
+    // For booked patients, payment exists from booking
+    if (isWalkIn && existingPaymentResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Payment already exists for this walk-in appointment'));
+    }
+
+    if (!isWalkIn && existingPaymentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Payment record not found for booked appointment'));
+    }
+
+    // Calculate total amount
+    const totalCharges = additionalCharges && additionalCharges.length > 0
+      ? additionalCharges.reduce((sum: number, charge: any) => sum + parseFloat(charge.amount), 0)
+      : 0;
+    const totalAmount = parseFloat(consultationFee) + totalCharges;
+
+    // Determine payment status
+    // CASH payments are immediately PAID (verified at time of recording)
+    // GCASH payments are PENDING_VERIFICATION (require receipt upload)
+    const paymentStatus = paymentMethod === 'CASH' ? 'PAID' : 'PENDING_VERIFICATION';
+    const verifiedBy = paymentMethod === 'CASH' ? secretaryRecordId : null;
+    const verifiedAt = paymentMethod === 'CASH' ? 'CURRENT_TIMESTAMP' : null;
+
+    let paymentId: string;
+
+    if (isWalkIn) {
+      // Create new payment record for walk-in patients
+      const paymentInsertResult = await client.query(
+        `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_additional_charges, total_amount, status, verified_by, verified_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ${verifiedAt})
+         RETURNING id`,
+        [appointment.patient_id, appointmentId, paymentMethod, consultationFee, totalCharges, totalAmount, paymentStatus, verifiedBy]
+      );
+      paymentId = paymentInsertResult.rows[0].id;
+
+      // Insert additional charges if provided
+      if (additionalCharges && additionalCharges.length > 0) {
+        for (const charge of additionalCharges) {
+          await client.query(
+            `INSERT INTO payment_charges (payment_id, description, amount, created_by)
+             VALUES ($1, $2, $3, $4)`,
+            [paymentId, charge.description.trim(), parseFloat(charge.amount), secretaryRecordId]
+          );
+        }
+      }
+    } else {
+      // Update existing payment record for booked patients
+      paymentId = existingPaymentResult.rows[0].id;
+
+      // Update payment method, status, and amounts
+      await client.query(
+        `UPDATE payments
+         SET payment_method = $1,
+             consultation_amount = $2,
+             total_additional_charges = $3,
+             total_amount = $4,
+             status = $5,
+             verified_by = $6,
+             verified_at = ${verifiedAt}
+         WHERE id = $7`,
+        [paymentMethod, consultationFee, totalCharges, totalAmount, paymentStatus, verifiedBy, paymentId]
+      );
+
+      // Delete existing charges and insert new ones
+      await client.query('DELETE FROM payment_charges WHERE payment_id = $1', [paymentId]);
+
+      if (additionalCharges && additionalCharges.length > 0) {
+        for (const charge of additionalCharges) {
+          await client.query(
+            `INSERT INTO payment_charges (payment_id, description, amount, created_by)
+             VALUES ($1, $2, $3, $4)`,
+            [paymentId, charge.description.trim(), parseFloat(charge.amount), secretaryRecordId]
+          );
+        }
+      }
+    }
+
+    // Send notification for CASH payments only
+    if (paymentMethod === 'CASH') {
+      await createNotification(
+        appointment.patient_user_id,
+        NotificationTypes.PAYMENT_VERIFIED,
+        'Payment Received',
+        'Your cash payment has been received.',
+        'payment',
+        paymentId
+      );
+    }
+
+    await client.query('COMMIT');
+    client.release();
+
+    // Send push notification for CASH payments (best-effort, outside transaction)
+    if (paymentMethod === 'CASH') {
+      try {
+        await sendPushNotification(
+          appointment.patient_user_id,
+          'Payment Received',
+          'Your cash payment has been received.',
+          { type: 'PAYMENT', paymentId }
+        );
+      } catch (pushError) {
+        console.error('Failed to send push notification:', pushError);
+      }
+    }
+
+    res.json(success({ paymentId }, 'Payment recorded successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    client.release();
+    console.error('Payment recording error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to record payment'));
+  }
+});
+
+// Record walk-in payment (secretary only) - DEPRECATED: Use /record instead
 router.post('/walk-in', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
   const client = await getClient();
   try {
@@ -1171,7 +1428,9 @@ router.post('/walk-in', authenticate, requireSecretaryPasswordChange, requireSec
     const totalAmount = parseFloat(consultationFee) + totalCharges;
 
     // Determine payment status
-    const paymentStatus = paymentMethod === 'CASH' ? 'PAID' : 'UNPAID';
+    // CASH payments are immediately PAID (verified at time of recording)
+    // GCASH payments are PENDING_VERIFICATION (require receipt upload)
+    const paymentStatus = paymentMethod === 'CASH' ? 'PAID' : 'PENDING_VERIFICATION';
     const verifiedBy = paymentMethod === 'CASH' ? secretaryRecordId : null;
     const verifiedAt = paymentMethod === 'CASH' ? 'CURRENT_TIMESTAMP' : null;
 
