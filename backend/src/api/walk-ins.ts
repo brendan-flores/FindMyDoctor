@@ -388,12 +388,8 @@ router.post('/', authenticate, requireSecretaryPasswordChange, requireSecretaryP
       [doctorId, appointmentDateOnly]
     );
 
-    // Create UNPAID payment record
-    await client.query(
-      `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_amount, status)
-       VALUES ($1, $2, 'CASH', $3, $3, 'UNPAID')`,
-      [patientId, appointmentId, doctor.consultation_fee]
-    );
+    // Note: Walk-in patients do NOT get an automatic payment record
+    // Payment is only recorded by secretary after checkup completion
 
     // Get total configured capacity for that day
     const totalCapacityResult = await client.query(
@@ -996,12 +992,8 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
       [assignedDoctorId, appointmentDateOnly]
     );
 
-    // Create UNPAID payment record
-    await client.query(
-      `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_amount, status)
-       VALUES ($1, $2, 'CASH', $3, $3, 'UNPAID')`,
-      [patientId, appointmentId, doctorResult.rows[0].consultation_fee]
-    );
+    // Note: Walk-in patients do NOT get an automatic payment record
+    // Payment is only recorded by secretary after checkup completion
 
     // Get total configured capacity for that day
     const totalCapacityResult = await client.query(
