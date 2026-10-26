@@ -17,8 +17,12 @@ interface PaymentModalProps {
 
 interface AdditionalCharge {
   id: string;
+  chargeType?: 'ADDITIONAL' | 'MEDICINE';
   description: string;
   amount: number;
+  name?: string;
+  quantity?: number;
+  unitPrice?: number;
 }
 
 export default function PaymentModal({
@@ -40,6 +44,10 @@ export default function PaymentModal({
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [chargeType, setChargeType] = useState<'ADDITIONAL' | 'MEDICINE'>('ADDITIONAL');
+  const [medicineName, setMedicineName] = useState('');
+  const [medicineQuantity, setMedicineQuantity] = useState('');
+  const [medicineUnitPrice, setMedicineUnitPrice] = useState('');
 
   // Reset form when modal opens
   useEffect(() => {
@@ -50,32 +58,77 @@ export default function PaymentModal({
       setNewChargeAmount('');
       setChargeFormError(null);
       setIsSubmitting(false);
+      setChargeType('ADDITIONAL');
+      setMedicineName('');
+      setMedicineQuantity('');
+      setMedicineUnitPrice('');
     }
   }, [isOpen, initialPaymentMethod]);
 
   const handleAddCharge = () => {
-    const trimmedDescription = newChargeDescription.trim();
-    if (!trimmedDescription) {
-      setChargeFormError('Description is required');
-      return;
-    }
-
-    const numAmount = parseFloat(newChargeAmount);
-    if (isNaN(numAmount) || !isFinite(numAmount) || numAmount <= 0) {
-      setChargeFormError('Amount must be a valid positive number');
-      return;
-    }
-
-    const newCharge: AdditionalCharge = {
-      id: Date.now().toString(),
-      description: trimmedDescription,
-      amount: numAmount,
-    };
-
-    setAdditionalCharges([...additionalCharges, newCharge]);
-    setNewChargeDescription('');
-    setNewChargeAmount('');
     setChargeFormError(null);
+
+    if (chargeType === 'MEDICINE') {
+      // Medicine charge validation
+      const trimmedName = medicineName.trim();
+      if (!trimmedName) {
+        setChargeFormError('Medicine name is required');
+        return;
+      }
+
+      const numQuantity = parseFloat(medicineQuantity);
+      if (isNaN(numQuantity) || !isFinite(numQuantity) || numQuantity <= 0) {
+        setChargeFormError('Quantity must be a valid positive number');
+        return;
+      }
+
+      const numUnitPrice = parseFloat(medicineUnitPrice);
+      if (isNaN(numUnitPrice) || !isFinite(numUnitPrice) || numUnitPrice <= 0) {
+        setChargeFormError('Unit price must be a valid positive number');
+        return;
+      }
+
+      const totalAmount = numQuantity * numUnitPrice;
+
+      const newCharge: AdditionalCharge = {
+        id: Date.now().toString(),
+        chargeType: 'MEDICINE',
+        description: trimmedName,
+        amount: totalAmount,
+        name: trimmedName,
+        quantity: numQuantity,
+        unitPrice: numUnitPrice,
+      };
+
+      setAdditionalCharges([...additionalCharges, newCharge]);
+      setMedicineName('');
+      setMedicineQuantity('');
+      setMedicineUnitPrice('');
+    } else {
+      // Additional charge validation
+      const trimmedDescription = newChargeDescription.trim();
+      if (!trimmedDescription) {
+        setChargeFormError('Description is required');
+        return;
+      }
+
+      const numAmount = parseFloat(newChargeAmount);
+      if (isNaN(numAmount) || !isFinite(numAmount) || numAmount <= 0) {
+        setChargeFormError('Amount must be a valid positive number');
+        return;
+      }
+
+      const newCharge: AdditionalCharge = {
+        id: Date.now().toString(),
+        chargeType: 'ADDITIONAL',
+        description: trimmedDescription,
+        amount: numAmount,
+      };
+
+      setAdditionalCharges([...additionalCharges, newCharge]);
+      setNewChargeDescription('');
+      setNewChargeAmount('');
+    }
   };
 
   const handleDeleteCharge = (chargeId: string) => {
@@ -98,11 +151,17 @@ export default function PaymentModal({
     setChargeFormError(null);
 
     try {
+      // Convert charges to the format expected by the backend
+      const chargesPayload = additionalCharges.map(charge => ({
+        description: charge.description,
+        amount: charge.amount,
+      }));
+
       const response = await secretaryApi.recordPayment({
         appointmentId,
         paymentMethod,
         consultationFee,
-        additionalCharges,
+        additionalCharges: chargesPayload,
       });
 
       if (response.success) {
@@ -199,38 +258,144 @@ export default function PaymentModal({
                 <h3 className="text-sm font-semibold text-slate-900">Additional Charges</h3>
               </div>
 
-              {/* Add Charge Form */}
+              {/* Charge Type Selector */}
               <div className="bg-slate-50 rounded-lg p-4 mb-3">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="text"
-                    value={newChargeDescription}
-                    onChange={(e) => {
-                      setNewChargeDescription(e.target.value);
-                      setChargeFormError(null);
-                    }}
-                    placeholder="Description (e.g., Medicine)"
-                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm"
-                  />
-                  <input
-                    type="number"
-                    value={newChargeAmount}
-                    onChange={(e) => {
-                      setNewChargeAmount(e.target.value);
-                      setChargeFormError(null);
-                    }}
-                    placeholder="Amount"
-                    min="0"
-                    step="0.01"
-                    className="w-full sm:w-32 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm"
-                  />
+                <label className="block text-sm font-medium text-slate-700 mb-2">Charge Type</label>
+                <div className="flex gap-3">
                   <button
-                    onClick={handleAddCharge}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                    type="button"
+                    onClick={() => {
+                      setChargeType('ADDITIONAL');
+                      setChargeFormError(null);
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      chargeType === 'ADDITIONAL'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                    disabled={isSubmitting}
                   >
-                    Add
+                    Additional
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChargeType('MEDICINE');
+                      setChargeFormError(null);
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      chargeType === 'MEDICINE'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                    disabled={isSubmitting}
+                  >
+                    Medicine
                   </button>
                 </div>
+              </div>
+
+              {/* Add Charge Form */}
+              <div className="bg-slate-50 rounded-lg p-4 mb-3">
+                {chargeType === 'ADDITIONAL' ? (
+                  <>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="text"
+                        value={newChargeDescription}
+                        onChange={(e) => {
+                          setNewChargeDescription(e.target.value);
+                          setChargeFormError(null);
+                        }}
+                        placeholder="Description (e.g., Lab tests, Additional services)"
+                        className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm text-slate-900"
+                      />
+                      <input
+                        type="number"
+                        value={newChargeAmount}
+                        onChange={(e) => {
+                          setNewChargeAmount(e.target.value);
+                          setChargeFormError(null);
+                        }}
+                        placeholder="Amount"
+                        min="0"
+                        step="0.01"
+                        className="w-full sm:w-32 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm text-slate-900"
+                      />
+                      <button
+                        onClick={handleAddCharge}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Medicine Name</label>
+                        <input
+                          type="text"
+                          value={medicineName}
+                          onChange={(e) => {
+                            setMedicineName(e.target.value);
+                            setChargeFormError(null);
+                          }}
+                          placeholder="e.g., Paracetamol 500mg"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Quantity</label>
+                        <input
+                          type="number"
+                          value={medicineQuantity}
+                          onChange={(e) => {
+                            setMedicineQuantity(e.target.value);
+                            setChargeFormError(null);
+                          }}
+                          placeholder="1"
+                          step="1"
+                          min="1"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Unit Price (₱)</label>
+                        <input
+                          type="number"
+                          value={medicineUnitPrice}
+                          onChange={(e) => {
+                            setMedicineUnitPrice(e.target.value);
+                            setChargeFormError(null);
+                          }}
+                          placeholder="0.00"
+                          step="0.01"
+                          min="0.01"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      {medicineQuantity && medicineUnitPrice && (
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                          <span className="text-slate-600">Total: </span>
+                          <span className="font-semibold text-slate-900">
+                            ₱{(parseFloat(medicineQuantity) * parseFloat(medicineUnitPrice)).toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                      <button
+                        onClick={handleAddCharge}
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
+                        Add Charge
+                      </button>
+                    </div>
+                  </>
+                )}
                 {chargeFormError && (
                   <p className="text-red-600 text-xs mt-2">{chargeFormError}</p>
                 )}
@@ -262,10 +427,10 @@ export default function PaymentModal({
             </div>
 
             {/* Total */}
-            <div className="bg-purple-50 rounded-lg p-4">
+            <div className="bg-blue-50 rounded-lg p-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-purple-900">Total Amount</span>
-                <span className="text-2xl font-bold text-purple-900">{formatAmount(totalAmount)}</span>
+                <span className="text-sm font-medium text-blue-900">Total Amount</span>
+                <span className="text-2xl font-bold text-blue-900">{formatAmount(totalAmount)}</span>
               </div>
             </div>
           </div>
@@ -274,7 +439,7 @@ export default function PaymentModal({
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="px-6 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
             >
               {isSubmitting ? 'Recording...' : 'Record Payment'}
             </button>

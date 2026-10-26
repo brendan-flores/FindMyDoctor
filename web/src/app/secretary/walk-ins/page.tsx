@@ -73,7 +73,7 @@ export default function SecretaryWalkIns() {
         const errorMessage = response.error || 'Failed to register walk-in';
         const errorDetails = response.errorCode ? ` (${response.errorCode})` : '';
         const httpStatus = response.httpStatus ? ` [HTTP ${response.httpStatus}]` : '';
-        console.error('Walk-in registration failed:', response);
+        console.error('Walk-in registration failed:', errorMessage, errorDetails, httpStatus, response);
         setError(`${errorMessage}${errorDetails}${httpStatus}`);
       }
     } catch (err) {
