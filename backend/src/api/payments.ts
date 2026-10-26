@@ -1303,11 +1303,13 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
     // Send push notification for CASH payments (best-effort, outside transaction)
     if (paymentMethod === 'CASH') {
       try {
-        await sendPushNotification(
+        await sendPushToUser(
           appointment.patient_user_id,
-          'Payment Received',
-          'Your cash payment has been received.',
-          { type: 'PAYMENT', paymentId }
+          {
+            title: 'Payment Received',
+            body: 'Your cash payment has been received.',
+            data: { type: 'PAYMENT', paymentId }
+          }
         );
       } catch (pushError) {
         console.error('Failed to send push notification:', pushError);
