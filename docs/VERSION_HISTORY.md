@@ -4,6 +4,44 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.26 (October 27, 2026)
+
+**Purpose:** Implement comprehensive prescription management for doctors, including the ability to create digital prescriptions and generate formal prescription PDF documents. PDFs are generated on demand, stored privately in Supabase, and accessible through short-lived signed URLs to ensure files are not publicly accessible.
+
+**Significant Features:**
+- Prescription PDF generation:
+  - Added pdfkit dependency to backend for PDF generation.
+  - Created private Supabase bucket for prescription PDFs (`prescription-pdfs`).
+  - Added storage helpers `uploadPrescriptionPdf()` and `generateSignedPrescriptionUrl()` in `storageService.ts` following the existing receipt signed-URL pattern, providing short-lived signed URLs of approximately 60 seconds.
+  - Added DOCTOR-only endpoint `GET /api/v1/prescriptions/:id/pdf` that generates a PDF containing doctor and clinic header, patient name and date of birth, reason for visit or diagnosis from the linked visits row, and each prescription item's medication, dosage, frequency, duration, and instructions.
+  - Added endpoint `GET /api/v1/prescriptions/:id/pdf-url` (DOCTOR and PATIENT) to fetch signed URLs for existing PDFs on demand.
+  - PDF path is stored in the existing `prescriptions.pdf_url` column.
+  - Added `hasPdf` field to responses from `GET /api/v1/prescriptions/:id` and `GET /api/v1/prescriptions/patients/:id` to indicate whether a PDF exists.
+- Prescription management frontend:
+  - Implemented `/doctor/prescriptions` page with list of all prescriptions for the doctor's patients.
+  - Added "Create Prescription" button and modal form with visit selection, medication items (add/remove multiple items), and optional notes.
+  - Added modal for viewing prescription details with full medication list.
+  - Added "Download PDF" action for prescriptions with existing PDFs and "Generate PDF" action for prescriptions without PDFs.
+  - Implemented `/doctor/patients/[id]` page displaying patient details, visit history, and prescription list with PDF download/generate actions.
+  - Added endpoint wrappers to `web/src/lib/api/doctorApi.ts` for prescription CRUD and PDF operations: `createPrescription()`, `getPrescriptionById()`, `generatePrescriptionPdf()`, and `getPrescriptionPdfUrl()`.
+  - Updated `Prescription` interface in `doctorApi.ts` to include `patient_first_name`, `patient_last_name`, `visit_date`, and `has_pdf` fields.
+
+**Improvements:**
+- Doctors can now create digital prescriptions linked to specific visits.
+- PDFs are generated on demand with professional formatting including doctor header, patient details, diagnosis, and medication instructions.
+- Secure PDF storage using Supabase private buckets with short-lived signed URLs (60 seconds) to prevent unauthorized access.
+- Centralized prescription management for doctors with filtering and quick access to patient history.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature only; existing prescription endpoints remain backward compatible).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md`, `VERSION_HISTORY.md`, and `backend/.env.example` (new `SUPABASE_PRESCRIPTION_BUCKET` config).
+
+---
+
 ### 01.25 (October 25, 2026)
 
 **Purpose:** Enable secretaries to record payments for walk-in patients immediately after consultation completion, improving cash flow tracking and reducing manual paperwork.
