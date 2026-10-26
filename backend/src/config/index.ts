@@ -95,6 +95,7 @@ export const config = {
     storageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'doctor-photos',
     gcashStorageBucket: process.env.SUPABASE_GCASH_BUCKET || 'gcash-qr-codes',
     receiptStorageBucket: process.env.SUPABASE_RECEIPT_BUCKET || 'payment-receipts',
+    prescriptionStorageBucket: process.env.SUPABASE_PRESCRIPTION_BUCKET || 'prescription-pdfs',
   },
 
   // Push notifications (FCM / APNs credentials remain backend-only)
