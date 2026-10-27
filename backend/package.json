@@ -31,7 +31,11 @@
     "migrate:session-version": "tsx src/database/applySessionVersion.ts",
     "migrate:ai-daily-limits": "tsx src/database/applyAiDailyLimits.ts",
     "migrate:ai-conversation-title": "tsx src/database/applyAiConversationTitle.ts",
+<<<<<<< HEAD
     "migrate:backfill-visits": "tsx src/database/applyBackfillVisits.ts",
+=======
+    "migrate:medicine-charge-fields": "tsx src/database/applyMedicineChargeFields.ts",
+>>>>>>> feat/medicine-charge-lines
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",

@@ -292,8 +292,16 @@ export const secretaryApi = {
   },
 
   // Payments: add charge to payment (by payment ID)
-  addCharge: async (paymentId: string, description: string, amount: number): Promise<{ success: boolean; data?: PaymentCharge; error?: string }> => {
-    return apiClient.post<PaymentCharge>(`/payments/${paymentId}/charges`, { description, amount });
+  addCharge: async (paymentId: string, payload: {
+    chargeType?: 'ADDITIONAL' | 'MEDICINE';
+    description?: string;
+    amount?: number;
+    name?: string;
+    quantity?: number;
+    unitPrice?: number;
+    prescriptionItemId?: string;
+  }): Promise<{ success: boolean; data?: PaymentCharge; error?: string }> => {
+    return apiClient.post<PaymentCharge>(`/payments/${paymentId}/charges`, payload);
   },
 
   // Payments: delete charge from payment (by payment ID and charge ID)
@@ -321,6 +329,13 @@ export const secretaryApi = {
     return apiClient.post<{ paymentId: string }>('/payments/walk-in', payload);
   },
 
+  // Prescriptions: get patient's prescriptions (with items for medicine charge linking)
+  // Note: Backend endpoint GET /api/v1/prescriptions/patients/:patientId currently only allows PATIENT and DOCTOR roles
+  // and returns prescriptions without items. This method is added for future backend support.
+  getPatientPrescriptions: async (patientId: string): Promise<{ success: boolean; data?: any[]; error?: string }> => {
+    return apiClient.get<any[]>(`/prescriptions/patients/${patientId}`);
+  },
+
   // Get secretary dashboard summary
   getDashboard: async (date?: string, options?: GetOptions): Promise<{ success: boolean; data?: SecretaryDashboard; error?: string }> => {
     const queryParams = date ? `?date=${encodeURIComponent(date)}` : '';
@@ -332,8 +347,12 @@ export const secretaryApi = {
 export interface PaymentCharge {
   id: string;
   payment_id: string;
+  charge_type?: 'ADDITIONAL' | 'MEDICINE';
   description: string;
   amount: number;
+  quantity?: number | null;
+  unit_price?: number | null;
+  prescription_item_id?: string | null;
   created_at: string;
   created_by?: string | null;
   created_by_first_name?: string | null;
@@ -480,6 +499,47 @@ export interface Notification {
   created_at: string;
   related_entity_type?: string | null;
   related_entity_id?: string | null;
+}
+
+// Secretary dashboard interface
+export interface SecretaryDashboard {
+  date: string;
+  queueCounts: {
+    waiting: number;
+    inConsultation: number;
+    done: number;
+  };
+  capacity: {
+    remaining: number;
+    total: number;
+  };
+  pendingVerificationPayments: number;
+  unreadMessages: number;
+  todayQueue: Array<{
+    queueNumber: number;
+    patientName: string;
+    reason: string | null;
+    status: string;
+    appointmentId: string | null;
+    registrationSource: string;
+  }>;
+  paymentsNeedingAction: Array<{
+    id: string;
+    appointmentId: string;
+    status: string;
+    paymentMethod: string;
+    totalAmount: number;
+    patientName: string;
+    appointmentDate: string;
+    appointmentStatus: string;
+  }>;
+  recentConversations: Array<{
+    id: string | null;
+    patientId: string;
+    patientName: string;
+    unreadCount: number;
+    updatedAt: string | null;
+  }>;
 }
 
 // Notifications API
