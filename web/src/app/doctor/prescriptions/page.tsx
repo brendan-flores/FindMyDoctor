@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { doctorApi, Prescription, PrescriptionItem, Visit } from '@/lib/api/doctorApi';
+import { doctorApi, Prescription, PrescriptionItem, Visit, Patient } from '@/lib/api/doctorApi';
 
 export default function DoctorPrescriptions() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +17,7 @@ export default function DoctorPrescriptions() {
   const [doctorId, setDoctorId] = useState<string | null>(null);
 
   const [createFormData, setCreateFormData] = useState({
+    patientId: '',
     visitId: '',
     notes: '',
     items: [{ medicationName: '', dosage: '', frequency: '', duration: '', instructions: '' }],
@@ -31,7 +33,7 @@ export default function DoctorPrescriptions() {
       if (response.success && response.data) {
         setDoctorId(response.data.id);
         fetchPrescriptions();
-        fetchVisits();
+        fetchPatients();
       } else {
         setError(response.error || 'Failed to fetch doctor profile');
         setIsLoading(false);
@@ -70,7 +72,7 @@ export default function DoctorPrescriptions() {
     }
   };
 
-  const fetchVisits = async () => {
+  const fetchPatients = async () => {
     try {
       const response = await doctorApi.getProfile();
       if (response.success && response.data) {
@@ -78,15 +80,19 @@ export default function DoctorPrescriptions() {
         const patientsResponse = await doctorApi.getPatients(doctorId);
 
         if (patientsResponse.success && patientsResponse.data) {
-          const allVisits: Visit[] = [];
-          for (const patient of patientsResponse.data) {
-            const visitsResponse = await doctorApi.getPatientVisits(patient.id);
-            if (visitsResponse.success && visitsResponse.data) {
-              allVisits.push(...visitsResponse.data);
-            }
-          }
-          setVisits(allVisits);
+          setPatients(patientsResponse.data);
         }
+      }
+    } catch (err) {
+      console.error('Error fetching patients:', err);
+    }
+  };
+
+  const fetchPatientVisits = async (patientId: string) => {
+    try {
+      const visitsResponse = await doctorApi.getPatientVisits(patientId);
+      if (visitsResponse.success && visitsResponse.data) {
+        setVisits(visitsResponse.data);
       }
     } catch (err) {
       console.error('Error fetching visits:', err);
@@ -120,7 +126,24 @@ export default function DoctorPrescriptions() {
     setCreateFormData({ ...createFormData, items: newItems });
   };
 
+  const handlePatientChange = (patientId: string) => {
+    setCreateFormData({
+      ...createFormData,
+      patientId,
+      visitId: '',
+    });
+    if (patientId) {
+      fetchPatientVisits(patientId);
+    } else {
+      setVisits([]);
+    }
+  };
+
   const handleCreatePrescription = async () => {
+    if (!createFormData.patientId) {
+      setCreateError('Please select a patient');
+      return;
+    }
     if (!createFormData.visitId) {
       setCreateError('Please select a visit');
       return;
@@ -145,10 +168,12 @@ export default function DoctorPrescriptions() {
       if (response.success) {
         setShowCreateModal(false);
         setCreateFormData({
+          patientId: '',
           visitId: '',
           notes: '',
           items: [{ medicationName: '', dosage: '', frequency: '', duration: '', instructions: '' }],
         });
+        setVisits([]);
         fetchPrescriptions();
       } else {
         setCreateError(response.error || 'Failed to create prescription');
@@ -189,6 +214,14 @@ export default function DoctorPrescriptions() {
     } catch (err) {
       alert('Network error occurred');
     }
+  };
+
+  const getPatientName = (patientId: string) => {
+    const patient = patients.find(p => p.id === patientId);
+    if (patient) {
+      return `${patient.first_name} ${patient.last_name}`;
+    }
+    return 'Unknown Patient';
   };
 
   return (
@@ -315,10 +348,12 @@ export default function DoctorPrescriptions() {
                     setShowCreateModal(false);
                     setCreateError(null);
                     setCreateFormData({
+                      patientId: '',
                       visitId: '',
                       notes: '',
                       items: [{ medicationName: '', dosage: '', frequency: '', duration: '', instructions: '' }],
                     });
+                    setVisits([]);
                   }}
                   className="text-slate-400 hover:text-slate-600"
                 >
@@ -335,11 +370,28 @@ export default function DoctorPrescriptions() {
 
             <div className="p-6 space-y-4">
               <div>
+                <label className="block text-sm text-slate-500 mb-1">Patient *</label>
+                <select
+                  value={createFormData.patientId}
+                  onChange={(e) => handlePatientChange(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select a patient</option>
+                  {patients.map((patient) => (
+                    <option key={patient.id} value={patient.id}>
+                      {patient.first_name} {patient.last_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-sm text-slate-500 mb-1">Visit *</label>
                 <select
                   value={createFormData.visitId}
                   onChange={(e) => setCreateFormData({ ...createFormData, visitId: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!createFormData.patientId}
                 >
                   <option value="">Select a visit</option>
                   {visits.map((visit) => (
@@ -348,6 +400,9 @@ export default function DoctorPrescriptions() {
                     </option>
                   ))}
                 </select>
+                {!createFormData.patientId && (
+                  <p className="text-xs text-slate-400 mt-1">Please select a patient first</p>
+                )}
               </div>
 
               <div>
@@ -445,10 +500,12 @@ export default function DoctorPrescriptions() {
                   setShowCreateModal(false);
                   setCreateError(null);
                   setCreateFormData({
+                    patientId: '',
                     visitId: '',
                     notes: '',
                     items: [{ medicationName: '', dosage: '', frequency: '', duration: '', instructions: '' }],
                   });
+                  setVisits([]);
                 }}
                 className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
                 disabled={isCreating}
