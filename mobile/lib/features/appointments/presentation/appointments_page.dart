@@ -103,22 +103,26 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
         children: [
           const AppHeader(showNotifications: true, showProfile: true),
           Expanded(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: spacing.AppSpacing.gutterLg),
-                    _buildHeader(),
-                    const SizedBox(height: spacing.AppSpacing.gutterMd),
-                    _buildSearchBar(),
-                    const SizedBox(height: spacing.AppSpacing.gutterLg),
-                    _buildFilterTabs(),
-                    const SizedBox(height: spacing.AppSpacing.gutterLg),
-                    _buildAppointmentsList(),
-                    const SizedBox(height: spacing.AppSpacing.gutter3xl),
-                  ],
+            child: RefreshIndicator(
+              onRefresh: _fetchAppointments,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Padding(
+                  padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: spacing.AppSpacing.gutterLg),
+                      _buildHeader(),
+                      const SizedBox(height: spacing.AppSpacing.gutterMd),
+                      _buildSearchBar(),
+                      const SizedBox(height: spacing.AppSpacing.gutterLg),
+                      _buildFilterTabs(),
+                      const SizedBox(height: spacing.AppSpacing.gutterLg),
+                      _buildAppointmentsList(),
+                      const SizedBox(height: spacing.AppSpacing.gutter3xl),
+                    ],
+                  ),
                 ),
               ),
             ),

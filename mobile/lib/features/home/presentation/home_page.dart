@@ -312,24 +312,28 @@ class _HomePageState extends State<HomePage> {
           },
         ),
         Expanded(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  _buildSearchBar(),
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  _buildSpecialties(),
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  _buildQuickActions(),
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  _buildRecommendedDoctors(),
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  _buildNearbyClinics(),
-                  const SizedBox(height: spacing.AppSpacing.gutter3xl),
-                ],
+          child: RefreshIndicator(
+            onRefresh: _loadData,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Padding(
+                padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildSearchBar(),
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildSpecialties(),
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildQuickActions(),
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildRecommendedDoctors(),
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildNearbyClinics(),
+                    const SizedBox(height: spacing.AppSpacing.gutter3xl),
+                  ],
+                ),
               ),
             ),
           ),
