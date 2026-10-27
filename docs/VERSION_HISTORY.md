@@ -4,6 +4,47 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.27 (October 27, 2026)
+
+**Purpose:** Add secretary settings for clinic information that appears in invoice headers and footers, scoped to the assigned doctor, enabling each doctor or clinic to have separate invoice details for future invoice PDF generation.
+
+**Significant Features:**
+- Invoice settings database schema:
+  - Created `invoice_settings` table with `doctor_id` as primary key and foreign key to doctors table.
+  - Columns: `clinic_name`, `address`, `contact_number`, `footer_line`, `created_at`, `updated_at`.
+  - Settings are scoped by doctor, allowing each doctor/clinic to have separate invoice details.
+  - Migration file: `backend/database/036_add_invoice_settings.sql`.
+  - Migration applied via `npm run migrate:invoice-settings`.
+- Secretary-only invoice details API endpoints:
+  - `GET /api/v1/secretaries/me/invoice-details`: Fetches invoice settings for the secretary's assigned doctor (scoped via `secretaries.doctor_id`). Returns null if no settings exist.
+  - `PUT /api/v1/secretaries/me/invoice-details`: Updates or inserts invoice settings for the secretary's assigned doctor. Validates all fields (clinic name 1-200 chars, address 1-500 chars, contact number 1-50 chars, footer line max 200 chars).
+  - Endpoints follow the ownership pattern of `/api/v1/secretaries/me`, ensuring secretaries can only manage invoice settings for their assigned doctor.
+- Frontend invoice details form:
+  - Replaced "Coming soon" placeholder on `/secretary/settings` with an editable form for clinic invoice details.
+  - Form fields: Clinic Name, Address (textarea), Contact Number, Footer Line.
+  - Form loads existing settings on mount and saves changes via the new API endpoints.
+  - Added loading states, error handling, and success feedback.
+  - Integrated with existing settings page design and error handling patterns.
+- Web API client updates:
+  - Added `InvoiceSettings` interface to `web/src/lib/api/secretaryApi.ts`.
+  - Added `getInvoiceDetails()` method for fetching invoice settings.
+  - Added `updateInvoiceDetails()` method for updating invoice settings.
+
+**Improvements:**
+- Secretaries can now configure clinic-specific invoice information that will be used in future invoice PDF generation (Task 6).
+- Settings are properly scoped to the assigned doctor, ensuring data isolation between different doctors/clinics.
+- Form validation ensures data quality and prevents invalid entries.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature only; existing secretary settings functionality unchanged).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md`, `VERSION_HISTORY.md`, and `backend/package.json` (added migrate:invoice-settings script).
+
+---
+
 ### 01.26 (October 27, 2026)
 
 **Purpose:** Implement comprehensive prescription management for doctors, including the ability to create digital prescriptions and generate formal prescription PDF documents. PDFs are generated on demand, stored privately in Supabase, and accessible through short-lived signed URLs to ensure files are not publicly accessible.

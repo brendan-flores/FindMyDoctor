@@ -966,7 +966,7 @@ The patient shall be required to change the temporary password before using norm
 
 The system shall display the static GCash QR code.
 
-Secretaries manage the QR code for their assigned doctor from the secretary dashboard (`/secretary/settings/gcash-qr`), and the secretary settings page shows the current QR image, an Active/Not uploaded status badge, and the last-updated date (Asia/Manila). No clinic payment setting besides the QR code itself is active; invoice details and GCash account details exist only as display-only "Coming soon" placeholders.
+Secretaries manage the QR code for their assigned doctor from the secretary dashboard (`/secretary/settings/gcash-qr`), and the secretary settings page shows the current QR image, an Active/Not uploaded status badge, and the last-updated date (Asia/Manila). Secretaries can configure clinic-specific invoice information (clinic name, address, contact number, footer line) through the Invoice details form on the settings page; these settings are stored in the `invoice_settings` table scoped by doctor and will be used in future invoice PDF generation. GCash account details exist only as a display-only "Coming soon" placeholder.
 
 ## FR-022 — Receipt Upload
 
