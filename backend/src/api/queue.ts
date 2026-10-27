@@ -249,14 +249,14 @@ router.post('/:id/complete', authenticate, requireSecretaryPasswordChange, requi
       queueQueryText = `UPDATE queue_entries
                    SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
                    WHERE id = $1 AND doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2)
-                   RETURNING appointment_id`;
+                   RETURNING appointment_id, patient_id, doctor_id`;
       queueParams.push(id, userId);
     } else {
       // DOCTOR
       queueQueryText = `UPDATE queue_entries
                    SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
                    WHERE id = $1 AND doctor_id = (SELECT id FROM doctors WHERE user_id = $2)
-                   RETURNING appointment_id`;
+                   RETURNING appointment_id, patient_id, doctor_id`;
       queueParams.push(id, userId);
     }
 
@@ -267,12 +267,22 @@ router.post('/:id/complete', authenticate, requireSecretaryPasswordChange, requi
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Queue entry not found or access denied'));
     }
 
-    const appointmentId = queueResult.rows[0].appointment_id;
+    const { appointment_id, patient_id, doctor_id } = queueResult.rows[0];
 
     // Update the associated appointment status to COMPLETED
-    const appointmentResult = await client.query(
+    await client.query(
       'UPDATE appointments SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      ['COMPLETED', appointmentId]
+      ['COMPLETED', appointment_id]
+    );
+
+    // Create a visit record for the completed checkup if it doesn't already exist
+    // Note: reason_for_visit, diagnosis, notes, and vitals are initially null
+    // and can be filled in later by the doctor via the visits API
+    await client.query(
+      `INSERT INTO visits (appointment_id, patient_id, doctor_id, visit_date)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+       ON CONFLICT (appointment_id) DO NOTHING`,
+      [appointment_id, patient_id, doctor_id]
     );
 
     await client.query('COMMIT');
