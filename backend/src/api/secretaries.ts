@@ -965,4 +965,134 @@ router.get('/me/dashboard', authenticate, authorize('SECRETARY'), async (req: Au
   }
 });
 
+// ============================================
+// SECRETARY INVOICE SETTINGS ENDPOINTS
+// ============================================
+
+// Get invoice details for assigned doctor
+router.get('/me/invoice-details', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [userId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+
+    // Fetch invoice settings for the assigned doctor
+    const result = await query(
+      'SELECT * FROM invoice_settings WHERE doctor_id = $1',
+      [doctorId]
+    );
+
+    if (result.rows.length === 0) {
+      // Return null if no settings exist yet
+      return res.json(success(null));
+    }
+
+    res.json(success(result.rows[0]));
+  } catch (err: any) {
+    console.error('Invoice details fetch error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch invoice details'));
+  }
+});
+
+// Update invoice details for assigned doctor
+router.put('/me/invoice-details', authenticate, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { clinicName, address, contactNumber, footerLine } = req.body;
+
+    // Validation
+    if (!clinicName || typeof clinicName !== 'string') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Clinic name is required'));
+    }
+
+    if (!address || typeof address !== 'string') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Address is required'));
+    }
+
+    if (!contactNumber || typeof contactNumber !== 'string') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Contact number is required'));
+    }
+
+    if (!footerLine || typeof footerLine !== 'string') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Footer line is required'));
+    }
+
+    // Trim whitespace
+    const trimmedClinicName = clinicName.trim();
+    const trimmedAddress = address.trim();
+    const trimmedContactNumber = contactNumber.trim();
+    const trimmedFooterLine = footerLine.trim();
+
+    // Length validation
+    if (trimmedClinicName.length === 0 || trimmedClinicName.length > 200) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Clinic name must be 1-200 characters'));
+    }
+
+    if (trimmedAddress.length === 0 || trimmedAddress.length > 500) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Address must be 1-500 characters'));
+    }
+
+    if (trimmedContactNumber.length === 0 || trimmedContactNumber.length > 50) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Contact number must be 1-50 characters'));
+    }
+
+    if (trimmedFooterLine.length > 200) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Footer line must be maximum 200 characters'));
+    }
+
+    // Get doctor_id from authenticated secretary
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [userId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const doctorId = secretaryResult.rows[0].doctor_id;
+
+    // Check if invoice settings exist for the doctor
+    const existingResult = await query(
+      'SELECT * FROM invoice_settings WHERE doctor_id = $1',
+      [doctorId]
+    );
+
+    let result;
+    if (existingResult.rows.length === 0) {
+      // Insert new invoice settings
+      result = await query(
+        `INSERT INTO invoice_settings (doctor_id, clinic_name, address, contact_number, footer_line)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [doctorId, trimmedClinicName, trimmedAddress, trimmedContactNumber, trimmedFooterLine]
+      );
+    } else {
+      // Update existing invoice settings
+      result = await query(
+        `UPDATE invoice_settings
+         SET clinic_name = $1, address = $2, contact_number = $3, footer_line = $4, updated_at = CURRENT_TIMESTAMP
+         WHERE doctor_id = $5
+         RETURNING *`,
+        [trimmedClinicName, trimmedAddress, trimmedContactNumber, trimmedFooterLine, doctorId]
+      );
+    }
+
+    res.json(success(result.rows[0], 'Invoice details updated successfully'));
+  } catch (err: any) {
+    console.error('Invoice details update error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update invoice details'));
+  }
+});
+
 export default router;
