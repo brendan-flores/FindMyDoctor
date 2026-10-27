@@ -31,6 +31,7 @@
     "migrate:session-version": "tsx src/database/applySessionVersion.ts",
     "migrate:ai-daily-limits": "tsx src/database/applyAiDailyLimits.ts",
     "migrate:ai-conversation-title": "tsx src/database/applyAiConversationTitle.ts",
+    "migrate:backfill-visits": "tsx src/database/applyBackfillVisits.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",
