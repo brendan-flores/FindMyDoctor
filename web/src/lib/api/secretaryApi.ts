@@ -341,6 +341,21 @@ export const secretaryApi = {
     const queryParams = date ? `?date=${encodeURIComponent(date)}` : '';
     return apiClient.get<SecretaryDashboard>(`/secretaries/me/dashboard${queryParams}`, options);
   },
+
+  // Invoice settings: get invoice details for assigned doctor
+  getInvoiceDetails: async (): Promise<{ success: boolean; data?: InvoiceSettings | null; error?: string }> => {
+    return apiClient.get<InvoiceSettings | null>('/secretaries/me/invoice-details');
+  },
+
+  // Invoice settings: update invoice details for assigned doctor
+  updateInvoiceDetails: async (payload: {
+    clinicName: string;
+    address: string;
+    contactNumber: string;
+    footerLine: string;
+  }): Promise<{ success: boolean; data?: InvoiceSettings; error?: string }> => {
+    return apiClient.put<InvoiceSettings>('/secretaries/me/invoice-details', payload);
+  },
 };
 
 // Payment charge (from payment_charges table)
@@ -499,6 +514,17 @@ export interface Notification {
   created_at: string;
   related_entity_type?: string | null;
   related_entity_id?: string | null;
+}
+
+// Invoice settings interface (from invoice_settings table)
+export interface InvoiceSettings {
+  doctor_id: string;
+  clinic_name: string;
+  address: string;
+  contact_number: string;
+  footer_line: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Secretary dashboard interface
