@@ -212,6 +212,20 @@ export const doctorApi = {
     return apiClient.get<Visit[]>(`/visits/patient/${patientId}`);
   },
 
+  // Create or update visit record
+  recordVisit: async (payload: {
+    appointmentId: string;
+    reasonForVisit?: string;
+    diagnosis?: string;
+    notes?: string;
+    bloodPressure?: string;
+    weight?: number;
+    height?: number;
+    temperature?: number;
+  }): Promise<{ success: boolean; data?: Visit; error?: string }> => {
+    return apiClient.post<Visit>('/visits', payload);
+  },
+
   // Associate patient with doctor (create association and submit initial details)
   associatePatient: async (payload: AssociatePatientRequest): Promise<{ success: boolean; data?: Patient; error?: string }> => {
     return apiClient.post<Patient>('/patients/associate', payload);
