@@ -9,7 +9,10 @@ class LocalConfig {
   // Use the IPv4 address from your active network adapter (Wi-Fi or Ethernet)
   // Example: 'http://192.168.1.100:3000/api/v1'
   static const String deviceBaseUrl = 'http://YOUR_IP_HERE:3000/api/v1';
-  
-  // Set to true when running on Android emulator, false for real device
+
+  // Android platform configuration:
+  // - Set to true when running on Android Emulator (uses 10.0.2.2 to access host)
+  // - Set to false when running on a real Android device (uses deviceBaseUrl above)
+  // Note: Web, Desktop (Windows/Linux/macOS), and iOS Simulator automatically use localhost
   static const bool useEmulator = false;
 }

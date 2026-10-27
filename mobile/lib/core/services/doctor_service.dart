@@ -10,18 +10,25 @@ class DoctorService {
     String? search,
   }) async {
     try {
+      print('🔍 DoctorService: Fetching doctors with params: specialty=$specialty, clinicId=$clinicId, search=$search');
       final response = await _apiService.getDoctors(
         specialty: specialty,
         clinicId: clinicId,
         search: search,
       );
-      
+
+      print('🔍 DoctorService: API response success=${response['success']}');
+
       if (response['success'] == true) {
         final List<dynamic> data = response['data'];
+        print('🔍 DoctorService: Parsed ${data.length} doctors from response');
         return data.map((json) => Doctor.fromJson(json)).toList();
+      } else {
+        print('🔴 DoctorService: API returned success=false. Error: ${response['error']}');
+        return [];
       }
-      return [];
     } catch (e) {
+      print('🔴 DoctorService: Exception thrown: $e');
       rethrow;
     }
   }

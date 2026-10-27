@@ -132,7 +132,9 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadData() async {
     try {
+      print('📱 HomePage: Starting to load doctors data...');
       final allDoctors = await _doctorService.getDoctors();
+      print('📱 HomePage: Loaded ${allDoctors.length} doctors');
 
       // Extract unique specialties
       final uniqueSpecialties =
@@ -156,6 +158,8 @@ class _HomePageState extends State<HomePage> {
       // Take first 2 doctors as recommended
       final recommended = allDoctors.take(2).toList();
 
+      print('📱 HomePage: Extracted ${uniqueSpecialties.length} specialties, ${uniqueHospitals.length} hospitals');
+
       if (!mounted) return;
       setState(() {
         _specialties = uniqueSpecialties;
@@ -165,6 +169,7 @@ class _HomePageState extends State<HomePage> {
         _isLoadingDoctors = false;
       });
     } catch (e) {
+      print('🔴 HomePage: Error loading data: $e');
       if (!mounted) return;
       setState(() {
         _isLoadingSpecialties = false;
@@ -307,24 +312,28 @@ class _HomePageState extends State<HomePage> {
           },
         ),
         Expanded(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  _buildSearchBar(),
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  _buildSpecialties(),
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  _buildQuickActions(),
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  _buildRecommendedDoctors(),
-                  const SizedBox(height: spacing.AppSpacing.gutterLg),
-                  _buildNearbyClinics(),
-                  const SizedBox(height: spacing.AppSpacing.gutter3xl),
-                ],
+          child: RefreshIndicator(
+            onRefresh: _loadData,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Padding(
+                padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildSearchBar(),
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildSpecialties(),
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildQuickActions(),
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildRecommendedDoctors(),
+                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    _buildNearbyClinics(),
+                    const SizedBox(height: spacing.AppSpacing.gutter3xl),
+                  ],
+                ),
               ),
             ),
           ),

@@ -24,6 +24,10 @@ jest.mock('../services/storageService', () => ({
   generateSignedReceiptUrl: jest.fn(),
 }));
 
+jest.mock('./notifications', () => ({
+  createNotification: jest.fn(),
+}));
+
 let mockUser: any = { id: 'test-secretary-id', role: 'SECRETARY', mustChangePassword: false };
 
 jest.mock('../middleware/auth', () => ({
@@ -55,6 +59,7 @@ jest.mock('../middleware/auth', () => ({
 const { query, getClient } = require('../database/connection');
 const { sendPushToUser } = require('../services/pushService');
 const { uploadPaymentReceipt, validatePaymentReceiptFile, generateSignedReceiptUrl } = require('../services/storageService');
+const { createNotification } = require('./notifications');
 
 describe('Secretary Payment Verification UI', () => {
   let app: express.Application;
@@ -73,7 +78,7 @@ describe('Secretary Payment Verification UI', () => {
         if (sql.includes('SELECT doctor_id FROM secretaries')) {
           return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
         }
-        if (sql.includes('FROM payments p') && sql.includes('WHERE a.doctor_id =')) {
+        if (sql.includes('FROM payments p') && sql.includes('WHERE a.doctor_id = $1')) {
           expect(params[0]).toBe('assigned-doctor-id');
           return Promise.resolve({
             rows: [{
@@ -264,9 +269,7 @@ describe('Secretary Payment Verification UI', () => {
 
     it('should return 404 if secretary profile not found', async () => {
       query.mockImplementation((sql: string, params: any[]) => {
-        if (sql.includes('SELECT doctor_id FROM secretaries')) {
-          return Promise.resolve({ rows: [] });
-        }
+        // Always return empty rows for secretary lookup
         return Promise.resolve({ rows: [] });
       });
 
@@ -328,7 +331,7 @@ describe('Secretary Payment Verification UI', () => {
         if (sql.includes('SELECT doctor_id FROM secretaries')) {
           return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
         }
-        if (sql.includes('WHERE p.appointment_id = $1') && sql.includes('AND a.doctor_id =')) {
+        if (sql.includes('WHERE p.appointment_id = $1') && sql.includes('AND a.doctor_id = $2')) {
           return Promise.resolve({
             rows: [{
               id: 'payment-1',
@@ -359,7 +362,7 @@ describe('Secretary Payment Verification UI', () => {
         if (sql.includes('SELECT doctor_id FROM secretaries')) {
           return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
         }
-        if (sql.includes('WHERE p.appointment_id = $1') && sql.includes('AND a.doctor_id =')) {
+        if (sql.includes('WHERE p.appointment_id = $1') && sql.includes('AND a.doctor_id = $2')) {
           // Payment belongs to different doctor
           return Promise.resolve({ rows: [] });
         }
@@ -592,7 +595,7 @@ describe('Secretary Payment Verification UI', () => {
           });
         }
         if (sql.includes('UPDATE payments') && sql.includes('SET status = \'PAID\'')) {
-          expect(params[0]).toBe('test-secretary-id');
+          expect(params[0]).toBe('secretary-1');
           expect(sql).toContain('verified_by');
           expect(sql).toContain('verified_at');
           return Promise.resolve();
@@ -1025,16 +1028,29 @@ describe('Secretary Payment Verification UI', () => {
 
   describe('POST /api/v1/payments/:id/charges', () => {
     it('should add charge for payment belonging to assigned doctor', async () => {
-      query.mockImplementation((sql: string, params: any[]) => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
         if (sql.includes('SELECT doctor_id FROM secretaries')) {
           return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
         }
-        if (sql.includes('FROM payments p') && sql.includes('JOIN appointments a')) {
+        if (sql.includes('FROM payments p') && sql.includes('JOIN appointments a') && sql.includes('FOR UPDATE')) {
           return Promise.resolve({
             rows: [{
               id: 'payment-1',
               doctor_id: 'assigned-doctor-id',
-              consultation_amount: 500.00
+              consultation_amount: 500.00,
+              status: 'UNPAID',
+              patient_user_id: 'patient-user-id',
+              patient_id: 'patient-1',
+              appointment_id: 'appointment-1'
             }]
           });
         }
@@ -1047,6 +1063,12 @@ describe('Secretary Payment Verification UI', () => {
         if (sql.includes('UPDATE payments')) {
           return Promise.resolve();
         }
+        if (sql.includes('INSERT INTO notifications')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
         return Promise.resolve({ rows: [] });
       });
 
@@ -1056,20 +1078,606 @@ describe('Secretary Payment Verification UI', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
+      expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
     });
 
-    it('should deny adding charge to another doctor\'s payment', async () => {
-      query.mockImplementation((sql: string, params: any[]) => {
+    it('should add medicine charge with server-side amount calculation', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
         if (sql.includes('SELECT doctor_id FROM secretaries')) {
           return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
         }
-        if (sql.includes('FROM payments p') && sql.includes('JOIN appointments a')) {
+        if (sql.includes('FROM payments p') && sql.includes('JOIN appointments a') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'payment-1',
+              doctor_id: 'assigned-doctor-id',
+              consultation_amount: 500.00,
+              status: 'UNPAID',
+              patient_user_id: 'patient-user-id',
+              patient_id: 'patient-1',
+              appointment_id: 'appointment-1'
+            }]
+          });
+        }
+        if (sql.includes('INSERT INTO payment_charges') && sql.includes('MEDICINE')) {
+          // Verify amount is calculated as quantity * unitPrice
+          expect(sql).toContain('MEDICINE');
+          expect(params[3]).toBe(350.00); // 7 * 50.00
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT COALESCE(SUM(amount)')) {
+          return Promise.resolve({ rows: [{ total_charges: '350.00' }] });
+        }
+        if (sql.includes('UPDATE payments')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('INSERT INTO notifications')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({
+          chargeType: 'MEDICINE',
+          name: 'Paracetamol',
+          quantity: 7,
+          unitPrice: 50.00
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should reject medicine charge with invalid quantity', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({
+          chargeType: 'MEDICINE',
+          name: 'Paracetamol',
+          quantity: -5,
+          unitPrice: 50.00
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toContain('Quantity must be a valid positive number');
+      expect(mockClient.release).toHaveBeenCalled();
+    });
+
+    it('should reject medicine charge with invalid unit price', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({
+          chargeType: 'MEDICINE',
+          name: 'Paracetamol',
+          quantity: 7,
+          unitPrice: -50.00
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toContain('Unit price must be a valid positive number');
+      expect(mockClient.release).toHaveBeenCalled();
+    });
+
+    it('should reject medicine charge with non-finite quantity', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({
+          chargeType: 'MEDICINE',
+          name: 'Paracetamol',
+          quantity: Infinity,
+          unitPrice: 50.00
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toContain('Quantity must be a valid positive number');
+      expect(mockClient.release).toHaveBeenCalled();
+    });
+
+    it('should accept medicine charge without prescription item ID', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('JOIN appointments a') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'payment-1',
+              doctor_id: 'assigned-doctor-id',
+              consultation_amount: 500.00,
+              status: 'UNPAID',
+              patient_user_id: 'patient-user-id',
+              patient_id: 'patient-1',
+              appointment_id: 'appointment-1'
+            }]
+          });
+        }
+        if (sql.includes('INSERT INTO payment_charges') && sql.includes('MEDICINE')) {
+          // Verify prescription_item_id is null when not provided
+          expect(params[7]).toBeNull();
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT COALESCE(SUM(amount)')) {
+          return Promise.resolve({ rows: [{ total_charges: '350.00' }] });
+        }
+        if (sql.includes('UPDATE payments')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('INSERT INTO notifications')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({
+          chargeType: 'MEDICINE',
+          name: 'Paracetamol',
+          quantity: 7,
+          unitPrice: 50.00
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should validate prescription item belongs to correct patient', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('JOIN appointments a') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'payment-1',
+              doctor_id: 'assigned-doctor-id',
+              consultation_amount: 500.00,
+              status: 'UNPAID',
+              patient_user_id: 'patient-user-id',
+              patient_id: 'patient-1',
+              appointment_id: 'appointment-1'
+            }]
+          });
+        }
+        if (sql.includes('FROM prescription_items pi')) {
+          // Prescription item belongs to different patient
+          return Promise.resolve({
+            rows: [{
+              id: 'rx-item-1',
+              patient_id: 'different-patient',
+              doctor_id: 'assigned-doctor-id',
+              appointment_id: 'appointment-1'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({
+          chargeType: 'MEDICINE',
+          name: 'Paracetamol',
+          quantity: 7,
+          unitPrice: 50.00,
+          prescriptionItemId: 'rx-item-1'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toContain('Prescription item does not belong to the payment patient');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+    });
+
+    it('should validate prescription item belongs to correct appointment', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('JOIN appointments a') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'payment-1',
+              doctor_id: 'assigned-doctor-id',
+              consultation_amount: 500.00,
+              status: 'UNPAID',
+              patient_user_id: 'patient-user-id',
+              patient_id: 'patient-1',
+              appointment_id: 'appointment-1'
+            }]
+          });
+        }
+        if (sql.includes('FROM prescription_items pi')) {
+          // Prescription item belongs to different appointment
+          return Promise.resolve({
+            rows: [{
+              id: 'rx-item-1',
+              patient_id: 'patient-1',
+              doctor_id: 'assigned-doctor-id',
+              appointment_id: 'different-appointment'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({
+          chargeType: 'MEDICINE',
+          name: 'Paracetamol',
+          quantity: 7,
+          unitPrice: 50.00,
+          prescriptionItemId: 'rx-item-1'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toContain('Prescription item does not belong to the payment appointment');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+    });
+
+    it('should validate prescription item belongs to correct doctor', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('JOIN appointments a') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'payment-1',
+              doctor_id: 'assigned-doctor-id',
+              consultation_amount: 500.00,
+              status: 'UNPAID',
+              patient_user_id: 'patient-user-id',
+              patient_id: 'patient-1',
+              appointment_id: 'appointment-1'
+            }]
+          });
+        }
+        if (sql.includes('FROM prescription_items pi')) {
+          // Prescription item belongs to different doctor
+          return Promise.resolve({
+            rows: [{
+              id: 'rx-item-1',
+              patient_id: 'patient-1',
+              doctor_id: 'different-doctor',
+              appointment_id: 'appointment-1'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({
+          chargeType: 'MEDICINE',
+          name: 'Paracetamol',
+          quantity: 7,
+          unitPrice: 50.00,
+          prescriptionItemId: 'rx-item-1'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toContain('Prescription item does not belong to the payment doctor');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+    });
+
+    it('should accept valid prescription item linkage', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('JOIN appointments a') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'payment-1',
+              doctor_id: 'assigned-doctor-id',
+              consultation_amount: 500.00,
+              status: 'UNPAID',
+              patient_user_id: 'patient-user-id',
+              patient_id: 'patient-1',
+              appointment_id: 'appointment-1'
+            }]
+          });
+        }
+        if (sql.includes('FROM prescription_items pi')) {
+          // Valid prescription item matching payment
+          return Promise.resolve({
+            rows: [{
+              id: 'rx-item-1',
+              patient_id: 'patient-1',
+              doctor_id: 'assigned-doctor-id',
+              appointment_id: 'appointment-1'
+            }]
+          });
+        }
+        if (sql.includes('INSERT INTO payment_charges') && sql.includes('MEDICINE')) {
+          expect(params[7]).toBe('rx-item-1');
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT COALESCE(SUM(amount)')) {
+          return Promise.resolve({ rows: [{ total_charges: '350.00' }] });
+        }
+        if (sql.includes('UPDATE payments')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('INSERT INTO notifications')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({
+          chargeType: 'MEDICINE',
+          name: 'Paracetamol',
+          quantity: 7,
+          unitPrice: 50.00,
+          prescriptionItemId: 'rx-item-1'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should maintain backward compatibility with legacy additional charge requests', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('JOIN appointments a') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'payment-1',
+              doctor_id: 'assigned-doctor-id',
+              consultation_amount: 500.00,
+              status: 'UNPAID',
+              patient_user_id: 'patient-user-id',
+              patient_id: 'patient-1',
+              appointment_id: 'appointment-1'
+            }]
+          });
+        }
+        if (sql.includes('INSERT INTO payment_charges') && sql.includes('ADDITIONAL')) {
+          // Verify legacy charge uses ADDITIONAL type
+          expect(sql).toContain('ADDITIONAL');
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT COALESCE(SUM(amount)')) {
+          return Promise.resolve({ rows: [{ total_charges: '100.00' }] });
+        }
+        if (sql.includes('UPDATE payments')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('INSERT INTO notifications')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({ description: 'Service Fee', amount: 100.00 });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should recalculate total from all charges including medicine charges', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      let chargesSumCalls = 0;
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('JOIN appointments a') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'payment-1',
+              doctor_id: 'assigned-doctor-id',
+              consultation_amount: 500.00,
+              status: 'UNPAID',
+              patient_user_id: 'patient-user-id',
+              patient_id: 'patient-1',
+              appointment_id: 'appointment-1'
+            }]
+          });
+        }
+        if (sql.includes('INSERT INTO payment_charges')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT COALESCE(SUM(amount)')) {
+          chargesSumCalls++;
+          // Simulate existing charges + new medicine charge
+          return Promise.resolve({ rows: [{ total_charges: '450.00' }] });
+        }
+        if (sql.includes('UPDATE payments')) {
+          // Verify total is consultation + charges
+          expect(params[1]).toBe(950.00); // 500 + 450
+          return Promise.resolve();
+        }
+        if (sql.includes('INSERT INTO notifications')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({
+          chargeType: 'MEDICINE',
+          name: 'Paracetamol',
+          quantity: 7,
+          unitPrice: 50.00
+        });
+
+      expect(response.status).toBe(200);
+      expect(chargesSumCalls).toBe(1);
+    });
+
+    it('should deny adding charge to another doctor\'s payment', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('JOIN appointments a') && sql.includes('FOR UPDATE')) {
           // Payment belongs to different doctor
           return Promise.resolve({
             rows: [{
               id: 'payment-1',
               doctor_id: 'other-doctor-id',
-              consultation_amount: 500.00
+              consultation_amount: 500.00,
+              status: 'UNPAID',
+              patient_user_id: 'patient-user-id',
+              patient_id: 'patient-1',
+              appointment_id: 'appointment-1'
             }]
           });
         }
@@ -1082,10 +1690,20 @@ describe('Secretary Payment Verification UI', () => {
 
       expect(response.status).toBe(403);
       expect(response.body.error.message).toContain('You can only add charges to payments for your assigned doctor');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
     });
 
     it('should return 404 if secretary profile not found', async () => {
-      query.mockImplementation((sql: string, params: any[]) => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
         if (sql.includes('SELECT doctor_id FROM secretaries')) {
           return Promise.resolve({ rows: [] });
         }
@@ -1098,6 +1716,7 @@ describe('Secretary Payment Verification UI', () => {
 
       expect(response.status).toBe(404);
       expect(response.body.error.message).toContain('Secretary profile not found');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
     });
   });
 

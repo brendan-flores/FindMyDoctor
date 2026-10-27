@@ -214,17 +214,20 @@ export async function requireSecretaryProfileCompletion(req: AuthRequest, res: R
       const secretary = result.rows[0];
 
       // Check if required fields are complete
-      const isComplete =
-        secretary.first_name &&
-        secretary.first_name.trim() !== '' &&
-        secretary.last_name &&
-        secretary.last_name.trim() !== '' &&
-        secretary.contact_number &&
-        secretary.contact_number.trim() !== '';
+      const missingFields = [];
+      if (!secretary.first_name || secretary.first_name.trim() === '') {
+        missingFields.push('first name');
+      }
+      if (!secretary.last_name || secretary.last_name.trim() === '') {
+        missingFields.push('last name');
+      }
+      if (!secretary.contact_number || secretary.contact_number.trim() === '') {
+        missingFields.push('contact number');
+      }
 
-      if (!isComplete) {
+      if (missingFields.length > 0) {
         return res.status(403).json(
-          error(ErrorCodes.FORBIDDEN, 'Profile completion required')
+          error(ErrorCodes.FORBIDDEN, `Profile completion required. Please complete your profile: ${missingFields.join(', ')}`)
         );
       }
     } catch (err) {

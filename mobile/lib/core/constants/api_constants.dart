@@ -1,4 +1,5 @@
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, PlatformException;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../config/local_config.dart';
 
 class ApiConstants {
@@ -10,20 +11,41 @@ class ApiConstants {
   static const String _emulatorBaseUrl = 'http://10.0.2.2:3000/api/v1';
 
   static String get baseUrl {
-    // Check if running on web first (Platform checks don't work on web)
+    // Auto-detect platform and use appropriate base URL
     try {
-      // This will throw on web, allowing us to use the web-specific URL
-      if (Platform.isAndroid) {
-        // Use emulator or real device URL based on local config
-        return LocalConfig.useEmulator ? _emulatorBaseUrl : LocalConfig.deviceBaseUrl;
-      } else if (Platform.isIOS) {
-        return 'http://localhost:3000/api/v1'; // iOS simulator
-      } else {
-        return 'http://localhost:3000/api/v1'; // Desktop
+      // Web platform
+      if (kIsWeb) {
+        return 'http://localhost:3000/api/v1';
       }
+
+      // Desktop platforms
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        return 'http://localhost:3000/api/v1';
+      }
+
+      // iOS (simulator)
+      if (Platform.isIOS) {
+        return 'http://localhost:3000/api/v1';
+      }
+
+      // Android - use local_config setting
+      if (Platform.isAndroid) {
+        try {
+          if (LocalConfig.useEmulator) {
+            return _emulatorBaseUrl;
+          } else {
+            return LocalConfig.deviceBaseUrl;
+          }
+        } catch (e) {
+          // If local_config fails, default to emulator IP (most common for development)
+          return _emulatorBaseUrl;
+        }
+      }
+
+      // Fallback
+      return 'http://localhost:3000/api/v1';
     } catch (e) {
-      // Running on web - Platform checks throw errors on web
-      return 'http://localhost:3000/api/v1'; // Web
+      return 'http://localhost:3000/api/v1';
     }
   }
 

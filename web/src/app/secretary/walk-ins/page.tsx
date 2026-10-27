@@ -69,10 +69,14 @@ export default function SecretaryWalkIns() {
         setRegistrationResult(response.data);
         setStep('success');
       } else {
-        setError(response.error || 'Failed to register walk-in');
+        // Show detailed error message from backend
+        const errorMessage = response.error || 'Failed to register walk-in';
+        console.error('Walk-in registration failed:', response);
+        setError(errorMessage);
       }
     } catch (err) {
-      setError('Network error occurred');
+      console.error('Network error:', err);
+      setError('Network error occurred. Please check your connection.');
     } finally {
       setIsRegistering(false);
     }

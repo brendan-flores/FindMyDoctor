@@ -142,109 +142,112 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 )
               else
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: _notifications.length,
-                    itemBuilder: (context, index) {
-                      final notification = _notifications[index];
-                      final isRead = notification['is_read'] == true;
-                      final message = notification['message'] ?? '';
-                      final type = notification['type']?.toString();
-                      final isPaymentNotification = type == 'ADDITIONAL_CHARGE_ADDED' || type == 'PAYMENT_VERIFIED' || type == 'PAYMENT_REJECTED';
+                  child: RefreshIndicator(
+                    onRefresh: _loadNotifications,
+                    child: ListView.builder(
+                      itemCount: _notifications.length,
+                      itemBuilder: (context, index) {
+                        final notification = _notifications[index];
+                        final isRead = notification['is_read'] == true;
+                        final message = notification['message'] ?? '';
+                        final type = notification['type']?.toString();
+                        final isPaymentNotification = type == 'ADDITIONAL_CHARGE_ADDED' || type == 'PAYMENT_VERIFIED' || type == 'PAYMENT_REJECTED';
 
-                      return Card(
-                        margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
-                        color: isRead ? AppColors.surface : AppColors.surfaceLow,
-                        child: InkWell(
-                          onTap: () async {
-                            if (!isRead) {
-                              await _markAsRead(notification['id']);
-                            }
+                        return Card(
+                          margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
+                          color: isRead ? AppColors.surface : AppColors.surfaceLow,
+                          child: InkWell(
+                            onTap: () async {
+                              if (!isRead) {
+                                await _markAsRead(notification['id']);
+                              }
 
-                            // Handle payment-related notifications - navigate to payment details
-                            if (isPaymentNotification) {
-                              final paymentId = notification['related_entity_id']?.toString();
-                              if (paymentId != null && paymentId.isNotEmpty) {
-                                try {
-                                  final paymentResponse = await _apiService.getPaymentById(paymentId);
-                                  if (paymentResponse['success'] == true && paymentResponse['data'] != null) {
-                                    final paymentData = paymentResponse['data'];
-                                    final appointmentId = paymentData['appointment_id']?.toString();
-                                    if (appointmentId != null && mounted) {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (context) => PaymentScreen(
-                                            appointmentId: appointmentId,
+                              // Handle payment-related notifications - navigate to payment details
+                              if (isPaymentNotification) {
+                                final paymentId = notification['related_entity_id']?.toString();
+                                if (paymentId != null && paymentId.isNotEmpty) {
+                                  try {
+                                    final paymentResponse = await _apiService.getPaymentById(paymentId);
+                                    if (paymentResponse['success'] == true && paymentResponse['data'] != null) {
+                                      final paymentData = paymentResponse['data'];
+                                      final appointmentId = paymentData['appointment_id']?.toString();
+                                      if (appointmentId != null && mounted) {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (context) => PaymentScreen(
+                                              appointmentId: appointmentId,
+                                            ),
                                           ),
-                                        ),
-                                      );
+                                        );
+                                      }
                                     }
+                                  } catch (e) {
+                                    // Silently fail - notification remains marked as read
                                   }
-                                } catch (e) {
-                                  // Silently fail - notification remains marked as read
                                 }
                               }
-                            }
-                          },
-                          child: Padding(
-                            padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
+                            },
+                            child: Padding(
+                              padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          notification['title'] ?? 'Notification',
+                                          style: AppTextStyles.bodyMdMedium.copyWith(
+                                            fontWeight: isRead ? FontWeight.w500 : FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      if (!isRead)
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.error,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: spacing.AppSpacing.gutterXs),
+                                  Text(
+                                    message,
+                                    style: AppTextStyles.labelSm.copyWith(
+                                      color: AppColors.secondary,
+                                    ),
+                                    maxLines: isPaymentNotification ? 8 : 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (isPaymentNotification)
+                                    Padding(
+                                      padding: EdgeInsets.only(top: spacing.AppSpacing.gutterXs),
                                       child: Text(
-                                        notification['title'] ?? 'Notification',
-                                        style: AppTextStyles.bodyMdMedium.copyWith(
-                                          fontWeight: isRead ? FontWeight.w500 : FontWeight.w700,
+                                        'Tap to view details',
+                                        style: AppTextStyles.labelSm.copyWith(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                     ),
-                                    if (!isRead)
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.error,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: spacing.AppSpacing.gutterXs),
-                                Text(
-                                  message,
-                                  style: AppTextStyles.labelSm.copyWith(
-                                    color: AppColors.secondary,
-                                  ),
-                                  maxLines: isPaymentNotification ? 8 : 3,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                if (isPaymentNotification)
-                                  Padding(
-                                    padding: EdgeInsets.only(top: spacing.AppSpacing.gutterXs),
-                                    child: Text(
-                                      'Tap to view details',
-                                      style: AppTextStyles.labelSm.copyWith(
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                  const SizedBox(height: spacing.AppSpacing.gutterXs),
+                                  Text(
+                                    _formatTimestamp(notification['created_at']),
+                                    style: AppTextStyles.labelSm.copyWith(
+                                      color: AppColors.outline,
+                                      fontSize: 11,
                                     ),
                                   ),
-                                const SizedBox(height: spacing.AppSpacing.gutterXs),
-                                Text(
-                                  _formatTimestamp(notification['created_at']),
-                                  style: AppTextStyles.labelSm.copyWith(
-                                    color: AppColors.outline,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ),
             ],

@@ -230,20 +230,23 @@ class _DoctorsPageState extends State<DoctorsPage> {
               ? const Center(child: CircularProgressIndicator())
               : _doctors.isEmpty
                   ? _buildEmptyDoctorsState()
-                  : ListView.builder(
-                      padding: EdgeInsets.only(
-                        left: spacing.AppSpacing.screenPadding,
-                        right: spacing.AppSpacing.screenPadding,
-                        top: spacing.AppSpacing.gutterSm,
-                        bottom: 80,
+                  : RefreshIndicator(
+                      onRefresh: _loadDoctors,
+                      child: ListView.builder(
+                        padding: EdgeInsets.only(
+                          left: spacing.AppSpacing.screenPadding,
+                          right: spacing.AppSpacing.screenPadding,
+                          top: spacing.AppSpacing.gutterSm,
+                          bottom: 80,
+                        ),
+                        itemCount: _doctors.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
+                            child: _buildDetailedDoctorCard(_doctors[index]),
+                          );
+                        },
                       ),
-                      itemCount: _doctors.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
-                          child: _buildDetailedDoctorCard(_doctors[index]),
-                        );
-                      },
                     ),
         ),
       ],
@@ -259,20 +262,23 @@ class _DoctorsPageState extends State<DoctorsPage> {
               ? const Center(child: CircularProgressIndicator())
               : _displayHospitals.isEmpty
                   ? _buildEmptyHospitalsState()
-                  : ListView.builder(
-                      padding: EdgeInsets.only(
-                        left: spacing.AppSpacing.screenPadding,
-                        right: spacing.AppSpacing.screenPadding,
-                        top: spacing.AppSpacing.gutterSm,
-                        bottom: 80,
+                  : RefreshIndicator(
+                      onRefresh: _loadDoctors,
+                      child: ListView.builder(
+                        padding: EdgeInsets.only(
+                          left: spacing.AppSpacing.screenPadding,
+                          right: spacing.AppSpacing.screenPadding,
+                          top: spacing.AppSpacing.gutterSm,
+                          bottom: 80,
+                        ),
+                        itemCount: _displayHospitals.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
+                            child: _buildHospitalCard(_displayHospitals[index]),
+                          );
+                        },
                       ),
-                      itemCount: _displayHospitals.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
-                          child: _buildHospitalCard(_displayHospitals[index]),
-                        );
-                      },
                     ),
         ),
       ],

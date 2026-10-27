@@ -34,6 +34,7 @@ const supabaseAdmin = config.supabase.url && config.supabase.serviceRoleKey
 const STORAGE_BUCKET = config.supabase.storageBucket || 'doctor-photos';
 const GCASH_STORAGE_BUCKET = config.supabase.gcashStorageBucket || 'gcash-qr-codes';
 const RECEIPT_STORAGE_BUCKET = config.supabase.receiptStorageBucket || 'payment-receipts';
+const PRESCRIPTION_STORAGE_BUCKET = config.supabase.prescriptionStorageBucket || 'prescription-pdfs';
 
 /**
  * Upload a doctor professional photo to Supabase Storage
@@ -593,6 +594,114 @@ export async function generateSignedReceiptUrl(
     // Generate signed URL with expiration
     const { data, error } = await supabaseAdmin.storage
       .from(RECEIPT_STORAGE_BUCKET)
+      .createSignedUrl(filePath, expiresIn);
+
+    if (error) {
+      console.error('Supabase Storage signed URL error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to generate signed URL'
+      };
+    }
+
+    console.log(`Signed URL generated successfully for: ${filePath}`);
+    return {
+      success: true,
+      signedUrl: data.signedUrl
+    };
+  } catch (err: any) {
+    console.error('Error generating signed URL:', err);
+    return {
+      success: false,
+      error: err.message || 'Signed URL generation failed'
+    };
+  }
+}
+
+/**
+ * Upload a prescription PDF to Supabase Storage
+ *
+ * @param fileBuffer - Buffer containing the PDF data
+ * @param fileName - Unique filename for the upload
+ * @returns Object with success status, file path (for storage in database), or error
+ */
+export async function uploadPrescriptionPdf(
+  fileBuffer: Buffer,
+  fileName: string
+): Promise<{ success: boolean; path?: string; error?: string }> {
+  try {
+    if (!supabaseAdmin) {
+      return {
+        success: false,
+        error: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to backend/.env.'
+      };
+    }
+
+    console.log(`Uploading prescription PDF to Supabase Storage: ${fileName}`);
+
+    // Upload file to Supabase Storage
+    const { data, error } = await supabaseAdmin.storage
+      .from(PRESCRIPTION_STORAGE_BUCKET)
+      .upload(fileName, fileBuffer, {
+        contentType: 'application/pdf',
+        upsert: true, // Allow overwriting for PDF regeneration
+      });
+
+    if (error) {
+      console.error('Supabase Storage upload error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to upload PDF to storage'
+      };
+    }
+
+    console.log(`Prescription PDF uploaded successfully: ${fileName}`);
+    return {
+      success: true,
+      path: fileName // Return the file path for storage in database
+    };
+  } catch (err: any) {
+    console.error('Error uploading prescription PDF:', err);
+    return {
+      success: false,
+      error: err.message || 'PDF upload failed'
+    };
+  }
+}
+
+/**
+ * Generate a signed URL for a prescription PDF
+ *
+ * @param filePath - Path of the file in Supabase Storage (filename, not full URL)
+ * @param expiresIn - Expiration time in seconds (default: 60 seconds)
+ * @returns Object with success status, signed URL, or error
+ */
+export async function generateSignedPrescriptionUrl(
+  filePath: string,
+  expiresIn: number = 60
+): Promise<{ success: boolean; signedUrl?: string; error?: string }> {
+  try {
+    if (!supabaseAdmin) {
+      return {
+        success: false,
+        error: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to backend/.env.'
+      };
+    }
+
+    // Detect legacy HTTP(S) URLs - these are not supported and cannot be converted to signed URLs
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      console.error(`Legacy HTTP(S) URL detected in pdf_url: ${filePath}. Legacy PDFs are not supported.`);
+      return {
+        success: false,
+        error: 'Legacy PDF format not supported. Please regenerate the PDF.'
+      };
+    }
+
+    console.log(`Generating signed URL for prescription PDF: ${filePath}`);
+
+    // Generate signed URL with expiration
+    const { data, error } = await supabaseAdmin.storage
+      .from(PRESCRIPTION_STORAGE_BUCKET)
       .createSignedUrl(filePath, expiresIn);
 
     if (error) {

@@ -32,7 +32,7 @@ jest.mock('../middleware/auth', () => ({
   requireSecretaryProfileCompletion: (req: any, res: any, next: any) => next(),
 }));
 
-const { query } = require('../database/connection');
+const { query, getClient } = require('../database/connection');
 
 describe('Queue API Security', () => {
   let app: express.Application;
@@ -371,12 +371,65 @@ describe('Queue API Security', () => {
   });
 
   describe('POST /api/v1/queue/:id/complete', () => {
+    it('should complete checkup and create visit record', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const mockQueueRow = {
+        appointment_id: 'appointment-1',
+        patient_id: 'patient-1',
+        doctor_id: 'doctor-1'
+      };
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('UPDATE queue_entries')) {
+          return Promise.resolve({ rowCount: 1, rows: [mockQueueRow] });
+        }
+        if (sql.includes('UPDATE appointments')) {
+          return Promise.resolve({ rowCount: 1 });
+        }
+        if (sql.includes('INSERT INTO visits')) {
+          return Promise.resolve({ rowCount: 1 });
+        }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve();
+      });
+
+      const response = await request(app)
+        .post('/api/v1/queue/queue-1/complete')
+        .send({});
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(mockClient.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO visits'),
+        ['appointment-1', 'patient-1', 'doctor-1']
+      );
+    });
+
     it('should return 404 when secretary tries to complete another doctor\'s queue entry', async () => {
-      query.mockImplementation((sql: string, params: any[]) => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
         if (sql.includes('UPDATE queue_entries')) {
           return Promise.resolve({ rowCount: 0 });
         }
-        return Promise.resolve({ rows: [] });
+        return Promise.resolve();
       });
 
       const response = await request(app)

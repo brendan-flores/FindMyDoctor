@@ -161,6 +161,7 @@ export interface QueueEntry {
   patient_email?: string;
   doctor_first_name: string;
   doctor_last_name: string;
+  consultation_fee?: number;
 }
 
 export const secretaryApi = {
@@ -260,6 +261,11 @@ export const secretaryApi = {
     return apiClient.get<Payment[]>(`/payments${queryParams}`);
   },
 
+  // Payments: get payment counts by status
+  getPaymentCounts: async (): Promise<{ success: boolean; data?: { UNPAID: number; PENDING_VERIFICATION: number; PAID: number; REJECTED: number; CANCELLED: number }; error?: string }> => {
+    return apiClient.get<{ UNPAID: number; PENDING_VERIFICATION: number; PAID: number; REJECTED: number; CANCELLED: number }>('/payments/counts');
+  },
+
   // Payments: get payment by appointment ID
   getPayment: async (appointmentId: string): Promise<{ success: boolean; data?: Payment; error?: string }> => {
     return apiClient.get<Payment>(`/payments/${appointmentId}`);
@@ -286,13 +292,48 @@ export const secretaryApi = {
   },
 
   // Payments: add charge to payment (by payment ID)
-  addCharge: async (paymentId: string, description: string, amount: number): Promise<{ success: boolean; data?: PaymentCharge; error?: string }> => {
-    return apiClient.post<PaymentCharge>(`/payments/${paymentId}/charges`, { description, amount });
+  addCharge: async (paymentId: string, payload: {
+    chargeType?: 'ADDITIONAL' | 'MEDICINE';
+    description?: string;
+    amount?: number;
+    name?: string;
+    quantity?: number;
+    unitPrice?: number;
+    prescriptionItemId?: string;
+  }): Promise<{ success: boolean; data?: PaymentCharge; error?: string }> => {
+    return apiClient.post<PaymentCharge>(`/payments/${paymentId}/charges`, payload);
   },
 
   // Payments: delete charge from payment (by payment ID and charge ID)
   deleteCharge: async (paymentId: string, chargeId: string): Promise<{ success: boolean; error?: string }> => {
     return apiClient.delete<void>(`/payments/${paymentId}/charges/${chargeId}`);
+  },
+
+  // Payments: record payment (works for both walk-in and booked patients)
+  recordPayment: async (payload: {
+    appointmentId: string;
+    paymentMethod: 'CASH' | 'GCASH';
+    consultationFee: number;
+    additionalCharges: Array<{ description: string; amount: number }>;
+  }): Promise<{ success: boolean; data?: { paymentId: string }; error?: string }> => {
+    return apiClient.post<{ paymentId: string }>('/payments/record', payload);
+  },
+
+  // Payments: record walk-in payment (deprecated - use recordPayment instead)
+  recordWalkInPayment: async (payload: {
+    appointmentId: string;
+    paymentMethod: 'CASH' | 'GCASH';
+    consultationFee: number;
+    additionalCharges: Array<{ description: string; amount: number }>;
+  }): Promise<{ success: boolean; data?: { paymentId: string }; error?: string }> => {
+    return apiClient.post<{ paymentId: string }>('/payments/walk-in', payload);
+  },
+
+  // Prescriptions: get patient's prescriptions (with items for medicine charge linking)
+  // Note: Backend endpoint GET /api/v1/prescriptions/patients/:patientId currently only allows PATIENT and DOCTOR roles
+  // and returns prescriptions without items. This method is added for future backend support.
+  getPatientPrescriptions: async (patientId: string): Promise<{ success: boolean; data?: any[]; error?: string }> => {
+    return apiClient.get<any[]>(`/prescriptions/patients/${patientId}`);
   },
 
   // Get secretary dashboard summary
@@ -306,8 +347,12 @@ export const secretaryApi = {
 export interface PaymentCharge {
   id: string;
   payment_id: string;
+  charge_type?: 'ADDITIONAL' | 'MEDICINE';
   description: string;
   amount: number;
+  quantity?: number | null;
+  unit_price?: number | null;
+  prescription_item_id?: string | null;
   created_at: string;
   created_by?: string | null;
   created_by_first_name?: string | null;
@@ -319,7 +364,7 @@ export interface Payment {
   id: string;
   appointment_id: string;
   patient_id: string;
-  status: 'UNPAID' | 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED';
+  status: 'UNPAID' | 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED' | 'CANCELLED';
   payment_method: string;
   receipt_url?: string | null;
   consultation_amount: number;
@@ -454,6 +499,47 @@ export interface Notification {
   created_at: string;
   related_entity_type?: string | null;
   related_entity_id?: string | null;
+}
+
+// Secretary dashboard interface
+export interface SecretaryDashboard {
+  date: string;
+  queueCounts: {
+    waiting: number;
+    inConsultation: number;
+    done: number;
+  };
+  capacity: {
+    remaining: number;
+    total: number;
+  };
+  pendingVerificationPayments: number;
+  unreadMessages: number;
+  todayQueue: Array<{
+    queueNumber: number;
+    patientName: string;
+    reason: string | null;
+    status: string;
+    appointmentId: string | null;
+    registrationSource: string;
+  }>;
+  paymentsNeedingAction: Array<{
+    id: string;
+    appointmentId: string;
+    status: string;
+    paymentMethod: string;
+    totalAmount: number;
+    patientName: string;
+    appointmentDate: string;
+    appointmentStatus: string;
+  }>;
+  recentConversations: Array<{
+    id: string | null;
+    patientId: string;
+    patientName: string;
+    unreadCount: number;
+    updatedAt: string | null;
+  }>;
 }
 
 // Notifications API

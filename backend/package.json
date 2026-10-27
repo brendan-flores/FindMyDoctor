@@ -31,6 +31,11 @@
     "migrate:session-version": "tsx src/database/applySessionVersion.ts",
     "migrate:ai-daily-limits": "tsx src/database/applyAiDailyLimits.ts",
     "migrate:ai-conversation-title": "tsx src/database/applyAiConversationTitle.ts",
+<<<<<<< HEAD
+    "migrate:backfill-visits": "tsx src/database/applyBackfillVisits.ts",
+=======
+    "migrate:medicine-charge-fields": "tsx src/database/applyMedicineChargeFields.ts",
+>>>>>>> feat/medicine-charge-lines
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",
@@ -60,6 +65,7 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
+    "pdfkit": "^0.15.2",
     "pg": "^8.11.3",
     "sharp": "^0.35.5",
     "uuid": "^9.0.1",
@@ -73,6 +79,7 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/multer": "^1.4.11",
     "@types/node": "^20.10.5",
+    "@types/pdfkit": "^0.13.9",
     "@types/pg": "^8.10.9",
     "@types/supertest": "^6.0.3",
     "@types/uuid": "^9.0.7",
