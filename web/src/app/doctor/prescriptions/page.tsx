@@ -15,6 +15,7 @@ export default function DoctorPrescriptions() {
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [showPatientNotified, setShowPatientNotified] = useState(false);
 
   const [createFormData, setCreateFormData] = useState({
     patientId: '',
@@ -175,6 +176,8 @@ export default function DoctorPrescriptions() {
         });
         setVisits([]);
         fetchPrescriptions();
+        setShowPatientNotified(true);
+        setTimeout(() => setShowPatientNotified(false), 3000);
       } else {
         setCreateError(response.error || 'Failed to create prescription');
       }
@@ -226,6 +229,13 @@ export default function DoctorPrescriptions() {
 
   return (
     <div className="space-y-6">
+      {showPatientNotified && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3 transition-opacity duration-300">
+          <span className="material-symbols-outlined text-emerald-600">check_circle</span>
+          <span className="text-emerald-800 font-medium">Patient notified of new prescription</span>
+        </div>
+      )}
+
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 shadow-lg">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-white">Prescriptions</h1>

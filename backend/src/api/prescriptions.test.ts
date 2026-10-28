@@ -12,6 +12,10 @@ jest.mock('../database/connection', () => ({
   query: jest.fn(),
 }));
 
+jest.mock('../services/pushService', () => ({
+  sendPushToUser: jest.fn().mockResolvedValue(undefined),
+}));
+
 let mockUser = { id: 'test-user-id', role: 'PATIENT' };
 
 jest.mock('../middleware/auth', () => ({
@@ -83,7 +87,7 @@ describe('Prescription Authorization', () => {
       expect(patientCheckCall[1]).toContain('patient-user-id');
     });
 
-    it('should deny patient access to another patient prescriptions (403)', async () => {
+    it('should deny patient access to another patient prescriptions (404 non-disclosing)', async () => {
       mockUser = { id: 'patient-user-id', role: 'PATIENT' };
 
       query.mockImplementation((sql: string, params: any[]) => {
@@ -96,8 +100,8 @@ describe('Prescription Authorization', () => {
       const response = await request(app)
         .get('/api/v1/prescriptions/patients/patient-123');
 
-      expect(response.status).toBe(403);
-      expect(response.body.error.message).toContain('Access denied');
+      expect(response.status).toBe(404);
+      expect(response.body.error.message).toContain('Not found');
 
       // Verify the ownership check happened
       const patientCheckCall = query.mock.calls.find((call: any) =>
@@ -299,6 +303,194 @@ describe('Prescription Authorization', () => {
 
       expect(response.status).toBe(403);
       expect(response.body.error).toContain('Forbidden');
+    });
+  });
+
+  describe('POST /api/v1/prescriptions (notification and push)', () => {
+    it('should create notification for patient after prescription creation', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      let callCount = 0;
+      query.mockImplementation((sql: string, params: any[]) => {
+        callCount++;
+        if (callCount === 1) {
+          // First call: fetch visit
+          return Promise.resolve({
+            rows: [{
+              id: 'visit-1',
+              patient_id: 'patient-123',
+              doctor_id: 'doctor-456'
+            }]
+          });
+        } else if (callCount === 2) {
+          // Second call: insert prescription
+          return Promise.resolve({
+            rows: [{
+              id: 'rx-1',
+              visit_id: 'visit-1',
+              patient_id: 'patient-123',
+              doctor_id: 'doctor-456'
+            }]
+          });
+        } else if (callCount === 3) {
+          // Third call: insert prescription items
+          return Promise.resolve({ rows: [] });
+        } else if (callCount === 4) {
+          // Fourth call: get patient user_id for notification
+          return Promise.resolve({
+            rows: [{ user_id: 'patient-user-123' }]
+          });
+        } else if (callCount === 5) {
+          // Fifth call: create notification
+          return Promise.resolve({ rows: [] });
+        } else {
+          return Promise.resolve({ rows: [] });
+        }
+      });
+
+      const response = await request(app)
+        .post('/api/v1/prescriptions')
+        .send({
+          visitId: 'visit-1',
+          items: [
+            {
+              medicationName: 'Paracetamol',
+              dosage: '500mg',
+              frequency: '3x daily',
+              duration: '7 days',
+              instructions: 'Take after meals'
+            }
+          ],
+          notes: 'Test prescription'
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
+
+      // Verify that notification was created
+      const notificationCall = query.mock.calls.find((call: any) =>
+        call[0].includes('INSERT INTO notifications')
+      );
+      expect(notificationCall).toBeDefined();
+      expect(notificationCall[1]).toContain('patient-user-123');
+      expect(notificationCall[1]).toContain('PRESCRIPTION_AVAILABLE');
+    });
+
+    it('should create prescription even if notification creation fails', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      let callCount = 0;
+      query.mockImplementation((sql: string, params: any[]) => {
+        callCount++;
+        if (callCount === 1) {
+          // First call: fetch visit
+          return Promise.resolve({
+            rows: [{
+              id: 'visit-1',
+              patient_id: 'patient-123',
+              doctor_id: 'doctor-456'
+            }]
+          });
+        } else if (callCount === 2) {
+          // Second call: insert prescription
+          return Promise.resolve({
+            rows: [{
+              id: 'rx-1',
+              visit_id: 'visit-1',
+              patient_id: 'patient-123',
+              doctor_id: 'doctor-456'
+            }]
+          });
+        } else if (callCount === 3) {
+          // Third call: insert prescription items
+          return Promise.resolve({ rows: [] });
+        } else if (callCount === 4) {
+          // Fourth call: get patient user_id for notification
+          return Promise.resolve({
+            rows: [{ user_id: 'patient-user-123' }]
+          });
+        } else if (callCount === 5) {
+          // Fifth call: create notification - fail this one
+          return Promise.reject(new Error('Database error'));
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/prescriptions')
+        .send({
+          visitId: 'visit-1',
+          items: [
+            {
+              medicationName: 'Paracetamol',
+              dosage: '500mg',
+              frequency: '3x daily',
+              duration: '7 days',
+              instructions: 'Take after meals'
+            }
+          ],
+          notes: 'Test prescription'
+        });
+
+      // Prescription should still be created successfully
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should create prescription even if patient user lookup fails', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      let callCount = 0;
+      query.mockImplementation((sql: string, params: any[]) => {
+        callCount++;
+        if (callCount === 1) {
+          // First call: fetch visit
+          return Promise.resolve({
+            rows: [{
+              id: 'visit-1',
+              patient_id: 'patient-123',
+              doctor_id: 'doctor-456'
+            }]
+          });
+        } else if (callCount === 2) {
+          // Second call: insert prescription
+          return Promise.resolve({
+            rows: [{
+              id: 'rx-1',
+              visit_id: 'visit-1',
+              patient_id: 'patient-123',
+              doctor_id: 'doctor-456'
+            }]
+          });
+        } else if (callCount === 3) {
+          // Third call: insert prescription items
+          return Promise.resolve({ rows: [] });
+        } else if (callCount === 4) {
+          // Fourth call: get patient user_id - return empty
+          return Promise.resolve({ rows: [] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/prescriptions')
+        .send({
+          visitId: 'visit-1',
+          items: [
+            {
+              medicationName: 'Paracetamol',
+              dosage: '500mg',
+              frequency: '3x daily',
+              duration: '7 days',
+              instructions: 'Take after meals'
+            }
+          ],
+          notes: 'Test prescription'
+        });
+
+      // Prescription should still be created successfully
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
     });
   });
 
