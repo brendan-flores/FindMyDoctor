@@ -28,11 +28,24 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   Map<String, dynamic>? _patient;
   bool _isLoading = true;
   String? _errorMessage;
+  bool _isEditing = false;
+  
+  // Edit form controllers
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  String? _formError;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _addressController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProfile() async {
@@ -46,8 +59,11 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
       final response = await _apiService.getCurrentPatient();
       if (response['success'] == true && response['data'] is Map) {
         if (!mounted) return;
+        final patientData = Map<String, dynamic>.from(response['data'] as Map);
         setState(() {
-          _patient = Map<String, dynamic>.from(response['data'] as Map);
+          _patient = patientData;
+          _phoneController.text = (patientData['phone'] ?? '').toString();
+          _addressController.text = (patientData['address'] ?? '').toString();
           _isLoading = false;
         });
       } else {
@@ -66,6 +82,80 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _saveProfile() async {
+    if (_patient == null) return;
+
+    final phone = _phoneController.text.trim();
+    final address = _addressController.text.trim();
+
+    if (phone.isEmpty) {
+      setState(() => _formError = 'Mobile number is required');
+      return;
+    }
+
+    if (address.isEmpty) {
+      setState(() => _formError = 'Address is required');
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _formError = null;
+    });
+
+    try {
+      final response = await _apiService.put(
+        '/patients/me',
+        body: {
+          'firstName': _patient!['first_name'],
+          'lastName': _patient!['last_name'],
+          'dateOfBirth': _patient!['date_of_birth'],
+          'sex': _patient!['sex'],
+          'phone': phone,
+          'address': address,
+          if (_patient!['middle_name'] != null) 'middleName': _patient!['middle_name'],
+        },
+      );
+
+      if (response['success'] == true) {
+        if (!mounted) return;
+        setState(() {
+          _patient = Map<String, dynamic>.from(response['data'] as Map);
+          _isEditing = false;
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated successfully')),
+        );
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _formError = response['error']?['message'] ?? 'Failed to update profile';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _formError = 'Cannot reach the server. Please check your connection and try again.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _toggleEditMode() {
+    setState(() {
+      if (_isEditing) {
+        // Cancel edit - reset controllers
+        _phoneController.text = (_patient!['phone'] ?? '').toString();
+        _addressController.text = (_patient!['address'] ?? '').toString();
+        _formError = null;
+      }
+      _isEditing = !_isEditing;
+    });
   }
 
   String _formatDateOfBirth(dynamic value) {
@@ -114,6 +204,14 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
             onBackPressed: () => Navigator.of(context).pop(),
             showNotifications: false,
             showProfile: false,
+            actions: _isLoading
+                ? null
+                : [
+                    IconButton(
+                      icon: Icon(_isEditing ? Icons.close : Icons.edit),
+                      onPressed: _toggleEditMode,
+                    ),
+                  ],
           ),
           Expanded(
             child: _buildBody(),
@@ -180,6 +278,30 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
             const SizedBox(height: spacing.AppSpacing.gutterLg),
             _buildSummaryTile(patient),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
+            if (_formError != null) ...[
+              Container(
+                padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.error),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                    const SizedBox(width: spacing.AppSpacing.gutterSm),
+                    Expanded(
+                      child: Text(
+                        _formError!,
+                        style: AppTextStyles.bodySm.copyWith(color: AppColors.error),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: spacing.AppSpacing.gutterMd),
+            ],
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
             Text(
               'PATIENT DETAILS',
               style: AppTextStyles.labelSm.copyWith(
@@ -230,20 +352,21 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                     value: _formatSex(patient['sex']),
                   ),
                   const SizedBox(height: spacing.AppSpacing.gutterMd),
-                  _buildInfoRow(
-                    icon: Icons.phone_outlined,
-                    label: 'Mobile number',
-                    value: (patient['phone'] ?? '—').toString(),
-                  ),
+                  _buildPhoneField(patient),
                   const SizedBox(height: spacing.AppSpacing.gutterMd),
-                  _buildInfoRow(
-                    icon: Icons.home_outlined,
-                    label: 'Address',
-                    value: (patient['address'] ?? '—').toString(),
-                  ),
+                  _buildAddressField(patient),
                 ],
               ),
             ),
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
+            if (_isEditing) ...[
+              PrimaryButton(
+                text: _isLoading ? 'Saving...' : 'Save Changes',
+                onPressed: _isLoading ? null : _saveProfile,
+                icon: const Icon(Icons.save, size: 20),
+              ),
+              const SizedBox(height: spacing.AppSpacing.gutterMd),
+            ],
             const SizedBox(height: spacing.AppSpacing.gutter3xl),
           ],
         ),
@@ -339,6 +462,118 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPhoneField(Map<String, dynamic> patient) {
+    if (_isEditing) {
+      return Semantics(
+        label: 'Mobile number field, editable',
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.phone_outlined,
+              color: AppColors.secondary,
+              size: spacing.AppSpacing.iconMd,
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Mobile number',
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.outline,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: spacing.AppSpacing.gutterXs),
+                  TextField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      hintText: 'Enter mobile number',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: spacing.AppSpacing.gutterMd,
+                        vertical: spacing.AppSpacing.gutterSm,
+                      ),
+                    ),
+                    style: AppTextStyles.bodyMdMedium.copyWith(
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return _buildInfoRow(
+      icon: Icons.phone_outlined,
+      label: 'Mobile number',
+      value: (patient['phone'] ?? '—').toString(),
+    );
+  }
+
+  Widget _buildAddressField(Map<String, dynamic> patient) {
+    if (_isEditing) {
+      return Semantics(
+        label: 'Address field, editable',
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.home_outlined,
+              color: AppColors.secondary,
+              size: spacing.AppSpacing.iconMd,
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Address',
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.outline,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: spacing.AppSpacing.gutterXs),
+                  TextField(
+                    controller: _addressController,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: 'Enter address',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: spacing.AppSpacing.gutterMd,
+                        vertical: spacing.AppSpacing.gutterSm,
+                      ),
+                    ),
+                    style: AppTextStyles.bodyMdMedium.copyWith(
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return _buildInfoRow(
+      icon: Icons.home_outlined,
+      label: 'Address',
+      value: (patient['address'] ?? '—').toString(),
     );
   }
 }
