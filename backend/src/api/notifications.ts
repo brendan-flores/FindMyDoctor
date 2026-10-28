@@ -85,6 +85,22 @@ router.patch('/:id/read', authenticate, async (req: AuthRequest, res: Response) 
   }
 });
 
+// Mark all notifications as read for current user
+router.patch('/read-all', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    await query(
+      'UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false',
+      [userId]
+    );
+
+    res.json(success(null, 'All notifications marked as read'));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to mark all notifications as read'));
+  }
+});
+
 // Register a push device token for the authenticated user
 router.post('/device-tokens', authenticate, async (req: AuthRequest, res: Response) => {
   try {

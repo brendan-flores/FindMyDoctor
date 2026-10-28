@@ -800,6 +800,13 @@ class ApiService {
     );
   }
 
+  Future<Map<String, dynamic>> markAllNotificationsRead() async {
+    return await patch(
+      '${ApiConstants.notifications}/read-all',
+      requireAuth: true,
+    );
+  }
+
   // ===========================
   // PAYMENTS METHODS
   // ===========================
