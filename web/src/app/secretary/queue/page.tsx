@@ -144,14 +144,14 @@ export default function SecretaryQueue() {
       if (queueEntry && queueEntry.appointment_id) {
         // Show payment modal for both walk-in and booked patients
         const consultationFee = queueEntry.consultation_fee !== null && queueEntry.consultation_fee !== undefined
-          ? parseFloat(queueEntry.consultation_fee)
+          ? queueEntry.consultation_fee
           : 0;
 
         if (consultationFee > 0) {
           const isWalkIn = queueEntry.registration_source === 'WALK_IN';
           let initialPaymentMethod: 'CASH' | 'GCASH' | undefined;
 
-          // For booked patients, fetch their initial payment method
+          // For booked patients, fetch their initial payment method and balance
           if (!isWalkIn) {
             try {
               const paymentResponse = await secretaryApi.getPayment(queueEntry.appointment_id);

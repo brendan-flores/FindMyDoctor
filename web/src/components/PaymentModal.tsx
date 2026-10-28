@@ -48,6 +48,12 @@ export default function PaymentModal({
   const [medicineName, setMedicineName] = useState('');
   const [medicineQuantity, setMedicineQuantity] = useState('');
   const [medicineUnitPrice, setMedicineUnitPrice] = useState('');
+  const [existingPayment, setExistingPayment] = useState<{
+    amountPaid: number;
+    balance: number;
+    status: string;
+  } | null>(null);
+  const [isLoadingPayment, setIsLoadingPayment] = useState(false);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -62,8 +68,32 @@ export default function PaymentModal({
       setMedicineName('');
       setMedicineQuantity('');
       setMedicineUnitPrice('');
+      setExistingPayment(null);
+
+      // Fetch existing payment data for booked patients
+      if (!isWalkIn) {
+        fetchExistingPayment();
+      }
     }
-  }, [isOpen, initialPaymentMethod]);
+  }, [isOpen, initialPaymentMethod, isWalkIn, appointmentId]);
+
+  const fetchExistingPayment = async () => {
+    setIsLoadingPayment(true);
+    try {
+      const response = await secretaryApi.getPayment(appointmentId);
+      if (response.success && response.data) {
+        setExistingPayment({
+          amountPaid: response.data.amount_paid || 0,
+          balance: response.data.balance || 0,
+          status: response.data.status,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch existing payment:', error);
+    } finally {
+      setIsLoadingPayment(false);
+    }
+  };
 
   const handleAddCharge = () => {
     setChargeFormError(null);
@@ -135,16 +165,24 @@ export default function PaymentModal({
     setAdditionalCharges(additionalCharges.filter(charge => charge.id !== chargeId));
   };
 
-  const totalAmount = useMemo(() => {
-    const validConsultationFee = (consultationFee !== null && consultationFee !== undefined && !isNaN(consultationFee) && isFinite(consultationFee))
-      ? parseFloat(consultationFee)
-      : 0;
-    const totalCharges = additionalCharges.reduce((sum, charge) => {
+  const totalCharges = useMemo(() => {
+    return additionalCharges.reduce((sum, charge) => {
       const chargeAmount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
-      return sum + (isNaN(chargeAmount) ? 0 : chargeAmount);
+      return sum + (isNaN(chargeAmount) || !isFinite(chargeAmount) ? 0 : chargeAmount);
     }, 0);
-    return validConsultationFee + totalCharges;
-  }, [additionalCharges, consultationFee]);
+  }, [additionalCharges]);
+
+  const totalAmount = useMemo(() => {
+    // If there's an existing payment with a balance, use that as the base amount
+    // Otherwise, use the consultation fee
+    const baseAmount = existingPayment && existingPayment.balance > 0
+      ? existingPayment.balance
+      : (consultationFee !== null && consultationFee !== undefined && !isNaN(consultationFee) && isFinite(consultationFee)
+          ? consultationFee
+          : 0);
+    // Round to 2 decimal places to avoid floating-point precision errors
+    return Math.round((baseAmount + totalCharges) * 100) / 100;
+  }, [totalCharges, consultationFee, existingPayment]);
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -166,8 +204,8 @@ export default function PaymentModal({
 
       if (response.success) {
         const message = paymentMethod === 'CASH'
-          ? 'Payment Recorded'
-          : 'Payment Pending - Patient will upload receipt later';
+          ? 'Payment recorded. You must explicitly confirm receipt as PAID.'
+          : 'Payment recorded. Patient will upload GCash receipt for verification.';
         setToastMessage(message);
         setToastType('success');
         setShowToast(true);
@@ -251,6 +289,44 @@ export default function PaymentModal({
                 <p className="text-lg font-bold text-slate-900">{formatAmount(consultationFee)}</p>
               </div>
             </div>
+
+            {/* Payment Status for Booked Patients */}
+            {!isWalkIn && (
+              <>
+                {isLoadingPayment ? (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    <p className="text-sm text-slate-600">Loading payment status...</p>
+                  </div>
+                ) : existingPayment ? (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-slate-900 mb-3">Payment Status</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Amount Paid:</span>
+                        <span className="text-slate-900 font-medium">{formatAmount(existingPayment.amountPaid)}</span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t border-slate-200">
+                        <span className="text-slate-700 font-medium">Remaining Balance:</span>
+                        <span className="text-slate-900 font-bold">{formatAmount(existingPayment.balance)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <div className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-[20px] text-amber-600 mt-0.5">info</span>
+                      <div className="text-sm">
+                        <p className="font-medium text-amber-900">New Payment</p>
+                        <p className="text-amber-700 mt-1">
+                          This patient will have a new payment record created. 
+                          Use the Payments page to mark payments as PAID or verify GCash receipts.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
 
             {/* Additional Charges */}
             <div>
@@ -424,13 +500,58 @@ export default function PaymentModal({
                   ))}
                 </div>
               )}
+
+              {/* Existing Payment Balance Display */}
+              {existingPayment && existingPayment.balance > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-amber-800 font-medium">Existing Balance</span>
+                    <span className="text-amber-900 font-bold">{formatAmount(existingPayment.balance)}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Total */}
             <div className="bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-blue-900">Total Amount</span>
-                <span className="text-2xl font-bold text-blue-900">{formatAmount(totalAmount)}</span>
+              <div className="space-y-2 mb-3">
+                {existingPayment && existingPayment.balance > 0 ? (
+                  <>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-blue-800">Remaining Balance</span>
+                      <span className="text-blue-900 font-medium">{formatAmount(existingPayment.balance)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-blue-800">Consultation Fee</span>
+                    <span className="text-blue-900 font-medium">{formatAmount(consultationFee)}</span>
+                  </div>
+                )}
+                {additionalCharges.length > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-blue-800">Additional Charges</span>
+                    <span className="text-blue-900 font-medium">
+                      {formatAmount(totalCharges)}
+                    </span>
+                  </div>
+                )}
+                {existingPayment && existingPayment.amountPaid > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-blue-800">Previously Paid</span>
+                    <span className="text-blue-900 font-medium">{formatAmount(existingPayment.amountPaid)}</span>
+                  </div>
+                )}
+              </div>
+              <div className="border-t border-blue-200 pt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-blue-900">
+                    Total Amount Owed
+                  </span>
+                  <span className="text-2xl font-bold text-blue-900">
+                    {formatAmount(totalAmount)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

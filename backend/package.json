@@ -33,6 +33,8 @@
     "migrate:ai-conversation-title": "tsx src/database/applyAiConversationTitle.ts",
     "migrate:backfill-visits": "tsx src/database/applyBackfillVisits.ts",
     "migrate:medicine-charge-fields": "tsx src/database/applyMedicineChargeFields.ts",
+    "migrate:cancelled-payment-status": "tsx src/database/applyCancelledPaymentStatus.ts",
+    "migrate:payment-balance-fields": "tsx src/database/applyPaymentBalanceFields.ts",
     "migrate:invoice-settings": "tsx src/database/applyInvoiceSettings.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",

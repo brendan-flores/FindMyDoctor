@@ -271,6 +271,11 @@ export const secretaryApi = {
     return apiClient.get<Payment>(`/payments/${appointmentId}`);
   },
 
+  // Payments: get payment by payment ID
+  getPaymentById: async (paymentId: string): Promise<{ success: boolean; data?: Payment; error?: string }> => {
+    return apiClient.get<Payment>(`/payments/by-id/${paymentId}`);
+  },
+
   // Payments: verify payment (by payment ID)
   verifyPayment: async (id: string): Promise<{ success: boolean; error?: string }> => {
     return apiClient.patch<void>(`/payments/${id}/verify`, {});
@@ -284,6 +289,11 @@ export const secretaryApi = {
   // Payments: mark as paid (for cash payments, by payment ID)
   markAsPaid: async (id: string): Promise<{ success: boolean; error?: string }> => {
     return apiClient.patch<void>(`/payments/${id}/mark-paid`, {});
+  },
+
+  // Payments: record partial payment (by payment ID)
+  recordPartialPayment: async (id: string, amountReceived: number): Promise<{ success: boolean; data?: { amountPaid: string; balance: string; status: string }; error?: string }> => {
+    return apiClient.patch<{ amountPaid: string; balance: string; status: string }>(`/payments/${id}/record-payment`, { amountReceived });
   },
 
   // Payments: get signed receipt URL (by payment ID)
@@ -385,6 +395,8 @@ export interface Payment {
   consultation_amount: number;
   total_additional_charges: number;
   total_amount: number;
+  amount_paid: number;
+  balance: string;
   created_at: string;
   updated_at: string;
   verified_by?: string | null;

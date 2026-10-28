@@ -60,16 +60,16 @@ export const config = {
   // reasonable burst when a user clicks through several pages quickly:
   //   - With client-side request de-duplication/caching a page navigation
   //     costs roughly 1-3 API calls.
-  //   - 300 requests per minute allows a burst of ~100 page views in one
+  //   - 600 requests per minute allows a burst of ~200 page views in one
   //     minute, which is well above normal navigation, while still stopping
   //     scripted abuse (thousands of requests per minute).
   // Sensitive authentication endpoints keep a separate, much stricter
   // budget (login, OTP, registration, password change).
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'),
-    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '300'),
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '600'),
     authWindowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || '900000'),
-    authMaxRequests: parseInt(process.env.AUTH_RATE_LIMIT_MAX_REQUESTS || '30'),
+    authMaxRequests: parseInt(process.env.AUTH_RATE_LIMIT_MAX_REQUESTS || '60'),
   },
 
   // Short-lived server-side caches for read-heavy, rarely changing data.
