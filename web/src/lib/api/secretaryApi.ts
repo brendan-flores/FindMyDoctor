@@ -324,7 +324,7 @@ export const secretaryApi = {
     appointmentId: string;
     paymentMethod: 'CASH' | 'GCASH';
     consultationFee: number;
-    additionalCharges: Array<{ description: string; amount: number }>;
+    additionalCharges: Array<{ description: string; amount: number; chargeType?: 'ADDITIONAL' | 'MEDICINE'; name?: string; quantity?: number; unitPrice?: number }>;
   }): Promise<{ success: boolean; data?: { paymentId: string }; error?: string }> => {
     return apiClient.post<{ paymentId: string }>('/payments/record', payload);
   },

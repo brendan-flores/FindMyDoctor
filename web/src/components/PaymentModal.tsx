@@ -41,8 +41,6 @@ export default function PaymentModal({
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [amountReceived, setAmountReceived] = useState('');
   const [recordPaymentError, setRecordPaymentError] = useState<string | null>(null);
-  const [showVerifyDialog, setShowVerifyDialog] = useState(false);
-  const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptImageLoaded, setReceiptImageLoaded] = useState(false);
   const [receiptImageError, setReceiptImageError] = useState(false);
@@ -54,11 +52,20 @@ export default function PaymentModal({
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [cashTenderAmount, setCashTenderAmount] = useState('');
+  const [cashTenderMethod, setCashTenderMethod] = useState<'CASH' | 'GCASH'>('CASH');
+  const [showCompleteCheckupModal, setShowCompleteCheckupModal] = useState(false);
+  const [cashTenderError, setCashTenderError] = useState<string | null>(null);
+  // Charges for walk-in payment creation
+  const [tempCharges, setTempCharges] = useState<Array<{ description: string; amount: number; chargeType: 'ADDITIONAL' | 'MEDICINE'; name?: string; quantity?: number; unitPrice?: number }>>([]);
 
   // Reset and fetch payment when modal opens
   useEffect(() => {
     if (isOpen) {
       setPaymentMethod(initialPaymentMethod || 'CASH');
+      setTempCharges([]);
+      setCashTenderAmount('');
+      setCashTenderMethod('CASH');
       fetchPayment();
     }
   }, [isOpen, appointmentId, initialPaymentMethod]);
@@ -92,7 +99,7 @@ export default function PaymentModal({
         appointmentId,
         paymentMethod: paymentMethod,
         consultationFee,
-        additionalCharges: [],
+        additionalCharges: tempCharges,
       });
 
       if (response.success) {
@@ -100,6 +107,33 @@ export default function PaymentModal({
         setShowToast(true);
         // Fetch the newly created payment
         await fetchPayment();
+
+        // If cash tender amount is provided, record the payment
+        if (cashTenderAmount && parseFloat(cashTenderAmount) > 0) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const paymentResponse = await secretaryApi.getPayment(appointmentId);
+          if (paymentResponse.success && paymentResponse.data) {
+            const numericAmount = parseFloat(cashTenderAmount);
+            const tenderResponse = await secretaryApi.recordPartialPayment(paymentResponse.data.id, numericAmount);
+            if (tenderResponse.success) {
+              setCashTenderAmount('');
+              // Refresh payment data to show updated status
+              await new Promise(resolve => setTimeout(resolve, 500));
+              const refreshResponse = await secretaryApi.getPayment(appointmentId);
+              if (refreshResponse.success && refreshResponse.data) {
+                setSelectedPayment(refreshResponse.data);
+
+                // If payment is now fully paid, automatically complete checkup
+                if (refreshResponse.data.status === 'PAID') {
+                  setToastMessage('Payment fully paid and checkup completed');
+                  setShowToast(true);
+                  onClose();
+                  onSuccess();
+                }
+              }
+            }
+          }
+        }
       } else {
         setChargeFormError(response.error || 'Failed to create payment');
         setToastMessage(response.error || 'Failed to create payment');
@@ -137,14 +171,149 @@ export default function PaymentModal({
     return `₱${numAmount.toFixed(2)}`;
   };
 
+  // Calculate total amount from consultation and charges (recalculated for accuracy)
+  // Using integer arithmetic in cents for 100% accuracy
+  const calculateTotalAmount = (payment: Payment) => {
+    const consultationAmount = typeof payment.consultation_amount === 'string'
+      ? parseFloat(payment.consultation_amount)
+      : (payment.consultation_amount || 0);
+    const charges = payment.charges || [];
+    const chargesTotal = charges.reduce((sum, charge) => {
+      const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
+      return sum + (amount || 0);
+    }, 0);
+
+    // Convert to cents for integer arithmetic
+    const totalCents = Math.round(consultationAmount * 100) + Math.round(chargesTotal * 100);
+    // Convert back to pesos
+    return totalCents / 100;
+  };
+
+  // Calculate real-time balance from current data
+  // Using integer arithmetic in cents for 100% accuracy
+  const calculateBalance = (payment: Payment) => {
+    const totalAmount = calculateTotalAmount(payment);
+    const amountPaid = typeof payment.amount_paid === 'string'
+      ? parseFloat(payment.amount_paid)
+      : (payment.amount_paid || 0);
+
+    // Convert to cents for integer arithmetic
+    const totalCents = Math.round(totalAmount * 100);
+    const paidCents = Math.round(amountPaid * 100);
+    const balanceCents = Math.max(0, totalCents - paidCents);
+
+    // Convert back to pesos
+    return balanceCents / 100;
+  };
+
   // Calculate real-time balance after receipt payment
   const getBalanceAfterPayment = (amount: string) => {
     if (!selectedPayment || !amount) return null;
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) return null;
-    const currentBalance = parseFloat(selectedPayment.balance);
-    const newBalance = currentBalance - numericAmount;
-    return newBalance >= 0 ? newBalance.toFixed(2) : null;
+    const currentBalance = calculateBalance(selectedPayment);
+    const newBalance = Math.max(0, currentBalance - numericAmount);
+    return newBalance.toFixed(2);
+  };
+
+  // Calculate change when cash tender amount exceeds balance
+  const getChange = (amount: string) => {
+    if (!selectedPayment || !amount) return null;
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) return null;
+    const currentBalance = calculateBalance(selectedPayment);
+    const change = numericAmount - currentBalance;
+    return change > 0 ? change.toFixed(2) : null;
+  };
+
+  // Calculate total for walk-in payment including temporary charges
+  const calculateWalkInTotal = () => {
+    const chargesTotal = tempCharges.reduce((sum, charge) => sum + charge.amount, 0);
+    return consultationFee + chargesTotal;
+  };
+
+  // Calculate change for walk-in payment
+  const getWalkInChange = (amount: string) => {
+    if (!amount) return null;
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) return null;
+    const total = calculateWalkInTotal();
+    const change = numericAmount - total;
+    return change > 0 ? change.toFixed(2) : null;
+  };
+
+  // Add temporary charge for walk-in payment
+  const handleAddTempCharge = () => {
+    let chargeAmount: number;
+    let chargeDescription: string;
+    let chargeData: any;
+
+    if (chargeType === 'MEDICINE') {
+      const trimmedName = medicineName.trim();
+      if (!trimmedName) {
+        setChargeFormError('Medicine name is required');
+        return;
+      }
+
+      const numQuantity = parseFloat(medicineQuantity);
+      if (isNaN(numQuantity) || !isFinite(numQuantity) || numQuantity <= 0) {
+        setChargeFormError('Quantity must be a valid positive number');
+        return;
+      }
+
+      const numUnitPrice = parseFloat(medicineUnitPrice);
+      if (isNaN(numUnitPrice) || !isFinite(numUnitPrice) || numUnitPrice <= 0) {
+        setChargeFormError('Unit price must be a valid positive number');
+        return;
+      }
+
+      chargeAmount = numQuantity * numUnitPrice;
+      chargeAmount = Math.round(chargeAmount * 100) / 100;
+      chargeDescription = trimmedName;
+      chargeData = {
+        description: chargeDescription,
+        amount: chargeAmount,
+        chargeType: 'MEDICINE',
+        name: trimmedName,
+        quantity: numQuantity,
+        unitPrice: numUnitPrice
+      };
+    } else {
+      const trimmedDescription = chargeDescription.trim();
+      if (!trimmedDescription) {
+        setChargeFormError('Description is required');
+        return;
+      }
+
+      const numAmount = parseFloat(chargeAmount);
+      if (isNaN(numAmount) || !isFinite(numAmount) || numAmount <= 0) {
+        setChargeFormError('Amount must be a valid positive number');
+        return;
+      }
+
+      chargeAmount = numAmount;
+      chargeDescription = trimmedDescription;
+      chargeData = {
+        description: chargeDescription,
+        amount: chargeAmount,
+        chargeType: 'ADDITIONAL'
+      };
+    }
+
+    setTempCharges([...tempCharges, chargeData]);
+    setChargeDescription('');
+    setChargeAmount('');
+    setMedicineName('');
+    setMedicineQuantity('');
+    setMedicineUnitPrice('');
+    setChargeType('ADDITIONAL');
+    setChargeFormError(null);
+    setShowAddChargeModal(false);
+  };
+
+  // Remove temporary charge
+  const handleRemoveTempCharge = (index: number) => {
+    setTempCharges(tempCharges.filter((_, i) => i !== index));
   };
 
   const handleAddCharge = async () => {
@@ -304,13 +473,7 @@ export default function PaymentModal({
           setSelectedPayment(paymentResponse.data);
         }
       } else {
-        if (response.error?.includes('cannot exceed outstanding balance')) {
-          setRecordPaymentError(
-            `${response.error}. Please adjust the amount or click "Use outstanding balance" to record the correct payment.`
-          );
-        } else {
-          setRecordPaymentError(response.error || 'Failed to record payment');
-        }
+        setRecordPaymentError(response.error || 'Failed to record payment');
       }
     } catch (error) {
       setRecordPaymentError('Failed to record payment');
@@ -350,63 +513,13 @@ export default function PaymentModal({
           setSelectedPayment(paymentResponse.data);
         }
       } else {
-        if (response.error?.includes('cannot exceed outstanding balance')) {
-          setReceiptPaymentError(
-            `${response.error}. Please adjust the amount or click "Use outstanding balance" to record the correct payment.`
-          );
-        } else {
-          setReceiptPaymentError(response.error || 'Failed to record payment');
-        }
+        setReceiptPaymentError(response.error || 'Failed to record payment');
       }
     } catch (error) {
       setReceiptPaymentError('Failed to record payment');
     } finally {
       setActionLoading(false);
     }
-  };
-
-  const handleVerify = async (paymentId: string) => {
-    setActionLoading(true);
-
-    const response = await secretaryApi.verifyPayment(paymentId);
-
-    if (response.success) {
-      setToastMessage('Payment verified successfully');
-      setToastType('success');
-      setShowToast(true);
-      setShowVerifyDialog(false);
-      if (selectedPayment) {
-        const paymentResponse = await secretaryApi.getPayment(appointmentId);
-        if (paymentResponse.success && paymentResponse.data) {
-          setSelectedPayment(paymentResponse.data);
-        }
-      }
-    } else {
-      setToastMessage(response.error || 'Failed to verify payment');
-      setToastType('error');
-      setShowToast(true);
-    }
-    setActionLoading(false);
-  };
-
-  const handleReject = async (paymentId: string) => {
-    setActionLoading(true);
-
-    const response = await secretaryApi.rejectPayment(paymentId);
-
-    if (response.success) {
-      setToastMessage('Payment rejected successfully');
-      setToastType('success');
-      setShowToast(true);
-      setShowRejectDialog(false);
-      onClose();
-      onSuccess();
-    } else {
-      setToastMessage(response.error || 'Failed to reject payment');
-      setToastType('error');
-      setShowToast(true);
-    }
-    setActionLoading(false);
   };
 
   const handleMarkAsPaid = async (paymentId: string) => {
@@ -428,6 +541,88 @@ export default function PaymentModal({
       onSuccess();
     } else {
       setToastMessage(response.error || 'Failed to mark payment as paid');
+      setToastType('error');
+      setShowToast(true);
+    }
+    setActionLoading(false);
+  };
+
+  const handleCashTenderPayment = async () => {
+    if (!selectedPayment) return;
+
+    setActionLoading(true);
+    setToastMessage('');
+    setToastType('success');
+    setCashTenderError(null);
+
+    try {
+      const numericAmount = parseFloat(cashTenderAmount);
+      if (isNaN(numericAmount) || !isFinite(numericAmount) || numericAmount <= 0) {
+        setCashTenderError('Amount must be a valid positive number');
+        setActionLoading(false);
+        return;
+      }
+
+      const response = await secretaryApi.recordPartialPayment(selectedPayment.id, numericAmount);
+
+      if (response.success) {
+        setToastMessage('Payment recorded successfully');
+        setShowToast(true);
+        setCashTenderAmount('');
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const paymentResponse = await secretaryApi.getPaymentById(selectedPayment.id);
+        if (paymentResponse.success && paymentResponse.data) {
+          setSelectedPayment(paymentResponse.data);
+        }
+        // Show complete checkup modal after recording payment
+        setShowCompleteCheckupModal(true);
+      } else {
+        setCashTenderError(response.error || 'Failed to record payment');
+      }
+    } catch (error) {
+      setCashTenderError('Failed to record payment');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCompleteCheckup = async () => {
+    if (!selectedPayment) return;
+
+    setActionLoading(true);
+
+    // Check if payment is already fully paid
+    if (selectedPayment.status === 'PAID') {
+      // Payment is already paid, just complete the checkup
+      setToastMessage('Checkup completed successfully');
+      setToastType('success');
+      setShowToast(true);
+      setShowCompleteCheckupModal(false);
+      onClose();
+      onSuccess();
+      setActionLoading(false);
+      return;
+    }
+
+    // Payment is not fully paid yet, mark it as paid
+    const response = await secretaryApi.markAsPaid(selectedPayment.id);
+
+    if (response.success) {
+      setToastMessage('Checkup completed and payment marked as paid');
+      setToastType('success');
+      setShowToast(true);
+      setShowCompleteCheckupModal(false);
+      if (selectedPayment) {
+        const paymentResponse = await secretaryApi.getPayment(appointmentId);
+        if (paymentResponse.success && paymentResponse.data) {
+          setSelectedPayment(paymentResponse.data);
+        }
+      }
+      onClose();
+      onSuccess();
+    } else {
+      setToastMessage(response.error || 'Failed to complete checkup');
       setToastType('error');
       setShowToast(true);
     }
@@ -521,6 +716,122 @@ export default function PaymentModal({
               </div>
             </div>
 
+            {/* Additional Charges Section */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-900">Additional Charges</h3>
+                <button
+                  onClick={() => setShowAddChargeModal(true)}
+                  disabled={actionLoading}
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                >
+                  + Add Charge
+                </button>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-4 space-y-2 text-sm">
+                {tempCharges.length === 0 ? (
+                  <p className="text-slate-500 italic">No additional charges</p>
+                ) : (
+                  tempCharges.map((charge, index) => (
+                    <div key={index} className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex justify-between">
+                          <span className="text-slate-600">{charge.description}:</span>
+                          <span className="text-slate-900">{formatAmount(charge.amount)}</span>
+                        </div>
+                        {charge.chargeType === 'MEDICINE' && charge.quantity && charge.unitPrice && (
+                          <div className="text-xs text-slate-500 mt-1">
+                            Qty: {charge.quantity} × {formatAmount(charge.unitPrice)}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleRemoveTempCharge(index)}
+                        disabled={actionLoading}
+                        className="ml-2 text-red-600 hover:text-red-700 disabled:opacity-50"
+                        title="Remove charge"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+                {tempCharges.length > 0 && (
+                  <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-semibold">
+                    <span className="text-slate-900">Total:</span>
+                    <span className="text-slate-900">{formatAmount(calculateWalkInTotal())}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Cash Tender Section */}
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 mb-3">Cash Tender</h3>
+              <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                {/* Payment Method Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Payment Method</label>
+                  <select
+                    value={cashTenderMethod}
+                    onChange={(e) => setCashTenderMethod(e.target.value as 'CASH' | 'GCASH')}
+                    disabled={actionLoading}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  >
+                    <option value="CASH">CASH</option>
+                    <option value="GCASH">GCASH</option>
+                  </select>
+                </div>
+
+                {/* Amount Input */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-slate-700">Amount Received (₱)</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCashTenderAmount(calculateWalkInTotal().toString());
+                        setCashTenderError(null);
+                      }}
+                      disabled={actionLoading}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                    >
+                      Use total amount
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    value={cashTenderAmount}
+                    onChange={(e) => {
+                      setCashTenderAmount(e.target.value);
+                      setCashTenderError(null);
+                    }}
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0.01"
+                    disabled={actionLoading}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+
+                {/* Change Display */}
+                {cashTenderAmount && getWalkInChange(cashTenderAmount) && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-emerald-700 font-medium">Change:</span>
+                      <span className="font-bold text-emerald-900">{formatAmount(getWalkInChange(cashTenderAmount))}</span>
+                    </div>
+                  </div>
+                )}
+
+                {cashTenderError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+                    {cashTenderError}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Info message */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start gap-2">
@@ -528,7 +839,7 @@ export default function PaymentModal({
                 <div className="text-sm">
                   <p className="font-medium text-blue-900">Create Payment Record</p>
                   <p className="text-blue-700 mt-1">
-                    Click "Create Payment" to create the payment record. After creation, you can add charges, record payments, and manage the payment status.
+                    Click "Create Payment" to create the payment record with charges and payment. The payment will be marked as paid if the full amount is received.
                   </p>
                 </div>
               </div>
@@ -689,18 +1000,7 @@ export default function PaymentModal({
                 <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-semibold">
                   <span className="text-slate-900">Total:</span>
                   <span className="text-slate-900">
-                    {(() => {
-                      const consultationAmount = typeof selectedPayment.consultation_amount === 'string'
-                        ? parseFloat(selectedPayment.consultation_amount)
-                        : (selectedPayment.consultation_amount || 0);
-                      const charges = selectedPayment.charges || [];
-                      const chargesTotal = charges.reduce((sum, charge) => {
-                        const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
-                        return sum + (amount || 0);
-                      }, 0);
-                      const total = consultationAmount + chargesTotal;
-                      return formatAmount(total);
-                    })()}
+                    {formatAmount(calculateTotalAmount(selectedPayment))}
                   </span>
                 </div>
               </div>
@@ -713,15 +1013,7 @@ export default function PaymentModal({
                 <div className="flex justify-between">
                   <span className="text-slate-600">Total Amount:</span>
                   <span className="text-slate-900 font-semibold">
-                    {formatAmount(
-                      (typeof selectedPayment.consultation_amount === 'string'
-                        ? parseFloat(selectedPayment.consultation_amount)
-                        : (selectedPayment.consultation_amount || 0)) +
-                      (selectedPayment.charges?.reduce((sum, charge) => {
-                        const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
-                        return sum + (amount || 0);
-                      }, 0) || 0)
-                    )}
+                    {formatAmount(calculateTotalAmount(selectedPayment))}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -730,118 +1022,136 @@ export default function PaymentModal({
                 </div>
                 <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between">
                   <span className="text-slate-700 font-medium">Remaining Balance:</span>
-                  <span className="text-slate-900 font-bold">{formatAmount(selectedPayment.balance)}</span>
+                  <span className="text-slate-900 font-bold">{formatAmount(calculateBalance(selectedPayment))}</span>
                 </div>
               </div>
             </div>
 
-            {/* Actions for unpaid payments (cash) */}
-            {selectedPayment.status === 'UNPAID' && (
-              <div className="flex gap-3 pt-4 border-t border-slate-200">
-                <button
-                  onClick={() => setShowRecordPaymentModal(true)}
-                  disabled={actionLoading}
-                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                >
-                  {actionLoading ? 'Recording...' : 'Record Payment'}
-                </button>
-                <button
-                  onClick={() => handleMarkAsPaid(selectedPayment.id)}
-                  disabled={actionLoading}
-                  className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                >
-                  {actionLoading ? 'Marking...' : 'Mark Full Payment'}
-                </button>
-              </div>
-            )}
+            {/* Cash Tender Section */}
+            {(selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Cash Tender</h3>
+                <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                  {/* Payment Method Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Payment Method</label>
+                    <select
+                      value={cashTenderMethod}
+                      onChange={(e) => setCashTenderMethod(e.target.value as 'CASH' | 'GCASH')}
+                      disabled={actionLoading}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    >
+                      <option value="CASH">CASH</option>
+                      <option value="GCASH">GCASH</option>
+                    </select>
+                  </div>
 
-            {/* Actions for pending payments (GCash) */}
-            {selectedPayment.status === 'PENDING_VERIFICATION' && (
-              <div className="flex gap-3 pt-4 border-t border-slate-200">
-                {selectedPayment.verified_by ? (
-                  <button
-                    onClick={() => handleMarkAsPaid(selectedPayment.id)}
-                    disabled={actionLoading}
-                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                  >
-                    {actionLoading ? 'Marking...' : 'Mark as Paid'}
-                  </button>
-                ) : (
-                  <>
+                  {/* Amount Input - only show if balance > 0 */}
+                  {calculateBalance(selectedPayment) > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-sm font-medium text-slate-700">Amount Received (₱)</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCashTenderAmount(calculateBalance(selectedPayment).toString());
+                            setCashTenderError(null);
+                          }}
+                          disabled={actionLoading}
+                          className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                        >
+                          Use outstanding balance
+                        </button>
+                      </div>
+                      <input
+                        type="number"
+                        value={cashTenderAmount}
+                        onChange={(e) => {
+                          setCashTenderAmount(e.target.value);
+                          setCashTenderError(null);
+                        }}
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0.01"
+                        disabled={actionLoading}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+                  )}
+
+                  {/* Balance After Payment */}
+                  {cashTenderAmount && getBalanceAfterPayment(cashTenderAmount) && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-blue-700 font-medium">Balance after payment:</span>
+                        <span className="font-bold text-blue-900">{formatAmount(getBalanceAfterPayment(cashTenderAmount))}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Change Display */}
+                  {cashTenderAmount && getChange(cashTenderAmount) && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-emerald-700 font-medium">Change:</span>
+                        <span className="font-bold text-emerald-900">{formatAmount(getChange(cashTenderAmount))}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {cashTenderError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+                      {cashTenderError}
+                    </div>
+                  )}
+
+                  {/* Mark as Paid Button - show if balance > 0 with amount input, or if balance is 0 (already paid partially) */}
+                  {calculateBalance(selectedPayment) > 0 ? (
                     <button
-                      onClick={() => setShowVerifyDialog(true)}
-                      disabled={actionLoading}
-                      className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                      onClick={handleCashTenderPayment}
+                      disabled={actionLoading || !cashTenderAmount}
+                      className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     >
-                      {actionLoading ? 'Verifying...' : 'Verify Payment'}
+                      {actionLoading ? 'Processing...' : 'Mark as Paid'}
                     </button>
+                  ) : (
                     <button
-                      onClick={() => setShowRejectDialog(true)}
+                      onClick={() => setShowCompleteCheckupModal(true)}
                       disabled={actionLoading}
-                      className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                      className="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     >
-                      {actionLoading ? 'Rejecting...' : 'Reject Payment'}
+                      {actionLoading ? 'Processing...' : 'Complete Checkup'}
                     </button>
-                  </>
-                )}
+                  )}
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Verify Confirmation Dialog */}
-      {showVerifyDialog && selectedPayment && (
+      {/* Complete Checkup Modal */}
+      {showCompleteCheckupModal && selectedPayment && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Verify Payment</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Complete Checkup</h3>
             <p className="text-sm text-slate-600 mb-4">
-              Are you sure you want to verify this payment with a remaining balance of {formatAmount(selectedPayment.balance)} from{' '}
-              {selectedPayment.patient_first_name} {selectedPayment.patient_last_name}?
+              Confirm that the checkup is complete and the payment should be marked as fully paid?
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => setShowVerifyDialog(false)}
+                onClick={() => setShowCompleteCheckupModal(false)}
                 disabled={actionLoading}
                 className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleVerify(selectedPayment.id)}
+                onClick={handleCompleteCheckup}
                 disabled={actionLoading}
                 className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
               >
-                {actionLoading ? 'Verifying...' : 'Verify'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Reject Confirmation Dialog */}
-      {showRejectDialog && selectedPayment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Reject Payment</h3>
-            <p className="text-sm text-slate-600 mb-4">
-              Are you sure you want to reject this payment with a remaining balance of {formatAmount(selectedPayment.balance)} from{' '}
-              {selectedPayment.patient_first_name} {selectedPayment.patient_last_name}?
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowRejectDialog(false)}
-                disabled={actionLoading}
-                className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleReject(selectedPayment.id)}
-                disabled={actionLoading}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-              >
-                {actionLoading ? 'Rejecting...' : 'Reject'}
+                {actionLoading ? 'Completing...' : 'Confirm Complete Checkup'}
               </button>
             </div>
           </div>
@@ -897,13 +1207,7 @@ export default function PaymentModal({
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-600">Total Amount:</span>
                       <span className="font-semibold text-slate-900">
-                        {formatAmount(
-                          (typeof selectedPayment.consultation_amount === 'string' ? parseFloat(selectedPayment.consultation_amount) : (selectedPayment.consultation_amount || 0)) +
-                          (selectedPayment.charges?.reduce((sum, charge) => {
-                            const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
-                            return sum + (amount || 0);
-                          }, 0) || 0)
-                        )}
+                        {formatAmount(calculateTotalAmount(selectedPayment))}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm mt-1">
@@ -912,18 +1216,18 @@ export default function PaymentModal({
                     </div>
                     <div className="flex justify-between text-sm mt-1 pt-2 border-t border-slate-200">
                       <span className="text-slate-700 font-medium">Outstanding Balance:</span>
-                      <span className="font-bold text-slate-900">{formatAmount(selectedPayment.balance)}</span>
+                      <span className="font-bold text-slate-900">{formatAmount(calculateBalance(selectedPayment))}</span>
                     </div>
                   </div>
 
                   {/* Amount Received Input */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm font-medium text-slate-700">Amount from Receipt (₱)</label>
+                      <label className="block text-sm font-medium text-slate-700">Gcash Advance Payment (₱)</label>
                       <button
                         type="button"
                         onClick={() => {
-                          setReceiptAmount(selectedPayment.balance);
+                          setReceiptAmount(calculateBalance(selectedPayment).toString());
                           setReceiptPaymentError(null);
                         }}
                         disabled={actionLoading}
@@ -942,36 +1246,13 @@ export default function PaymentModal({
                       placeholder="0.00"
                       step="0.01"
                       min="0.01"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900 ${
-                        receiptAmount && parseFloat(receiptAmount) > parseFloat(selectedPayment.balance)
-                          ? 'border-amber-300 focus:ring-amber-500'
-                          : 'border-slate-300'
-                      }`}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
                       disabled={actionLoading}
                     />
                     <p className="text-xs text-slate-500 mt-1">
-                      Outstanding balance: {formatAmount(selectedPayment.balance)}
+                      Outstanding balance: {formatAmount(calculateBalance(selectedPayment))}
                     </p>
                   </div>
-
-                  {/* Warning when amount exceeds balance */}
-                  {receiptAmount && parseFloat(receiptAmount) > parseFloat(selectedPayment.balance) && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-                      <div className="flex items-start gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-amber-600 mt-0.5">warning</span>
-                        <div className="text-sm">
-                          <p className="text-amber-800 font-medium">Amount exceeds outstanding balance</p>
-                          <p className="text-amber-700 mt-1">
-                            The receipt amount ({formatAmount(receiptAmount)}) is greater than the outstanding balance ({formatAmount(selectedPayment.balance)}).
-                            This may be due to additional charges added after the receipt was uploaded.
-                          </p>
-                          <p className="text-amber-700 mt-1">
-                            Please adjust the amount or click "Use outstanding balance" to record the correct payment.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Real-time Balance After Payment */}
                   {receiptAmount && getBalanceAfterPayment(receiptAmount) && (
@@ -1216,13 +1497,7 @@ export default function PaymentModal({
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600">Total Amount:</span>
                   <span className="font-semibold text-slate-900">
-                    {formatAmount(
-                      (typeof selectedPayment.consultation_amount === 'string' ? parseFloat(selectedPayment.consultation_amount) : (selectedPayment.consultation_amount || 0)) +
-                      (selectedPayment.charges?.reduce((sum, charge) => {
-                        const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
-                        return sum + (amount || 0);
-                      }, 0) || 0)
-                    )}
+                    {formatAmount(calculateTotalAmount(selectedPayment))}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm mt-1">
@@ -1231,7 +1506,7 @@ export default function PaymentModal({
                 </div>
                 <div className="flex justify-between text-sm mt-1 pt-2 border-t border-slate-200">
                   <span className="text-slate-700 font-medium">Outstanding Balance:</span>
-                  <span className="font-bold text-slate-900">{formatAmount(selectedPayment.balance)}</span>
+                  <span className="font-bold text-slate-900">{formatAmount(calculateBalance(selectedPayment))}</span>
                 </div>
               </div>
 
@@ -1242,7 +1517,7 @@ export default function PaymentModal({
                   <button
                     type="button"
                     onClick={() => {
-                      setAmountReceived(selectedPayment.balance);
+                      setAmountReceived(calculateBalance(selectedPayment).toString());
                       setRecordPaymentError(null);
                     }}
                     disabled={actionLoading}
@@ -1261,36 +1536,15 @@ export default function PaymentModal({
                   placeholder="0.00"
                   step="0.01"
                   min="0.01"
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900 ${
-                    amountReceived && parseFloat(amountReceived) > parseFloat(selectedPayment.balance)
-                      ? 'border-amber-300 focus:ring-amber-500'
-                      : 'border-slate-300'
-                  }`}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
                   disabled={actionLoading}
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  Outstanding balance: {formatAmount(selectedPayment.balance)}
+                  Outstanding balance: {formatAmount(calculateBalance(selectedPayment))}
                 </p>
               </div>
 
               {/* Warning when amount exceeds balance */}
-              {amountReceived && parseFloat(amountReceived) > parseFloat(selectedPayment.balance) && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-                  <div className="flex items-start gap-2">
-                    <span className="material-symbols-outlined text-[18px] text-amber-600 mt-0.5">warning</span>
-                    <div className="text-sm">
-                      <p className="text-amber-800 font-medium">Amount exceeds outstanding balance</p>
-                      <p className="text-amber-700 mt-1">
-                        The received amount ({formatAmount(amountReceived)}) is greater than the outstanding balance ({formatAmount(selectedPayment.balance)}).
-                      </p>
-                      <p className="text-amber-700 mt-1">
-                        Please adjust the amount or click "Use outstanding balance" to record the correct payment.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Real-time Balance After Payment */}
               {amountReceived && getBalanceAfterPayment(amountReceived) && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">

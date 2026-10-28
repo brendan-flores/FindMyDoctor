@@ -159,7 +159,7 @@ router.get('/', authenticate, requireSecretaryPasswordChange, requireSecretaryPr
     }
 
     const payments = result.rows.map(payment => {
-      const balance = parseFloat(payment.total_amount) - parseFloat(payment.amount_paid);
+      const balance = Math.max(0, parseFloat(payment.total_amount) - parseFloat(payment.amount_paid));
       return {
         ...payment,
         charges: chargesByPayment.get(payment.id) || [],
@@ -309,7 +309,7 @@ router.get('/:appointmentId', authenticate, requireSecretaryPasswordChange, requ
 
     const payment = result.rows[0];
     payment.charges = chargesResult.rows;
-    const balance = parseFloat(payment.total_amount) - parseFloat(payment.amount_paid);
+    const balance = Math.max(0, parseFloat(payment.total_amount) - parseFloat(payment.amount_paid));
     payment.balance = balance.toFixed(2);
 
     res.json(success(payment));
@@ -695,6 +695,14 @@ router.patch('/:id/mark-paid', authenticate, requireSecretaryPasswordChange, req
        SET status = 'PAID', amount_paid = $1, verified_by = $2, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = $3`,
       [payment.total_amount, secretaryRecordId, id]
+    );
+
+    // Update queue entry status to COMPLETED
+    await client.query(
+      `UPDATE queue_entries
+       SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE appointment_id = $1`,
+      [payment.appointment_id]
     );
 
     // Insert notification for patient
@@ -1175,7 +1183,7 @@ router.get('/by-id/:id', authenticate, async (req: AuthRequest, res: Response) =
 
     const payment = result.rows[0];
     payment.charges = chargesResult.rows;
-    const balance = parseFloat(payment.total_amount) - parseFloat(payment.amount_paid);
+    const balance = Math.max(0, parseFloat(payment.total_amount) - parseFloat(payment.amount_paid));
     payment.balance = balance.toFixed(2);
 
     res.json(success(payment));
@@ -1265,13 +1273,46 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
     // Validate additional charges if provided
     if (additionalCharges && Array.isArray(additionalCharges)) {
       for (const charge of additionalCharges) {
-        if (!charge.description || typeof charge.description !== 'string' || charge.description.trim() === '') {
+        const chargeType = charge.chargeType || 'ADDITIONAL';
+
+        if (!['ADDITIONAL', 'MEDICINE'].includes(chargeType)) {
           client.release();
-          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a non-empty description'));
+          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid charge type. Must be ADDITIONAL or MEDICINE'));
         }
-        if (charge.amount === undefined || charge.amount === null || isNaN(charge.amount) || charge.amount <= 0) {
-          client.release();
-          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a positive amount'));
+
+        if (chargeType === 'MEDICINE') {
+          // Medicine charge validation
+          if (!charge.name || typeof charge.name !== 'string' || charge.name.trim() === '') {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Medicine name is required for medicine charges'));
+          }
+
+          const quantity = Number(charge.quantity);
+          if (isNaN(quantity) || !isFinite(quantity) || quantity <= 0) {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Quantity must be a valid positive number for medicine charges'));
+          }
+
+          const unitPrice = Number(charge.unitPrice);
+          if (isNaN(unitPrice) || !isFinite(unitPrice) || unitPrice <= 0) {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Unit price must be a valid positive number for medicine charges'));
+          }
+
+          // Calculate amount on server (never trust client-supplied medicine total)
+          charge.amount = quantity * unitPrice;
+          charge.amount = Math.round(charge.amount * 100) / 100;
+          charge.description = charge.name.trim();
+        } else {
+          // Additional charge validation
+          if (!charge.description || typeof charge.description !== 'string' || charge.description.trim() === '') {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a non-empty description'));
+          }
+          if (charge.amount === undefined || charge.amount === null || isNaN(charge.amount) || charge.amount <= 0) {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a positive amount'));
+          }
         }
       }
     }
@@ -1368,11 +1409,21 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
       // Insert additional charges if provided
       if (additionalCharges && additionalCharges.length > 0) {
         for (const charge of additionalCharges) {
-          await client.query(
-            `INSERT INTO payment_charges (payment_id, description, amount, created_by)
-             VALUES ($1, $2, $3, $4)`,
-            [paymentId, charge.description.trim(), parseFloat(charge.amount), secretaryRecordId]
-          );
+          const chargeType = charge.chargeType || 'ADDITIONAL';
+
+          if (chargeType === 'MEDICINE') {
+            await client.query(
+              `INSERT INTO payment_charges (payment_id, charge_type, description, amount, quantity, unit_price, created_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [paymentId, 'MEDICINE', charge.description.trim(), parseFloat(charge.amount), Number(charge.quantity), Number(charge.unitPrice), secretaryRecordId]
+            );
+          } else {
+            await client.query(
+              `INSERT INTO payment_charges (payment_id, charge_type, description, amount, created_by)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [paymentId, 'ADDITIONAL', charge.description.trim(), parseFloat(charge.amount), secretaryRecordId]
+            );
+          }
         }
       }
     } else {
@@ -1396,11 +1447,21 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
 
       if (additionalCharges && additionalCharges.length > 0) {
         for (const charge of additionalCharges) {
-          await client.query(
-            `INSERT INTO payment_charges (payment_id, description, amount, created_by)
-             VALUES ($1, $2, $3, $4)`,
-            [paymentId, charge.description.trim(), parseFloat(charge.amount), secretaryRecordId]
-          );
+          const chargeType = charge.chargeType || 'ADDITIONAL';
+
+          if (chargeType === 'MEDICINE') {
+            await client.query(
+              `INSERT INTO payment_charges (payment_id, charge_type, description, amount, quantity, unit_price, created_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [paymentId, 'MEDICINE', charge.description.trim(), parseFloat(charge.amount), Number(charge.quantity), Number(charge.unitPrice), secretaryRecordId]
+            );
+          } else {
+            await client.query(
+              `INSERT INTO payment_charges (payment_id, charge_type, description, amount, created_by)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [paymentId, 'ADDITIONAL', charge.description.trim(), parseFloat(charge.amount), secretaryRecordId]
+            );
+          }
         }
       }
     }
@@ -1507,18 +1568,11 @@ router.patch('/:id/record-payment', authenticate, requireSecretaryPasswordChange
     // Calculate current balance
     const currentAmountPaid = parseFloat(payment.amount_paid);
     const totalAmount = parseFloat(payment.total_amount);
-    const currentBalance = totalAmount - currentAmountPaid;
+    const currentBalance = Math.max(0, totalAmount - currentAmountPaid);
 
-    // Validate amount does not exceed outstanding balance
-    if (numericAmount > currentBalance) {
-      await client.query('ROLLBACK');
-      client.release();
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, `Amount received cannot exceed outstanding balance of ₱${currentBalance.toFixed(2)}`));
-    }
-
-    // Calculate new amount paid (cumulative)
-    const newAmountPaid = currentAmountPaid + numericAmount;
-    const newBalance = totalAmount - newAmountPaid;
+    // Calculate new amount paid (cumulative), but cap at total_amount
+    const newAmountPaid = Math.min(currentAmountPaid + numericAmount, totalAmount);
+    const newBalance = Math.max(0, totalAmount - newAmountPaid);
 
     // Determine if payment is now fully paid
     const isFullyPaid = newBalance <= 0.01; // Account for floating point precision
@@ -1610,13 +1664,46 @@ router.post('/walk-in', authenticate, requireSecretaryPasswordChange, requireSec
     // Validate additional charges if provided
     if (additionalCharges && Array.isArray(additionalCharges)) {
       for (const charge of additionalCharges) {
-        if (!charge.description || typeof charge.description !== 'string' || charge.description.trim() === '') {
+        const chargeType = charge.chargeType || 'ADDITIONAL';
+
+        if (!['ADDITIONAL', 'MEDICINE'].includes(chargeType)) {
           client.release();
-          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a non-empty description'));
+          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid charge type. Must be ADDITIONAL or MEDICINE'));
         }
-        if (charge.amount === undefined || charge.amount === null || isNaN(charge.amount) || charge.amount <= 0) {
-          client.release();
-          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a positive amount'));
+
+        if (chargeType === 'MEDICINE') {
+          // Medicine charge validation
+          if (!charge.name || typeof charge.name !== 'string' || charge.name.trim() === '') {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Medicine name is required for medicine charges'));
+          }
+
+          const quantity = Number(charge.quantity);
+          if (isNaN(quantity) || !isFinite(quantity) || quantity <= 0) {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Quantity must be a valid positive number for medicine charges'));
+          }
+
+          const unitPrice = Number(charge.unitPrice);
+          if (isNaN(unitPrice) || !isFinite(unitPrice) || unitPrice <= 0) {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Unit price must be a valid positive number for medicine charges'));
+          }
+
+          // Calculate amount on server (never trust client-supplied medicine total)
+          charge.amount = quantity * unitPrice;
+          charge.amount = Math.round(charge.amount * 100) / 100;
+          charge.description = charge.name.trim();
+        } else {
+          // Additional charge validation
+          if (!charge.description || typeof charge.description !== 'string' || charge.description.trim() === '') {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a non-empty description'));
+          }
+          if (charge.amount === undefined || charge.amount === null || isNaN(charge.amount) || charge.amount <= 0) {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a positive amount'));
+          }
         }
       }
     }

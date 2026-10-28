@@ -33,8 +33,6 @@ export default function SecretaryPayments() {
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showVerifyDialog, setShowVerifyDialog] = useState(false);
-  const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptImageLoaded, setReceiptImageLoaded] = useState(false);
   const [receiptImageError, setReceiptImageError] = useState(false);
@@ -56,15 +54,64 @@ export default function SecretaryPayments() {
   const [recordPaymentError, setRecordPaymentError] = useState<string | null>(null);
   const [receiptAmount, setReceiptAmount] = useState('');
   const [receiptPaymentError, setReceiptPaymentError] = useState<string | null>(null);
+  const [cashTenderAmount, setCashTenderAmount] = useState('');
+  const [cashTenderMethod, setCashTenderMethod] = useState<'CASH' | 'GCASH'>('CASH');
+  const [showCompleteCheckupModal, setShowCompleteCheckupModal] = useState(false);
+  const [cashTenderError, setCashTenderError] = useState<string | null>(null);
+
+  // Calculate total amount from consultation and charges (recalculated for accuracy)
+  // Using integer arithmetic in cents for 100% accuracy
+  const calculateTotalAmount = (payment: Payment) => {
+    const consultationAmount = typeof payment.consultation_amount === 'string'
+      ? parseFloat(payment.consultation_amount)
+      : (payment.consultation_amount || 0);
+    const charges = payment.charges || [];
+    const chargesTotal = charges.reduce((sum, charge) => {
+      const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
+      return sum + (amount || 0);
+    }, 0);
+
+    // Convert to cents for integer arithmetic
+    const totalCents = Math.round(consultationAmount * 100) + Math.round(chargesTotal * 100);
+    // Convert back to pesos
+    return totalCents / 100;
+  };
+
+  // Calculate real-time balance from current data
+  // Using integer arithmetic in cents for 100% accuracy
+  const calculateBalance = (payment: Payment) => {
+    const totalAmount = calculateTotalAmount(payment);
+    const amountPaid = typeof payment.amount_paid === 'string'
+      ? parseFloat(payment.amount_paid)
+      : (payment.amount_paid || 0);
+
+    // Convert to cents for integer arithmetic
+    const totalCents = Math.round(totalAmount * 100);
+    const paidCents = Math.round(amountPaid * 100);
+    const balanceCents = Math.max(0, totalCents - paidCents);
+
+    // Convert back to pesos
+    return balanceCents / 100;
+  };
 
   // Calculate real-time balance after receipt payment
   const getBalanceAfterPayment = (amount: string) => {
     if (!selectedPayment || !amount) return null;
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) return null;
-    const currentBalance = parseFloat(selectedPayment.balance);
-    const newBalance = currentBalance - numericAmount;
-    return newBalance >= 0 ? newBalance.toFixed(2) : null;
+    const currentBalance = calculateBalance(selectedPayment);
+    const newBalance = Math.max(0, currentBalance - numericAmount);
+    return newBalance.toFixed(2);
+  };
+
+  // Calculate change when cash tender amount exceeds balance
+  const getChange = (amount: string) => {
+    if (!selectedPayment || !amount) return null;
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) return null;
+    const currentBalance = calculateBalance(selectedPayment);
+    const change = numericAmount - currentBalance;
+    return change > 0 ? change.toFixed(2) : null;
   };
 
   useEffect(() => {
@@ -108,54 +155,6 @@ export default function SecretaryPayments() {
     }
   };
 
-  const handleVerify = async (paymentId: string) => {
-    setActionLoading(true);
-
-    const response = await secretaryApi.verifyPayment(paymentId);
-
-    if (response.success) {
-      setToastMessage('Payment verified successfully');
-      setToastType('success');
-      setShowToast(true);
-      setShowVerifyDialog(false);
-      // Refresh payment details to show verification metadata
-      if (selectedPayment) {
-        const paymentResponse = await secretaryApi.getPayment(selectedPayment.appointment_id);
-        if (paymentResponse.success && paymentResponse.data) {
-          setSelectedPayment(paymentResponse.data);
-        }
-      }
-      fetchPayments();
-      fetchPaymentCounts();
-    } else {
-      setToastMessage(response.error || 'Failed to verify payment');
-      setToastType('error');
-      setShowToast(true);
-    }
-    setActionLoading(false);
-  };
-
-  const handleReject = async (paymentId: string) => {
-    setActionLoading(true);
-
-    const response = await secretaryApi.rejectPayment(paymentId);
-
-    if (response.success) {
-      setToastMessage('Payment rejected successfully');
-      setToastType('success');
-      setShowToast(true);
-      setShowRejectDialog(false);
-      setShowDetailsModal(false);
-      fetchPayments();
-      fetchPaymentCounts();
-    } else {
-      setToastMessage(response.error || 'Failed to reject payment');
-      setToastType('error');
-      setShowToast(true);
-    }
-    setActionLoading(false);
-  };
-
   const handleMarkAsPaid = async (paymentId: string) => {
     setActionLoading(true);
 
@@ -178,6 +177,90 @@ export default function SecretaryPayments() {
       fetchPaymentCounts();
     } else {
       setToastMessage(response.error || 'Failed to mark payment as paid');
+      setToastType('error');
+      setShowToast(true);
+    }
+    setActionLoading(false);
+  };
+
+  const handleCashTenderPayment = async () => {
+    if (!selectedPayment) return;
+
+    setActionLoading(true);
+    setToastMessage('');
+    setToastType('success');
+    setCashTenderError(null);
+
+    try {
+      const numericAmount = parseFloat(cashTenderAmount);
+      if (isNaN(numericAmount) || !isFinite(numericAmount) || numericAmount <= 0) {
+        setCashTenderError('Amount must be a valid positive number');
+        setActionLoading(false);
+        return;
+      }
+
+      const response = await secretaryApi.recordPartialPayment(selectedPayment.id, numericAmount);
+
+      if (response.success) {
+        setToastMessage('Payment recorded successfully');
+        setShowToast(true);
+        setCashTenderAmount('');
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const paymentResponse = await secretaryApi.getPaymentById(selectedPayment.id);
+        if (paymentResponse.success && paymentResponse.data) {
+          setSelectedPayment(paymentResponse.data);
+        }
+        // Show complete checkup modal after recording payment
+        setShowCompleteCheckupModal(true);
+      } else {
+        setCashTenderError(response.error || 'Failed to record payment');
+      }
+    } catch (error) {
+      setCashTenderError('Failed to record payment');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCompleteCheckup = async () => {
+    if (!selectedPayment) return;
+
+    setActionLoading(true);
+
+    // Check if payment is already fully paid
+    if (selectedPayment.status === 'PAID') {
+      // Payment is already paid, just complete the checkup
+      setToastMessage('Checkup completed successfully');
+      setToastType('success');
+      setShowToast(true);
+      setShowCompleteCheckupModal(false);
+      setShowDetailsModal(false);
+      fetchPayments();
+      fetchPaymentCounts();
+      setActionLoading(false);
+      return;
+    }
+
+    // Payment is not fully paid yet, mark it as paid
+    const response = await secretaryApi.markAsPaid(selectedPayment.id);
+
+    if (response.success) {
+      setToastMessage('Checkup completed and payment marked as paid');
+      setToastType('success');
+      setShowToast(true);
+      setShowCompleteCheckupModal(false);
+      if (selectedPayment) {
+        const paymentResponse = await secretaryApi.getPayment(selectedPayment.appointment_id);
+        if (paymentResponse.success && paymentResponse.data) {
+          setSelectedPayment(paymentResponse.data);
+        }
+      }
+      setShowDetailsModal(false);
+      fetchPayments();
+      fetchPaymentCounts();
+    } else {
+      setToastMessage(response.error || 'Failed to complete checkup');
       setToastType('error');
       setShowToast(true);
     }
@@ -396,14 +479,7 @@ export default function SecretaryPayments() {
           setShowToast(true);
         }
       } else {
-        // Enhance error message with outstanding balance context
-        if (response.error?.includes('cannot exceed outstanding balance')) {
-          setRecordPaymentError(
-            `${response.error}. Please adjust the amount or click "Use outstanding balance" to record the correct payment.`
-          );
-        } else {
-          setRecordPaymentError(response.error || 'Failed to record payment');
-        }
+        setRecordPaymentError(response.error || 'Failed to record payment');
       }
     } catch (error) {
       setRecordPaymentError('Failed to record payment');
@@ -432,7 +508,7 @@ export default function SecretaryPayments() {
         paymentId: selectedPayment.id,
         amount: numericAmount,
         currentAmountPaid: selectedPayment.amount_paid,
-        currentBalance: selectedPayment.balance
+        currentBalance: calculateBalance(selectedPayment)
       });
 
       const response = await secretaryApi.recordPartialPayment(selectedPayment.id, numericAmount);
@@ -472,14 +548,7 @@ export default function SecretaryPayments() {
         }
       } else {
         console.error('Failed to record payment:', response.error);
-        // Enhance error message with outstanding balance context
-        if (response.error?.includes('cannot exceed outstanding balance')) {
-          setReceiptPaymentError(
-            `${response.error}. Please adjust the amount or click "Use outstanding balance" to record the correct payment.`
-          );
-        } else {
-          setReceiptPaymentError(response.error || 'Failed to record payment');
-        }
+        setReceiptPaymentError(response.error || 'Failed to record payment');
       }
     } catch (error) {
       console.error('Error recording payment:', error);
@@ -723,7 +792,7 @@ export default function SecretaryPayments() {
                               {STATUS_LABELS[payment.status]}
                             </span>
                             <span className="text-lg font-bold text-slate-900">
-                              {formatAmount(payment.balance)}
+                              {formatAmount(calculateBalance(payment))}
                             </span>
                           </div>
                         </div>
@@ -817,18 +886,7 @@ export default function SecretaryPayments() {
 
               {/* Charges Breakdown */}
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Charges Breakdown</h3>
-                  {(selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && (
-                    <button
-                      onClick={() => setShowAddChargeModal(true)}
-                      disabled={actionLoading}
-                      className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
-                    >
-                      + Add Charge
-                    </button>
-                  )}
-                </div>
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Charges Breakdown</h3>
                 <div className="bg-slate-50 rounded-lg p-4 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-600">Consultation Fee:</span>
@@ -850,19 +908,6 @@ export default function SecretaryPayments() {
                               )}
                             </div>
                           </div>
-                          {(selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && (
-                            <button
-                              onClick={() => {
-                                setChargeToDelete(charge);
-                                setShowDeleteChargeDialog(true);
-                              }}
-                              disabled={actionLoading}
-                              className="ml-2 text-red-600 hover:text-red-700 disabled:opacity-50"
-                              title="Delete charge"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">delete</span>
-                            </button>
-                          )}
                         </div>
                       ))}
                     </>
@@ -870,18 +915,7 @@ export default function SecretaryPayments() {
                   <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-semibold">
                     <span className="text-slate-900">Total:</span>
                     <span className="text-slate-900">
-                      {(() => {
-                        const consultationAmount = typeof selectedPayment.consultation_amount === 'string'
-                          ? parseFloat(selectedPayment.consultation_amount)
-                          : (selectedPayment.consultation_amount || 0);
-                        const charges = selectedPayment.charges || [];
-                        const chargesTotal = charges.reduce((sum, charge) => {
-                          const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
-                          return sum + (amount || 0);
-                        }, 0);
-                        const total = consultationAmount + chargesTotal;
-                        return formatAmount(total);
-                      })()}
+                      {formatAmount(calculateTotalAmount(selectedPayment))}
                     </span>
                   </div>
                 </div>
@@ -894,15 +928,7 @@ export default function SecretaryPayments() {
                   <div className="flex justify-between">
                     <span className="text-slate-600">Total Amount:</span>
                     <span className="text-slate-900 font-semibold">
-                      {formatAmount(
-                        (typeof selectedPayment.consultation_amount === 'string'
-                          ? parseFloat(selectedPayment.consultation_amount)
-                          : (selectedPayment.consultation_amount || 0)) +
-                        (selectedPayment.charges?.reduce((sum, charge) => {
-                          const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
-                          return sum + (amount || 0);
-                        }, 0) || 0)
-                      )}
+                      {formatAmount(calculateTotalAmount(selectedPayment))}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -911,7 +937,7 @@ export default function SecretaryPayments() {
                   </div>
                   <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between">
                     <span className="text-slate-700 font-medium">Remaining Balance:</span>
-                    <span className="text-slate-900 font-bold">{formatAmount(selectedPayment.balance)}</span>
+                    <span className="text-slate-900 font-bold">{formatAmount(calculateBalance(selectedPayment))}</span>
                   </div>
                 </div>
               </div>
@@ -963,118 +989,6 @@ export default function SecretaryPayments() {
                   </div>
                 </div>
               )}
-
-              {/* Actions for unpaid payments (cash) */}
-              {selectedPayment.status === 'UNPAID' && (
-                <div className="flex gap-3 pt-4 border-t border-slate-200">
-                  <button
-                    onClick={() => setShowRecordPaymentModal(true)}
-                    disabled={actionLoading}
-                    className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                  >
-                    {actionLoading ? 'Recording...' : 'Record Payment'}
-                  </button>
-                  <button
-                    onClick={() => handleMarkAsPaid(selectedPayment.id)}
-                    disabled={actionLoading}
-                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                  >
-                    {actionLoading ? 'Marking...' : 'Mark Full Payment'}
-                  </button>
-                </div>
-              )}
-
-              {/* Actions for pending payments (GCash) */}
-              {selectedPayment.status === 'PENDING_VERIFICATION' && (
-                <div className="flex gap-3 pt-4 border-t border-slate-200">
-                  {selectedPayment.verified_by ? (
-                    // Receipt verified - show Mark as Paid button
-                    <button
-                      onClick={() => handleMarkAsPaid(selectedPayment.id)}
-                      disabled={actionLoading}
-                      className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                    >
-                      {actionLoading ? 'Marking...' : 'Mark as Paid'}
-                    </button>
-                  ) : (
-                    // Receipt not verified - show Verify and Reject buttons
-                    <>
-                      <button
-                        onClick={() => setShowVerifyDialog(true)}
-                        disabled={actionLoading}
-                        className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                      >
-                        {actionLoading ? 'Verifying...' : 'Verify Payment'}
-                      </button>
-                      <button
-                        onClick={() => setShowRejectDialog(true)}
-                        disabled={actionLoading}
-                        className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                      >
-                        {actionLoading ? 'Rejecting...' : 'Reject Payment'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Verify Confirmation Dialog */}
-      {showVerifyDialog && selectedPayment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Verify Payment</h3>
-            <p className="text-sm text-slate-600 mb-4">
-              Are you sure you want to verify this payment with a remaining balance of {formatAmount(selectedPayment.balance)} from{' '}
-              {selectedPayment.patient_first_name} {selectedPayment.patient_last_name}?
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowVerifyDialog(false)}
-                disabled={actionLoading}
-                className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleVerify(selectedPayment.id)}
-                disabled={actionLoading}
-                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-              >
-                {actionLoading ? 'Verifying...' : 'Verify'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Reject Confirmation Dialog */}
-      {showRejectDialog && selectedPayment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Reject Payment</h3>
-            <p className="text-sm text-slate-600 mb-4">
-              Are you sure you want to reject this payment with a remaining balance of {formatAmount(selectedPayment.balance)} from{' '}
-              {selectedPayment.patient_first_name} {selectedPayment.patient_last_name}?
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowRejectDialog(false)}
-                disabled={actionLoading}
-                className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleReject(selectedPayment.id)}
-                disabled={actionLoading}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-              >
-                {actionLoading ? 'Rejecting...' : 'Reject'}
-              </button>
             </div>
           </div>
         </div>
@@ -1120,117 +1034,6 @@ export default function SecretaryPayments() {
                 onError={() => setReceiptImageError(true)}
               />
             </div>
-            {/* Payment Recording Section */}
-            {(selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && (
-              <div className="p-4 border-t border-slate-200 bg-white flex-shrink-0 max-h-[50vh] overflow-y-auto">
-                <div className="space-y-3">
-                  {/* Outstanding Balance Display */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600">Total Amount:</span>
-                      <span className="font-semibold text-slate-900">
-                        {formatAmount(
-                          (typeof selectedPayment.consultation_amount === 'string' ? parseFloat(selectedPayment.consultation_amount) : (selectedPayment.consultation_amount || 0)) +
-                          (selectedPayment.charges?.reduce((sum, charge) => {
-                            const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
-                            return sum + (amount || 0);
-                          }, 0) || 0)
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-slate-600">Amount Paid:</span>
-                      <span className="font-semibold text-slate-900">{formatAmount(selectedPayment.amount_paid)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1 pt-2 border-t border-slate-200">
-                      <span className="text-slate-700 font-medium">Outstanding Balance:</span>
-                      <span className="font-bold text-slate-900">{formatAmount(selectedPayment.balance)}</span>
-                    </div>
-                  </div>
-
-                  {/* Amount Received Input */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm font-medium text-slate-700">Amount from Receipt (₱)</label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setReceiptAmount(selectedPayment.balance);
-                          setReceiptPaymentError(null);
-                        }}
-                        disabled={actionLoading}
-                        className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
-                      >
-                        Use outstanding balance
-                      </button>
-                    </div>
-                    <input
-                      type="number"
-                      value={receiptAmount}
-                      onChange={(e) => {
-                        setReceiptAmount(e.target.value);
-                        setReceiptPaymentError(null);
-                      }}
-                      placeholder="0.00"
-                      step="0.01"
-                      min="0.01"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900 ${
-                        receiptAmount && parseFloat(receiptAmount) > parseFloat(selectedPayment.balance)
-                          ? 'border-amber-300 focus:ring-amber-500'
-                          : 'border-slate-300'
-                      }`}
-                      disabled={actionLoading}
-                    />
-                    <p className="text-xs text-slate-500 mt-1">
-                      Outstanding balance: {formatAmount(selectedPayment.balance)}
-                    </p>
-                  </div>
-
-                  {/* Warning when amount exceeds balance */}
-                  {receiptAmount && parseFloat(receiptAmount) > parseFloat(selectedPayment.balance) && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-                      <div className="flex items-start gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-amber-600 mt-0.5">warning</span>
-                        <div className="text-sm">
-                          <p className="text-amber-800 font-medium">Amount exceeds outstanding balance</p>
-                          <p className="text-amber-700 mt-1">
-                            The receipt amount ({formatAmount(receiptAmount)}) is greater than the outstanding balance ({formatAmount(selectedPayment.balance)}).
-                            This may be due to additional charges added after the receipt was uploaded.
-                          </p>
-                          <p className="text-amber-700 mt-1">
-                            Please adjust the amount or click "Use outstanding balance" to record the correct payment.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Real-time Balance After Payment */}
-                  {receiptAmount && getBalanceAfterPayment(receiptAmount) && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-blue-700 font-medium">Balance after this payment:</span>
-                        <span className="font-bold text-blue-900">{formatAmount(getBalanceAfterPayment(receiptAmount))}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {receiptPaymentError && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
-                      {receiptPaymentError}
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handleRecordPaymentFromReceipt}
-                    disabled={actionLoading || !receiptAmount}
-                    className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                  >
-                    {actionLoading ? 'Recording...' : 'Record Payment'}
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -1447,13 +1250,7 @@ export default function SecretaryPayments() {
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600">Total Amount:</span>
                   <span className="font-semibold text-slate-900">
-                    {formatAmount(
-                      (typeof selectedPayment.consultation_amount === 'string' ? parseFloat(selectedPayment.consultation_amount) : (selectedPayment.consultation_amount || 0)) +
-                      (selectedPayment.charges?.reduce((sum, charge) => {
-                        const amount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : charge.amount;
-                        return sum + (amount || 0);
-                      }, 0) || 0)
-                    )}
+                    {formatAmount(calculateTotalAmount(selectedPayment))}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm mt-1">
@@ -1462,7 +1259,7 @@ export default function SecretaryPayments() {
                 </div>
                 <div className="flex justify-between text-sm mt-1 pt-2 border-t border-slate-200">
                   <span className="text-slate-700 font-medium">Outstanding Balance:</span>
-                  <span className="font-bold text-slate-900">{formatAmount(selectedPayment.balance)}</span>
+                  <span className="font-bold text-slate-900">{formatAmount(calculateBalance(selectedPayment))}</span>
                 </div>
               </div>
 
@@ -1473,7 +1270,7 @@ export default function SecretaryPayments() {
                   <button
                     type="button"
                     onClick={() => {
-                      setAmountReceived(selectedPayment.balance);
+                      setAmountReceived(calculateBalance(selectedPayment).toString());
                       setRecordPaymentError(null);
                     }}
                     disabled={actionLoading}
@@ -1492,36 +1289,13 @@ export default function SecretaryPayments() {
                   placeholder="0.00"
                   step="0.01"
                   min="0.01"
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900 ${
-                    amountReceived && parseFloat(amountReceived) > parseFloat(selectedPayment.balance)
-                      ? 'border-amber-300 focus:ring-amber-500'
-                      : 'border-slate-300'
-                  }`}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
                   disabled={actionLoading}
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  Outstanding balance: {formatAmount(selectedPayment.balance)}
+                  Outstanding balance: {formatAmount(calculateBalance(selectedPayment))}
                 </p>
               </div>
-
-              {/* Warning when amount exceeds balance */}
-              {amountReceived && parseFloat(amountReceived) > parseFloat(selectedPayment.balance) && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-                  <div className="flex items-start gap-2">
-                    <span className="material-symbols-outlined text-[18px] text-amber-600 mt-0.5">warning</span>
-                    <div className="text-sm">
-                      <p className="text-amber-800 font-medium">Amount exceeds outstanding balance</p>
-                      <p className="text-amber-700 mt-1">
-                        The entered amount ({formatAmount(amountReceived)}) is greater than the outstanding balance ({formatAmount(selectedPayment.balance)}).
-                        This may be due to additional charges added after the initial payment.
-                      </p>
-                      <p className="text-amber-700 mt-1">
-                        Please adjust the amount or click "Use outstanding balance" to record the correct payment.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Payment Method Display */}
               <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm">
@@ -1555,6 +1329,34 @@ export default function SecretaryPayments() {
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
               >
                 {actionLoading ? 'Recording...' : 'Record Payment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Complete Checkup Modal */}
+      {showCompleteCheckupModal && selectedPayment && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Complete Checkup</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Confirm that the checkup is complete and the payment should be marked as fully paid?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCompleteCheckupModal(false)}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCompleteCheckup}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                {actionLoading ? 'Completing...' : 'Confirm Complete Checkup'}
               </button>
             </div>
           </div>
