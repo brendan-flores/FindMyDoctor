@@ -38,34 +38,35 @@ export default function PaymentModal({
   const [medicineName, setMedicineName] = useState('');
   const [medicineQuantity, setMedicineQuantity] = useState('');
   const [medicineUnitPrice, setMedicineUnitPrice] = useState('');
-  const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
-  const [amountReceived, setAmountReceived] = useState('');
-  const [recordPaymentError, setRecordPaymentError] = useState<string | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptImageLoaded, setReceiptImageLoaded] = useState(false);
   const [receiptImageError, setReceiptImageError] = useState(false);
   const [receiptSignedUrl, setReceiptSignedUrl] = useState<string | null>(null);
   const [isFetchingReceiptUrl, setIsFetchingReceiptUrl] = useState(false);
-  const [receiptAmount, setReceiptAmount] = useState('');
-  const [receiptPaymentError, setReceiptPaymentError] = useState<string | null>(null);
+  const [advancePaymentAmount, setAdvancePaymentAmount] = useState('');
+  const [advancePaymentError, setAdvancePaymentError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
-  const [cashTenderAmount, setCashTenderAmount] = useState('');
-  const [cashTenderMethod, setCashTenderMethod] = useState<'CASH' | 'GCASH'>('CASH');
+  const [cashPaymentAmount, setCashPaymentAmount] = useState('');
   const [showCompleteCheckupModal, setShowCompleteCheckupModal] = useState(false);
-  const [cashTenderError, setCashTenderError] = useState<string | null>(null);
+  const [cashPaymentError, setCashPaymentError] = useState<string | null>(null);
   // Charges for walk-in payment creation
   const [tempCharges, setTempCharges] = useState<Array<{ description: string; amount: number; chargeType: 'ADDITIONAL' | 'MEDICINE'; name?: string; quantity?: number; unitPrice?: number }>>([]);
+  // Track payment method editing state
+  const [isEditingPaymentMethod, setIsEditingPaymentMethod] = useState(false);
+  const [editedPaymentMethod, setEditedPaymentMethod] = useState<'CASH' | 'GCASH'>('CASH');
 
   // Reset and fetch payment when modal opens
   useEffect(() => {
     if (isOpen) {
       setPaymentMethod(initialPaymentMethod || 'CASH');
       setTempCharges([]);
-      setCashTenderAmount('');
-      setCashTenderMethod('CASH');
+      setCashPaymentAmount('');
+      setAdvancePaymentAmount('');
+      setIsEditingPaymentMethod(false);
+      setEditedPaymentMethod(initialPaymentMethod || 'CASH');
       fetchPayment();
     }
   }, [isOpen, appointmentId, initialPaymentMethod]);
@@ -108,28 +109,20 @@ export default function PaymentModal({
         // Fetch the newly created payment
         await fetchPayment();
 
-        // If cash tender amount is provided, record the payment
-        if (cashTenderAmount && parseFloat(cashTenderAmount) > 0) {
+        // If cash payment amount is provided, record the payment
+        if (cashPaymentAmount && parseFloat(cashPaymentAmount) > 0) {
           await new Promise(resolve => setTimeout(resolve, 500));
           const paymentResponse = await secretaryApi.getPayment(appointmentId);
           if (paymentResponse.success && paymentResponse.data) {
-            const numericAmount = parseFloat(cashTenderAmount);
+            const numericAmount = parseFloat(cashPaymentAmount);
             const tenderResponse = await secretaryApi.recordPartialPayment(paymentResponse.data.id, numericAmount);
             if (tenderResponse.success) {
-              setCashTenderAmount('');
+              setCashPaymentAmount('');
               // Refresh payment data to show updated status
               await new Promise(resolve => setTimeout(resolve, 500));
               const refreshResponse = await secretaryApi.getPayment(appointmentId);
               if (refreshResponse.success && refreshResponse.data) {
                 setSelectedPayment(refreshResponse.data);
-
-                // If payment is now fully paid, automatically complete checkup
-                if (refreshResponse.data.status === 'PAID') {
-                  setToastMessage('Payment fully paid and checkup completed');
-                  setShowToast(true);
-                  onClose();
-                  onSuccess();
-                }
               }
             }
           }
@@ -244,8 +237,8 @@ export default function PaymentModal({
 
   // Add temporary charge for walk-in payment
   const handleAddTempCharge = () => {
-    let chargeAmount: number;
-    let chargeDescription: string;
+    let finalChargeAmount: number = 0;
+    let finalChargeDescription: string = '';
     let chargeData: any;
 
     if (chargeType === 'MEDICINE') {
@@ -267,12 +260,12 @@ export default function PaymentModal({
         return;
       }
 
-      chargeAmount = numQuantity * numUnitPrice;
-      chargeAmount = Math.round(chargeAmount * 100) / 100;
-      chargeDescription = trimmedName;
+      finalChargeAmount = numQuantity * numUnitPrice;
+      finalChargeAmount = Math.round(finalChargeAmount * 100) / 100;
+      finalChargeDescription = trimmedName;
       chargeData = {
-        description: chargeDescription,
-        amount: chargeAmount,
+        description: finalChargeDescription,
+        amount: finalChargeAmount,
         chargeType: 'MEDICINE',
         name: trimmedName,
         quantity: numQuantity,
@@ -291,11 +284,11 @@ export default function PaymentModal({
         return;
       }
 
-      chargeAmount = numAmount;
-      chargeDescription = trimmedDescription;
+      finalChargeAmount = numAmount;
+      finalChargeDescription = trimmedDescription;
       chargeData = {
-        description: chargeDescription,
-        amount: chargeAmount,
+        description: finalChargeDescription,
+        amount: finalChargeAmount,
         chargeType: 'ADDITIONAL'
       };
     }
@@ -443,18 +436,18 @@ export default function PaymentModal({
     }
   };
 
-  const handleRecordPayment = async () => {
+  const handleRecordAdvancePayment = async () => {
     if (!selectedPayment) return;
 
     setActionLoading(true);
     setToastMessage('');
     setToastType('success');
-    setRecordPaymentError(null);
+    setAdvancePaymentError(null);
 
     try {
-      const numericAmount = parseFloat(amountReceived);
+      const numericAmount = parseFloat(advancePaymentAmount);
       if (isNaN(numericAmount) || !isFinite(numericAmount) || numericAmount <= 0) {
-        setRecordPaymentError('Amount must be a valid positive number');
+        setAdvancePaymentError('Amount must be a valid positive number');
         setActionLoading(false);
         return;
       }
@@ -462,10 +455,9 @@ export default function PaymentModal({
       const response = await secretaryApi.recordPartialPayment(selectedPayment.id, numericAmount);
 
       if (response.success) {
-        setToastMessage(response.data?.status === 'PAID' ? 'Payment fully paid' : 'Partial payment recorded');
+        setToastMessage(response.data?.status === 'PAID' ? 'Payment fully paid' : 'Advance payment recorded');
         setShowToast(true);
-        setShowRecordPaymentModal(false);
-        setAmountReceived('');
+        setAdvancePaymentAmount('');
 
         await new Promise(resolve => setTimeout(resolve, 500));
         const paymentResponse = await secretaryApi.getPayment(appointmentId);
@@ -473,27 +465,27 @@ export default function PaymentModal({
           setSelectedPayment(paymentResponse.data);
         }
       } else {
-        setRecordPaymentError(response.error || 'Failed to record payment');
+        setAdvancePaymentError(response.error || 'Failed to record advance payment');
       }
     } catch (error) {
-      setRecordPaymentError('Failed to record payment');
+      setAdvancePaymentError('Failed to record advance payment');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleRecordPaymentFromReceipt = async () => {
+  const handleRecordCashPayment = async () => {
     if (!selectedPayment) return;
 
     setActionLoading(true);
     setToastMessage('');
     setToastType('success');
-    setReceiptPaymentError(null);
+    setCashPaymentError(null);
 
     try {
-      const numericAmount = parseFloat(receiptAmount);
+      const numericAmount = parseFloat(cashPaymentAmount);
       if (isNaN(numericAmount) || !isFinite(numericAmount) || numericAmount <= 0) {
-        setReceiptPaymentError('Amount must be a valid positive number');
+        setCashPaymentError('Amount must be a valid positive number');
         setActionLoading(false);
         return;
       }
@@ -501,11 +493,9 @@ export default function PaymentModal({
       const response = await secretaryApi.recordPartialPayment(selectedPayment.id, numericAmount);
 
       if (response.success) {
-        setToastMessage(response.data?.status === 'PAID' ? 'Payment fully paid' : 'Partial payment recorded');
+        setToastMessage(response.data?.status === 'PAID' ? 'Payment fully paid' : 'Cash payment recorded');
         setShowToast(true);
-        setShowReceiptModal(false);
-        setReceiptAmount('');
-        setReceiptSignedUrl(null);
+        setCashPaymentAmount('');
 
         await new Promise(resolve => setTimeout(resolve, 500));
         const paymentResponse = await secretaryApi.getPaymentById(selectedPayment.id);
@@ -513,10 +503,10 @@ export default function PaymentModal({
           setSelectedPayment(paymentResponse.data);
         }
       } else {
-        setReceiptPaymentError(response.error || 'Failed to record payment');
+        setCashPaymentError(response.error || 'Failed to record cash payment');
       }
     } catch (error) {
-      setReceiptPaymentError('Failed to record payment');
+      setCashPaymentError('Failed to record cash payment');
     } finally {
       setActionLoading(false);
     }
@@ -547,41 +537,35 @@ export default function PaymentModal({
     setActionLoading(false);
   };
 
-  const handleCashTenderPayment = async () => {
+  const handleSavePaymentMethod = async () => {
     if (!selectedPayment) return;
 
     setActionLoading(true);
     setToastMessage('');
     setToastType('success');
-    setCashTenderError(null);
 
     try {
-      const numericAmount = parseFloat(cashTenderAmount);
-      if (isNaN(numericAmount) || !isFinite(numericAmount) || numericAmount <= 0) {
-        setCashTenderError('Amount must be a valid positive number');
-        setActionLoading(false);
-        return;
-      }
-
-      const response = await secretaryApi.recordPartialPayment(selectedPayment.id, numericAmount);
+      const response = await secretaryApi.updatePaymentMethod(selectedPayment.id, editedPaymentMethod);
 
       if (response.success) {
-        setToastMessage('Payment recorded successfully');
+        setToastMessage('Payment method updated successfully');
         setShowToast(true);
-        setCashTenderAmount('');
+        setIsEditingPaymentMethod(false);
 
         await new Promise(resolve => setTimeout(resolve, 500));
-        const paymentResponse = await secretaryApi.getPaymentById(selectedPayment.id);
+        const paymentResponse = await secretaryApi.getPayment(appointmentId);
         if (paymentResponse.success && paymentResponse.data) {
           setSelectedPayment(paymentResponse.data);
         }
-        // Show complete checkup modal after recording payment
-        setShowCompleteCheckupModal(true);
       } else {
-        setCashTenderError(response.error || 'Failed to record payment');
+        setToastMessage(response.error || 'Failed to update payment method');
+        setToastType('error');
+        setShowToast(true);
       }
     } catch (error) {
-      setCashTenderError('Failed to record payment');
+      setToastMessage('Failed to update payment method');
+      setToastType('error');
+      setShowToast(true);
     } finally {
       setActionLoading(false);
     }
@@ -662,15 +646,31 @@ export default function PaymentModal({
     );
   }
 
+  // Show initial modal only if payment doesn't exist
   if (!selectedPayment) {
-    // Show payment creation form
+    // Show payment creation form (but display receipt if payment exists with one)
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-6 border-b border-slate-200">
-            <h2 className="text-lg font-bold text-slate-900">
-              {isWalkIn ? 'Record Walk-in Payment' : 'Record Payment'}
-            </h2>
+          <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-bold text-slate-900">
+                {isWalkIn ? 'Record Walk-in Payment' : 'Record Payment'}
+              </h2>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                isWalkIn
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-blue-100 text-blue-700'
+              }`}>
+                {isWalkIn ? 'Walk-in' : 'Booked'}
+              </span>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <span className="material-symbols-outlined text-[24px] text-slate-500">close</span>
+            </button>
           </div>
 
           <div className="p-6 space-y-6">
@@ -765,24 +765,10 @@ export default function PaymentModal({
               </div>
             </div>
 
-            {/* Cash Tender Section */}
+            {/* Cash Payment Section */}
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 mb-3">Cash Tender</h3>
+              <h3 className="text-sm font-semibold text-slate-900 mb-3">Cash Payment (At Clinic)</h3>
               <div className="bg-slate-50 rounded-lg p-4 space-y-3">
-                {/* Payment Method Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Payment Method</label>
-                  <select
-                    value={cashTenderMethod}
-                    onChange={(e) => setCashTenderMethod(e.target.value as 'CASH' | 'GCASH')}
-                    disabled={actionLoading}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  >
-                    <option value="CASH">CASH</option>
-                    <option value="GCASH">GCASH</option>
-                  </select>
-                </div>
-
                 {/* Amount Input */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -790,8 +776,8 @@ export default function PaymentModal({
                     <button
                       type="button"
                       onClick={() => {
-                        setCashTenderAmount(calculateWalkInTotal().toString());
-                        setCashTenderError(null);
+                        setCashPaymentAmount(calculateWalkInTotal().toString());
+                        setCashPaymentError(null);
                       }}
                       disabled={actionLoading}
                       className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
@@ -801,10 +787,10 @@ export default function PaymentModal({
                   </div>
                   <input
                     type="number"
-                    value={cashTenderAmount}
+                    value={cashPaymentAmount}
                     onChange={(e) => {
-                      setCashTenderAmount(e.target.value);
-                      setCashTenderError(null);
+                      setCashPaymentAmount(e.target.value);
+                      setCashPaymentError(null);
                     }}
                     placeholder="0.00"
                     step="0.01"
@@ -815,18 +801,18 @@ export default function PaymentModal({
                 </div>
 
                 {/* Change Display */}
-                {cashTenderAmount && getWalkInChange(cashTenderAmount) && (
+                {cashPaymentAmount && getWalkInChange(cashPaymentAmount) && (
                   <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-emerald-700 font-medium">Change:</span>
-                      <span className="font-bold text-emerald-900">{formatAmount(getWalkInChange(cashTenderAmount))}</span>
+                      <span className="font-bold text-emerald-900">{formatAmount(getWalkInChange(cashPaymentAmount))}</span>
                     </div>
                   </div>
                 )}
 
-                {cashTenderError && (
+                {cashPaymentError && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
-                    {cashTenderError}
+                    {cashPaymentError}
                   </div>
                 )}
               </div>
@@ -872,7 +858,16 @@ export default function PaymentModal({
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-900">Payment Details</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-bold text-slate-900">Payment Details</h2>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                isWalkIn
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-blue-100 text-blue-700'
+              }`}>
+                {isWalkIn ? 'Walk-in' : 'Booked'}
+              </span>
+            </div>
             <button
               onClick={onClose}
               className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -914,9 +909,53 @@ export default function PaymentModal({
                     <span className="text-slate-900">{selectedPayment.reason_for_visit}</span>
                   </div>
                 )}
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-slate-600">Payment Method:</span>
-                  <span className="text-slate-900">{selectedPayment.payment_method}</span>
+                  {isEditingPaymentMethod ? (
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={editedPaymentMethod}
+                        onChange={(e) => setEditedPaymentMethod(e.target.value as 'CASH' | 'GCASH')}
+                        className="px-3 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm"
+                      >
+                        <option value="CASH">CASH</option>
+                        <option value="GCASH">GCASH</option>
+                      </select>
+                      <button
+                        onClick={() => handleSavePaymentMethod()}
+                        disabled={actionLoading}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsEditingPaymentMethod(false);
+                          setEditedPaymentMethod(selectedPayment.payment_method as 'CASH' | 'GCASH');
+                        }}
+                        disabled={actionLoading}
+                        className="text-xs text-slate-600 hover:text-slate-700 font-medium disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-900">{selectedPayment.payment_method}</span>
+                      {selectedPayment.amount_paid === 0 && (selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && (
+                        <button
+                          onClick={() => {
+                            setIsEditingPaymentMethod(true);
+                            setEditedPaymentMethod(selectedPayment.payment_method as 'CASH' | 'GCASH');
+                          }}
+                          disabled={actionLoading}
+                          className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -925,16 +964,31 @@ export default function PaymentModal({
             {selectedPayment.payment_method === 'GCASH' ? (
               <div>
                 <h3 className="text-sm font-semibold text-slate-900 mb-3">Payment Receipt</h3>
-                <div className="bg-slate-50 rounded-lg p-4">
+                <div className="bg-slate-50 rounded-lg p-4 space-y-3">
                   {selectedPayment.receipt_url ? (
-                    <button
-                      onClick={() => handleViewReceipt(selectedPayment.id)}
-                      disabled={isFetchingReceiptUrl}
-                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">visibility</span>
-                      {isFetchingReceiptUrl ? 'Loading...' : 'View Receipt'}
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleViewReceipt(selectedPayment.id)}
+                        disabled={isFetchingReceiptUrl}
+                        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">visibility</span>
+                        {isFetchingReceiptUrl ? 'Loading...' : 'View Receipt'}
+                      </button>
+                      {(selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && calculateBalance(selectedPayment) > 0 && (
+                        <button
+                          onClick={() => {
+                            setAdvancePaymentAmount(calculateBalance(selectedPayment).toString());
+                            setAdvancePaymentError(null);
+                          }}
+                          disabled={actionLoading}
+                          className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 text-sm font-medium disabled:opacity-50"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">request_quote</span>
+                          Apply Receipt Amount to Balance
+                        </button>
+                      )}
+                    </>
                   ) : (
                     <p className="text-sm text-slate-600 flex items-center gap-2">
                       <span className="material-symbols-outlined text-[18px] text-amber-500">warning</span>
@@ -1016,9 +1070,19 @@ export default function PaymentModal({
                     {formatAmount(calculateTotalAmount(selectedPayment))}
                   </span>
                 </div>
+                {selectedPayment.payment_method === 'GCASH' && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Advance Paid (GCash):</span>
+                    <span className="text-purple-700 font-semibold">{formatAmount(selectedPayment.amount_paid)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Amount Paid:</span>
-                  <span className="text-slate-900 font-semibold">{formatAmount(selectedPayment.amount_paid)}</span>
+                  <span className="text-slate-600">Cash Paid (At Clinic):</span>
+                  <span className="text-emerald-700 font-semibold">{formatAmount(0)}</span>
+                </div>
+                <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between">
+                  <span className="text-slate-700 font-medium">Total Paid:</span>
+                  <span className="text-slate-900 font-bold">{formatAmount(selectedPayment.amount_paid)}</span>
                 </div>
                 <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between">
                   <span className="text-slate-700 font-medium">Remaining Balance:</span>
@@ -1027,103 +1091,156 @@ export default function PaymentModal({
               </div>
             </div>
 
-            {/* Cash Tender Section */}
-            {(selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && (
+            {/* Advance Payment Section (GCash Receipts) */}
+            {selectedPayment.payment_method === 'GCASH' && (selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && calculateBalance(selectedPayment) > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-3">Cash Tender</h3>
-                <div className="bg-slate-50 rounded-lg p-4 space-y-3">
-                  {/* Payment Method Selection */}
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Advance Payment (GCash Receipt)</h3>
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Payment Method</label>
-                    <select
-                      value={cashTenderMethod}
-                      onChange={(e) => setCashTenderMethod(e.target.value as 'CASH' | 'GCASH')}
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-slate-700">Advance Payment Amount from Receipt (₱)</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAdvancePaymentAmount(calculateBalance(selectedPayment).toString());
+                          setAdvancePaymentError(null);
+                        }}
+                        disabled={actionLoading}
+                        className="text-xs text-purple-600 hover:text-purple-700 font-medium disabled:opacity-50"
+                      >
+                        Use outstanding balance
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      value={advancePaymentAmount}
+                      onChange={(e) => {
+                        setAdvancePaymentAmount(e.target.value);
+                        setAdvancePaymentError(null);
+                      }}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0.01"
                       disabled={actionLoading}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    >
-                      <option value="CASH">CASH</option>
-                      <option value="GCASH">GCASH</option>
-                    </select>
+                      className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Outstanding balance: {formatAmount(calculateBalance(selectedPayment))}
+                    </p>
                   </div>
 
-                  {/* Amount Input - only show if balance > 0 */}
-                  {calculateBalance(selectedPayment) > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-sm font-medium text-slate-700">Amount Received (₱)</label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCashTenderAmount(calculateBalance(selectedPayment).toString());
-                            setCashTenderError(null);
-                          }}
-                          disabled={actionLoading}
-                          className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
-                        >
-                          Use outstanding balance
-                        </button>
+                  {/* Balance After Payment */}
+                  {advancePaymentAmount && getBalanceAfterPayment(advancePaymentAmount) && (
+                    <div className="bg-purple-100 border border-purple-300 rounded-lg px-3 py-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-purple-700 font-medium">Balance after this payment:</span>
+                        <span className="font-bold text-purple-900">{formatAmount(getBalanceAfterPayment(advancePaymentAmount))}</span>
                       </div>
-                      <input
-                        type="number"
-                        value={cashTenderAmount}
-                        onChange={(e) => {
-                          setCashTenderAmount(e.target.value);
-                          setCashTenderError(null);
-                        }}
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0.01"
-                        disabled={actionLoading}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                      />
                     </div>
                   )}
 
+                  {advancePaymentError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+                      {advancePaymentError}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleRecordAdvancePayment}
+                    disabled={actionLoading || !advancePaymentAmount}
+                    className="w-full px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  >
+                    {actionLoading ? 'Processing...' : 'Record Advance Payment'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Cash Payment Section (At Clinic) */}
+            {(selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && calculateBalance(selectedPayment) > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Cash Payment (At Clinic)</h3>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-slate-700">Cash Amount Received (₱)</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCashPaymentAmount(calculateBalance(selectedPayment).toString());
+                          setCashPaymentError(null);
+                        }}
+                        disabled={actionLoading}
+                        className="text-xs text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
+                      >
+                        Use outstanding balance
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      value={cashPaymentAmount}
+                      onChange={(e) => {
+                        setCashPaymentAmount(e.target.value);
+                        setCashPaymentError(null);
+                      }}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0.01"
+                      disabled={actionLoading}
+                      className="w-full px-3 py-2 border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Outstanding balance: {formatAmount(calculateBalance(selectedPayment))}
+                    </p>
+                  </div>
+
                   {/* Balance After Payment */}
-                  {cashTenderAmount && getBalanceAfterPayment(cashTenderAmount) && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                  {cashPaymentAmount && getBalanceAfterPayment(cashPaymentAmount) && (
+                    <div className="bg-emerald-100 border border-emerald-300 rounded-lg px-3 py-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-blue-700 font-medium">Balance after payment:</span>
-                        <span className="font-bold text-blue-900">{formatAmount(getBalanceAfterPayment(cashTenderAmount))}</span>
+                        <span className="text-emerald-700 font-medium">Balance after this payment:</span>
+                        <span className="font-bold text-emerald-900">{formatAmount(getBalanceAfterPayment(cashPaymentAmount))}</span>
                       </div>
                     </div>
                   )}
 
                   {/* Change Display */}
-                  {cashTenderAmount && getChange(cashTenderAmount) && (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                  {cashPaymentAmount && getChange(cashPaymentAmount) && (
+                    <div className="bg-emerald-100 border border-emerald-300 rounded-lg px-3 py-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-emerald-700 font-medium">Change:</span>
-                        <span className="font-bold text-emerald-900">{formatAmount(getChange(cashTenderAmount))}</span>
+                        <span className="font-bold text-emerald-900">{formatAmount(getChange(cashPaymentAmount))}</span>
                       </div>
                     </div>
                   )}
 
-                  {cashTenderError && (
+                  {cashPaymentError && (
                     <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
-                      {cashTenderError}
+                      {cashPaymentError}
                     </div>
                   )}
 
-                  {/* Mark as Paid Button - show if balance > 0 with amount input, or if balance is 0 (already paid partially) */}
-                  {calculateBalance(selectedPayment) > 0 ? (
-                    <button
-                      onClick={handleCashTenderPayment}
-                      disabled={actionLoading || !cashTenderAmount}
-                      className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                    >
-                      {actionLoading ? 'Processing...' : 'Mark as Paid'}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setShowCompleteCheckupModal(true)}
-                      disabled={actionLoading}
-                      className="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                    >
-                      {actionLoading ? 'Processing...' : 'Complete Checkup'}
-                    </button>
-                  )}
+                  <button
+                    onClick={handleRecordCashPayment}
+                    disabled={actionLoading || !cashPaymentAmount}
+                    className="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  >
+                    {actionLoading ? 'Processing...' : 'Record Cash Payment'}
+                  </button>
                 </div>
+              </div>
+            )}
+
+            {/* Mark as Paid Button - only shown when amount_paid > 0 and status is not PAID */}
+            {selectedPayment.amount_paid > 0 && (selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && (
+              <div>
+                <button
+                  onClick={() => setShowCompleteCheckupModal(true)}
+                  disabled={actionLoading}
+                  className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  {actionLoading ? 'Processing...' : 'Complete Payment & Mark as Paid'}
+                </button>
               </div>
             )}
           </div>
@@ -1163,13 +1280,13 @@ export default function PaymentModal({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
             <div className="p-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-lg font-bold text-slate-900">Payment Receipt</h3>
+              <h3 className="text-lg font-bold text-slate-900">GCash Advance Payment Receipt</h3>
               <button
                 onClick={() => {
                   setShowReceiptModal(false);
                   setReceiptSignedUrl(null);
-                  setReceiptAmount('');
-                  setReceiptPaymentError(null);
+                  setAdvancePaymentAmount('');
+                  setAdvancePaymentError(null);
                 }}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
               >
@@ -1198,88 +1315,6 @@ export default function PaymentModal({
                 onError={() => setReceiptImageError(true)}
               />
             </div>
-            {/* Payment Recording Section */}
-            {(selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && (
-              <div className="p-4 border-t border-slate-200 bg-white flex-shrink-0 max-h-[50vh] overflow-y-auto">
-                <div className="space-y-3">
-                  {/* Outstanding Balance Display */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600">Total Amount:</span>
-                      <span className="font-semibold text-slate-900">
-                        {formatAmount(calculateTotalAmount(selectedPayment))}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-slate-600">Amount Paid:</span>
-                      <span className="font-semibold text-slate-900">{formatAmount(selectedPayment.amount_paid)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1 pt-2 border-t border-slate-200">
-                      <span className="text-slate-700 font-medium">Outstanding Balance:</span>
-                      <span className="font-bold text-slate-900">{formatAmount(calculateBalance(selectedPayment))}</span>
-                    </div>
-                  </div>
-
-                  {/* Amount Received Input */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm font-medium text-slate-700">Gcash Advance Payment (₱)</label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setReceiptAmount(calculateBalance(selectedPayment).toString());
-                          setReceiptPaymentError(null);
-                        }}
-                        disabled={actionLoading}
-                        className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
-                      >
-                        Use outstanding balance
-                      </button>
-                    </div>
-                    <input
-                      type="number"
-                      value={receiptAmount}
-                      onChange={(e) => {
-                        setReceiptAmount(e.target.value);
-                        setReceiptPaymentError(null);
-                      }}
-                      placeholder="0.00"
-                      step="0.01"
-                      min="0.01"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
-                      disabled={actionLoading}
-                    />
-                    <p className="text-xs text-slate-500 mt-1">
-                      Outstanding balance: {formatAmount(calculateBalance(selectedPayment))}
-                    </p>
-                  </div>
-
-                  {/* Real-time Balance After Payment */}
-                  {receiptAmount && getBalanceAfterPayment(receiptAmount) && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-blue-700 font-medium">Balance after this payment:</span>
-                        <span className="font-bold text-blue-900">{formatAmount(getBalanceAfterPayment(receiptAmount))}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {receiptPaymentError && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
-                      {receiptPaymentError}
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handleRecordPaymentFromReceipt}
-                    disabled={actionLoading || !receiptAmount}
-                    className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                  >
-                    {actionLoading ? 'Recording...' : 'Record Payment'}
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -1481,106 +1516,6 @@ export default function PaymentModal({
               >
                 {actionLoading ? 'Deleting...' : 'Delete'}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Record Payment Modal */}
-      {showRecordPaymentModal && selectedPayment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Record Payment</h3>
-            <div className="space-y-4">
-              {/* Outstanding Balance Display */}
-              <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Total Amount:</span>
-                  <span className="font-semibold text-slate-900">
-                    {formatAmount(calculateTotalAmount(selectedPayment))}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm mt-1">
-                  <span className="text-slate-600">Amount Paid:</span>
-                  <span className="font-semibold text-slate-900">{formatAmount(selectedPayment.amount_paid)}</span>
-                </div>
-                <div className="flex justify-between text-sm mt-1 pt-2 border-t border-slate-200">
-                  <span className="text-slate-700 font-medium">Outstanding Balance:</span>
-                  <span className="font-bold text-slate-900">{formatAmount(calculateBalance(selectedPayment))}</span>
-                </div>
-              </div>
-
-              {/* Amount Received Input */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm font-medium text-slate-700">Amount Received (₱)</label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAmountReceived(calculateBalance(selectedPayment).toString());
-                      setRecordPaymentError(null);
-                    }}
-                    disabled={actionLoading}
-                    className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
-                  >
-                    Use outstanding balance
-                  </button>
-                </div>
-                <input
-                  type="number"
-                  value={amountReceived}
-                  onChange={(e) => {
-                    setAmountReceived(e.target.value);
-                    setRecordPaymentError(null);
-                  }}
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0.01"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-900"
-                  disabled={actionLoading}
-                />
-                <p className="text-xs text-slate-500 mt-1">
-                  Outstanding balance: {formatAmount(calculateBalance(selectedPayment))}
-                </p>
-              </div>
-
-              {/* Warning when amount exceeds balance */}
-              {/* Real-time Balance After Payment */}
-              {amountReceived && getBalanceAfterPayment(amountReceived) && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-blue-700 font-medium">Balance after this payment:</span>
-                    <span className="font-bold text-blue-900">{formatAmount(getBalanceAfterPayment(amountReceived))}</span>
-                  </div>
-                </div>
-              )}
-
-              {recordPaymentError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
-                  {recordPaymentError}
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => {
-                    setShowRecordPaymentModal(false);
-                    setRecordPaymentError(null);
-                    setAmountReceived('');
-                  }}
-                  disabled={actionLoading}
-                  className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleRecordPayment}
-                  disabled={actionLoading || !amountReceived}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                >
-                  {actionLoading ? 'Recording...' : 'Record Payment'}
-                </button>
-              </div>
             </div>
           </div>
         </div>

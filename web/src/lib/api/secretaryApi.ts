@@ -329,6 +329,11 @@ export const secretaryApi = {
     return apiClient.post<{ paymentId: string }>('/payments/record', payload);
   },
 
+  // Payments: update payment method (secretary only)
+  updatePaymentMethod: async (paymentId: string, paymentMethod: 'CASH' | 'GCASH'): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/payments/${paymentId}/payment-method`, { paymentMethod });
+  },
+
   // Payments: record walk-in payment (deprecated - use recordPayment instead)
   recordWalkInPayment: async (payload: {
     appointmentId: string;

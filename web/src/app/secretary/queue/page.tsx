@@ -61,7 +61,6 @@ export default function SecretaryQueue() {
     initialPaymentMethod?: 'CASH' | 'GCASH';
     isWalkIn: boolean;
   } | null>(null);
-  const [paidAppointmentIds, setPaidAppointmentIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchSecretaryProfile();
@@ -143,14 +142,6 @@ export default function SecretaryQueue() {
       const queueEntry = queueEntries.find(entry => entry.id === queueId);
 
       if (queueEntry && queueEntry.appointment_id) {
-        // Check if payment is already processed
-        if (paidAppointmentIds.has(queueEntry.appointment_id)) {
-          setSuccess('Checkup already completed and payment processed');
-          fetchQueue();
-          setActionLoading(false);
-          return;
-        }
-
         // Show payment modal for both walk-in and booked patients
         const consultationFee = queueEntry.consultation_fee !== null && queueEntry.consultation_fee !== undefined
           ? queueEntry.consultation_fee
@@ -199,11 +190,7 @@ export default function SecretaryQueue() {
 
   const handlePaymentSuccess = () => {
     setSuccess('Payment recorded successfully');
-    // Add the appointment ID to the paid set to prevent reopening payment modal
-    if (paymentModalData) {
-      setPaidAppointmentIds(prev => new Set(prev).add(paymentModalData.appointmentId));
-    }
-    // Also mark the queue entry as completed since payment is done
+    // Refresh queue to show updated payment status
     fetchQueue();
   };
 
@@ -685,9 +672,9 @@ export default function SecretaryQueue() {
                           {entry.status === 'IN_CHECKUP' && (
                             <button
                               onClick={() => handleCompleteCheckup(entry.id)}
-                              disabled={actionLoading || !isToday(selectedDate) || (entry.appointment_id && paidAppointmentIds.has(entry.appointment_id))}
+                              disabled={actionLoading || !isToday(selectedDate)}
                               className="px-3 py-1.5 bg-[#1b5eb8] text-white rounded-lg hover:bg-[#1550a0] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
-                              title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : (entry.appointment_id && paidAppointmentIds.has(entry.appointment_id)) ? 'Payment already processed' : ''}
+                              title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                             >
                               Complete Checkup
                             </button>

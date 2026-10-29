@@ -1098,6 +1098,91 @@ router.delete('/:id/charges/:chargeId', authenticate, requireSecretaryPasswordCh
   }
 });
 
+// Update payment method (secretary only)
+router.patch('/:id/payment-method', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    const { id } = req.params;
+    const { paymentMethod } = req.body;
+    const secretaryId = req.user!.id;
+
+    // Validate payment method
+    if (!paymentMethod || !['CASH', 'GCASH'].includes(paymentMethod)) {
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid payment method. Must be CASH or GCASH'));
+    }
+
+    await client.query('BEGIN');
+
+    // Get secretary's assigned doctor
+    const secretaryResult = await client.query(
+      'SELECT id, doctor_id FROM secretaries WHERE user_id = $1',
+      [secretaryId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    // Get payment with doctor assignment check (lock row for update)
+    const paymentResult = await client.query(
+      `SELECT p.*, a.doctor_id
+       FROM payments p
+       JOIN appointments a ON p.appointment_id = a.id
+       WHERE p.id = $1
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (paymentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Payment not found'));
+    }
+
+    const payment = paymentResult.rows[0];
+
+    // Verify payment belongs to secretary's assigned doctor
+    if (payment.doctor_id !== assignedDoctorId) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only update payments for your assigned doctor'));
+    }
+
+    // Only allow payment method changes when no payment has been recorded
+    if (payment.amount_paid > 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot change payment method after payment has been recorded'));
+    }
+
+    // Update payment method
+    await client.query(
+      `UPDATE payments
+       SET payment_method = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [paymentMethod, id]
+    );
+
+    await client.query('COMMIT');
+    client.release();
+
+    res.json(success(null, 'Payment method updated successfully'));
+  } catch (err: any) {
+    try {
+      await client.query('ROLLBACK');
+      client.release();
+    } catch (rollbackErr) {
+      console.error('Rollback failed:', rollbackErr);
+    }
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update payment method'));
+  }
+});
+
 // Get payment by ID (for mobile notifications)
 // This route uses a distinct path to avoid conflict with GET /:appointmentId
 router.get('/by-id/:id', authenticate, async (req: AuthRequest, res: Response) => {
@@ -1570,63 +1655,27 @@ router.patch('/:id/record-payment', authenticate, requireSecretaryPasswordChange
     const totalAmount = parseFloat(payment.total_amount);
     const currentBalance = Math.max(0, totalAmount - currentAmountPaid);
 
-    // Calculate new amount paid (cumulative), but cap at total_amount
-    const newAmountPaid = Math.min(currentAmountPaid + numericAmount, totalAmount);
+    // Calculate new amount paid (cumulative) - allow excess for change scenarios
+    const newAmountPaid = currentAmountPaid + numericAmount;
     const newBalance = Math.max(0, totalAmount - newAmountPaid);
 
-    // Determine if payment is now fully paid
-    const isFullyPaid = newBalance <= 0.01; // Account for floating point precision
-
-    // Update payment
-    if (isFullyPaid) {
-      // Fully paid - set status to PAID and verification metadata
-      await client.query(
-        `UPDATE payments
-         SET amount_paid = $1, status = 'PAID', verified_by = $2, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3`,
-        [newAmountPaid, secretaryRecordId, id]
-      );
-
-      // Insert notification for patient
-      await client.query(
-        `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
-         VALUES ($1, 'PAYMENT_VERIFIED', 'Payment Confirmed', 'Your payment has been confirmed.', 'payment', $2)`,
-        [payment.patient_user_id, id]
-      );
-    } else {
-      // Partial payment - only update amount_paid, do not change status
-      await client.query(
-        `UPDATE payments
-         SET amount_paid = $1, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2`,
-        [newAmountPaid, id]
-      );
-    }
+    // Update payment - only update amount_paid, do not change status
+    // Secretary must explicitly use /mark-paid to mark as PAID
+    await client.query(
+      `UPDATE payments
+       SET amount_paid = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [newAmountPaid, id]
+    );
 
     await client.query('COMMIT');
     client.release();
 
-    // Send push notification (best-effort, outside transaction)
-    if (isFullyPaid) {
-      try {
-        await sendPushToUser(payment.patient_user_id, {
-          title: 'Payment Confirmed',
-          body: 'Your payment has been confirmed.',
-          data: {
-            type: 'PAYMENT_VERIFIED',
-            paymentId: id,
-          },
-        });
-      } catch (pushErr) {
-        console.error('Push delivery failed:', pushErr);
-      }
-    }
-
     res.json(success({
       amountPaid: newAmountPaid.toFixed(2),
       balance: newBalance.toFixed(2),
-      status: isFullyPaid ? 'PAID' : payment.status
-    }, isFullyPaid ? 'Payment fully paid' : 'Partial payment recorded'));
+      status: payment.status
+    }, 'Payment recorded successfully'));
   } catch (err: any) {
     try {
       await client.query('ROLLBACK');
