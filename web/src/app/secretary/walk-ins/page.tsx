@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { secretaryApi, SecretaryProfile, DirectWalkInRegistrationRequest } from '@/lib/api/secretaryApi';
+import DatePicker from '@/components/DatePicker';
 
 type Step = 'form' | 'success';
 
@@ -27,6 +28,12 @@ export default function SecretaryWalkIns() {
   // Success result
   const [registrationResult, setRegistrationResult] = useState<any>(null);
 
+  // Field-level errors
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Custom dropdown states
+  const [isSexDropdownOpen, setIsSexDropdownOpen] = useState(false);
+
   useEffect(() => {
     fetchSecretaryProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -48,6 +55,10 @@ export default function SecretaryWalkIns() {
   };
 
   const handleDirectRegister = async () => {
+    // Clear previous errors
+    setFieldErrors({});
+    setError(null);
+
     // Validate required fields
     if (!formData.email.trim() ||
         !formData.firstName.trim() ||
@@ -59,8 +70,14 @@ export default function SecretaryWalkIns() {
       return;
     }
 
+    // Validate Philippine mobile number format
+    const phoneDigits = formData.phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10) {
+      setFieldErrors({ phone: 'Mobile number must be 10 digits (excluding +63)' });
+      return;
+    }
+
     setIsRegistering(true);
-    setError(null);
 
     try {
       const response = await secretaryApi.directRegisterWalkIn(formData);
@@ -69,16 +86,86 @@ export default function SecretaryWalkIns() {
         setRegistrationResult(response.data);
         setStep('success');
       } else {
-        // Show detailed error message from backend
-        const errorMessage = response.error || 'Failed to register walk-in';
-        console.error('Walk-in registration failed:', response);
+        // Parse error message to identify field-level errors
+        let errorMessage = 'Failed to register walk-in';
+        
+        // Handle nested error object format: { error: { code, message } }
+        if (typeof response.error === 'object' && response.error !== null) {
+          errorMessage = response.error.message || response.error.code || errorMessage;
+        } else if (typeof response.error === 'string') {
+          errorMessage = response.error;
+        } else if (response.errorCode) {
+          errorMessage = response.errorCode;
+        }
+        
+        console.warn('Walk-in registration validation failed:', response);
+
+        // Set field-level errors based on error message
+        const newFieldErrors: Record<string, string> = {};
+        const lowerError = errorMessage.toLowerCase();
+
+        if (lowerError.includes('email')) {
+          newFieldErrors.email = 'Email already registered';
+          setError(null); // Clear global error when field error is set
+        } else if (lowerError.includes('phone') || lowerError.includes('mobile')) {
+          newFieldErrors.phone = errorMessage;
+        } else if (lowerError.includes('name')) {
+          newFieldErrors.firstName = errorMessage;
+        }
+
+        setFieldErrors(newFieldErrors);
+        if (!newFieldErrors.email) {
+          setError(errorMessage);
+        }
+      }
+    } catch (err: any) {
+      console.error('Network error:', err);
+      // Handle axios/network errors
+      let errorMessage = 'Network error occurred. Please check your connection.';
+      
+      if (err.response?.data?.error?.message) {
+        errorMessage = err.response.data.error.message;
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      const newFieldErrors: Record<string, string> = {};
+      const lowerError = errorMessage.toLowerCase();
+
+      if (lowerError.includes('email')) {
+        newFieldErrors.email = 'Email already registered';
+        setError(null);
+      } else if (lowerError.includes('phone') || lowerError.includes('mobile')) {
+        newFieldErrors.phone = errorMessage;
+      } else if (lowerError.includes('name')) {
+        newFieldErrors.firstName = errorMessage;
+      }
+
+      setFieldErrors(newFieldErrors);
+      if (!newFieldErrors.email) {
         setError(errorMessage);
       }
-    } catch (err) {
-      console.error('Network error:', err);
-      setError('Network error occurred. Please check your connection.');
     } finally {
       setIsRegistering(false);
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    
+    // Remove all non-digit characters
+    value = value.replace(/\D/g, '');
+    
+    // Limit to 10 digits (Philippine mobile number after +63)
+    if (value.length > 10) {
+      value = value.slice(0, 10);
+    }
+    
+    setFormData(prev => ({ ...prev, phone: value }));
+    if (fieldErrors.phone) {
+      setFieldErrors(prev => ({ ...prev, phone: '' }));
     }
   };
 
@@ -96,12 +183,33 @@ export default function SecretaryWalkIns() {
     });
     setRegistrationResult(null);
     setError(null);
+    setFieldErrors({});
+    setIsSexDropdownOpen(false);
   };
 
   const handleReturnToForm = () => {
     setError(null);
     // NOTE: Do NOT call handleReset() - preserve current step and form data
   };
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      
+      // Check if click is outside any dropdown button or dropdown content
+      const isOutside = !target.closest('[data-dropdown]') && !target.closest('[data-dropdown-content]');
+      
+      if (isOutside) {
+        setIsSexDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSexDropdownOpen]);
 
   if (isLoading) {
     return (
@@ -153,6 +261,11 @@ export default function SecretaryWalkIns() {
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-800 mb-4">Register Walk-in Patient</h2>
           <div className="space-y-4">
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
             <div>
               <label className="block text-sm text-slate-600 mb-2">Assigned Doctor</label>
               <input
@@ -167,10 +280,22 @@ export default function SecretaryWalkIns() {
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, email: e.target.value }));
+                  if (fieldErrors.email) {
+                    setFieldErrors(prev => ({ ...prev, email: '' }));
+                  }
+                }}
                 placeholder="Enter patient email"
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  fieldErrors.email
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-slate-200 focus:ring-emerald-500'
+                }`}
               />
+              {fieldErrors.email && (
+                <p className="text-xs text-red-600 mt-1">{fieldErrors.email}</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -178,10 +303,22 @@ export default function SecretaryWalkIns() {
                 <input
                   type="text"
                   value={formData.firstName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, firstName: e.target.value }));
+                    if (fieldErrors.firstName) {
+                      setFieldErrors(prev => ({ ...prev, firstName: '' }));
+                    }
+                  }}
                   placeholder="First name"
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                    fieldErrors.firstName
+                      ? 'border-red-500 focus:ring-red-500'
+                      : 'border-slate-200 focus:ring-emerald-500'
+                  }`}
                 />
+                {fieldErrors.firstName && (
+                  <p className="text-xs text-red-600 mt-1">{fieldErrors.firstName}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-slate-600 mb-2">Middle Name</label>
@@ -199,44 +336,113 @@ export default function SecretaryWalkIns() {
               <input
                 type="text"
                 value={formData.lastName}
-                onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, lastName: e.target.value }));
+                  if (fieldErrors.lastName) {
+                    setFieldErrors(prev => ({ ...prev, lastName: '' }));
+                  }
+                }}
                 placeholder="Last name"
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  fieldErrors.lastName
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-slate-200 focus:ring-emerald-500'
+                }`}
               />
+              {fieldErrors.lastName && (
+                <p className="text-xs text-red-600 mt-1">{fieldErrors.lastName}</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-slate-600 mb-2">Date of Birth *</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={formData.dateOfBirth}
-                  onChange={(e) => setFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  onChange={(date) => setFormData(prev => ({ ...prev, dateOfBirth: date }))}
+                  maxDate={new Date().toISOString().split('T')[0]}
                 />
               </div>
               <div>
                 <label className="block text-sm text-slate-600 mb-2">Sex *</label>
-                <select
-                  value={formData.sex}
-                  onChange={(e) => setFormData(prev => ({ ...prev, sex: e.target.value }))}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                  <option value="OTHER">Other</option>
-                  <option value="NOT_SPECIFIED">Not Specified</option>
-                </select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    data-dropdown
+                    onClick={() => setIsSexDropdownOpen(!isSexDropdownOpen)}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-left flex items-center justify-between bg-white hover:border-emerald-300 transition-colors"
+                  >
+                    {formData.sex === 'MALE' ? 'Male' : formData.sex === 'FEMALE' ? 'Female' : formData.sex === 'OTHER' ? 'Other' : 'Not Specified'}
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {isSexDropdownOpen && (
+                    <div data-dropdown-content className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, sex: 'MALE' }));
+                          setIsSexDropdownOpen(false);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-emerald-50 hover:text-emerald-700 transition-colors first:rounded-t-lg"
+                      >
+                        Male
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, sex: 'FEMALE' }));
+                          setIsSexDropdownOpen(false);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                      >
+                        Female
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, sex: 'OTHER' }));
+                          setIsSexDropdownOpen(false);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                      >
+                        Other
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, sex: 'NOT_SPECIFIED' }));
+                          setIsSexDropdownOpen(false);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-emerald-50 hover:text-emerald-700 transition-colors last:rounded-b-lg"
+                      >
+                        Not Specified
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div>
               <label className="block text-sm text-slate-600 mb-2">Mobile Number *</label>
-              <input
-                type="text"
-                value={formData.phone}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="Mobile number"
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">+63</span>
+                <input
+                  type="text"
+                  value={formData.phone}
+                  onChange={handlePhoneChange}
+                  placeholder="9123456789"
+                  maxLength={10}
+                  className={`w-full pl-14 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                    fieldErrors.phone
+                      ? 'border-red-500 focus:ring-red-500'
+                      : 'border-slate-200 focus:ring-emerald-500'
+                  }`}
+                />
+              </div>
+              {fieldErrors.phone && (
+                <p className="text-xs text-red-600 mt-1">{fieldErrors.phone}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm text-slate-600 mb-2">Address *</label>
