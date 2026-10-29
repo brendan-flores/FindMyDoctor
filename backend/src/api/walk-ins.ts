@@ -574,7 +574,8 @@ router.post('/submit-patient-details', authenticate, requireSecretaryPasswordCha
     const trimmedMiddleName = middleName ? middleName.trim() : null;
     const trimmedLastName = lastName.trim();
     const trimmedSex = sex.trim().toUpperCase();
-    const trimmedPhone = phone.trim();
+    // Prepend '+63' to phone number for Philippine format (e.g., +639123456789)
+    const trimmedPhone = phone.trim().startsWith('+63') ? phone.trim() : `+63${phone.trim()}`;
     const trimmedAddress = address.trim();
 
     // Length validation
@@ -593,9 +594,9 @@ router.post('/submit-patient-details', authenticate, requireSecretaryPasswordCha
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name must be 1-100 characters'));
     }
 
-    if (trimmedPhone.length === 0 || trimmedPhone.length > 20) {
+    if (trimmedPhone.length !== 13) {
       await client.query('ROLLBACK');
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 1-20 characters'));
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 13 characters (+63 followed by 10 digits)'));
     }
 
     if (trimmedAddress.length === 0) {
@@ -778,7 +779,8 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
     const trimmedMiddleName = middleName ? middleName.trim() : null;
     const trimmedLastName = lastName.trim();
     const trimmedSex = sex.trim().toUpperCase();
-    const trimmedPhone = phone.trim();
+    // Prepend '+63' to phone number for Philippine format (e.g., +639123456789)
+    const trimmedPhone = phone.trim().startsWith('+63') ? phone.trim() : `+63${phone.trim()}`;
     const trimmedAddress = address.trim();
 
     // Length validation
@@ -797,9 +799,9 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name must be 1-100 characters'));
     }
 
-    if (trimmedPhone.length === 0 || trimmedPhone.length > 20) {
+    if (trimmedPhone.length !== 13) {
       await client.query('ROLLBACK');
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 1-20 characters'));
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 13 characters (+63 followed by 10 digits)'));
     }
 
     if (trimmedAddress.length === 0) {
