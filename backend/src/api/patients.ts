@@ -87,7 +87,8 @@ router.put('/me', authenticate, requirePasswordChange, authorize('PATIENT'), asy
     const trimmedMiddleName = middleName ? middleName.trim() : null;
     const trimmedLastName = lastName.trim();
     const trimmedSex = sex.trim().toUpperCase();
-    const trimmedPhone = phone.trim();
+    // Prepend '+63' to phone number for Philippine format (e.g., +639123456789)
+    const trimmedPhone = phone.trim().startsWith('+63') ? phone.trim() : `+63${phone.trim()}`;
     const trimmedAddress = address.trim();
 
     // Length validation
@@ -103,8 +104,8 @@ router.put('/me', authenticate, requirePasswordChange, authorize('PATIENT'), asy
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name must be 1-100 characters'));
     }
 
-    if (trimmedPhone.length === 0 || trimmedPhone.length > 20) {
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 1-20 characters'));
+    if (trimmedPhone.length !== 13) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 13 characters (+63 followed by 10 digits)'));
     }
 
     if (trimmedAddress.length === 0) {
@@ -333,7 +334,8 @@ router.post('/submit-details', authenticate, requirePasswordChange, authorize('P
     const trimmedMiddleName = middleName ? middleName.trim() : null;
     const trimmedLastName = lastName.trim();
     const trimmedSex = sex.trim().toUpperCase();
-    const trimmedPhone = phone.trim();
+    // Prepend '+63' to phone number for Philippine format (e.g., +639123456789)
+    const trimmedPhone = phone.trim().startsWith('+63') ? phone.trim() : `+63${phone.trim()}`;
     const trimmedAddress = address.trim();
 
     // Length validation
@@ -720,7 +722,8 @@ router.post('/associate', authenticate, requirePasswordChange, authorize('DOCTOR
     const trimmedMiddleName = middleName ? middleName.trim() : null;
     const trimmedLastName = lastName.trim();
     const trimmedSex = sex.trim().toUpperCase();
-    const trimmedPhone = phone.trim();
+    // Prepend '+63' to phone number for Philippine format (e.g., +639123456789)
+    const trimmedPhone = phone.trim().startsWith('+63') ? phone.trim() : `+63${phone.trim()}`;
     const trimmedAddress = address.trim();
 
     // Length validation
@@ -985,7 +988,8 @@ router.put('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
     const trimmedFirstName = firstName.trim();
     const trimmedLastName = lastName.trim();
     const trimmedSex = sex.trim().toUpperCase();
-    const trimmedPhone = phone.trim();
+    // Prepend '+63' to phone number for Philippine format (e.g., +639123456789)
+    const trimmedPhone = phone.trim().startsWith('+63') ? phone.trim() : `+63${phone.trim()}`;
     const trimmedAddress = address.trim();
 
     // Validate trimmed required fields
@@ -995,8 +999,8 @@ router.put('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
     if (trimmedLastName.length === 0 || trimmedLastName.length > 100) {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name must be 1-100 characters'));
     }
-    if (trimmedPhone.length === 0 || trimmedPhone.length > 20) {
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 1-20 characters'));
+    if (trimmedPhone.length !== 13) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 13 characters (+63 followed by 10 digits)'));
     }
     if (trimmedAddress.length === 0) {
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Address is required'));
