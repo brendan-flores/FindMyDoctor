@@ -252,6 +252,12 @@ Each doctor profile should include:
 - Consultation/checkup fee.
 - Availability.
 - Professional photo (PNG, max 4MB, stored in Supabase Storage).
+- Clinic/practice name, address, and room number.
+- Years of experience.
+- Areas of expertise.
+- Languages spoken.
+
+The patient-facing profile is available only to authenticated patients and only for active, approved doctors with active accounts. It shall not display the doctor's email address, contact number, PRC license number, approval status, account status, queue contents, or any other patient's data. Empty optional sections are hidden, except the Schedule section which is always shown regardless of today's availability to allow patients to view the doctor's weekly working days and hours and plan future bookings.
 
 **Photo Storage:**
 - Doctor professional photos are stored in Supabase Storage bucket `doctor-photos`

@@ -553,6 +553,10 @@ Current System State (October 2026):
 - Mobile Doctors page search functionality works with specialty and hospital filters applied
 - Mobile Doctors page result count dynamically updates based on current filters and search query
 - Mobile Doctors page "Book Visit" button navigates to /doctor-schedule to select appointment time
+- Mobile Doctors page "View Profile" button opens the patient-only Doctor Profile screen (`/doctor-profile`) with the selected doctor id; the screen shows a back arrow, professional photo, name, specialty, credentials, consultation fee, years of experience, default visit length, today's availability and remaining slots, next available date, an expandable biography, languages, areas of expertise (only when they add detail beyond the specialty line), weekly working hours, clinic name/address/room, and a Google Maps "Get directions" link that uses a search URL without an API key
+- The Doctor Profile screen hides empty sections, shows loading, retryable error, and generic not-found states, and never renders a doctor's email, phone number, PRC license, approval status, or other private fields
+- The Doctor Profile sticky "Book appointment" button opens the existing `/doctor-schedule` booking flow (including the doctor-specific patient record check) with the selected doctor's id, name, specialty, clinic, consultation fee, and photo
+- Mobile route `/doctor-profile` is patient-only: unauthenticated users are redirected to login and secretaries are kept on the secretary home by the shared route guard
 - Mobile Doctors page dynamically derives specialties and hospitals from actual registered doctors
 - Mobile Doctors page shows hospital cards with hospital name, address, and doctor count derived from database
 
@@ -611,6 +615,7 @@ Current System State (October 2026):
 - Backend doctors API returns all profile fields including `profile_completion_status` and `profile_submitted_at`
 - Patient-facing doctor search endpoint `GET /api/v1/doctors` does not expose PRC license number, personal contact number, or email address
 - Patient-facing doctor by ID endpoint `GET /api/v1/doctors/:id` does not expose PRC license number, personal contact number, or email address
+- Patient-only doctor profile endpoint: `GET /api/v1/patient/doctors/:id/profile` (requires a PATIENT token; SECRETARY, DOCTOR, ADMIN, and anonymous callers are rejected). It returns only `id`, `displayName`, `photoUrl`, `specialty`, `credentials`, `practiceName`, `practiceAddress`, `roomNumber`, `yearsOfExperience`, `consultationFee`, `areasOfExpertise`, `languagesSpoken`, `biography`, and `availability` (`availableToday`, `slotsLeftToday`, `nextAvailableDate`, `consultationDurationMinutes`, `workingDays`). It never returns email, contact number, PRC license, approval status, active flags, queue contents, or other patient data. Only doctors with `approval_status = 'ACTIVE'`, `is_approved = true`, and an active linked user account are returned; all other ids receive a generic `Doctor not found` 404
 
 ## Patient-Secretary Messaging and Push Notifications
 - Conversations router mounted at `/api/v1/conversations`; `GET /conversations` lists conversations for the authenticated patient or secretary with patient details, doctor/practice names, an unread count computed from `messages.read_at` (excluding the caller's own sent messages), and a latest-message preview consistent with the newest saved message

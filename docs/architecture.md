@@ -693,6 +693,8 @@ Profile
 
 There is no direct doctor-chat screen.
 
+The mobile patient Doctor Profile screen (`/doctor-profile`) is opened from "View Profile" on a doctor card and is patient-only (the shared route guard redirects unauthenticated users to login and keeps secretaries on the secretary home). It loads `GET /api/v1/patient/doctors/:id/profile` and shows only public professional information plus availability: photo, display name, specialty, credentials, consultation fee, years of experience, today's availability and remaining slots, next available date, expandable biography, languages, weekly working hours (Schedule section always shown regardless of today's availability, with today's row marked as "Today"), clinic name/address/room, and a Google Maps search link (no map API key). Private fields (email, phone, PRC license, approval status, account status) and other patients' data are never returned or displayed. The sticky "Book appointment" action enters the existing `/doctor-schedule` booking flow, including the doctor-specific patient-record check. Empty optional sections are hidden, except the Schedule section which is always shown with "Schedule not available yet" when no schedule is configured. The screen provides loading, retryable error, and generic not-found states. There is no waitlist UI because the waitlist feature has no endpoints or screens.
+
 ---
 
 # 6.1. Patient Registration with OTP
@@ -1659,6 +1661,7 @@ Responsibilities:
 - Approval status.
 - Availability.
 - Capacity.
+- Patient-facing public profile (active, approved doctors only; whitelisted professional fields plus availability, never private contact or account fields).
 
 ---
 
@@ -1755,6 +1758,14 @@ Base:
 ```text
 /api/v1
 ```
+
+### Patient Doctor Profile
+
+```text
+GET  /patient/doctors/:id/profile
+```
+
+Patient-only (a PATIENT token is required; SECRETARY, DOCTOR, ADMIN, and anonymous callers are rejected). The endpoint returns only the public professional whitelist (`id`, `displayName`, `photoUrl`, `specialty`, `credentials`, `practiceName`, `practiceAddress`, `roomNumber`, `yearsOfExperience`, `consultationFee`, `areasOfExpertise`, `languagesSpoken`, `biography`) plus `availability` (`availableToday`, `slotsLeftToday`, `nextAvailableDate`, `consultationDurationMinutes`, `workingDays`). Availability reuses the scheduling and capacity services in the clinic timezone (Asia/Manila), so breaks are never bookable and a fully booked day resolves the next available date. Only doctors with `approval_status = 'ACTIVE'`, `is_approved = true`, and an active linked user account are returned; every other id receives the same generic `404 Doctor not found`. Private fields (email, contact number, PRC license, approval/account status), queue contents, and other patient data are never returned.
 
 ### Capacity
 
