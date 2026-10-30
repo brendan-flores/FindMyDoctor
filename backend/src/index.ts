@@ -29,6 +29,7 @@ import prescriptionsRouter from './api/prescriptions.js';
 import notificationsRouter from './api/notifications.js';
 import adminRouter from './api/admin.js';
 import gcashQrRouter from './api/gcashQr.js';
+import patientDoctorsRouter from './api/patientDoctors.js';
 
 const app = express();
 const apiVersion = config.app.apiVersion;
@@ -111,6 +112,7 @@ app.use(`/api/${apiVersion}/auth/patient/otp`, patientOtpRouter);
 app.use(`/api/${apiVersion}/auth/password-reset`, passwordResetRouter);
 app.use(`/api/${apiVersion}/users`, authenticate, usersRouter);
 app.use(`/api/${apiVersion}/patients`, authenticate, patientsRouter);
+app.use(`/api/${apiVersion}/patient`, authenticate, patientDoctorsRouter);
 app.use(`/api/${apiVersion}/doctors`, doctorsRouter);
 app.use(`/api/${apiVersion}/secretaries`, authenticate, secretariesRouter);
 app.use(`/api/${apiVersion}/appointments`, authenticate, appointmentsRouter);
