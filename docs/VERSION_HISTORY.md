@@ -4,6 +4,68 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.29 (October 30, 2026)
+
+**Purpose:** Add invoice voiding and reissue workflow to allow secretaries to correct invoice errors by voiding an invoice and generating a replacement, preserving audit trail integrity.
+
+**Significant Features:**
+- Invoice status field and voiding workflow:
+  - Added `status` column to `invoices` table with values: ACTIVE (default), VOID.
+  - Database constraint ensures only valid status values.
+  - Migration file: `backend/database/040_add_invoice_status.sql`.
+  - Migration applied via `npm run migrate:invoice-status`.
+- Secretary-only invoice voiding API endpoint:
+  - `POST /api/v1/invoices/:id/void`: Marks an invoice as VOID (irreversible).
+  - Validates secretary is assigned to the invoice's doctor.
+  - Rejects voiding already-voided invoices.
+  - Preserves invoice data for audit trail (PDF data remains but is not downloadable).
+- Invoice generation prevention:
+  - Modified `POST /api/v1/invoices/generate/:paymentId` to prevent duplicate ACTIVE invoices.
+  - Returns error if an ACTIVE invoice already exists for the payment.
+  - Allows generating new ACTIVE invoice after voiding the existing one.
+- Invoice status filtering:
+  - Modified `GET /api/v1/invoices/by-payment/:paymentId` to filter by status.
+  - By default, only returns ACTIVE invoices.
+  - Optional `?includeVoid=true` query parameter returns all invoices (for audit purposes).
+- PDF download restriction:
+  - Modified `GET /api/v1/invoices/:id/pdf` to reject PDF downloads for VOID invoices.
+  - Returns 403 error with message: "Cannot download PDF for voided invoice".
+- Frontend invoice status display:
+  - Added `status` field to `Invoice` interface in `web/src/lib/api/secretaryApi.ts`.
+  - Added `voidInvoice()` method to secretary API client.
+  - Updated secretary payments page (`/secretary/payments`) to display invoice status (ACTIVE/VOID badge).
+  - Added "Void Invoice" button for ACTIVE invoices with confirmation dialog.
+  - Confirmation message: "Paid invoices are voided and reissued, never edited. This action is irreversible."
+  - Voided invoices re-enable the "Generate Invoice" button for reissue.
+- Invoice modal updates:
+  - Updated `InvoiceModal` component to display invoice status badge.
+  - Disabled PDF download button for VOID invoices with tooltip.
+  - Added "Generate Invoice" button when invoice is VOID to enable reissue.
+  - Shows success message after generating replacement invoice.
+
+**Improvements:**
+- Secretaries can now correct invoice errors without compromising audit trail integrity.
+- One ACTIVE invoice per payment enforced at backend to prevent confusion.
+- Voided invoices remain in database for audit purposes but are not downloadable.
+- Clear visual indicators (status badges, disabled buttons) guide users through void-and-reissue workflow.
+- Irreversible voiding with confirmation prevents accidental errors.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature only; existing invoice functionality unchanged).
+
+**Documentation Updates:**
+- Updated `docs/prd.md` to add invoice voiding to secretary capabilities.
+- Updated `docs/architecture-essentials.md` to include invoices table with status field in required database concepts.
+- Added migration reference to architecture-essentials migration list.
+- Updated `CURRENT_VERSION.md` to 01.29.
+- Added version entry to `VERSION_HISTORY.md`.
+- Updated `backend/package.json` to add `migrate:invoice-status` script.
+
+---
+
 ### 01.27 (October 27, 2026)
 
 **Purpose:** Add secretary settings for clinic information that appears in invoice headers and footers, scoped to the assigned doctor, enabling each doctor or clinic to have separate invoice details for future invoice PDF generation.

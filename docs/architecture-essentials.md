@@ -683,6 +683,7 @@ prescription_items
 
 payments
 payment_charges
+invoices (with status: ACTIVE, VOID)
 
 conversations
 messages
@@ -716,6 +717,7 @@ login_otp_challenges (for login OTP challenge state)
 - `033_add_gcash_qr_updated_at.sql` - Adds `doctors.gcash_qr_updated_at` for the QR upload timestamp shown in secretary settings (cleared on QR deletion); `doctors.updated_at` cannot serve this role because profile/photo edits also bump it. Applied via `npm run migrate:gcash-qr-updated-at`.
 - `022_add_trusted_browsers.sql` - Creates the `trusted_browsers` table for trusted-device sessions (hashed tokens, device info, 30-day expiry, revocation timestamps)
 - `032_add_session_version.sql` - Adds `users.session_version` for account-wide refresh-token revocation on password change/reset, deactivation, and "Sign out of all devices"
+- `040_add_invoice_status.sql` - Adds `invoices.status` field to support invoice voiding and reissue workflow (status: ACTIVE, VOID). Applied via `npm run migrate:invoice-status`.
 
 ---
 
