@@ -391,8 +391,8 @@ router.post('/:appointmentId/receipt', authenticate, authorize('PATIENT'), uploa
       const consultationFee = doctorResult.rows[0].consultation_fee;
 
       await client.query(
-        `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_amount, status, receipt_url)
-         VALUES ($1, $2, 'GCASH', $3, $3, 'PENDING_VERIFICATION', $4)`,
+        `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_amount, gcash_advance_amount, cash_tendered_amount, status, receipt_url)
+         VALUES ($1, $2, 'GCASH', $3, $3, 0.00, 0.00, 'PENDING_VERIFICATION', $4)`,
         [appointment.patient_id, appointmentId, consultationFee, receiptPath]
       );
     }
@@ -475,14 +475,21 @@ router.patch('/:id/verify', authenticate, requireSecretaryPasswordChange, requir
       return res.status(400).json(error(ErrorCodes.PAYMENT_VERIFICATION_REQUIRED, 'Payment is not in pending verification status'));
     }
 
-    // Update payment verification metadata only (do not change status to PAID or set amount_paid)
+    // Update payment verification metadata and set gcash_advance_amount for GCash payments
     // Secretary must explicitly use /mark-paid to mark a verified GCash payment as PAID
-    await client.query(
-      `UPDATE payments
-       SET verified_by = $1, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [secretaryRecordId, id]
-    );
+    const updateQuery = payment.payment_method === 'GCASH'
+      ? `UPDATE payments
+         SET verified_by = $1, verified_at = CURRENT_TIMESTAMP, gcash_advance_amount = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`
+      : `UPDATE payments
+         SET verified_by = $1, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`;
+
+    const updateParams = payment.payment_method === 'GCASH'
+      ? [secretaryRecordId, payment.total_amount, id]
+      : [secretaryRecordId, id];
+
+    await client.query(updateQuery, updateParams);
 
     // Insert notification for patient using helper
     await createNotification(
@@ -652,10 +659,25 @@ router.patch('/:id/mark-paid', authenticate, requireSecretaryPasswordChange, req
 
     // Get payment with doctor assignment check (lock row for update)
     const paymentResult = await client.query(
-      `SELECT p.*, a.doctor_id, pat.user_id as patient_user_id
+      `SELECT p.*, a.doctor_id, a.appointment_date, a.reason_for_visit,
+              pat.user_id as patient_user_id,
+              pat.first_name as patient_first_name,
+              pat.last_name as patient_last_name,
+              pat.phone as patient_phone,
+              pat.address as patient_address,
+              pat.date_of_birth as patient_dob,
+              pat.sex as patient_sex,
+              u.email as patient_email,
+              d.first_name as doctor_first_name,
+              d.last_name as doctor_last_name,
+              d.specialty,
+              d.practice_name,
+              d.consultation_fee
        FROM payments p
        JOIN appointments a ON p.appointment_id = a.id
        JOIN patients pat ON p.patient_id = pat.id
+       JOIN users u ON pat.user_id = u.id
+       JOIN doctors d ON a.doctor_id = d.id
        WHERE p.id = $1
        FOR UPDATE`,
       [id]
@@ -690,12 +712,32 @@ router.patch('/:id/mark-paid', authenticate, requireSecretaryPasswordChange, req
     }
 
     // Update payment status and set amount_paid to total_amount
-    await client.query(
-      `UPDATE payments
-       SET status = 'PAID', amount_paid = $1, verified_by = $2, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3`,
-      [payment.total_amount, secretaryRecordId, id]
-    );
+    // Preserve payment method amounts if partial payments were already recorded
+    let updateQuery = 'UPDATE payments SET status = $1, amount_paid = $2, verified_by = $3, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP';
+    const updateParams: any[] = ['PAID', payment.total_amount, secretaryRecordId];
+
+    // Only set payment method amounts if they are currently 0 (no partial payments recorded)
+    // This preserves amounts recorded via recordPartialPayment for split payment scenarios
+    // DO NOT overwrite either column if it has a value, as split payments (GCash + cash) are now supported
+    const currentGcashAdvance = parseFloat(payment.gcash_advance_amount || '0');
+    const currentCashTendered = parseFloat(payment.cash_tendered_amount || '0');
+
+    if (currentGcashAdvance === 0 && currentCashTendered === 0) {
+      // No partial payments recorded - set the appropriate column based on payment method
+      if (payment.payment_method === 'GCASH') {
+        updateQuery += ', gcash_advance_amount = $4';
+        updateParams.push(payment.total_amount);
+      } else if (payment.payment_method === 'CASH') {
+        updateQuery += ', cash_tendered_amount = $4';
+        updateParams.push(payment.total_amount);
+      }
+    }
+    // If either column has a value, preserve both - don't overwrite anything
+
+    updateQuery += ' WHERE id = $' + (updateParams.length + 1);
+    updateParams.push(id);
+
+    await client.query(updateQuery, updateParams);
 
     // Update queue entry status to COMPLETED
     await client.query(
@@ -711,6 +753,140 @@ router.patch('/:id/mark-paid', authenticate, requireSecretaryPasswordChange, req
        VALUES ($1, 'PAYMENT_VERIFIED', 'Payment Confirmed', 'Your payment has been confirmed.', 'payment', $2)`,
       [payment.patient_user_id, id]
     );
+
+    // Automatically generate invoice for the paid payment
+    // Check if invoice already exists
+    const existingInvoiceResult = await client.query(
+      'SELECT id FROM invoices WHERE payment_id = $1',
+      [id]
+    );
+
+    if (existingInvoiceResult.rows.length === 0) {
+      // Get invoice settings for the doctor
+      const invoiceSettingsResult = await client.query(
+        'SELECT clinic_name, address, contact_number, footer_line FROM invoice_settings WHERE doctor_id = $1',
+        [assignedDoctorId]
+      );
+
+      const invoiceSettings = invoiceSettingsResult.rows[0] || {
+        clinic_name: payment.practice_name || 'Find My Doctor',
+        address: '',
+        contact_number: '',
+        footer_line: 'Thank you for your visit!'
+      };
+
+      // Get payment charges
+      const chargesResult = await client.query(
+        `SELECT pc.charge_type, pc.description, pc.amount, pc.quantity, pc.unit_price
+         FROM payment_charges pc
+         WHERE pc.payment_id = $1 AND pc.deleted_at IS NULL`,
+        [id]
+      );
+
+      // Calculate amounts
+      const consultationAmount = parseFloat(payment.consultation_amount || '0');
+      const chargesTotal = chargesResult.rows.reduce((sum, charge) => sum + parseFloat(charge.amount || '0'), 0);
+      const subtotal = consultationAmount + chargesTotal;
+      const totalAmount = parseFloat(payment.total_amount || '0');
+      const amountPaid = parseFloat(payment.amount_paid || '0');
+      const advancePayment = parseFloat(payment.gcash_advance_amount || '0');
+      const cashTendered = parseFloat(payment.cash_tendered_amount || '0');
+      const remainingBalanceBeforePayment = Math.max(0, totalAmount - advancePayment);
+      const amountApplied = Math.min(cashTendered, remainingBalanceBeforePayment);
+      const changeAmount = Math.max(0, cashTendered - amountApplied);
+      const finalBalance = Math.max(0, totalAmount - amountPaid);
+
+      // Generate sequential invoice number per doctor
+      const lastInvoiceResult = await client.query(
+        `SELECT invoice_number FROM invoices WHERE doctor_id = $1 ORDER BY invoice_number DESC LIMIT 1`,
+        [assignedDoctorId]
+      );
+
+      let nextInvoiceNumber = 1;
+      if (lastInvoiceResult.rows.length > 0) {
+        const lastInvoiceNumber = lastInvoiceResult.rows[0].invoice_number;
+        const numericPart = parseInt(lastInvoiceNumber.replace(/\D/g, '')) || 0;
+        nextInvoiceNumber = numericPart + 1;
+      }
+
+      const invoiceNumber = `INV-${String(nextInvoiceNumber).padStart(4, '0')}`;
+
+      // Prepare invoice data JSONB
+      const invoiceData = {
+        clinic: {
+          name: invoiceSettings.clinic_name,
+          address: invoiceSettings.address,
+          contact_number: invoiceSettings.contact_number,
+          footer_line: invoiceSettings.footer_line
+        },
+        doctor: {
+          first_name: payment.doctor_first_name,
+          last_name: payment.doctor_last_name,
+          specialty: payment.specialty,
+          practice_name: payment.practice_name
+        },
+        patient: {
+          first_name: payment.patient_first_name,
+          last_name: payment.patient_last_name,
+          email: payment.patient_email,
+          phone: payment.patient_phone,
+          address: payment.patient_address,
+          date_of_birth: payment.patient_dob,
+          sex: payment.patient_sex
+        },
+        appointment: {
+          date: payment.appointment_date,
+          reason_for_visit: payment.reason_for_visit
+        },
+        charges: chargesResult.rows.map(charge => ({
+          charge_type: charge.charge_type,
+          description: charge.description,
+          amount: parseFloat(charge.amount || '0'),
+          quantity: charge.quantity ? parseFloat(charge.quantity) : null,
+          unit_price: charge.unit_price ? parseFloat(charge.unit_price) : null
+        })),
+        payment: {
+          consultation_amount: consultationAmount,
+          charges_total: chargesTotal,
+          subtotal: subtotal,
+          total_amount: totalAmount,
+          advance_payment: advancePayment,
+          remaining_balance_before_payment: remainingBalanceBeforePayment,
+          payment_method: payment.payment_method,
+          cash_tendered: cashTendered,
+          amount_applied: amountApplied,
+          change_amount: changeAmount,
+          final_balance: finalBalance
+        }
+      };
+
+      // Insert invoice record
+      await client.query(
+        `INSERT INTO invoices (
+          invoice_number, payment_id, doctor_id, patient_id, invoice_date,
+          subtotal, total_amount, advance_payment, remaining_balance_before_payment,
+          payment_method, cash_tendered, amount_applied, change_amount, final_balance,
+          invoice_data
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+        [
+          invoiceNumber,
+          id,
+          assignedDoctorId,
+          payment.patient_id,
+          new Date(),
+          subtotal,
+          totalAmount,
+          advancePayment,
+          remainingBalanceBeforePayment,
+          payment.payment_method,
+          cashTendered,
+          amountApplied,
+          changeAmount,
+          finalBalance,
+          JSON.stringify(invoiceData)
+        ]
+      );
+    }
 
     await client.query('COMMIT');
     client.release();
@@ -1482,12 +1658,16 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
     let paymentId: string;
 
     if (isWalkIn) {
+      // Determine initial payment method amounts
+      const gcashAdvanceAmount = paymentMethod === 'GCASH' ? 0.00 : 0.00;
+      const cashTenderedAmount = paymentMethod === 'CASH' ? 0.00 : 0.00;
+
       // Create new payment record for walk-in patients
       const paymentInsertResult = await client.query(
-        `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_additional_charges, total_amount, amount_paid, status, verified_by, verified_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 0.00, $7, $8, CURRENT_TIMESTAMP)
+        `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_additional_charges, total_amount, amount_paid, gcash_advance_amount, cash_tendered_amount, status, verified_by, verified_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 0.00, $7, $8, $9, $10, CURRENT_TIMESTAMP)
          RETURNING id`,
-        [appointment.patient_id, appointmentId, paymentMethod, consultationFee, totalCharges, totalAmount, paymentStatus, verifiedBy]
+        [appointment.patient_id, appointmentId, paymentMethod, consultationFee, totalCharges, totalAmount, gcashAdvanceAmount, cashTenderedAmount, paymentStatus, verifiedBy]
       );
       paymentId = paymentInsertResult.rows[0].id;
 
@@ -1515,6 +1695,11 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
       // Update existing payment record for booked patients
       paymentId = existingPaymentResult.rows[0].id;
 
+      // Determine payment method amounts based on payment method
+      // Note: For booked patients, these will be updated later when actual payments are recorded
+      const gcashAdvanceAmount = paymentMethod === 'GCASH' ? 0.00 : 0.00;
+      const cashTenderedAmount = paymentMethod === 'CASH' ? 0.00 : 0.00;
+
       // Update payment method, status, and amounts (do not set amount_paid or change status automatically)
       await client.query(
         `UPDATE payments
@@ -1522,9 +1707,11 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
              consultation_amount = $2,
              total_additional_charges = $3,
              total_amount = $4,
+             gcash_advance_amount = $5,
+             cash_tendered_amount = $6,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $5`,
-        [paymentMethod, consultationFee, totalCharges, totalAmount, paymentId]
+         WHERE id = $7`,
+        [paymentMethod, consultationFee, totalCharges, totalAmount, gcashAdvanceAmount, cashTenderedAmount, paymentId]
       );
 
       // Delete existing charges and insert new ones
@@ -1568,7 +1755,7 @@ router.patch('/:id/record-payment', authenticate, requireSecretaryPasswordChange
   const client = await getClient();
   try {
     const { id } = req.params;
-    const { amountReceived } = req.body;
+    const { amountReceived, paymentMethodType } = req.body;
     const secretaryId = req.user!.id;
 
     // Validate amount received
@@ -1586,6 +1773,12 @@ router.patch('/:id/record-payment', authenticate, requireSecretaryPasswordChange
     if (numericAmount <= 0) {
       client.release();
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'amountReceived must be greater than zero'));
+    }
+
+    // Validate payment method type if provided
+    if (paymentMethodType && !['GCASH', 'CASH'].includes(paymentMethodType)) {
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'paymentMethodType must be GCASH or CASH'));
     }
 
     await client.query('BEGIN');
@@ -1659,14 +1852,28 @@ router.patch('/:id/record-payment', authenticate, requireSecretaryPasswordChange
     const newAmountPaid = currentAmountPaid + numericAmount;
     const newBalance = Math.max(0, totalAmount - newAmountPaid);
 
-    // Update payment - only update amount_paid, do not change status
-    // Secretary must explicitly use /mark-paid to mark as PAID
-    await client.query(
-      `UPDATE payments
-       SET amount_paid = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [newAmountPaid, id]
-    );
+    // Build update query based on payment method type
+    let updateQuery = 'UPDATE payments SET amount_paid = $1, updated_at = CURRENT_TIMESTAMP';
+    const updateParams: any[] = [newAmountPaid];
+
+    if (paymentMethodType === 'GCASH') {
+      // Update gcash_advance_amount
+      const currentGcashAdvance = parseFloat(payment.gcash_advance_amount || '0');
+      const newGcashAdvance = currentGcashAdvance + numericAmount;
+      updateQuery += ', gcash_advance_amount = $2';
+      updateParams.push(newGcashAdvance);
+    } else if (paymentMethodType === 'CASH') {
+      // Update cash_tendered_amount
+      const currentCashTendered = parseFloat(payment.cash_tendered_amount || '0');
+      const newCashTendered = currentCashTendered + numericAmount;
+      updateQuery += ', cash_tendered_amount = $2';
+      updateParams.push(newCashTendered);
+    }
+
+    updateQuery += ' WHERE id = $' + (updateParams.length + 1);
+    updateParams.push(id);
+
+    await client.query(updateQuery, updateParams);
 
     await client.query('COMMIT');
     client.release();

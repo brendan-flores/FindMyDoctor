@@ -72,6 +72,9 @@ dependencies:
   # Dio for downloading files
   dio: ^5.4.0
 
+  # Share Plus for sharing/downloading files
+  share_plus: ^13.3.1
+
   # Image manipulation for cropping
   image: ^4.1.7
 

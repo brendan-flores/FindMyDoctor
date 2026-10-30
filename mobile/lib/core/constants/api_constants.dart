@@ -103,6 +103,11 @@ class ApiConstants {
   static const String paymentCharges = '/charges';
   static const String paymentGcashQr = '/gcash-qr';
 
+  // Invoices endpoints
+  static const String invoices = '/invoices';
+  static const String invoiceByPayment = '/invoices/by-payment';
+  static const String invoicePdf = '/pdf';
+
   // Visits endpoints
   static const String visits = '/visits';
 

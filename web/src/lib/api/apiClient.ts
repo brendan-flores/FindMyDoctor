@@ -522,6 +522,14 @@ class ApiClient {
     return this.role ? { 'X-Portal-Role': this.role } : {};
   }
 
+  public getBaseUrl(): string {
+    return API_BASE_URL;
+  }
+
+  public getToken(): string | null {
+    return this.getStoredToken();
+  }
+
   /**
    * Authentication endpoints return 401 for invalid credentials/OTP. Refreshing
    * and retrying those would replace the real error with a misleading

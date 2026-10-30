@@ -42,6 +42,7 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
           d.consultation_fee, d.professional_photo_url,
           q.queue_number, q.status as queue_status,
           COALESCE(q.registration_source, 'ONLINE') as registration_source,
+          p.id as payment_id,
           p.status as payment_status,
           p.payment_method
         FROM appointments a
@@ -61,6 +62,7 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
           d.consultation_fee,
           q.queue_number, q.status as queue_status,
           COALESCE(q.registration_source, 'ONLINE') as registration_source,
+          pay.id as payment_id,
           pay.status as payment_status,
           pay.payment_method
         FROM appointments a
@@ -80,6 +82,8 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
           d.practice_name,
           d.consultation_fee,
           q.queue_number, q.status as queue_status,
+          COALESCE(q.registration_source, 'ONLINE') as registration_source,
+          pay.id as payment_id,
           pay.status as payment_status,
           pay.payment_method
         FROM appointments a
@@ -425,6 +429,7 @@ router.get('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
                d.consultation_fee, d.professional_photo_url,
                q.queue_number, q.status as queue_status,
                COALESCE(q.registration_source, 'ONLINE') as registration_source,
+               p.id as payment_id,
                p.status as payment_status,
                p.payment_method
         FROM appointments a
@@ -439,11 +444,15 @@ router.get('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
         SELECT a.*, p.first_name as patient_first_name, p.last_name as patient_last_name,
                d.practice_name,
                d.consultation_fee,
-               q.queue_number, q.status as queue_status
+               q.queue_number, q.status as queue_status,
+               pay.id as payment_id,
+               pay.status as payment_status,
+               pay.payment_method
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         JOIN doctors d ON a.doctor_id = d.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
+        LEFT JOIN payments pay ON a.id = pay.appointment_id
         WHERE a.id = $1 AND a.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)
       `;
       params.push(userId);

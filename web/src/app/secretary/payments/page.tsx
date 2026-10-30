@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { secretaryApi, Payment, PaymentCharge } from '@/lib/api/secretaryApi';
 import Toast from '@/components/ui/Toast';
+import InvoiceModal from '@/components/InvoiceModal';
 
 type TabType = 'UNPAID' | 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED' | 'CANCELLED';
 
@@ -38,6 +39,8 @@ export default function SecretaryPayments() {
   const [receiptImageError, setReceiptImageError] = useState(false);
   const [receiptSignedUrl, setReceiptSignedUrl] = useState<string | null>(null);
   const [isFetchingReceiptUrl, setIsFetchingReceiptUrl] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedPaymentForInvoice, setSelectedPaymentForInvoice] = useState<Payment | null>(null);
   const [paymentCounts, setPaymentCounts] = useState({ unpaid: 0, pending: 0, paid: 0, rejected: 0, cancelled: 0 });
   const [showAddChargeModal, setShowAddChargeModal] = useState(false);
   const [showDeleteChargeDialog, setShowDeleteChargeDialog] = useState(false);
@@ -578,6 +581,11 @@ export default function SecretaryPayments() {
     setIsFetchingReceiptUrl(false);
   };
 
+  const handleViewInvoice = (payment: Payment) => {
+    setSelectedPaymentForInvoice(payment);
+    setShowInvoiceModal(true);
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -939,6 +947,15 @@ export default function SecretaryPayments() {
                     <span className="text-slate-700 font-medium">Remaining Balance:</span>
                     <span className="text-slate-900 font-bold">{formatAmount(calculateBalance(selectedPayment))}</span>
                   </div>
+                  {selectedPayment.status === 'PAID' && (
+                    <button
+                      onClick={() => handleViewInvoice(selectedPayment)}
+                      className="mt-3 w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+                      View Invoice
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1361,6 +1378,18 @@ export default function SecretaryPayments() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Invoice Modal */}
+      {showInvoiceModal && selectedPaymentForInvoice && (
+        <InvoiceModal
+          isOpen={showInvoiceModal}
+          onClose={() => {
+            setShowInvoiceModal(false);
+            setSelectedPaymentForInvoice(null);
+          }}
+          paymentId={selectedPaymentForInvoice.id}
+        />
       )}
 
       {/* Toast Notification */}

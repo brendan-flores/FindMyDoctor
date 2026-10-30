@@ -4,6 +4,58 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.28 (October 30, 2026)
+
+**Purpose:** Implement automatic invoice generation in the Secretary > Daily Queue payment workflow, generating invoices after successful checkup completion and payment confirmation for payments with PAID status.
+
+**Significant Features:**
+- Invoice database schema:
+  - Created `invoices` table with sequential invoice numbering per doctor/clinic.
+  - Columns: `invoice_number`, `payment_id`, `doctor_id`, `patient_id`, `invoice_date`, `subtotal`, `total_amount`, `advance_payment`, `remaining_balance_before_payment`, `payment_method`, `cash_tendered`, `amount_applied`, `change_amount`, `final_balance`, `invoice_data` (JSONB).
+  - Unique constraint on (doctor_id, invoice_number) to prevent duplicate invoice numbers per clinic.
+  - Migration file: `backend/database/037_add_invoices_table.sql`.
+  - Migration applied via `npm run migrate:invoices-table`.
+- Backend invoice generation API:
+  - `POST /api/v1/invoices/generate/:paymentId` (SECRETARY only): Generates invoice for a paid payment, including sequential invoice number calculation, payment breakdown calculations, and invoice data storage.
+  - `GET /api/v1/invoices/:id`: Fetches invoice by ID with role-based access control (SECRETARY, PATIENT, DOCTOR, ADMIN).
+  - `GET /api/v1/invoices/by-payment/:paymentId`: Fetches invoice by payment ID.
+  - `GET /api/v1/invoices/:id/pdf`: Downloads invoice as PDF using PDFKit for professional invoice formatting.
+  - Invoices only generated for payments with PAID status; duplicate invoice generation prevented.
+- Backend PDF generation service:
+  - Created `invoicePdfService.ts` using PDFKit to generate professional invoice PDFs.
+  - PDF includes Find My Doctor branding, clinic details from invoice_settings, patient information, itemized charges breakdown, payment calculations (subtotal, advance payment, remaining balance, cash tendered, change, final balance), and Philippine peso formatting.
+  - PDF layout matches reference design with professional formatting and clear calculation breakdown.
+- Frontend InvoiceModal component:
+  - Created `InvoiceModal.tsx` component for invoice preview and download.
+  - Modal displays invoice preview with all payment details, charges breakdown, and calculations.
+  - Modal includes "Download" button to download invoice as PDF and "Done" button to close modal and return to queue.
+  - Automatic invoice generation when modal opens if invoice doesn't exist yet.
+- Integration with checkup completion workflow:
+  - Updated `PaymentModal.tsx` to automatically show InvoiceModal after successful checkup completion and payment confirmation.
+  - Invoice modal triggers after payment status changes to PAID via "Complete Checkup" confirmation.
+  - Workflow: Secretary completes checkup → Payment marked as PAID → Invoice generated automatically → Invoice modal opens for preview and download.
+- Web API client updates:
+  - Added `Invoice` and `InvoiceData` interfaces to `web/src/lib/api/secretaryApi.ts`.
+  - Added `generateInvoice()`, `getInvoice()`, `getInvoiceByPayment()`, and `downloadInvoicePdf()` methods.
+  - Added `getBaseUrl()` and `getToken()` helper methods to `apiClient.ts` for PDF download.
+
+**Improvements:**
+- Secretaries can now automatically generate professional invoices for paid payments at point of service.
+- Invoices provide clear breakdown of charges, payments, and calculations for patients.
+- Sequential invoice numbering per clinic ensures organized record-keeping.
+- PDF download allows patients to retain official invoices for their records.
+- Automatic generation streamlines the workflow without requiring manual invoice creation.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature only; existing payment and queue workflows unchanged).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md`, `VERSION_HISTORY.md`, and `backend/package.json` (added migrate:invoices-table script).
+
+---
+
 ### 01.27 (October 27, 2026)
 
 **Purpose:** Add secretary settings for clinic information that appears in invoice headers and footers, scoped to the assigned doctor, enabling each doctor or clinic to have separate invoice details for future invoice PDF generation.

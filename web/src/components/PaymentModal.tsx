@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { secretaryApi, Payment, PaymentCharge } from '@/lib/api/secretaryApi';
 import Toast from './ui/Toast';
+import InvoiceModal from './InvoiceModal';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -52,6 +53,7 @@ export default function PaymentModal({
   const [cashPaymentAmount, setCashPaymentAmount] = useState('');
   const [showCompleteCheckupModal, setShowCompleteCheckupModal] = useState(false);
   const [cashPaymentError, setCashPaymentError] = useState<string | null>(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   // Charges for walk-in payment creation
   const [tempCharges, setTempCharges] = useState<Array<{ description: string; amount: number; chargeType: 'ADDITIONAL' | 'MEDICINE'; name?: string; quantity?: number; unitPrice?: number }>>([]);
   // Track payment method editing state
@@ -115,7 +117,7 @@ export default function PaymentModal({
           const paymentResponse = await secretaryApi.getPayment(appointmentId);
           if (paymentResponse.success && paymentResponse.data) {
             const numericAmount = parseFloat(cashPaymentAmount);
-            const tenderResponse = await secretaryApi.recordPartialPayment(paymentResponse.data.id, numericAmount);
+            const tenderResponse = await secretaryApi.recordPartialPayment(paymentResponse.data.id, numericAmount, 'CASH');
             if (tenderResponse.success) {
               setCashPaymentAmount('');
               // Refresh payment data to show updated status
@@ -452,7 +454,7 @@ export default function PaymentModal({
         return;
       }
 
-      const response = await secretaryApi.recordPartialPayment(selectedPayment.id, numericAmount);
+      const response = await secretaryApi.recordPartialPayment(selectedPayment.id, numericAmount, 'GCASH');
 
       if (response.success) {
         setToastMessage(response.data?.status === 'PAID' ? 'Payment fully paid' : 'Advance payment recorded');
@@ -490,7 +492,7 @@ export default function PaymentModal({
         return;
       }
 
-      const response = await secretaryApi.recordPartialPayment(selectedPayment.id, numericAmount);
+      const response = await secretaryApi.recordPartialPayment(selectedPayment.id, numericAmount, 'CASH');
 
       if (response.success) {
         setToastMessage(response.data?.status === 'PAID' ? 'Payment fully paid' : 'Cash payment recorded');
@@ -578,13 +580,12 @@ export default function PaymentModal({
 
     // Check if payment is already fully paid
     if (selectedPayment.status === 'PAID') {
-      // Payment is already paid, just complete the checkup
+      // Payment is already paid, just complete the checkup and show invoice
       setToastMessage('Checkup completed successfully');
       setToastType('success');
       setShowToast(true);
       setShowCompleteCheckupModal(false);
-      onClose();
-      onSuccess();
+      setShowInvoiceModal(true);
       setActionLoading(false);
       return;
     }
@@ -603,8 +604,8 @@ export default function PaymentModal({
           setSelectedPayment(paymentResponse.data);
         }
       }
-      onClose();
-      onSuccess();
+      // Show invoice modal after successful payment
+      setShowInvoiceModal(true);
     } else {
       setToastMessage(response.error || 'Failed to complete checkup');
       setToastType('error');
@@ -977,15 +978,37 @@ export default function PaymentModal({
                       </button>
                       {(selectedPayment.status === 'UNPAID' || selectedPayment.status === 'PENDING_VERIFICATION') && calculateBalance(selectedPayment) > 0 && (
                         <button
-                          onClick={() => {
-                            setAdvancePaymentAmount(calculateBalance(selectedPayment).toString());
+                          onClick={async () => {
+                            const balance = calculateBalance(selectedPayment);
+                            setAdvancePaymentAmount(balance.toString());
                             setAdvancePaymentError(null);
+                            // Automatically record the payment as GCash
+                            setActionLoading(true);
+                            try {
+                              const response = await secretaryApi.recordPartialPayment(selectedPayment.id, balance, 'GCASH');
+                              if (response.success) {
+                                setToastMessage(response.data?.status === 'PAID' ? 'Payment fully paid' : 'Advance payment recorded');
+                                setShowToast(true);
+                                setAdvancePaymentAmount('');
+                                await new Promise(resolve => setTimeout(resolve, 500));
+                                const paymentResponse = await secretaryApi.getPayment(appointmentId);
+                                if (paymentResponse.success && paymentResponse.data) {
+                                  setSelectedPayment(paymentResponse.data);
+                                }
+                              } else {
+                                setAdvancePaymentError(response.error || 'Failed to record advance payment');
+                              }
+                            } catch (error) {
+                              setAdvancePaymentError('Failed to record advance payment');
+                            } finally {
+                              setActionLoading(false);
+                            }
                           }}
                           disabled={actionLoading}
                           className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 text-sm font-medium disabled:opacity-50"
                         >
                           <span className="material-symbols-outlined text-[20px]">request_quote</span>
-                          Apply Receipt Amount to Balance
+                          {actionLoading ? 'Recording...' : 'Apply Receipt Amount to Balance'}
                         </button>
                       )}
                     </>
@@ -1526,6 +1549,18 @@ export default function PaymentModal({
           type={toastType}
           message={toastMessage}
           onClose={() => setShowToast(false)}
+        />
+      )}
+
+      {showInvoiceModal && selectedPayment && (
+        <InvoiceModal
+          isOpen={showInvoiceModal}
+          onClose={() => {
+            setShowInvoiceModal(false);
+            onClose();
+            onSuccess();
+          }}
+          paymentId={selectedPayment.id}
         />
       )}
     </>

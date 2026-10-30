@@ -292,8 +292,8 @@ export const secretaryApi = {
   },
 
   // Payments: record partial payment (by payment ID)
-  recordPartialPayment: async (id: string, amountReceived: number): Promise<{ success: boolean; data?: { amountPaid: string; balance: string; status: string }; error?: string }> => {
-    return apiClient.patch<{ amountPaid: string; balance: string; status: string }>(`/payments/${id}/record-payment`, { amountReceived });
+  recordPartialPayment: async (id: string, amountReceived: number, paymentMethodType?: 'GCASH' | 'CASH'): Promise<{ success: boolean; data?: { amountPaid: string; balance: string; status: string }; error?: string }> => {
+    return apiClient.patch<{ amountPaid: string; balance: string; status: string }>(`/payments/${id}/record-payment`, { amountReceived, paymentMethodType });
   },
 
   // Payments: get signed receipt URL (by payment ID)
@@ -371,6 +371,39 @@ export const secretaryApi = {
   }): Promise<{ success: boolean; data?: InvoiceSettings; error?: string }> => {
     return apiClient.put<InvoiceSettings>('/secretaries/me/invoice-details', payload);
   },
+
+  // Invoices: generate invoice for a paid payment
+  generateInvoice: async (paymentId: string): Promise<{ success: boolean; data?: Invoice; error?: string }> => {
+    return apiClient.post<Invoice>(`/invoices/generate/${paymentId}`);
+  },
+
+  // Invoices: get invoice by ID
+  getInvoice: async (invoiceId: string): Promise<{ success: boolean; data?: Invoice; error?: string }> => {
+    return apiClient.get<Invoice>(`/invoices/${invoiceId}`);
+  },
+
+  // Invoices: get invoice by payment ID
+  getInvoiceByPayment: async (paymentId: string): Promise<{ success: boolean; data?: Invoice; error?: string }> => {
+    return apiClient.get<Invoice>(`/invoices/by-payment/${paymentId}`);
+  },
+
+  // Invoices: download invoice as PDF
+  downloadInvoicePdf: async (invoiceId: string): Promise<{ success: boolean; data?: Blob; error?: string }> => {
+    const response = await fetch(`${apiClient.getBaseUrl()}/invoices/${invoiceId}/pdf`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiClient.getToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return { success: false, error: errorData.message || 'Failed to download invoice' };
+    }
+
+    const blob = await response.blob();
+    return { success: true, data: blob };
+  },
 };
 
 // Payment charge (from payment_charges table)
@@ -418,6 +451,80 @@ export interface Payment {
   reason_for_visit?: string;
   // Nested charges
   charges?: PaymentCharge[];
+}
+
+// Invoice (from invoices table)
+export interface Invoice {
+  id: string;
+  invoice_number: string;
+  payment_id: string;
+  doctor_id: string;
+  patient_id: string;
+  invoice_date: string;
+  subtotal: number;
+  total_amount: number;
+  advance_payment: number;
+  remaining_balance_before_payment: number;
+  payment_method: string;
+  cash_tendered: number;
+  amount_applied: number;
+  change_amount: number;
+  final_balance: number;
+  invoice_data: InvoiceData;
+  created_at: string;
+  updated_at: string;
+}
+
+// Invoice data (JSONB field)
+export interface InvoiceData {
+  invoice_number: string;
+  invoice_date: string;
+  clinic: {
+    name: string;
+    address: string;
+    contact_number: string;
+    footer_line: string;
+  };
+  doctor: {
+    first_name: string;
+    last_name: string;
+    specialty: string | null;
+    practice_name: string | null;
+  };
+  patient: {
+    first_name: string;
+    last_name: string;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+    date_of_birth: string | null;
+    sex: string | null;
+  };
+  appointment: {
+    date: string | null;
+    reason_for_visit: string | null;
+  };
+  charges: Array<{
+    charge_type: string;
+    description: string | null;
+    name: string | null;
+    amount: number;
+    quantity: number | null;
+    unit_price: number | null;
+  }>;
+  payment: {
+    consultation_amount: number;
+    charges_total: number;
+    subtotal: number;
+    total_amount: number;
+    advance_payment: number;
+    remaining_balance_before_payment: number;
+    payment_method: string;
+    cash_tendered: number;
+    amount_applied: number;
+    change_amount: number;
+    final_balance: number;
+  };
 }
 
 // Conversation list entry (matches GET /conversations response shape)

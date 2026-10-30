@@ -838,6 +838,47 @@ class ApiService {
       requireAuth: false,
     );
   }
+
+  // ===========================
+  // INVOICES METHODS
+  // ===========================
+
+  Future<Map<String, dynamic>> getInvoiceByPayment(String paymentId) async {
+    return await get(
+      '${ApiConstants.invoiceByPayment}/$paymentId',
+      requireAuth: true,
+    );
+  }
+
+  Future<List<int>> downloadInvoicePdf(String invoiceId) async {
+    final client = _httpClient ?? http.Client();
+    final response = await client.get(
+      Uri.parse('$baseUrl${ApiConstants.invoices}/$invoiceId${ApiConstants.invoicePdf}'),
+      headers: _getHeaders(requireAuth: true),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.bodyBytes;
+    } else {
+      try {
+        final body = jsonDecode(response.body);
+        throw ApiException(
+          message: body['error']?['message'] ?? 'Failed to download invoice',
+          code: body['error']?['code'] ?? 'DOWNLOAD_ERROR',
+          statusCode: response.statusCode,
+        );
+      } catch (e) {
+        if (e is ApiException) {
+          rethrow;
+        }
+        throw ApiException(
+          message: 'Failed to download invoice',
+          code: 'DOWNLOAD_ERROR',
+          statusCode: response.statusCode,
+        );
+      }
+    }
+  }
 }
 
 // Custom exception for API errors
