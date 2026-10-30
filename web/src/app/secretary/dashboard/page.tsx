@@ -251,9 +251,13 @@ export default function SecretaryDashboard() {
                   <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
                     payment.status === 'PENDING_VERIFICATION' ? 'bg-amber-100 text-amber-700' :
                     payment.status === 'UNPAID' ? 'bg-slate-100 text-slate-600' :
+                    payment.status === 'PAID' && payment.invoiceNotSent ? 'bg-emerald-100 text-emerald-700' :
                     'bg-slate-100 text-slate-600'
                   }`}>
-                    {payment.status === 'PENDING_VERIFICATION' ? 'Pending' : payment.status}
+                    {payment.status === 'PENDING_VERIFICATION' ? 'Pending' :
+                     payment.status === 'UNPAID' ? 'Unpaid' :
+                     payment.status === 'PAID' && payment.invoiceNotSent ? 'Paid — invoice not sent' :
+                     payment.status}
                   </span>
                 </div>
               </div>

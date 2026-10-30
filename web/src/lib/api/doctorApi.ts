@@ -299,6 +299,13 @@ export interface DoctorDashboard {
     status: string;
     queueNumber: number | null;
   }>;
+  consultationsNeedingRecords: Array<{
+    appointmentId: string;
+    patientName: string;
+    appointmentDate: string;
+    missingRecord: boolean;
+    missingPrescription: boolean;
+  }>;
   todaySchedule: {
     workingHours: Array<{ start: string; end: string }>;
     breaks: Array<{ start: string; end: string }>;

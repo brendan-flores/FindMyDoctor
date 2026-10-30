@@ -688,6 +688,7 @@ export interface SecretaryDashboard {
     patientName: string;
     appointmentDate: string;
     appointmentStatus: string;
+    invoiceNotSent?: boolean;
   }>;
   recentConversations: Array<{
     id: string | null;
