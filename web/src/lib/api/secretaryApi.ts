@@ -404,6 +404,11 @@ export const secretaryApi = {
     const blob = await response.blob();
     return { success: true, data: blob };
   },
+
+  // Invoices: void invoice (secretary only)
+  voidInvoice: async (invoiceId: string): Promise<{ success: boolean; data?: Invoice; error?: string }> => {
+    return apiClient.post<Invoice>(`/invoices/${invoiceId}/void`);
+  },
 };
 
 // Payment charge (from payment_charges table)
@@ -471,6 +476,7 @@ export interface Invoice {
   change_amount: number;
   final_balance: number;
   invoice_data: InvoiceData;
+  status: 'ACTIVE' | 'VOID';
   created_at: string;
   updated_at: string;
 }
