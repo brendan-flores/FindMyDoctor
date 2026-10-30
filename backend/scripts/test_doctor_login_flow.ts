@@ -1,6 +1,6 @@
-import { config } from './src/config';
-import { query, pool } from './src/database/connection';
-import { registerDoctor, login, verifyLoginOtp, hashChallengeToken } from './src/modules/auth/authService';
+import { config } from '../src/config';
+import { query, pool } from '../src/database/connection';
+import { registerDoctor, login, verifyLoginOtp, hashChallengeToken } from '../src/modules/auth/authService';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -53,7 +53,7 @@ async function runRegressionTests() {
     const userResult = await query('SELECT * FROM users WHERE id = $1', [doctorUserId]);
     const user = userResult.rows[0];
 
-    const { generateAccessToken, generateRefreshToken } = await import('./src/modules/auth/authService');
+    const { generateAccessToken, generateRefreshToken } = await import('../src/modules/auth/authService');
     const accessTokenNoRemember = generateAccessToken(user, false);
     const refreshTokenNoRemember = generateRefreshToken(user, false);
 
@@ -79,7 +79,7 @@ async function runRegressionTests() {
 
     // 5. Test Trusted Browser Registration & Bypass
     console.log('\n5️⃣ Testing Trusted Browser Registration & Subsequent Login...');
-    const { registerTrustedBrowser, checkTrustedBrowser } = await import('./src/modules/auth/authService');
+    const { registerTrustedBrowser, checkTrustedBrowser } = await import('../src/modules/auth/authService');
     const trustedToken = await registerTrustedBrowser(user.id, 'TestAgent/1.0');
     console.log('✅ Trusted browser registered');
 
@@ -108,7 +108,7 @@ async function runRegressionTests() {
 
     // 6. Test Revoke Trusted Browser when Remember Me is unchecked
     console.log('\n6️⃣ Testing Trusted Browser Revocation on unchecked Remember Me...');
-    const { revokeTrustedBrowser } = await import('./src/modules/auth/authService');
+    const { revokeTrustedBrowser } = await import('../src/modules/auth/authService');
     await revokeTrustedBrowser(user.id, trustedToken);
 
     const checkRevoked = await checkTrustedBrowser(user.id, trustedToken);

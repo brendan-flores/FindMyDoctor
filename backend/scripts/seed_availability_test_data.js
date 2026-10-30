@@ -80,7 +80,7 @@ async function seedAvailabilityTestData() {
 
     console.log('\n✓ Test data seeded successfully!');
     console.log('\nYou can now test the availability endpoint:');
-    console.log('  node test_availability.js');
+    console.log('  (manual availability endpoint checks can be run against the running API)');
 
   } catch (error) {
     console.error('✗ Error seeding test data:', error);
