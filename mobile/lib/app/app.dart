@@ -14,6 +14,7 @@ import '../features/auth/presentation/change_password_page.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/doctors/presentation/doctor_schedule_page.dart';
 import '../features/doctors/presentation/doctors_page.dart';
+import '../features/doctors/presentation/doctor_profile_page.dart';
 import '../features/appointments/presentation/booking_confirmation_page.dart';
 import '../features/patients/presentation/patient_details_page.dart';
 import '../features/patients/presentation/patient_profile_page.dart';
@@ -172,6 +173,7 @@ class MyAppState extends State<MyApp> {
             );
           case '/home':
           case '/doctors':
+          case '/doctor-profile':
           case '/doctor-schedule':
           case '/booking-confirmation':
           case '/patient-details':
@@ -211,6 +213,13 @@ class MyAppState extends State<MyApp> {
                 return MaterialPageRoute(
                   builder: (context) =>
                       const DoctorsPage(onNavigateToTab: null),
+                );
+              case '/doctor-profile':
+                final args = settings.arguments as Map<String, dynamic>?;
+                return MaterialPageRoute(
+                  builder: (context) => DoctorProfilePage(
+                    doctorId: args?['doctorId']?.toString() ?? '',
+                  ),
                 );
               case '/doctor-schedule':
                 final args = settings.arguments as Map<String, dynamic>?;

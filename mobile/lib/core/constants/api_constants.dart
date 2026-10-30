@@ -60,6 +60,8 @@ class ApiConstants {
   // Doctors endpoints
   static const String doctors = '/doctors';
   static const String doctorDetails = '/doctors';
+  static const String patientDoctors = '/patient/doctors';
+  static const String doctorProfile = '/profile';
   static const String doctorSchedules = '/schedules';
   static const String doctorAvailability = '/availability';
   static const String doctorCapacity = '/capacity';

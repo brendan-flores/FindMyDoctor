@@ -604,6 +604,14 @@ class ApiService {
     );
   }
 
+  /// Patient-only doctor profile used by the mobile "View Profile" screen.
+  Future<Map<String, dynamic>> getPatientDoctorProfile(String doctorId) async {
+    return await get(
+      '${ApiConstants.patientDoctors}/$doctorId${ApiConstants.doctorProfile}',
+      requireAuth: true,
+    );
+  }
+
   // ===========================
   // APPOINTMENTS METHODS
   // ===========================
