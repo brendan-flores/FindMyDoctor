@@ -39,6 +39,7 @@
     "migrate:invoice-settings": "tsx src/database/applyInvoiceSettings.ts",
     "migrate:invoices-table": "tsx src/database/applyInvoicesTable.ts",
     "migrate:fix-split-payment-cash-tendered": "tsx src/database/applyFixSplitPaymentCashTendered.ts",
+    "migrate:invoice-status": "tsx src/database/applyInvoiceStatus.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",

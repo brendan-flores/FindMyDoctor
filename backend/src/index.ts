@@ -29,11 +29,8 @@ import prescriptionsRouter from './api/prescriptions.js';
 import notificationsRouter from './api/notifications.js';
 import adminRouter from './api/admin.js';
 import gcashQrRouter from './api/gcashQr.js';
-<<<<<<< HEAD
 import invoicesRouter from './api/invoices.js';
-=======
 import patientDoctorsRouter from './api/patientDoctors.js';
->>>>>>> feature/view-doctor-profile-mobile
 
 const app = express();
 const apiVersion = config.app.apiVersion;

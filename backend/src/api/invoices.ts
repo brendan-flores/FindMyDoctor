@@ -80,16 +80,20 @@ router.post('/generate/:paymentId', authenticate, requireSecretaryPasswordChange
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invoice can only be generated for paid payments'));
     }
 
-    // Check if invoice already exists for this payment
+    // Check if an ACTIVE invoice already exists for this payment
     const existingInvoiceResult = await client.query(
-      'SELECT id FROM invoices WHERE payment_id = $1',
+      'SELECT id, status FROM invoices WHERE payment_id = $1',
       [paymentId]
     );
 
     if (existingInvoiceResult.rows.length > 0) {
-      await client.query('ROLLBACK');
-      client.release();
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invoice already exists for this payment'));
+      const existingInvoice = existingInvoiceResult.rows[0];
+      if (existingInvoice.status === 'ACTIVE') {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'An active invoice already exists for this payment. Void the existing invoice first.'));
+      }
+      // If invoice is VOID, we can proceed to generate a new ACTIVE invoice
     }
 
     // Get invoice settings for the doctor
@@ -299,18 +303,22 @@ router.get('/by-payment/:paymentId', authenticate, async (req: AuthRequest, res:
   const client = await getClient();
   try {
     const { paymentId } = req.params;
+    const { includeVoid } = req.query;
     const userId = req.user!.id;
     const role = req.user!.role;
 
     let queryText = '';
     const params = [paymentId];
 
+    // If includeVoid is not set, only return ACTIVE invoices
+    const statusFilter = includeVoid === 'true' ? '' : "AND i.status = 'ACTIVE'";
+
     if (role === 'SECRETARY') {
       queryText = `
         SELECT i.*, p.gcash_advance_amount, p.cash_tendered_amount, p.total_amount, p.amount_paid
         FROM invoices i
         JOIN payments p ON i.payment_id = p.id
-        WHERE i.payment_id = $1 AND i.doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2)
+        WHERE i.payment_id = $1 AND i.doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2) ${statusFilter}
       `;
       params.push(userId);
     } else if (role === 'PATIENT') {
@@ -318,7 +326,7 @@ router.get('/by-payment/:paymentId', authenticate, async (req: AuthRequest, res:
         SELECT i.*, p.gcash_advance_amount, p.cash_tendered_amount, p.total_amount, p.amount_paid
         FROM invoices i
         JOIN payments p ON i.payment_id = p.id
-        WHERE i.payment_id = $1 AND i.patient_id = (SELECT id FROM patients WHERE user_id = $2)
+        WHERE i.payment_id = $1 AND i.patient_id = (SELECT id FROM patients WHERE user_id = $2) ${statusFilter}
       `;
       params.push(userId);
     } else if (role === 'DOCTOR') {
@@ -326,7 +334,7 @@ router.get('/by-payment/:paymentId', authenticate, async (req: AuthRequest, res:
         SELECT i.*, p.gcash_advance_amount, p.cash_tendered_amount, p.total_amount, p.amount_paid
         FROM invoices i
         JOIN payments p ON i.payment_id = p.id
-        WHERE i.payment_id = $1 AND i.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)
+        WHERE i.payment_id = $1 AND i.doctor_id = (SELECT id FROM doctors WHERE user_id = $2) ${statusFilter}
       `;
       params.push(userId);
     } else if (role === 'ADMIN') {
@@ -334,7 +342,7 @@ router.get('/by-payment/:paymentId', authenticate, async (req: AuthRequest, res:
         SELECT i.*, p.gcash_advance_amount, p.cash_tendered_amount, p.total_amount, p.amount_paid
         FROM invoices i
         JOIN payments p ON i.payment_id = p.id
-        WHERE i.payment_id = $1
+        WHERE i.payment_id = $1 ${statusFilter}
       `;
     } else {
       client.release();
@@ -408,6 +416,83 @@ router.get('/by-payment/:paymentId', authenticate, async (req: AuthRequest, res:
   }
 });
 
+// Void invoice (secretary only)
+router.post('/:id/void', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    const { id } = req.params;
+    const secretaryId = req.user!.id;
+
+    await client.query('BEGIN');
+
+    // Get secretary's assigned doctor
+    const secretaryResult = await client.query(
+      'SELECT id, doctor_id FROM secretaries WHERE user_id = $1',
+      [secretaryId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    // Get invoice with doctor assignment check (lock row for update)
+    const invoiceResult = await client.query(
+      'SELECT * FROM invoices WHERE id = $1 FOR UPDATE',
+      [id]
+    );
+
+    if (invoiceResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Invoice not found'));
+    }
+
+    const invoice = invoiceResult.rows[0];
+
+    // Verify invoice belongs to secretary's assigned doctor
+    if (invoice.doctor_id !== assignedDoctorId) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only void invoices for your assigned doctor'));
+    }
+
+    // Check if invoice is already voided
+    if (invoice.status === 'VOID') {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invoice is already voided'));
+    }
+
+    // Update invoice status to VOID
+    await client.query(
+      'UPDATE invoices SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      ['VOID', id]
+    );
+
+    await client.query('COMMIT');
+    client.release();
+
+    // Return updated invoice
+    const updatedInvoice = { ...invoice, status: 'VOID' };
+    updatedInvoice.invoice_data = typeof updatedInvoice.invoice_data === 'string' ? JSON.parse(updatedInvoice.invoice_data) : updatedInvoice.invoice_data;
+
+    res.json(success(updatedInvoice, 'Invoice voided successfully'));
+  } catch (err: any) {
+    try {
+      await client.query('ROLLBACK');
+      client.release();
+    } catch (rollbackErr) {
+      console.error('Rollback failed:', rollbackErr);
+    }
+    console.error('Invoice voiding error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, `Failed to void invoice: ${err.message}`));
+  }
+});
+
 // Download invoice as PDF
 router.get('/:id/pdf', authenticate, async (req: AuthRequest, res: Response) => {
   const client = await getClient();
@@ -463,6 +548,13 @@ router.get('/:id/pdf', authenticate, async (req: AuthRequest, res: Response) => 
     }
 
     const invoice = result.rows[0];
+
+    // Reject PDF download for voided invoices
+    if (invoice.status === 'VOID') {
+      client.release();
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Cannot download PDF for voided invoice'));
+    }
+
     const invoiceData = typeof invoice.invoice_data === 'string' ? JSON.parse(invoice.invoice_data) : invoice.invoice_data;
 
     // Update invoice data with current payment data to ensure PDF matches preview
