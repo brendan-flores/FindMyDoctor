@@ -1350,7 +1350,12 @@ class _DoctorsPageState extends State<DoctorsPage> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.of(context).pushNamed(
+                      '/doctor-profile',
+                      arguments: {'doctorId': doctor.id},
+                    );
+                  },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
                     side: BorderSide(color: AppColors.primary),
