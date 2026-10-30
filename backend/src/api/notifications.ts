@@ -14,6 +14,7 @@ export const NotificationTypes = {
   PAYMENT_REJECTED: 'PAYMENT_REJECTED',
   NEW_SECRETARY_MESSAGE: 'NEW_SECRETARY_MESSAGE',
   NEW_PATIENT_MESSAGE: 'NEW_PATIENT_MESSAGE',
+  PRESCRIPTION_AVAILABLE: 'PRESCRIPTION_AVAILABLE',
 } as const;
 
 /**
@@ -81,6 +82,22 @@ router.patch('/:id/read', authenticate, async (req: AuthRequest, res: Response) 
     res.json(success(null, 'Notification marked as read'));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to mark notification as read'));
+  }
+});
+
+// Mark all notifications as read for current user
+router.patch('/read-all', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    await query(
+      'UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false',
+      [userId]
+    );
+
+    res.json(success(null, 'All notifications marked as read'));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to mark all notifications as read'));
   }
 });
 

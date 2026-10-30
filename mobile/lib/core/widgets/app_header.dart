@@ -116,11 +116,9 @@ class _AppHeaderState extends State<AppHeader> {
             children: [
               Positioned(
                 right: spacing.AppSpacing.screenPadding,
-                top: 70, // Offset from top to account for header
+                top: 70,
                 child: GestureDetector(
                   onTap: () {},
-                  // The overlay is inserted above the app's Material widgets, so
-                  // the dropdown needs its own Material ancestor for InkWell.
                   child: Material(
                     color: AppColors.surface,
                     elevation: 8,
@@ -173,130 +171,40 @@ class _AppHeaderState extends State<AppHeader> {
                             )
                           else
                             Expanded(
-                              child: ListView.separated(
-                                padding: EdgeInsets.zero,
-                                itemCount: _notifications.length,
-                                separatorBuilder: (context, index) => Divider(
-                                  height: 1,
-                                  thickness: 1,
-                                  color: AppColors.slate200,
-                                ),
-                                itemBuilder: (context, index) {
-                                  final notification = _notifications[index];
-                                  return InkWell(
-                                    onTap: () {
-                                      _handleNotificationItemClick(
-                                        notification,
-                                      );
-                                      _closeDropdown();
-                                    },
-                                    child: Padding(
-                                      padding: EdgeInsets.all(
-                                        spacing.AppSpacing.gutterMd,
+                              child: Column(
+                                children: [
+                                  if (_notifications.any((n) => !n.isRead))
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: spacing.AppSpacing.gutterMd,
+                                        vertical: spacing.AppSpacing.gutterSm,
                                       ),
                                       child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.end,
                                         children: [
-                                          Container(
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal:
-                                                  spacing.AppSpacing.gutterSm,
-                                              vertical:
-                                                  spacing.AppSpacing.gutterXs,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: _getTypeBadgeColor(
-                                                notification.type,
-                                              ).withValues(alpha: 0.1),
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                    spacing.AppSpacing.radiusMd,
-                                                  ),
-                                            ),
-                                            child: Text(
-                                              _getTypeBadgeText(
-                                                notification.type,
-                                              ),
-                                              style: AppTextStyles.labelSm
-                                                  .copyWith(
-                                                    color: _getTypeBadgeColor(
-                                                      notification.type,
-                                                    ),
+                                          InkWell(
+                                            onTap: () async {
+                                              await _markAllAsRead();
+                                              _closeDropdown();
+                                              if (widget.onUnreadCountUpdate != null) {
+                                                widget.onUnreadCountUpdate!();
+                                              }
+                                            },
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.mark_email_read,
+                                                  size: 16,
+                                                  color: AppColors.primary,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  'Mark all as read',
+                                                  style: AppTextStyles.labelSm.copyWith(
+                                                    color: AppColors.primary,
                                                     fontWeight: FontWeight.w600,
                                                   ),
-                                            ),
-                                          ),
-                                          const SizedBox(
-                                            width: spacing.AppSpacing.gutterMd,
-                                          ),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: Text(
-                                                        notification.title,
-                                                        style: AppTextStyles
-                                                            .bodyMdMedium
-                                                            .copyWith(
-                                                              fontWeight:
-                                                                  notification
-                                                                      .isRead
-                                                                  ? FontWeight
-                                                                        .w500
-                                                                  : FontWeight
-                                                                        .w700,
-                                                            ),
-                                                      ),
-                                                    ),
-                                                    if (!notification.isRead)
-                                                      Container(
-                                                        width: 8,
-                                                        height: 8,
-                                                        decoration:
-                                                            BoxDecoration(
-                                                              color: AppColors
-                                                                  .primary,
-                                                              shape: BoxShape
-                                                                  .circle,
-                                                            ),
-                                                      ),
-                                                  ],
-                                                ),
-                                                const SizedBox(
-                                                  height: spacing
-                                                      .AppSpacing
-                                                      .gutterXs,
-                                                ),
-                                                Text(
-                                                  notification.message,
-                                                  style: AppTextStyles.labelSm
-                                                      .copyWith(
-                                                        color:
-                                                            AppColors.secondary,
-                                                      ),
-                                                  maxLines: 2,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                                const SizedBox(
-                                                  height: spacing
-                                                      .AppSpacing
-                                                      .gutterXs,
-                                                ),
-                                                Text(
-                                                  _formatTimestamp(
-                                                    notification.createdAt,
-                                                  ),
-                                                  style: AppTextStyles.labelSm
-                                                      .copyWith(
-                                                        color:
-                                                            AppColors.outline,
-                                                      ),
                                                 ),
                                               ],
                                             ),
@@ -304,37 +212,172 @@ class _AppHeaderState extends State<AppHeader> {
                                         ],
                                       ),
                                     ),
-                                  );
-                                },
-                              ),
-                            ),
-                          if (!_isLoadingNotifications &&
-                              _notifications.isNotEmpty)
-                            Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.all(
-                                spacing.AppSpacing.gutterMd,
-                              ),
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  top: BorderSide(color: AppColors.slate200),
-                                ),
-                              ),
-                              child: InkWell(
-                                onTap: () {
-                                  _closeDropdown();
-                                  if (widget.onViewAll != null) {
-                                    widget.onViewAll!();
-                                  }
-                                },
-                                child: Text(
-                                  'View All',
-                                  style: AppTextStyles.labelMd.copyWith(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.bold,
+                                  Expanded(
+                                    child: ListView.separated(
+                                      padding: EdgeInsets.zero,
+                                      itemCount: _notifications.length,
+                                      separatorBuilder: (context, index) => Divider(
+                                        height: 1,
+                                        thickness: 1,
+                                        color: AppColors.slate200,
+                                      ),
+                                      itemBuilder: (context, index) {
+                                        final notification = _notifications[index];
+                                        return InkWell(
+                                          onTap: () {
+                                            _handleNotificationItemClick(
+                                              notification,
+                                            );
+                                            _closeDropdown();
+                                          },
+                                          child: Padding(
+                                            padding: EdgeInsets.all(
+                                              spacing.AppSpacing.gutterMd,
+                                            ),
+                                            child: Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Container(
+                                                  padding: EdgeInsets.symmetric(
+                                                    horizontal:
+                                                        spacing.AppSpacing.gutterSm,
+                                                    vertical:
+                                                        spacing.AppSpacing.gutterXs,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: _getTypeBadgeColor(
+                                                  notification.type,
+                                                ).withValues(alpha: 0.1),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          spacing.AppSpacing.radiusMd,
+                                                        ),
+                                                  ),
+                                                  child: Text(
+                                                    _getTypeBadgeText(
+                                                      notification.type,
+                                                    ),
+                                                    style: AppTextStyles.labelSm
+                                                        .copyWith(
+                                                          color: _getTypeBadgeColor(
+                                                            notification.type,
+                                                          ),
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                  ),
+                                                ),
+                                                const SizedBox(
+                                                  width: spacing.AppSpacing.gutterMd,
+                                                ),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.start,
+                                                    children: [
+                                                      Row(
+                                                        children: [
+                                                          Expanded(
+                                                            child: Text(
+                                                              notification.title,
+                                                              style: AppTextStyles
+                                                                  .bodyMdMedium
+                                                                  .copyWith(
+                                                                    fontWeight:
+                                                                        notification
+                                                                            .isRead
+                                                                    ? FontWeight
+                                                                        .w500
+                                                                    : FontWeight
+                                                                        .w700,
+                                                                  ),
+                                                            ),
+                                                          ),
+                                                          if (!notification.isRead)
+                                                            Container(
+                                                              width: 8,
+                                                              height: 8,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                    color: AppColors
+                                                                        .primary,
+                                                                    shape: BoxShape
+                                                                        .circle,
+                                                                  ),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(
+                                                        height: spacing
+                                                            .AppSpacing
+                                                            .gutterXs,
+                                                      ),
+                                                      Text(
+                                                        notification.message,
+                                                        style: AppTextStyles.labelSm
+                                                            .copyWith(
+                                                              color:
+                                                                  AppColors.secondary,
+                                                            ),
+                                                        maxLines: 2,
+                                                        overflow:
+                                                            TextOverflow.ellipsis,
+                                                      ),
+                                                      const SizedBox(
+                                                        height: spacing
+                                                            .AppSpacing
+                                                            .gutterXs,
+                                                      ),
+                                                      Text(
+                                                        _formatTimestamp(
+                                                          notification.createdAt,
+                                                        ),
+                                                        style: AppTextStyles.labelSm
+                                                            .copyWith(
+                                                              color:
+                                                                  AppColors.outline,
+                                                            ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   ),
-                                  textAlign: TextAlign.center,
-                                ),
+                                  if (!_isLoadingNotifications &&
+                                      _notifications.isNotEmpty)
+                                    Container(
+                                      width: double.infinity,
+                                      padding: EdgeInsets.all(
+                                        spacing.AppSpacing.gutterMd,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        border: Border(
+                                          top: BorderSide(color: AppColors.slate200),
+                                        ),
+                                      ),
+                                      child: InkWell(
+                                        onTap: () {
+                                          _closeDropdown();
+                                          if (widget.onViewAll != null) {
+                                            widget.onViewAll!();
+                                          }
+                                        },
+                                        child: Text(
+                                          'View All',
+                                          style: AppTextStyles.labelMd.copyWith(
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                         ],
@@ -424,6 +467,34 @@ class _AppHeaderState extends State<AppHeader> {
       }
     } catch (e) {
       // Silently fail - notification will remain unread
+    }
+  }
+
+  Future<void> _markAllAsRead() async {
+    try {
+      await _apiService.markAllNotificationsRead();
+      if (mounted) {
+        setState(() {
+          _notifications = _notifications.map((n) => notif_model.Notification(
+            id: n.id,
+            userId: n.userId,
+            type: n.type,
+            title: n.title,
+            message: n.message,
+            isRead: true,
+            createdAt: n.createdAt,
+            relatedEntityType: n.relatedEntityType,
+            relatedEntityId: n.relatedEntityId,
+          )).toList();
+        });
+        _rebuildDropdown();
+        // Notify parent to update unread count
+        if (widget.onUnreadCountUpdate != null) {
+          widget.onUnreadCountUpdate!();
+        }
+      }
+    } catch (e) {
+      // Silently fail - user can try again
     }
   }
 

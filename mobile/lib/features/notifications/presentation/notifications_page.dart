@@ -67,6 +67,28 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
+  Future<void> _markAllAsRead() async {
+    try {
+      await _apiService.markAllNotificationsRead();
+      if (!mounted) return;
+      setState(() {
+        _notifications = _notifications.map((n) {
+          final updated = Map<String, dynamic>.from(n);
+          updated['is_read'] = true;
+          return updated;
+        }).toList();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All notifications marked as read')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to mark all as read')),
+      );
+    }
+  }
+
   String _formatTimestamp(String? timestamp) {
     if (timestamp == null) return '';
     final dateTime = DateTime.parse(timestamp);
@@ -95,6 +117,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.onSurface,
         elevation: 0,
+        actions: [
+          if (!_isLoading && _notifications.any((n) => n['is_read'] == false))
+            TextButton.icon(
+              onPressed: _markAllAsRead,
+              icon: const Icon(Icons.mark_email_read),
+              label: const Text('Read all'),
+            ),
+        ],
       ),
       body: SafeArea(
         child: Padding(

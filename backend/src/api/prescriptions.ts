@@ -5,6 +5,8 @@ import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 import PDFDocument from 'pdfkit';
 import { uploadPrescriptionPdf, generateSignedPrescriptionUrl } from '../services/storageService';
 import { v4 as uuidv4 } from 'uuid';
+import { createNotification, NotificationTypes } from './notifications';
+import { sendPushToUser } from '../services/pushService';
 
 const router = Router();
 
@@ -46,6 +48,39 @@ router.post('/', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [prescriptionId, item.medicationName, item.dosage, item.frequency, item.duration, item.instructions]
       );
+    }
+
+    // Create notification for patient (best-effort, does not block prescription creation)
+    const patientUserResult = await query(
+      'SELECT user_id FROM patients WHERE id = $1',
+      [visit.patient_id]
+    );
+
+    if (patientUserResult.rows.length > 0) {
+      const patientUserId = patientUserResult.rows[0].user_id;
+      try {
+        await createNotification(
+          patientUserId,
+          NotificationTypes.PRESCRIPTION_AVAILABLE,
+          'New Prescription Available',
+          'Your doctor has issued a new prescription. View it in your prescriptions.',
+          'prescription',
+          prescriptionId
+        );
+
+        // Send push notification (best-effort, failures are logged and never block)
+        await sendPushToUser(patientUserId, {
+          title: 'New Prescription Available',
+          body: 'Your doctor has issued a new prescription.',
+          data: {
+            type: 'PRESCRIPTION_AVAILABLE',
+            prescriptionId: prescriptionId,
+          },
+        });
+      } catch (notificationError) {
+        console.error('Failed to create notification or send push for prescription:', notificationError);
+        // Do not fail the prescription creation if notification fails
+      }
     }
 
     res.status(201).json(success(prescriptionResult.rows[0], 'Prescription created successfully'));
@@ -131,7 +166,8 @@ router.get('/patients/:id', authenticate, authorize('PATIENT', 'DOCTOR', 'SECRET
       );
 
       if (patientResult.rows.length === 0 || patientResult.rows[0].id !== id) {
-        return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Access denied'));
+        // Return non-disclosing 404 to avoid revealing whether the patient exists
+        return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Not found'));
       }
 
       queryText = `
@@ -168,7 +204,7 @@ router.get('/patients/:id', authenticate, authorize('PATIENT', 'DOCTOR', 'SECRET
       const assignedDoctorId = secretaryResult.rows[0].doctor_id;
 
       queryText = `
-        SELECT p.*, 
+        SELECT p.*,
                d.first_name as doctor_first_name, d.last_name as doctor_last_name
         FROM prescriptions p
         JOIN doctors d ON p.doctor_id = d.id

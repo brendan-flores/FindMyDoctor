@@ -31,11 +31,14 @@
     "migrate:session-version": "tsx src/database/applySessionVersion.ts",
     "migrate:ai-daily-limits": "tsx src/database/applyAiDailyLimits.ts",
     "migrate:ai-conversation-title": "tsx src/database/applyAiConversationTitle.ts",
-<<<<<<< HEAD
     "migrate:backfill-visits": "tsx src/database/applyBackfillVisits.ts",
-=======
     "migrate:medicine-charge-fields": "tsx src/database/applyMedicineChargeFields.ts",
->>>>>>> feat/medicine-charge-lines
+    "migrate:cancelled-payment-status": "tsx src/database/applyCancelledPaymentStatus.ts",
+    "migrate:payment-balance-fields": "tsx src/database/applyPaymentBalanceFields.ts",
+    "migrate:payment-method-amounts": "tsx src/database/applyPaymentMethodAmounts.ts",
+    "migrate:invoice-settings": "tsx src/database/applyInvoiceSettings.ts",
+    "migrate:invoices-table": "tsx src/database/applyInvoicesTable.ts",
+    "migrate:fix-split-payment-cash-tendered": "tsx src/database/applyFixSplitPaymentCashTendered.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",

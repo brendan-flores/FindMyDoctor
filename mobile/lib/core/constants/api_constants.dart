@@ -60,6 +60,8 @@ class ApiConstants {
   // Doctors endpoints
   static const String doctors = '/doctors';
   static const String doctorDetails = '/doctors';
+  static const String patientDoctors = '/patient/doctors';
+  static const String doctorProfile = '/profile';
   static const String doctorSchedules = '/schedules';
   static const String doctorAvailability = '/availability';
   static const String doctorCapacity = '/capacity';
@@ -102,6 +104,11 @@ class ApiConstants {
   static const String paymentReject = '/reject';
   static const String paymentCharges = '/charges';
   static const String paymentGcashQr = '/gcash-qr';
+
+  // Invoices endpoints
+  static const String invoices = '/invoices';
+  static const String invoiceByPayment = '/invoices/by-payment';
+  static const String invoicePdf = '/pdf';
 
   // Visits endpoints
   static const String visits = '/visits';

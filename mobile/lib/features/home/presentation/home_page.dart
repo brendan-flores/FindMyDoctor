@@ -78,14 +78,14 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadUserInfo() async {
     try {
-      final response = await _apiService.getCurrentUser();
+      final response = await _apiService.getCurrentPatient();
       if (response['success'] == true && response['data'] != null) {
         if (!mounted) return;
         setState(() {
           _userName =
-              response['data']['firstName'] != null &&
-                  response['data']['lastName'] != null
-              ? '${response['data']['firstName']} ${response['data']['lastName']}'
+              response['data']['first_name'] != null &&
+                  response['data']['last_name'] != null
+              ? '${response['data']['first_name']} ${response['data']['last_name']}'
               : response['data']['email'];
           _userEmail = response['data']['email'];
           _accountInfoFailed = false;

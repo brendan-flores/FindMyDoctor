@@ -18,6 +18,7 @@ export default function PatientDetails() {
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [isEditingVisit, setIsEditingVisit] = useState(false);
   const [editVisitError, setEditVisitError] = useState<string | null>(null);
+  const [showPatientNotified, setShowPatientNotified] = useState(false);
 
   const [visitFormData, setVisitFormData] = useState({
     reasonForVisit: '',
@@ -164,6 +165,11 @@ export default function PatientDetails() {
     }
   };
 
+  const showPatientNotifiedConfirmation = () => {
+    setShowPatientNotified(true);
+    setTimeout(() => setShowPatientNotified(false), 3000);
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -193,6 +199,13 @@ export default function PatientDetails() {
 
   return (
     <div className="space-y-6">
+      {showPatientNotified && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3 transition-opacity duration-300">
+          <span className="material-symbols-outlined text-emerald-600">check_circle</span>
+          <span className="text-emerald-800 font-medium">Patient notified of new prescription</span>
+        </div>
+      )}
+
       <div className="flex items-center gap-4">
         <button
           onClick={() => router.push('/doctor/patients')}

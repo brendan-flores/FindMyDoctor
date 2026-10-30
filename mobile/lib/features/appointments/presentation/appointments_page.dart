@@ -9,6 +9,7 @@ import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/utils/json_parsers.dart';
 import 'appointment_detail_page.dart';
+import '../../payments/presentation/invoice_bottom_sheet.dart';
 
 class AppointmentsPage extends StatefulWidget {
   final ApiService? apiService;
@@ -45,18 +46,30 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
       final response = await _apiService.getAppointments(status: null);
 
       if (response['success'] == true) {
+        final appointments = response['data'] ?? [];
+        print('Fetched ${appointments.length} appointments');
+        
+        // Log completed appointments with payment status
+        final completedAppointments = appointments.where((a) => a['status'] == 'COMPLETED').toList();
+        print('Completed appointments: ${completedAppointments.length}');
+        for (var apt in completedAppointments) {
+          print('  - ID: ${apt['id']}, PaymentStatus: ${apt['payment_status']}, PaymentId: ${apt['payment_id']}');
+        }
+        
         setState(() {
-          _allAppointments = response['data'] ?? [];
+          _allAppointments = appointments;
           _filterAppointments();
           _isLoading = false;
         });
       } else {
+        print('Failed to fetch appointments: ${response['error']}');
         setState(() {
           _errorMessage = response['error']?['message'] ?? 'Failed to load appointments';
           _isLoading = false;
         });
       }
     } catch (e) {
+      print('Exception fetching appointments: $e');
       setState(() {
         _errorMessage = 'Failed to load appointments: $e';
         _isLoading = false;
@@ -474,6 +487,21 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     final consultationFee = parseNum(appointment['consultation_fee']);
     final paymentStatus = parseString(appointment['payment_status']);
     final paymentMethod = parseString(appointment['payment_method']);
+    final paymentId = appointment['payment_id']?.toString();
+
+    // Show invoice button only for completed appointments with PAID status (case-insensitive)
+    final showInvoiceButton = status == 'COMPLETED' && paymentStatus?.toUpperCase() == 'PAID' && paymentId != null;
+
+    // Enhanced debug logging for invoice button visibility
+    print('=== Invoice Button Debug (Appointments List) ===');
+    print('Appointment ID: $appointmentId');
+    print('Status: $status');
+    print('Payment Status: $paymentStatus');
+    print('Payment Status (uppercase): ${paymentStatus?.toUpperCase()}');
+    print('Payment ID: $paymentId');
+    print('Show Invoice Button: $showInvoiceButton');
+    print('Full appointment object: $appointment');
+    print('================================================');
 
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
@@ -533,6 +561,48 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                   ],
                 ),
               ),
+              if (showInvoiceButton)
+                GestureDetector(
+                  onTap: () {
+                    print('Invoice button tapped for paymentId: $paymentId');
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => InvoiceBottomSheet(paymentId: paymentId!),
+                    );
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: spacing.AppSpacing.gutterSm,
+                      vertical: spacing.AppSpacing.gutterXs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryContainer.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.receipt_long,
+                          size: spacing.AppSpacing.iconSm,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: spacing.AppSpacing.gutterXs),
+                        Text(
+                          'View Invoice',
+                          style: AppTextStyles.labelSm.copyWith(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),

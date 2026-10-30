@@ -97,6 +97,7 @@ router.get('/', authenticate, requireSecretaryPasswordChange, requireSecretaryPr
         p.consultation_amount,
         p.total_additional_charges,
         p.total_amount,
+        p.amount_paid,
         p.created_at,
         p.verified_by,
         p.verified_at,
@@ -157,10 +158,14 @@ router.get('/', authenticate, requireSecretaryPasswordChange, requireSecretaryPr
       }
     }
 
-    const payments = result.rows.map(payment => ({
-      ...payment,
-      charges: chargesByPayment.get(payment.id) || [],
-    }));
+    const payments = result.rows.map(payment => {
+      const balance = Math.max(0, parseFloat(payment.total_amount) - parseFloat(payment.amount_paid));
+      return {
+        ...payment,
+        charges: chargesByPayment.get(payment.id) || [],
+        balance: balance.toFixed(2),
+      };
+    });
 
     res.json(success(payments));
   } catch (err: any) {
@@ -304,6 +309,8 @@ router.get('/:appointmentId', authenticate, requireSecretaryPasswordChange, requ
 
     const payment = result.rows[0];
     payment.charges = chargesResult.rows;
+    const balance = Math.max(0, parseFloat(payment.total_amount) - parseFloat(payment.amount_paid));
+    payment.balance = balance.toFixed(2);
 
     res.json(success(payment));
   } catch (err: any) {
@@ -384,8 +391,8 @@ router.post('/:appointmentId/receipt', authenticate, authorize('PATIENT'), uploa
       const consultationFee = doctorResult.rows[0].consultation_fee;
 
       await client.query(
-        `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_amount, status, receipt_url)
-         VALUES ($1, $2, 'GCASH', $3, $3, 'PENDING_VERIFICATION', $4)`,
+        `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_amount, gcash_advance_amount, cash_tendered_amount, status, receipt_url)
+         VALUES ($1, $2, 'GCASH', $3, $3, 0.00, 0.00, 'PENDING_VERIFICATION', $4)`,
         [appointment.patient_id, appointmentId, consultationFee, receiptPath]
       );
     }
@@ -468,20 +475,28 @@ router.patch('/:id/verify', authenticate, requireSecretaryPasswordChange, requir
       return res.status(400).json(error(ErrorCodes.PAYMENT_VERIFICATION_REQUIRED, 'Payment is not in pending verification status'));
     }
 
-    // Update payment status
-    await client.query(
-      `UPDATE payments
-       SET status = 'PAID', verified_by = $1, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [secretaryRecordId, id]
-    );
+    // Update payment verification metadata and set gcash_advance_amount for GCash payments
+    // Secretary must explicitly use /mark-paid to mark a verified GCash payment as PAID
+    const updateQuery = payment.payment_method === 'GCASH'
+      ? `UPDATE payments
+         SET verified_by = $1, verified_at = CURRENT_TIMESTAMP, gcash_advance_amount = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`
+      : `UPDATE payments
+         SET verified_by = $1, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`;
+
+    const updateParams = payment.payment_method === 'GCASH'
+      ? [secretaryRecordId, payment.total_amount, id]
+      : [secretaryRecordId, id];
+
+    await client.query(updateQuery, updateParams);
 
     // Insert notification for patient using helper
     await createNotification(
       payment.patient_user_id,
       NotificationTypes.PAYMENT_VERIFIED,
-      'Payment Verified',
-      'Your payment has been verified.',
+      'Payment Receipt Verified',
+      'Your payment receipt has been verified.',
       'payment',
       id
     );
@@ -492,8 +507,8 @@ router.patch('/:id/verify', authenticate, requireSecretaryPasswordChange, requir
     // Send push notification (best-effort, outside transaction)
     try {
       await sendPushToUser(payment.patient_user_id, {
-        title: 'Payment Verified',
-        body: 'Your payment has been verified.',
+        title: 'Payment Receipt Verified',
+        body: 'Your payment receipt has been verified.',
         data: {
           type: 'PAYMENT_VERIFIED',
           paymentId: id,
@@ -503,7 +518,7 @@ router.patch('/:id/verify', authenticate, requireSecretaryPasswordChange, requir
       console.error('Push delivery failed:', pushErr);
     }
 
-    res.json(success(null, 'Payment verified successfully'));
+    res.json(success(null, 'Payment receipt verified successfully'));
   } catch (err: any) {
     try {
       await client.query('ROLLBACK');
@@ -644,10 +659,25 @@ router.patch('/:id/mark-paid', authenticate, requireSecretaryPasswordChange, req
 
     // Get payment with doctor assignment check (lock row for update)
     const paymentResult = await client.query(
-      `SELECT p.*, a.doctor_id, pat.user_id as patient_user_id
+      `SELECT p.*, a.doctor_id, a.appointment_date, a.reason_for_visit,
+              pat.user_id as patient_user_id,
+              pat.first_name as patient_first_name,
+              pat.last_name as patient_last_name,
+              pat.phone as patient_phone,
+              pat.address as patient_address,
+              pat.date_of_birth as patient_dob,
+              pat.sex as patient_sex,
+              u.email as patient_email,
+              d.first_name as doctor_first_name,
+              d.last_name as doctor_last_name,
+              d.specialty,
+              d.practice_name,
+              d.consultation_fee
        FROM payments p
        JOIN appointments a ON p.appointment_id = a.id
        JOIN patients pat ON p.patient_id = pat.id
+       JOIN users u ON pat.user_id = u.id
+       JOIN doctors d ON a.doctor_id = d.id
        WHERE p.id = $1
        FOR UPDATE`,
       [id]
@@ -674,26 +704,189 @@ router.patch('/:id/mark-paid', authenticate, requireSecretaryPasswordChange, req
       return res.status(400).json(error(ErrorCodes.PAYMENT_ALREADY_VERIFIED, 'Payment already paid'));
     }
 
-    if (payment.status !== 'UNPAID') {
+    // Allow marking UNPAID (cash) or PENDING_VERIFICATION (verified GCash) as PAID
+    if (payment.status !== 'UNPAID' && payment.status !== 'PENDING_VERIFICATION') {
       await client.query('ROLLBACK');
       client.release();
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Only unpaid cash payments can be marked as paid'));
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Only unpaid or verified payments can be marked as paid'));
     }
 
-    // Update payment status
+    // Update payment status and set amount_paid to total_amount
+    // Preserve payment method amounts if partial payments were already recorded
+    let updateQuery = 'UPDATE payments SET status = $1, amount_paid = $2, verified_by = $3, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP';
+    const updateParams: any[] = ['PAID', payment.total_amount, secretaryRecordId];
+
+    // Only set payment method amounts if they are currently 0 (no partial payments recorded)
+    // This preserves amounts recorded via recordPartialPayment for split payment scenarios
+    // DO NOT overwrite either column if it has a value, as split payments (GCash + cash) are now supported
+    const currentGcashAdvance = parseFloat(payment.gcash_advance_amount || '0');
+    const currentCashTendered = parseFloat(payment.cash_tendered_amount || '0');
+
+    if (currentGcashAdvance === 0 && currentCashTendered === 0) {
+      // No partial payments recorded - set the appropriate column based on payment method
+      if (payment.payment_method === 'GCASH') {
+        updateQuery += ', gcash_advance_amount = $4';
+        updateParams.push(payment.total_amount);
+      } else if (payment.payment_method === 'CASH') {
+        updateQuery += ', cash_tendered_amount = $4';
+        updateParams.push(payment.total_amount);
+      }
+    }
+    // If either column has a value, preserve both - don't overwrite anything
+
+    updateQuery += ' WHERE id = $' + (updateParams.length + 1);
+    updateParams.push(id);
+
+    await client.query(updateQuery, updateParams);
+
+    // Update queue entry status to COMPLETED
     await client.query(
-      `UPDATE payments
-       SET status = 'PAID', verified_by = $1, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [secretaryRecordId, id]
+      `UPDATE queue_entries
+       SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE appointment_id = $1`,
+      [payment.appointment_id]
     );
 
     // Insert notification for patient
     await client.query(
       `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
-       VALUES ($1, 'PAYMENT_VERIFIED', 'Payment Received', 'Your cash payment has been received.', 'payment', $2)`,
+       VALUES ($1, 'PAYMENT_VERIFIED', 'Payment Confirmed', 'Your payment has been confirmed.', 'payment', $2)`,
       [payment.patient_user_id, id]
     );
+
+    // Automatically generate invoice for the paid payment
+    // Check if invoice already exists
+    const existingInvoiceResult = await client.query(
+      'SELECT id FROM invoices WHERE payment_id = $1',
+      [id]
+    );
+
+    if (existingInvoiceResult.rows.length === 0) {
+      // Get invoice settings for the doctor
+      const invoiceSettingsResult = await client.query(
+        'SELECT clinic_name, address, contact_number, footer_line FROM invoice_settings WHERE doctor_id = $1',
+        [assignedDoctorId]
+      );
+
+      const invoiceSettings = invoiceSettingsResult.rows[0] || {
+        clinic_name: payment.practice_name || 'Find My Doctor',
+        address: '',
+        contact_number: '',
+        footer_line: 'Thank you for your visit!'
+      };
+
+      // Get payment charges
+      const chargesResult = await client.query(
+        `SELECT pc.charge_type, pc.description, pc.amount, pc.quantity, pc.unit_price
+         FROM payment_charges pc
+         WHERE pc.payment_id = $1 AND pc.deleted_at IS NULL`,
+        [id]
+      );
+
+      // Calculate amounts
+      const consultationAmount = parseFloat(payment.consultation_amount || '0');
+      const chargesTotal = chargesResult.rows.reduce((sum, charge) => sum + parseFloat(charge.amount || '0'), 0);
+      const subtotal = consultationAmount + chargesTotal;
+      const totalAmount = parseFloat(payment.total_amount || '0');
+      const amountPaid = parseFloat(payment.amount_paid || '0');
+      const advancePayment = parseFloat(payment.gcash_advance_amount || '0');
+      const cashTendered = parseFloat(payment.cash_tendered_amount || '0');
+      const remainingBalanceBeforePayment = Math.max(0, totalAmount - advancePayment);
+      const amountApplied = Math.min(cashTendered, remainingBalanceBeforePayment);
+      const changeAmount = Math.max(0, cashTendered - amountApplied);
+      const finalBalance = Math.max(0, totalAmount - amountPaid);
+
+      // Generate sequential invoice number per doctor
+      const lastInvoiceResult = await client.query(
+        `SELECT invoice_number FROM invoices WHERE doctor_id = $1 ORDER BY invoice_number DESC LIMIT 1`,
+        [assignedDoctorId]
+      );
+
+      let nextInvoiceNumber = 1;
+      if (lastInvoiceResult.rows.length > 0) {
+        const lastInvoiceNumber = lastInvoiceResult.rows[0].invoice_number;
+        const numericPart = parseInt(lastInvoiceNumber.replace(/\D/g, '')) || 0;
+        nextInvoiceNumber = numericPart + 1;
+      }
+
+      const invoiceNumber = `INV-${String(nextInvoiceNumber).padStart(4, '0')}`;
+
+      // Prepare invoice data JSONB
+      const invoiceData = {
+        clinic: {
+          name: invoiceSettings.clinic_name,
+          address: invoiceSettings.address,
+          contact_number: invoiceSettings.contact_number,
+          footer_line: invoiceSettings.footer_line
+        },
+        doctor: {
+          first_name: payment.doctor_first_name,
+          last_name: payment.doctor_last_name,
+          specialty: payment.specialty,
+          practice_name: payment.practice_name
+        },
+        patient: {
+          first_name: payment.patient_first_name,
+          last_name: payment.patient_last_name,
+          email: payment.patient_email,
+          phone: payment.patient_phone,
+          address: payment.patient_address,
+          date_of_birth: payment.patient_dob,
+          sex: payment.patient_sex
+        },
+        appointment: {
+          date: payment.appointment_date,
+          reason_for_visit: payment.reason_for_visit
+        },
+        charges: chargesResult.rows.map(charge => ({
+          charge_type: charge.charge_type,
+          description: charge.description,
+          amount: parseFloat(charge.amount || '0'),
+          quantity: charge.quantity ? parseFloat(charge.quantity) : null,
+          unit_price: charge.unit_price ? parseFloat(charge.unit_price) : null
+        })),
+        payment: {
+          consultation_amount: consultationAmount,
+          charges_total: chargesTotal,
+          subtotal: subtotal,
+          total_amount: totalAmount,
+          advance_payment: advancePayment,
+          remaining_balance_before_payment: remainingBalanceBeforePayment,
+          payment_method: payment.payment_method,
+          cash_tendered: cashTendered,
+          amount_applied: amountApplied,
+          change_amount: changeAmount,
+          final_balance: finalBalance
+        }
+      };
+
+      // Insert invoice record
+      await client.query(
+        `INSERT INTO invoices (
+          invoice_number, payment_id, doctor_id, patient_id, invoice_date,
+          subtotal, total_amount, advance_payment, remaining_balance_before_payment,
+          payment_method, cash_tendered, amount_applied, change_amount, final_balance,
+          invoice_data
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+        [
+          invoiceNumber,
+          id,
+          assignedDoctorId,
+          payment.patient_id,
+          new Date(),
+          subtotal,
+          totalAmount,
+          advancePayment,
+          remainingBalanceBeforePayment,
+          payment.payment_method,
+          cashTendered,
+          amountApplied,
+          changeAmount,
+          finalBalance,
+          JSON.stringify(invoiceData)
+        ]
+      );
+    }
 
     await client.query('COMMIT');
     client.release();
@@ -701,8 +894,8 @@ router.patch('/:id/mark-paid', authenticate, requireSecretaryPasswordChange, req
     // Send push notification (best-effort, outside transaction)
     try {
       await sendPushToUser(payment.patient_user_id, {
-        title: 'Payment Received',
-        body: 'Your cash payment has been received.',
+        title: 'Payment Confirmed',
+        body: 'Your payment has been confirmed.',
         data: {
           type: 'PAYMENT_VERIFIED',
           paymentId: id,
@@ -910,24 +1103,27 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
 
     // Recalculate total from authoritative charge records (excluding deleted charges)
     const chargesResult = await client.query(
-      'SELECT COALESCE(SUM(amount), 0) as total_charges FROM payment_charges WHERE payment_id = $1 AND deleted_at IS NULL',
+      'SELECT COALESCE(SUM(amount)::numeric, 0) as total_charges FROM payment_charges WHERE payment_id = $1 AND deleted_at IS NULL',
       [id]
     );
 
     const totalCharges = parseFloat(chargesResult.rows[0].total_charges);
-    const newTotal = payment.consultation_amount + totalCharges;
+    const newTotal = parseFloat(payment.consultation_amount) + totalCharges;
 
     console.log('[Add Charge] Current consultation_amount:', payment.consultation_amount);
     console.log('[Add Charge] Total charges from DB:', totalCharges);
     console.log('[Add Charge] New total:', newTotal);
+    console.log('[Add Charge] Payment ID:', id);
 
-    // Update payment totals
-    await client.query(
+    // Update payment totals (do not reset amount_paid or change status)
+    const updateResult = await client.query(
       `UPDATE payments
        SET total_additional_charges = $1, total_amount = $2, updated_at = CURRENT_TIMESTAMP
        WHERE id = $3`,
       [totalCharges, newTotal, id]
     );
+
+    console.log('[Add Charge] Update result rowCount:', updateResult.rowCount);
 
     // Insert notification for patient with charge amount
     const notificationMessage = `An additional charge of ₱${chargeAmount.toFixed(2)} has been added to your payment.`;
@@ -1078,8 +1274,94 @@ router.delete('/:id/charges/:chargeId', authenticate, requireSecretaryPasswordCh
   }
 });
 
+// Update payment method (secretary only)
+router.patch('/:id/payment-method', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    const { id } = req.params;
+    const { paymentMethod } = req.body;
+    const secretaryId = req.user!.id;
+
+    // Validate payment method
+    if (!paymentMethod || !['CASH', 'GCASH'].includes(paymentMethod)) {
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid payment method. Must be CASH or GCASH'));
+    }
+
+    await client.query('BEGIN');
+
+    // Get secretary's assigned doctor
+    const secretaryResult = await client.query(
+      'SELECT id, doctor_id FROM secretaries WHERE user_id = $1',
+      [secretaryId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    // Get payment with doctor assignment check (lock row for update)
+    const paymentResult = await client.query(
+      `SELECT p.*, a.doctor_id
+       FROM payments p
+       JOIN appointments a ON p.appointment_id = a.id
+       WHERE p.id = $1
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (paymentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Payment not found'));
+    }
+
+    const payment = paymentResult.rows[0];
+
+    // Verify payment belongs to secretary's assigned doctor
+    if (payment.doctor_id !== assignedDoctorId) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only update payments for your assigned doctor'));
+    }
+
+    // Only allow payment method changes when no payment has been recorded
+    if (payment.amount_paid > 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot change payment method after payment has been recorded'));
+    }
+
+    // Update payment method
+    await client.query(
+      `UPDATE payments
+       SET payment_method = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [paymentMethod, id]
+    );
+
+    await client.query('COMMIT');
+    client.release();
+
+    res.json(success(null, 'Payment method updated successfully'));
+  } catch (err: any) {
+    try {
+      await client.query('ROLLBACK');
+      client.release();
+    } catch (rollbackErr) {
+      console.error('Rollback failed:', rollbackErr);
+    }
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update payment method'));
+  }
+});
+
 // Get payment by ID (for mobile notifications)
-router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+// This route uses a distinct path to avoid conflict with GET /:appointmentId
+router.get('/by-id/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;
@@ -1162,6 +1444,8 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 
     const payment = result.rows[0];
     payment.charges = chargesResult.rows;
+    const balance = Math.max(0, parseFloat(payment.total_amount) - parseFloat(payment.amount_paid));
+    payment.balance = balance.toFixed(2);
 
     res.json(success(payment));
   } catch (err: any) {
@@ -1250,13 +1534,46 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
     // Validate additional charges if provided
     if (additionalCharges && Array.isArray(additionalCharges)) {
       for (const charge of additionalCharges) {
-        if (!charge.description || typeof charge.description !== 'string' || charge.description.trim() === '') {
+        const chargeType = charge.chargeType || 'ADDITIONAL';
+
+        if (!['ADDITIONAL', 'MEDICINE'].includes(chargeType)) {
           client.release();
-          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a non-empty description'));
+          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid charge type. Must be ADDITIONAL or MEDICINE'));
         }
-        if (charge.amount === undefined || charge.amount === null || isNaN(charge.amount) || charge.amount <= 0) {
-          client.release();
-          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a positive amount'));
+
+        if (chargeType === 'MEDICINE') {
+          // Medicine charge validation
+          if (!charge.name || typeof charge.name !== 'string' || charge.name.trim() === '') {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Medicine name is required for medicine charges'));
+          }
+
+          const quantity = Number(charge.quantity);
+          if (isNaN(quantity) || !isFinite(quantity) || quantity <= 0) {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Quantity must be a valid positive number for medicine charges'));
+          }
+
+          const unitPrice = Number(charge.unitPrice);
+          if (isNaN(unitPrice) || !isFinite(unitPrice) || unitPrice <= 0) {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Unit price must be a valid positive number for medicine charges'));
+          }
+
+          // Calculate amount on server (never trust client-supplied medicine total)
+          charge.amount = quantity * unitPrice;
+          charge.amount = Math.round(charge.amount * 100) / 100;
+          charge.description = charge.name.trim();
+        } else {
+          // Additional charge validation
+          if (!charge.description || typeof charge.description !== 'string' || charge.description.trim() === '') {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a non-empty description'));
+          }
+          if (charge.amount === undefined || charge.amount === null || isNaN(charge.amount) || charge.amount <= 0) {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a positive amount'));
+          }
         }
       }
     }
@@ -1332,50 +1649,69 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
     const totalAmount = parseFloat(consultationFee) + totalCharges;
 
     // Determine payment status
-    // CASH payments are immediately PAID (verified at time of recording)
-    // GCASH payments are PENDING_VERIFICATION (require receipt upload)
-    const paymentStatus = paymentMethod === 'CASH' ? 'PAID' : 'PENDING_VERIFICATION';
-    const verifiedBy = paymentMethod === 'CASH' ? secretaryRecordId : null;
-    const verifiedAt = paymentMethod === 'CASH' ? 'CURRENT_TIMESTAMP' : null;
+    // All payments start as UNPAID; secretary must explicitly mark CASH as PAID via /mark-paid
+    // GCASH payments remain UNPAID until receipt is uploaded and verified
+    const paymentStatus = 'UNPAID';
+    const verifiedBy = null;
+    const verifiedAt = null;
 
     let paymentId: string;
 
     if (isWalkIn) {
+      // Determine initial payment method amounts
+      const gcashAdvanceAmount = paymentMethod === 'GCASH' ? 0.00 : 0.00;
+      const cashTenderedAmount = paymentMethod === 'CASH' ? 0.00 : 0.00;
+
       // Create new payment record for walk-in patients
       const paymentInsertResult = await client.query(
-        `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_additional_charges, total_amount, status, verified_by, verified_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ${verifiedAt})
+        `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_additional_charges, total_amount, amount_paid, gcash_advance_amount, cash_tendered_amount, status, verified_by, verified_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 0.00, $7, $8, $9, $10, CURRENT_TIMESTAMP)
          RETURNING id`,
-        [appointment.patient_id, appointmentId, paymentMethod, consultationFee, totalCharges, totalAmount, paymentStatus, verifiedBy]
+        [appointment.patient_id, appointmentId, paymentMethod, consultationFee, totalCharges, totalAmount, gcashAdvanceAmount, cashTenderedAmount, paymentStatus, verifiedBy]
       );
       paymentId = paymentInsertResult.rows[0].id;
 
       // Insert additional charges if provided
       if (additionalCharges && additionalCharges.length > 0) {
         for (const charge of additionalCharges) {
-          await client.query(
-            `INSERT INTO payment_charges (payment_id, description, amount, created_by)
-             VALUES ($1, $2, $3, $4)`,
-            [paymentId, charge.description.trim(), parseFloat(charge.amount), secretaryRecordId]
-          );
+          const chargeType = charge.chargeType || 'ADDITIONAL';
+
+          if (chargeType === 'MEDICINE') {
+            await client.query(
+              `INSERT INTO payment_charges (payment_id, charge_type, description, amount, quantity, unit_price, created_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [paymentId, 'MEDICINE', charge.description.trim(), parseFloat(charge.amount), Number(charge.quantity), Number(charge.unitPrice), secretaryRecordId]
+            );
+          } else {
+            await client.query(
+              `INSERT INTO payment_charges (payment_id, charge_type, description, amount, created_by)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [paymentId, 'ADDITIONAL', charge.description.trim(), parseFloat(charge.amount), secretaryRecordId]
+            );
+          }
         }
       }
     } else {
       // Update existing payment record for booked patients
       paymentId = existingPaymentResult.rows[0].id;
 
-      // Update payment method, status, and amounts
+      // Determine payment method amounts based on payment method
+      // Note: For booked patients, these will be updated later when actual payments are recorded
+      const gcashAdvanceAmount = paymentMethod === 'GCASH' ? 0.00 : 0.00;
+      const cashTenderedAmount = paymentMethod === 'CASH' ? 0.00 : 0.00;
+
+      // Update payment method, status, and amounts (do not set amount_paid or change status automatically)
       await client.query(
         `UPDATE payments
          SET payment_method = $1,
              consultation_amount = $2,
              total_additional_charges = $3,
              total_amount = $4,
-             status = $5,
-             verified_by = $6,
-             verified_at = ${verifiedAt}
+             gcash_advance_amount = $5,
+             cash_tendered_amount = $6,
+             updated_at = CURRENT_TIMESTAMP
          WHERE id = $7`,
-        [paymentMethod, consultationFee, totalCharges, totalAmount, paymentStatus, verifiedBy, paymentId]
+        [paymentMethod, consultationFee, totalCharges, totalAmount, gcashAdvanceAmount, cashTenderedAmount, paymentId]
       );
 
       // Delete existing charges and insert new ones
@@ -1383,51 +1719,177 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
 
       if (additionalCharges && additionalCharges.length > 0) {
         for (const charge of additionalCharges) {
-          await client.query(
-            `INSERT INTO payment_charges (payment_id, description, amount, created_by)
-             VALUES ($1, $2, $3, $4)`,
-            [paymentId, charge.description.trim(), parseFloat(charge.amount), secretaryRecordId]
-          );
+          const chargeType = charge.chargeType || 'ADDITIONAL';
+
+          if (chargeType === 'MEDICINE') {
+            await client.query(
+              `INSERT INTO payment_charges (payment_id, charge_type, description, amount, quantity, unit_price, created_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [paymentId, 'MEDICINE', charge.description.trim(), parseFloat(charge.amount), Number(charge.quantity), Number(charge.unitPrice), secretaryRecordId]
+            );
+          } else {
+            await client.query(
+              `INSERT INTO payment_charges (payment_id, charge_type, description, amount, created_by)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [paymentId, 'ADDITIONAL', charge.description.trim(), parseFloat(charge.amount), secretaryRecordId]
+            );
+          }
         }
       }
     }
 
-    // Send notification for CASH payments only
-    if (paymentMethod === 'CASH') {
-      await createNotification(
-        appointment.patient_user_id,
-        NotificationTypes.PAYMENT_VERIFIED,
-        'Payment Received',
-        'Your cash payment has been received.',
-        'payment',
-        paymentId
-      );
-    }
-
     await client.query('COMMIT');
     client.release();
-
-    // Send push notification for CASH payments (best-effort, outside transaction)
-    if (paymentMethod === 'CASH') {
-      try {
-        await sendPushToUser(
-          appointment.patient_user_id,
-          {
-            title: 'Payment Received',
-            body: 'Your cash payment has been received.',
-            data: { type: 'PAYMENT', paymentId }
-          }
-        );
-      } catch (pushError) {
-        console.error('Failed to send push notification:', pushError);
-      }
-    }
 
     res.json(success({ paymentId }, 'Payment recorded successfully'));
   } catch (err: any) {
     await client.query('ROLLBACK');
     client.release();
     console.error('Payment recording error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to record payment'));
+  }
+});
+
+// Record partial payment (secretary only) - for recording advance/partial payments on existing payments
+router.patch('/:id/record-payment', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    const { id } = req.params;
+    const { amountReceived, paymentMethodType } = req.body;
+    const secretaryId = req.user!.id;
+
+    // Validate amount received
+    if (amountReceived === undefined || amountReceived === null) {
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'amountReceived is required'));
+    }
+
+    const numericAmount = Number(amountReceived);
+    if (isNaN(numericAmount) || !isFinite(numericAmount)) {
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'amountReceived must be a valid number'));
+    }
+
+    if (numericAmount <= 0) {
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'amountReceived must be greater than zero'));
+    }
+
+    // Validate payment method type if provided
+    if (paymentMethodType && !['GCASH', 'CASH'].includes(paymentMethodType)) {
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'paymentMethodType must be GCASH or CASH'));
+    }
+
+    await client.query('BEGIN');
+
+    // Get secretary's assigned doctor and secretary id
+    const secretaryResult = await client.query(
+      'SELECT id, doctor_id FROM secretaries WHERE user_id = $1',
+      [secretaryId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const secretaryRecordId = secretaryResult.rows[0].id;
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    // Get payment with doctor assignment check (lock row for update)
+    const paymentResult = await client.query(
+      `SELECT p.*, a.doctor_id, pat.user_id as patient_user_id
+       FROM payments p
+       JOIN appointments a ON p.appointment_id = a.id
+       JOIN patients pat ON p.patient_id = pat.id
+       WHERE p.id = $1
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (paymentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Payment not found'));
+    }
+
+    const payment = paymentResult.rows[0];
+
+    // Verify payment belongs to secretary's assigned doctor
+    if (payment.doctor_id !== assignedDoctorId) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only record payments for your assigned doctor'));
+    }
+
+    // Prevent updates to rejected, cancelled, or fully paid payments
+    if (payment.status === 'REJECTED') {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot record payment for a rejected payment'));
+    }
+
+    if (payment.status === 'CANCELLED') {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot record payment for a cancelled payment'));
+    }
+
+    if (payment.status === 'PAID') {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Payment is already fully paid'));
+    }
+
+    // Calculate current balance
+    const currentAmountPaid = parseFloat(payment.amount_paid);
+    const totalAmount = parseFloat(payment.total_amount);
+    const currentBalance = Math.max(0, totalAmount - currentAmountPaid);
+
+    // Calculate new amount paid (cumulative) - allow excess for change scenarios
+    const newAmountPaid = currentAmountPaid + numericAmount;
+    const newBalance = Math.max(0, totalAmount - newAmountPaid);
+
+    // Build update query based on payment method type
+    let updateQuery = 'UPDATE payments SET amount_paid = $1, updated_at = CURRENT_TIMESTAMP';
+    const updateParams: any[] = [newAmountPaid];
+
+    if (paymentMethodType === 'GCASH') {
+      // Update gcash_advance_amount
+      const currentGcashAdvance = parseFloat(payment.gcash_advance_amount || '0');
+      const newGcashAdvance = currentGcashAdvance + numericAmount;
+      updateQuery += ', gcash_advance_amount = $2';
+      updateParams.push(newGcashAdvance);
+    } else if (paymentMethodType === 'CASH') {
+      // Update cash_tendered_amount
+      const currentCashTendered = parseFloat(payment.cash_tendered_amount || '0');
+      const newCashTendered = currentCashTendered + numericAmount;
+      updateQuery += ', cash_tendered_amount = $2';
+      updateParams.push(newCashTendered);
+    }
+
+    updateQuery += ' WHERE id = $' + (updateParams.length + 1);
+    updateParams.push(id);
+
+    await client.query(updateQuery, updateParams);
+
+    await client.query('COMMIT');
+    client.release();
+
+    res.json(success({
+      amountPaid: newAmountPaid.toFixed(2),
+      balance: newBalance.toFixed(2),
+      status: payment.status
+    }, 'Payment recorded successfully'));
+  } catch (err: any) {
+    try {
+      await client.query('ROLLBACK');
+      client.release();
+    } catch (rollbackErr) {
+      console.error('Rollback failed:', rollbackErr);
+    }
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to record payment'));
   }
 });
@@ -1458,13 +1920,46 @@ router.post('/walk-in', authenticate, requireSecretaryPasswordChange, requireSec
     // Validate additional charges if provided
     if (additionalCharges && Array.isArray(additionalCharges)) {
       for (const charge of additionalCharges) {
-        if (!charge.description || typeof charge.description !== 'string' || charge.description.trim() === '') {
+        const chargeType = charge.chargeType || 'ADDITIONAL';
+
+        if (!['ADDITIONAL', 'MEDICINE'].includes(chargeType)) {
           client.release();
-          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a non-empty description'));
+          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid charge type. Must be ADDITIONAL or MEDICINE'));
         }
-        if (charge.amount === undefined || charge.amount === null || isNaN(charge.amount) || charge.amount <= 0) {
-          client.release();
-          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a positive amount'));
+
+        if (chargeType === 'MEDICINE') {
+          // Medicine charge validation
+          if (!charge.name || typeof charge.name !== 'string' || charge.name.trim() === '') {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Medicine name is required for medicine charges'));
+          }
+
+          const quantity = Number(charge.quantity);
+          if (isNaN(quantity) || !isFinite(quantity) || quantity <= 0) {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Quantity must be a valid positive number for medicine charges'));
+          }
+
+          const unitPrice = Number(charge.unitPrice);
+          if (isNaN(unitPrice) || !isFinite(unitPrice) || unitPrice <= 0) {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Unit price must be a valid positive number for medicine charges'));
+          }
+
+          // Calculate amount on server (never trust client-supplied medicine total)
+          charge.amount = quantity * unitPrice;
+          charge.amount = Math.round(charge.amount * 100) / 100;
+          charge.description = charge.name.trim();
+        } else {
+          // Additional charge validation
+          if (!charge.description || typeof charge.description !== 'string' || charge.description.trim() === '') {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a non-empty description'));
+          }
+          if (charge.amount === undefined || charge.amount === null || isNaN(charge.amount) || charge.amount <= 0) {
+            client.release();
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Each additional charge must have a positive amount'));
+          }
         }
       }
     }
@@ -1537,18 +2032,16 @@ router.post('/walk-in', authenticate, requireSecretaryPasswordChange, requireSec
     const totalAmount = parseFloat(consultationFee) + totalCharges;
 
     // Determine payment status
-    // CASH payments are immediately PAID (verified at time of recording)
-    // GCASH payments are PENDING_VERIFICATION (require receipt upload)
-    const paymentStatus = paymentMethod === 'CASH' ? 'PAID' : 'PENDING_VERIFICATION';
-    const verifiedBy = paymentMethod === 'CASH' ? secretaryRecordId : null;
-    const verifiedAt = paymentMethod === 'CASH' ? 'CURRENT_TIMESTAMP' : null;
+    // All payments start as UNPAID; secretary must explicitly mark CASH as PAID via /mark-paid
+    // GCASH payments remain UNPAID until receipt is uploaded and verified
+    const paymentStatus = 'UNPAID';
 
     // Insert payment record
     const paymentInsertResult = await client.query(
-      `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_additional_charges, total_amount, status, verified_by, verified_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ${verifiedAt})
+      `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_additional_charges, total_amount, amount_paid, status, verified_by, verified_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 0.00, $7, null, CURRENT_TIMESTAMP)
        RETURNING id`,
-      [appointment.patient_id, appointmentId, paymentMethod, consultationFee, totalCharges, totalAmount, paymentStatus, verifiedBy]
+      [appointment.patient_id, appointmentId, paymentMethod, consultationFee, totalCharges, totalAmount, paymentStatus]
     );
 
     const paymentId = paymentInsertResult.rows[0].id;
@@ -1564,36 +2057,8 @@ router.post('/walk-in', authenticate, requireSecretaryPasswordChange, requireSec
       }
     }
 
-    // Send notification for CASH payments only
-    if (paymentMethod === 'CASH') {
-      await createNotification(
-        appointment.patient_user_id,
-        NotificationTypes.PAYMENT_VERIFIED,
-        'Payment Received',
-        'Your cash payment has been received.',
-        'payment',
-        paymentId
-      );
-    }
-
     await client.query('COMMIT');
     client.release();
-
-    // Send push notification for CASH payments (best-effort, outside transaction)
-    if (paymentMethod === 'CASH') {
-      try {
-        await sendPushToUser(appointment.patient_user_id, {
-          title: 'Payment Received',
-          body: 'Your cash payment has been received.',
-          data: {
-            type: 'PAYMENT_VERIFIED',
-            paymentId: paymentId,
-          },
-        });
-      } catch (pushErr) {
-        console.error('Push delivery failed:', pushErr);
-      }
-    }
 
     res.json(success({ paymentId }, 'Payment recorded successfully'));
   } catch (err: any) {

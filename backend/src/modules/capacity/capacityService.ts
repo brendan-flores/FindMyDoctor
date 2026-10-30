@@ -18,6 +18,15 @@ export interface TimeRange {
 }
 
 /**
+ * Expose the single configured default consultation duration so callers that
+ * present the visit length (for example the patient doctor profile) do not
+ * hardcode their own copy of the default.
+ */
+export function getConsultationDurationMinutes(): number {
+  return CONSULTATION_DURATION_MINUTES;
+}
+
+/**
  * Pre-fetched schedule inputs for a single date. Used by dashboard endpoints
  * that already load the doctor's working hours, breaks and exceptions, so the
  * capacity calculation does not repeat those three queries.

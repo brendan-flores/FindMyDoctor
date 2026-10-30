@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
+import { secretaryApi, type InvoiceSettings } from '@/lib/api/secretaryApi';
 import Toast from '@/components/ui/Toast';
 import TrustedBrowsersCard from '@/components/settings/TrustedBrowsersCard';
 import ChangePasswordCard from '@/components/settings/ChangePasswordCard';
@@ -45,6 +46,19 @@ export default function SecretarySettings() {
   const [gcashQr, setGcashQr] = useState<GcashQrData | null>(null);
   const [isQrLoading, setIsQrLoading] = useState(true);
   const [qrError, setQrError] = useState('');
+
+  // Invoice settings
+  const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings | null>(null);
+  const [isInvoiceLoading, setIsInvoiceLoading] = useState(true);
+  const [invoiceError, setInvoiceError] = useState('');
+  const [invoiceForm, setInvoiceForm] = useState({
+    clinicName: '',
+    address: '',
+    contactNumber: '',
+    footerLine: '',
+  });
+  const [isSavingInvoice, setIsSavingInvoice] = useState(false);
+
   const router = useRouter();
 
   useEffect(() => {
@@ -84,9 +98,12 @@ export default function SecretarySettings() {
         if (!data.doctor_id) {
           setQrError('You are not assigned to a doctor. Please contact your administrator.');
           setIsQrLoading(false);
+          setInvoiceError('You are not assigned to a doctor. Please contact your administrator.');
+          setIsInvoiceLoading(false);
           return;
         }
         fetchGcashQr(data.doctor_id);
+        fetchInvoiceSettings();
       } else {
         setError('Failed to load settings');
       }
@@ -113,6 +130,54 @@ export default function SecretarySettings() {
       setQrError('Failed to load the GCash QR status');
     } finally {
       setIsQrLoading(false);
+    }
+  };
+
+  const fetchInvoiceSettings = async () => {
+    setIsInvoiceLoading(true);
+    setInvoiceError('');
+    try {
+      const response = await secretaryApi.getInvoiceDetails();
+      if (response.success) {
+        const data = response.data;
+        if (data) {
+          setInvoiceSettings(data);
+          setInvoiceForm({
+            clinicName: data.clinic_name,
+            address: data.address,
+            contactNumber: data.contact_number,
+            footerLine: data.footer_line,
+          });
+        }
+      } else {
+        setInvoiceError(response.error || 'Failed to load invoice details');
+      }
+    } catch (err) {
+      console.error('Error fetching invoice settings:', err);
+      setInvoiceError('Failed to load invoice details');
+    } finally {
+      setIsInvoiceLoading(false);
+    }
+  };
+
+  const handleSaveInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingInvoice(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await secretaryApi.updateInvoiceDetails(invoiceForm);
+      if (response.success && response.data) {
+        setInvoiceSettings(response.data);
+        setSuccess('Invoice details updated successfully');
+      } else {
+        setError(response.error || 'Failed to update invoice details');
+      }
+    } catch (err) {
+      setError('An error occurred. Please try again.');
+    } finally {
+      setIsSavingInvoice(false);
     }
   };
 
@@ -290,22 +355,104 @@ export default function SecretarySettings() {
               </div>
             </div>
 
-            {/* Placeholder: waiting for the invoice feature (clinic invoice details are not stored or editable yet). Do not build until invoices ship. */}
+            {/* Invoice Details */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="font-semibold text-slate-900">Invoice details</h3>
-                  <p className="text-sm text-slate-600 mt-1">
-                    Clinic name, address, contact number, and footer line shown on invoices.
-                  </p>
-                </div>
-                <span className="flex-shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 border border-slate-200">
-                  Coming soon
-                </span>
+              <div>
+                <h3 className="font-semibold text-slate-900">Invoice details</h3>
+                <p className="text-sm text-slate-600 mt-1">
+                  Clinic name, address, contact number, and footer line shown on invoices.
+                </p>
               </div>
-              <p className="mt-3 text-sm text-slate-500">
-                Available later with the invoice feature.
-              </p>
+
+              {isInvoiceLoading ? (
+                <div className="mt-5 text-sm text-slate-500" aria-busy="true">
+                  Loading invoice details…
+                </div>
+              ) : invoiceError ? (
+                <div className="mt-5">
+                  <p className="text-sm text-rose-600" role="alert">
+                    {invoiceError}
+                  </p>
+                  <button
+                    onClick={fetchInvoiceSettings}
+                    className="mt-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-[#1A62CD] hover:bg-blue-50 transition-colors"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSaveInvoice} className="mt-5 space-y-4">
+                  <div>
+                    <label htmlFor="clinicName" className="block text-sm font-medium text-slate-700 mb-1">
+                      Clinic Name
+                    </label>
+                    <input
+                      type="text"
+                      id="clinicName"
+                      value={invoiceForm.clinicName}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, clinicName: e.target.value })}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]"
+                      placeholder="Enter clinic name"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="address" className="block text-sm font-medium text-slate-700 mb-1">
+                      Address
+                    </label>
+                    <textarea
+                      id="address"
+                      value={invoiceForm.address}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, address: e.target.value })}
+                      rows={3}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]"
+                      placeholder="Enter clinic address"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="contactNumber" className="block text-sm font-medium text-slate-700 mb-1">
+                      Contact Number
+                    </label>
+                    <input
+                      type="text"
+                      id="contactNumber"
+                      value={invoiceForm.contactNumber}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, contactNumber: e.target.value })}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]"
+                      placeholder="Enter contact number"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="footerLine" className="block text-sm font-medium text-slate-700 mb-1">
+                      Footer Line
+                    </label>
+                    <input
+                      type="text"
+                      id="footerLine"
+                      value={invoiceForm.footerLine}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, footerLine: e.target.value })}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]"
+                      placeholder="Enter footer line (e.g., Thank you for your visit)"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSavingInvoice}
+                      className="px-4 py-2 bg-[#1A62CD] text-white rounded-lg hover:bg-[#1550A8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSavingInvoice ? 'Saving…' : 'Save Changes'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
 
             {/* Placeholder: waiting for the patient payments view (account details displayed beside the QR code). Do not build until patient payments ship. */}

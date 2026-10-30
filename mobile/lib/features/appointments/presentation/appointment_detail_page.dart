@@ -8,6 +8,7 @@ import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/utils/json_parsers.dart';
+import '../../payments/presentation/invoice_bottom_sheet.dart';
 
 class AppointmentDetailPage extends StatefulWidget {
   final String appointmentId;
@@ -637,9 +638,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   Widget _buildPaymentInfo() {
     final paymentMethod = parseString(_appointment?['payment_method']);
     final paymentStatus = parseString(_appointment?['payment_status']);
+    final paymentId = _appointment?['payment_id']?.toString();
     // consultation_fee is a PostgreSQL DECIMAL column, so the API delivers it
     // as a JSON string (e.g. "500.00") - parse it instead of casting.
     final consultationFee = parseNum(_appointment?['consultation_fee']);
+    final status = parseString(_appointment?['status']) ?? 'SCHEDULED';
 
     if (paymentMethod == null) {
       return const SizedBox.shrink();
@@ -664,6 +667,18 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     final formattedConsultationFee = consultationFee != null
         ? '₱${consultationFee.toStringAsFixed(2)}'
         : 'N/A';
+
+    // Show invoice button only for completed appointments with PAID status (case-insensitive)
+    final showInvoiceButton = status == 'COMPLETED' && paymentStatus?.toUpperCase() == 'PAID' && paymentId != null;
+
+    // Debug logging for invoice button visibility
+    print('=== Invoice Button Debug ===');
+    print('Status: $status');
+    print('Payment Status: $paymentStatus');
+    print('Payment Status (uppercase): ${paymentStatus?.toUpperCase()}');
+    print('Payment ID: $paymentId');
+    print('Show Invoice Button: $showInvoiceButton');
+    print('===========================');
 
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
@@ -725,6 +740,31 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               ),
             ],
           ),
+          if (showInvoiceButton) ...[
+            const SizedBox(height: spacing.AppSpacing.gutterMd),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => InvoiceBottomSheet(paymentId: paymentId!),
+                  );
+                },
+                icon: const Icon(Icons.receipt_long, size: 18),
+                label: const Text('View Invoice'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                  padding: EdgeInsets.symmetric(
+                    vertical: spacing.AppSpacing.gutterMd,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

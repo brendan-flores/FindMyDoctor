@@ -271,6 +271,11 @@ export const secretaryApi = {
     return apiClient.get<Payment>(`/payments/${appointmentId}`);
   },
 
+  // Payments: get payment by payment ID
+  getPaymentById: async (paymentId: string): Promise<{ success: boolean; data?: Payment; error?: string }> => {
+    return apiClient.get<Payment>(`/payments/by-id/${paymentId}`);
+  },
+
   // Payments: verify payment (by payment ID)
   verifyPayment: async (id: string): Promise<{ success: boolean; error?: string }> => {
     return apiClient.patch<void>(`/payments/${id}/verify`, {});
@@ -284,6 +289,11 @@ export const secretaryApi = {
   // Payments: mark as paid (for cash payments, by payment ID)
   markAsPaid: async (id: string): Promise<{ success: boolean; error?: string }> => {
     return apiClient.patch<void>(`/payments/${id}/mark-paid`, {});
+  },
+
+  // Payments: record partial payment (by payment ID)
+  recordPartialPayment: async (id: string, amountReceived: number, paymentMethodType?: 'GCASH' | 'CASH'): Promise<{ success: boolean; data?: { amountPaid: string; balance: string; status: string }; error?: string }> => {
+    return apiClient.patch<{ amountPaid: string; balance: string; status: string }>(`/payments/${id}/record-payment`, { amountReceived, paymentMethodType });
   },
 
   // Payments: get signed receipt URL (by payment ID)
@@ -314,9 +324,14 @@ export const secretaryApi = {
     appointmentId: string;
     paymentMethod: 'CASH' | 'GCASH';
     consultationFee: number;
-    additionalCharges: Array<{ description: string; amount: number }>;
+    additionalCharges: Array<{ description: string; amount: number; chargeType?: 'ADDITIONAL' | 'MEDICINE'; name?: string; quantity?: number; unitPrice?: number }>;
   }): Promise<{ success: boolean; data?: { paymentId: string }; error?: string }> => {
     return apiClient.post<{ paymentId: string }>('/payments/record', payload);
+  },
+
+  // Payments: update payment method (secretary only)
+  updatePaymentMethod: async (paymentId: string, paymentMethod: 'CASH' | 'GCASH'): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/payments/${paymentId}/payment-method`, { paymentMethod });
   },
 
   // Payments: record walk-in payment (deprecated - use recordPayment instead)
@@ -340,6 +355,54 @@ export const secretaryApi = {
   getDashboard: async (date?: string, options?: GetOptions): Promise<{ success: boolean; data?: SecretaryDashboard; error?: string }> => {
     const queryParams = date ? `?date=${encodeURIComponent(date)}` : '';
     return apiClient.get<SecretaryDashboard>(`/secretaries/me/dashboard${queryParams}`, options);
+  },
+
+  // Invoice settings: get invoice details for assigned doctor
+  getInvoiceDetails: async (): Promise<{ success: boolean; data?: InvoiceSettings | null; error?: string }> => {
+    return apiClient.get<InvoiceSettings | null>('/secretaries/me/invoice-details');
+  },
+
+  // Invoice settings: update invoice details for assigned doctor
+  updateInvoiceDetails: async (payload: {
+    clinicName: string;
+    address: string;
+    contactNumber: string;
+    footerLine: string;
+  }): Promise<{ success: boolean; data?: InvoiceSettings; error?: string }> => {
+    return apiClient.put<InvoiceSettings>('/secretaries/me/invoice-details', payload);
+  },
+
+  // Invoices: generate invoice for a paid payment
+  generateInvoice: async (paymentId: string): Promise<{ success: boolean; data?: Invoice; error?: string }> => {
+    return apiClient.post<Invoice>(`/invoices/generate/${paymentId}`);
+  },
+
+  // Invoices: get invoice by ID
+  getInvoice: async (invoiceId: string): Promise<{ success: boolean; data?: Invoice; error?: string }> => {
+    return apiClient.get<Invoice>(`/invoices/${invoiceId}`);
+  },
+
+  // Invoices: get invoice by payment ID
+  getInvoiceByPayment: async (paymentId: string): Promise<{ success: boolean; data?: Invoice; error?: string }> => {
+    return apiClient.get<Invoice>(`/invoices/by-payment/${paymentId}`);
+  },
+
+  // Invoices: download invoice as PDF
+  downloadInvoicePdf: async (invoiceId: string): Promise<{ success: boolean; data?: Blob; error?: string }> => {
+    const response = await fetch(`${apiClient.getBaseUrl()}/invoices/${invoiceId}/pdf`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiClient.getToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return { success: false, error: errorData.message || 'Failed to download invoice' };
+    }
+
+    const blob = await response.blob();
+    return { success: true, data: blob };
   },
 };
 
@@ -370,6 +433,8 @@ export interface Payment {
   consultation_amount: number;
   total_additional_charges: number;
   total_amount: number;
+  amount_paid: number;
+  balance: string;
   created_at: string;
   updated_at: string;
   verified_by?: string | null;
@@ -386,6 +451,80 @@ export interface Payment {
   reason_for_visit?: string;
   // Nested charges
   charges?: PaymentCharge[];
+}
+
+// Invoice (from invoices table)
+export interface Invoice {
+  id: string;
+  invoice_number: string;
+  payment_id: string;
+  doctor_id: string;
+  patient_id: string;
+  invoice_date: string;
+  subtotal: number;
+  total_amount: number;
+  advance_payment: number;
+  remaining_balance_before_payment: number;
+  payment_method: string;
+  cash_tendered: number;
+  amount_applied: number;
+  change_amount: number;
+  final_balance: number;
+  invoice_data: InvoiceData;
+  created_at: string;
+  updated_at: string;
+}
+
+// Invoice data (JSONB field)
+export interface InvoiceData {
+  invoice_number: string;
+  invoice_date: string;
+  clinic: {
+    name: string;
+    address: string;
+    contact_number: string;
+    footer_line: string;
+  };
+  doctor: {
+    first_name: string;
+    last_name: string;
+    specialty: string | null;
+    practice_name: string | null;
+  };
+  patient: {
+    first_name: string;
+    last_name: string;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+    date_of_birth: string | null;
+    sex: string | null;
+  };
+  appointment: {
+    date: string | null;
+    reason_for_visit: string | null;
+  };
+  charges: Array<{
+    charge_type: string;
+    description: string | null;
+    name: string | null;
+    amount: number;
+    quantity: number | null;
+    unit_price: number | null;
+  }>;
+  payment: {
+    consultation_amount: number;
+    charges_total: number;
+    subtotal: number;
+    total_amount: number;
+    advance_payment: number;
+    remaining_balance_before_payment: number;
+    payment_method: string;
+    cash_tendered: number;
+    amount_applied: number;
+    change_amount: number;
+    final_balance: number;
+  };
 }
 
 // Conversation list entry (matches GET /conversations response shape)
@@ -499,6 +638,17 @@ export interface Notification {
   created_at: string;
   related_entity_type?: string | null;
   related_entity_id?: string | null;
+}
+
+// Invoice settings interface (from invoice_settings table)
+export interface InvoiceSettings {
+  doctor_id: string;
+  clinic_name: string;
+  address: string;
+  contact_number: string;
+  footer_line: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Secretary dashboard interface

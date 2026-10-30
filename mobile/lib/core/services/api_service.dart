@@ -604,6 +604,14 @@ class ApiService {
     );
   }
 
+  /// Patient-only doctor profile used by the mobile "View Profile" screen.
+  Future<Map<String, dynamic>> getPatientDoctorProfile(String doctorId) async {
+    return await get(
+      '${ApiConstants.patientDoctors}/$doctorId${ApiConstants.doctorProfile}',
+      requireAuth: true,
+    );
+  }
+
   // ===========================
   // APPOINTMENTS METHODS
   // ===========================
@@ -800,6 +808,13 @@ class ApiService {
     );
   }
 
+  Future<Map<String, dynamic>> markAllNotificationsRead() async {
+    return await patch(
+      '${ApiConstants.notifications}/read-all',
+      requireAuth: true,
+    );
+  }
+
   // ===========================
   // PAYMENTS METHODS
   // ===========================
@@ -830,6 +845,47 @@ class ApiService {
       queryParams: {'doctorId': doctorId},
       requireAuth: false,
     );
+  }
+
+  // ===========================
+  // INVOICES METHODS
+  // ===========================
+
+  Future<Map<String, dynamic>> getInvoiceByPayment(String paymentId) async {
+    return await get(
+      '${ApiConstants.invoiceByPayment}/$paymentId',
+      requireAuth: true,
+    );
+  }
+
+  Future<List<int>> downloadInvoicePdf(String invoiceId) async {
+    final client = _httpClient ?? http.Client();
+    final response = await client.get(
+      Uri.parse('$baseUrl${ApiConstants.invoices}/$invoiceId${ApiConstants.invoicePdf}'),
+      headers: _getHeaders(requireAuth: true),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.bodyBytes;
+    } else {
+      try {
+        final body = jsonDecode(response.body);
+        throw ApiException(
+          message: body['error']?['message'] ?? 'Failed to download invoice',
+          code: body['error']?['code'] ?? 'DOWNLOAD_ERROR',
+          statusCode: response.statusCode,
+        );
+      } catch (e) {
+        if (e is ApiException) {
+          rethrow;
+        }
+        throw ApiException(
+          message: 'Failed to download invoice',
+          code: 'DOWNLOAD_ERROR',
+          statusCode: response.statusCode,
+        );
+      }
+    }
   }
 }
 

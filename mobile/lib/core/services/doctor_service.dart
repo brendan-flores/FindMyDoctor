@@ -1,5 +1,6 @@
 import 'api_service.dart';
 import '../models/doctor.dart';
+import '../models/doctor_profile.dart';
 
 class DoctorService {
   final ApiService _apiService = ApiService();
@@ -65,6 +66,28 @@ class DoctorService {
       }
       return null;
     } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Load the patient-only public doctor profile. Returns null only when the
+  /// backend reports that no active, approved doctor matches the id. Network,
+  /// authentication, and server failures are rethrown so the screen can show a
+  /// retryable error instead of a false "not found".
+  Future<DoctorProfile?> getPatientDoctorProfile(String doctorId) async {
+    try {
+      final response = await _apiService.getPatientDoctorProfile(doctorId);
+
+      if (response['success'] == true && response['data'] is Map) {
+        return DoctorProfile.fromJson(
+          Map<String, dynamic>.from(response['data'] as Map),
+        );
+      }
+      return null;
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) {
+        return null;
+      }
       rethrow;
     }
   }
