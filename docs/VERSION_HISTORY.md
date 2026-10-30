@@ -4,6 +4,41 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.28 (October 30, 2026)
+
+**Purpose:** Add the patient-facing doctor profile screen in the mobile app, backed by a new patient-only backend endpoint that returns a whitelisted public professional profile plus availability.
+
+**Significant Features:**
+- Patient-only API endpoint `GET /api/v1/patient/doctors/:id/profile`:
+  - Requires a PATIENT token; SECRETARY, DOCTOR, ADMIN, and anonymous callers are rejected.
+  - Returns only `id`, `displayName`, `photoUrl`, `specialty`, `credentials`, `practiceName`, `practiceAddress`, `roomNumber`, `yearsOfExperience`, `consultationFee`, `areasOfExpertise`, `languagesSpoken`, `biography`, and `availability`.
+  - `availability` contains `availableToday`, `slotsLeftToday`, `nextAvailableDate`, `consultationDurationMinutes`, and weekly `workingDays`.
+  - Reuses the existing availability and capacity services in Asia/Manila; breaks are not bookable and a fully booked day resolves the next available date.
+  - Only active, approved doctors with active user accounts are returned; other ids receive a generic `Doctor not found` 404 with no status detail.
+  - Never returns email, contact number, PRC license, approval/account status, queue contents, or other patient data.
+- Mobile Doctor Profile screen (`/doctor-profile`):
+  - Opens from the Doctors page "View Profile" action with a back arrow.
+  - Shows photo, display name, specialty, credentials, consultation fee, years of experience, default visit length, today's availability and remaining slots, next available date, expandable biography, languages, areas of expertise (only when they add detail beyond the specialty), weekly working hours, clinic name/address/room, and a Google Maps search link without a map API key.
+  - Hides empty sections and provides loading, retryable error, and generic not-found states.
+  - Sticky "Book appointment" action enters the existing `/doctor-schedule` flow, including the doctor-specific patient-record check.
+  - Patient-only route guard; unauthenticated users go to login and secretaries remain on the secretary home.
+- Backend `getConsultationDurationMinutes()` exposes the existing 30-minute capacity default so the profile does not hardcode visit length.
+
+**Improvements:**
+- Patients can review a doctor's public professional details and schedule before booking.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature and new endpoint only; existing endpoints unchanged).
+
+**Documentation Updates:** Updated `prd.md` (doctor information fields and privacy), `architecture.md` (patient navigation, doctor module, API architecture), `SYSTEM_STATE.md` (mobile screen and endpoint), `PROJECT_SCHEDULE.md` (completed outside the weekly plan), `CURRENT_VERSION.md`, and `VERSION_HISTORY.md`.
+
+**Database Migration:** None required; all fields and tables already existed.
+
+---
+
 ### 01.27 (October 27, 2026)
 
 **Purpose:** Add secretary settings for clinic information that appears in invoice headers and footers, scoped to the assigned doctor, enabling each doctor or clinic to have separate invoice details for future invoice PDF generation.

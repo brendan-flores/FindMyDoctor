@@ -8,7 +8,7 @@ This schedule follows Section 3.2, Project Schedules, in the SPMP. The SPMP desc
 
 **Settings note:** The Secretary and Doctor Settings page redesigns both include Change password (built outside the weekly plan). On the Secretary page, the "Invoice details" card is now active (version 01.27) with an editable form for clinic information used in invoice headers and footers; the "GCash account details" card remains a "Coming soon" placeholder until Week 8.
 
-**Completed outside the weekly plan:** The Doctor, Secretary, and Admin dashboard redesigns, the admin audit log, doctor deactivation, and secretary invite resend and password reset are complete. The web session redesign (role-scoped sessions, Remember Me, trusted browsers) is implemented.
+**Completed outside the weekly plan:** The Doctor, Secretary, and Admin dashboard redesigns, the admin audit log, doctor deactivation, and secretary invite resend and password reset are complete. The web session redesign (role-scoped sessions, Remember Me, trusted browsers) is implemented. The mobile patient doctor profile screen opened from "View Profile" (public professional details, availability, schedule, clinic directions, and entry to the existing booking flow through a patient-only backend endpoint) is also complete.
 
 | Week | Primary activities | Exit evidence | Status |
 |---|---|---|---|
