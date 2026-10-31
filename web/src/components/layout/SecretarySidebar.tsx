@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
-import { conversationApi } from '@/lib/api/secretaryApi';
+import { secretaryApi } from '@/lib/api/secretaryApi';
 
 interface SecretarySidebarProps {
   userName?: string;
@@ -24,7 +24,7 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
     // Poll unread conversation badges without changing the sidebar layout
     const fetchUnread = async () => {
       try {
-        const response = await conversationApi.getConversations();
+        const response = await secretaryApi.getConversations();
         if (response.success && response.data) {
           const total = response.data.reduce((sum, conversation) => {
             const unreadCount = Number(conversation.unread_count);

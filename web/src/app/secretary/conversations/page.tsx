@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  conversationApi,
+  secretaryApi,
   Conversation,
   ConversationMessage,
   AppointmentSummary,
+  Invoice,
+  Payment,
 } from '@/lib/api/secretaryApi';
 
 const MESSAGES_POLL_MS = 30000;
@@ -32,6 +34,9 @@ export default function SecretaryConversations() {
     isOwn: boolean;
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [showInvoicePicker, setShowInvoicePicker] = useState(false);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -50,7 +55,7 @@ export default function SecretaryConversations() {
   }, []);
 
   const fetchConversations = useCallback(async () => {
-    const response = await conversationApi.getConversations();
+    const response = await secretaryApi.getConversations();
     if (response.success && response.data) {
       const getActivityTime = (conversation: Conversation) => {
         const timestamp = conversation.last_message_sent_at ?? conversation.updated_at;
@@ -76,10 +81,10 @@ export default function SecretaryConversations() {
       let summaryResponse;
       if (patientId) {
         // For patients without conversations, use patient ID to get summary
-        summaryResponse = await conversationApi.getAppointmentSummaryByPatientId(patientId);
+        summaryResponse = await secretaryApi.getAppointmentSummary(patientId);
       } else {
         // For existing conversations, use conversation ID
-        summaryResponse = await conversationApi.getAppointmentSummary(conversationId);
+        summaryResponse = await secretaryApi.getAppointmentSummary(conversationId);
       }
 
       if (summaryResponse.success && summaryResponse.data) {
@@ -91,7 +96,7 @@ export default function SecretaryConversations() {
 
       // Only fetch messages if we have a conversation ID
       if (!patientId) {
-        const messagesResponse = await conversationApi.getMessages(conversationId);
+        const messagesResponse = await secretaryApi.getMessages(conversationId);
         if (messagesResponse.success && messagesResponse.data) {
           setMessages(messagesResponse.data);
         } else {
@@ -99,7 +104,7 @@ export default function SecretaryConversations() {
         }
 
         // Mark incoming messages as read, then refresh badges
-        const readResponse = await conversationApi.markAsRead(conversationId);
+        const readResponse = await secretaryApi.markMessagesAsRead(conversationId);
         if (readResponse.success) {
           fetchConversations();
         }
@@ -124,7 +129,7 @@ export default function SecretaryConversations() {
     const interval = setInterval(() => {
       fetchConversations();
       if (selectedId) {
-        conversationApi.getMessages(selectedId).then((response) => {
+        secretaryApi.getMessages(selectedId).then((response) => {
           if (response.success && response.data) {
             setMessages(response.data);
           }
@@ -140,11 +145,11 @@ export default function SecretaryConversations() {
 
   const handleSelectConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
-    
+
     // If conversation doesn't exist (patient without messages), create one first
     if (!conversation.id) {
       try {
-        const createResponse = await conversationApi.createConversation({ patientId: conversation.patient_id });
+        const createResponse = await secretaryApi.createConversation(conversation.patient_id);
         if (createResponse.success && createResponse.data) {
           // Select the newly created conversation
           const newConversation = createResponse.data;
@@ -181,11 +186,11 @@ export default function SecretaryConversations() {
     setIsSending(true);
 
     try {
-      const response = await conversationApi.sendMessage(selectedId, message);
+      const response = await secretaryApi.sendMessage(selectedId, message);
 
       if (response.success) {
         setDraft('');
-        const messagesResponse = await conversationApi.getMessages(selectedId);
+        const messagesResponse = await secretaryApi.getMessages(selectedId);
         if (messagesResponse.success && messagesResponse.data) {
           setMessages(messagesResponse.data);
         } else {
@@ -200,6 +205,66 @@ export default function SecretaryConversations() {
       setThreadError('Network error occurred');
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleSendInvoice = async (invoiceId: string) => {
+    if (!selectedId || isSending) {
+      return;
+    }
+
+    setIsSending(true);
+    setShowInvoicePicker(false);
+
+    try {
+      const response = await secretaryApi.sendInvoiceMessage(selectedId, invoiceId);
+
+      if (response.success) {
+        const messagesResponse = await secretaryApi.getMessages(selectedId);
+        if (messagesResponse.success && messagesResponse.data) {
+          setMessages(messagesResponse.data);
+        } else {
+          setThreadError(messagesResponse.error || 'Failed to refresh messages');
+        }
+        // Update the preview/unread state in the conversation list
+        fetchConversations();
+      } else {
+        setThreadError(response.error || 'Failed to send invoice');
+      }
+    } catch {
+      setThreadError('Network error occurred');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleOpenInvoicePicker = async () => {
+    if (!summary?.appointment?.appointmentId) {
+      setThreadError('No appointment found for this patient');
+      return;
+    }
+
+    setIsLoadingInvoices(true);
+    setShowInvoicePicker(true);
+
+    try {
+      // First get the payment for this appointment
+      const paymentResponse = await secretaryApi.getPayment(summary.appointment.appointmentId);
+      if (paymentResponse.success && paymentResponse.data) {
+        // Then get the invoice for this payment
+        const invoiceResponse = await secretaryApi.getInvoiceByPayment(paymentResponse.data.id);
+        if (invoiceResponse.success && invoiceResponse.data) {
+          setInvoices([invoiceResponse.data]);
+        } else {
+          setInvoices([]);
+        }
+      } else {
+        setInvoices([]);
+      }
+    } catch {
+      setThreadError('Failed to load invoices');
+    } finally {
+      setIsLoadingInvoices(false);
     }
   };
 
@@ -370,6 +435,8 @@ export default function SecretaryConversations() {
                   messages.map((message) => {
                     const isOwn = message.sender_user_id === currentUserId;
                     const isHovered = hoveredMessage?.id === message.id;
+                    const isInvoice = message.message_type === 'INVOICE';
+
                     return (
                       <div key={message.id} className={`flex w-full min-w-0 items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                         {!isOwn && (
@@ -395,7 +462,17 @@ export default function SecretaryConversations() {
                             }}
                             onMouseLeave={() => setHoveredMessage(null)}
                           >
-                            <p className="text-sm text-justify whitespace-pre-wrap break-words">{message.message}</p>
+                            {isInvoice ? (
+                              <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+                                <div>
+                                  <p className="text-sm font-medium">Invoice {message.invoice?.invoice_number}</p>
+                                  <p className="text-xs opacity-90">Tap to view invoice</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-justify whitespace-pre-wrap break-words">{message.message}</p>
+                            )}
                           </div>
                           {isHovered && typeof document !== 'undefined' && createPortal(
                             <div
@@ -423,6 +500,15 @@ export default function SecretaryConversations() {
               {/* Composer */}
               <div className="border-t border-slate-100 p-3">
                 <div className="flex items-end gap-2">
+                  <button
+                    onClick={handleOpenInvoicePicker}
+                    disabled={isSending}
+                    className="px-3 py-2 rounded-lg text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    title="Send invoice to patient"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+                    <span className="hidden sm:inline">Send Invoice</span>
+                  </button>
                   <textarea
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
@@ -523,6 +609,51 @@ export default function SecretaryConversations() {
           </div>
         </div>
       </div>
+
+      {/* Invoice Picker Modal */}
+      {showInvoicePicker && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">Send Invoice to Patient</h3>
+              <button
+                onClick={() => setShowInvoicePicker(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {isLoadingInvoices ? (
+                <p className="text-xs text-slate-500 text-center py-4">Loading invoices…</p>
+              ) : invoices.length === 0 ? (
+                <p className="text-xs text-slate-500 text-center py-4">No invoices available for this appointment.</p>
+              ) : (
+                <div className="space-y-2">
+                  {invoices.map((invoice) => (
+                    <button
+                      key={invoice.id}
+                      onClick={() => handleSendInvoice(invoice.id)}
+                      className="w-full text-left px-4 py-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{invoice.invoice_number}</p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Total: ₱{typeof invoice.total_amount === 'string' ? parseFloat(invoice.total_amount).toFixed(2) : invoice.total_amount.toFixed(2)}
+                          </p>
+                        </div>
+                        <span className="material-symbols-outlined text-slate-400 text-[20px]">send</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
