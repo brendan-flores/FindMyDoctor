@@ -404,6 +404,55 @@ export const secretaryApi = {
     const blob = await response.blob();
     return { success: true, data: blob };
   },
+
+  // Invoices: get download URL for invoice (short-lived signed URL)
+  getInvoiceDownloadUrl: async (invoiceId: string): Promise<{ success: boolean; data?: { downloadUrl: string; expiresAt: string }; error?: string }> => {
+    return apiClient.get<{ downloadUrl: string; expiresAt: string }>(`/invoices/${invoiceId}/download-url`);
+  },
+
+  // Conversations: get conversations for secretary
+  getConversations: async (): Promise<{ success: boolean; data?: Conversation[]; error?: string }> => {
+    return apiClient.get<Conversation[]>('/conversations');
+  },
+
+  // Conversations: create conversation for a patient
+  createConversation: async (patientId: string): Promise<{ success: boolean; data?: Conversation; error?: string }> => {
+    return apiClient.post<Conversation>('/conversations', { patientId });
+  },
+
+  // Conversations: get conversation by ID
+  getConversation: async (conversationId: string): Promise<{ success: boolean; data?: Conversation; error?: string }> => {
+    return apiClient.get<Conversation>(`/conversations/${conversationId}`);
+  },
+
+  // Conversations: get messages for conversation
+  getMessages: async (conversationId: string): Promise<{ success: boolean; data?: ConversationMessage[]; error?: string }> => {
+    return apiClient.get<ConversationMessage[]>(`/conversations/${conversationId}/messages`);
+  },
+
+  // Conversations: send text message
+  sendMessage: async (conversationId: string, message: string): Promise<{ success: boolean; data?: ConversationMessage; error?: string }> => {
+    return apiClient.post<ConversationMessage>(`/conversations/${conversationId}/messages`, { message });
+  },
+
+  // Conversations: send invoice message
+  sendInvoiceMessage: async (conversationId: string, invoiceId: string): Promise<{ success: boolean; data?: ConversationMessage; error?: string }> => {
+    return apiClient.post<ConversationMessage>(`/conversations/${conversationId}/messages`, {
+      message: 'Invoice sent',
+      messageType: 'INVOICE',
+      invoiceId,
+    });
+  },
+
+  // Conversations: mark messages as read
+  markMessagesAsRead: async (conversationId: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/conversations/${conversationId}/read`, {});
+  },
+
+  // Conversations: get appointment summary for patient (for patients without conversations)
+  getAppointmentSummary: async (patientId: string): Promise<{ success: boolean; data?: any; error?: string }> => {
+    return apiClient.get<any>(`/conversations/patient/${patientId}/appointment-summary`);
+  },
 };
 
 // Payment charge (from payment_charges table)
@@ -558,6 +607,12 @@ export interface ConversationMessage {
   sent_at: string;
   read_at: string | null;
   sender_email: string;
+  message_type?: 'TEXT' | 'INVOICE';
+  invoice_id?: string | null;
+  invoice?: {
+    id: string;
+    invoice_number: string;
+  } | null;
 }
 
 // Patient-info sheet (read-only appointment summary from GET /conversations/:id/appointment-summary)
@@ -572,6 +627,7 @@ export interface AppointmentSummary {
     email: string | null;
   };
   appointment: {
+    appointmentId: string;
     appointmentDate: string;
     status: string;
     reasonForVisit: string | null;
@@ -583,49 +639,6 @@ export interface AppointmentSummary {
     practiceName: string;
   };
 }
-
-// Conversations: secretaries only see their assigned doctor's patients
-export const conversationApi = {
-  // List conversations (patient details, unread badges, latest-message previews)
-  getConversations: async (): Promise<{ success: boolean; data?: Conversation[]; error?: string }> => {
-    return apiClient.get<Conversation[]>('/conversations');
-  },
-
-  // Create a conversation (for secretaries to start chat with a patient)
-  createConversation: async (payload: { patientId: string }): Promise<{ success: boolean; data?: Conversation; error?: string }> => {
-    return apiClient.post<Conversation>('/conversations', payload);
-  },
-
-  // Retrieve a single conversation
-  getConversation: async (conversationId: string): Promise<{ success: boolean; data?: Conversation; error?: string }> => {
-    return apiClient.get<Conversation>(`/conversations/${conversationId}`);
-  },
-
-  // Retrieve message history
-  getMessages: async (conversationId: string): Promise<{ success: boolean; data?: ConversationMessage[]; error?: string }> => {
-    return apiClient.get<ConversationMessage[]>(`/conversations/${conversationId}/messages`);
-  },
-
-  // Send a message
-  sendMessage: async (conversationId: string, message: string): Promise<{ success: boolean; data?: ConversationMessage; error?: string }> => {
-    return apiClient.post<ConversationMessage>(`/conversations/${conversationId}/messages`, { message });
-  },
-
-  // Mark incoming messages as read
-  markAsRead: async (conversationId: string): Promise<{ success: boolean; error?: string }> => {
-    return apiClient.patch<void>(`/conversations/${conversationId}/read`, {});
-  },
-
-  // Read-only patient-info sheet for the selected conversation
-  getAppointmentSummary: async (conversationId: string): Promise<{ success: boolean; data?: AppointmentSummary; error?: string }> => {
-    return apiClient.get<AppointmentSummary>(`/conversations/${conversationId}/appointment-summary`);
-  },
-
-  // Read-only patient-info sheet by patient ID (for patients without conversations)
-  getAppointmentSummaryByPatientId: async (patientId: string): Promise<{ success: boolean; data?: AppointmentSummary; error?: string }> => {
-    return apiClient.get<AppointmentSummary>(`/conversations/patient/${patientId}/appointment-summary`);
-  },
-};
 
 // Notification interface (from notifications table)
 export interface Notification {
