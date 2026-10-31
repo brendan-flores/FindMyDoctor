@@ -3,6 +3,8 @@ import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, requireSecretaryProfileCompletion } from '../middleware/auth';
 import { generateInvoicePdf } from '../services/invoicePdfService';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -508,6 +510,160 @@ router.get('/:id/pdf', authenticate, async (req: AuthRequest, res: Response) => 
     console.error('PDF generation error:', err);
     console.error('Error details:', err.message, err.stack);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, `Failed to generate PDF: ${err.message}`));
+  }
+});
+
+// Get download URL for invoice (authorized short-lived signed URL)
+router.get('/:id/download-url', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+    const role = req.user!.role;
+
+    // Get the invoice with conversation information
+    const invoiceResult = await query(
+      `SELECT i.*, m.conversation_id
+       FROM invoices i
+       LEFT JOIN messages m ON m.invoice_id = i.id
+       WHERE i.id = $1
+       LIMIT 1`,
+      [id]
+    );
+
+    if (invoiceResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Invoice not found'));
+    }
+
+    const invoice = invoiceResult.rows[0];
+
+    // Authorization: Only the patient in the conversation or the secretary for their assigned doctor
+    let authorized = false;
+
+    if (role === 'PATIENT') {
+      // Patient must be the invoice's patient
+      const patientCheck = await query(
+        `SELECT 1 FROM patients WHERE id = $1 AND user_id = $2`,
+        [invoice.patient_id, userId]
+      );
+      authorized = patientCheck.rows.length > 0;
+    } else if (role === 'SECRETARY') {
+      // Secretary must be assigned to the invoice's doctor
+      const secretaryCheck = await query(
+        `SELECT 1 FROM secretaries WHERE user_id = $1 AND doctor_id = $2`,
+        [userId, invoice.doctor_id]
+      );
+      authorized = secretaryCheck.rows.length > 0;
+    }
+
+    if (!authorized) {
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You are not authorized to download this invoice'));
+    }
+
+    // Generate a short-lived signed URL token (15 minutes)
+    const token = jwt.sign(
+      {
+        invoiceId: id,
+        userId: userId,
+        role: role,
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '15m' }
+    );
+
+    const downloadUrl = `${process.env.API_BASE_URL || 'http://localhost:3000'}/api/v1/invoices/${id}/download?token=${token}`;
+
+    res.json(success({ downloadUrl, expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString() }, 'Download URL generated'));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to generate download URL'));
+  }
+});
+
+// Download invoice using signed URL (public endpoint with token verification)
+router.get('/:id/download', async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    const { id } = req.params;
+    const { token } = req.query;
+
+    if (!token || typeof token !== 'string') {
+      client.release();
+      return res.status(401).json(error(ErrorCodes.UNAUTHORIZED, 'Download token is required'));
+    }
+
+    // Verify the token
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    } catch (err) {
+      client.release();
+      return res.status(401).json(error(ErrorCodes.UNAUTHORIZED, 'Invalid or expired download token'));
+    }
+
+    // Verify the token matches the invoice
+    if (decoded.invoiceId !== id) {
+      client.release();
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Token does not match this invoice'));
+    }
+
+    // Get invoice data
+    const invoiceResult = await client.query(
+      `SELECT i.*, p.gcash_advance_amount, p.cash_tendered_amount, p.total_amount, p.amount_paid
+       FROM invoices i
+       JOIN payments p ON i.payment_id = p.id
+       WHERE i.id = $1`,
+      [id]
+    );
+
+    if (invoiceResult.rows.length === 0) {
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Invoice not found'));
+    }
+
+    const invoice = invoiceResult.rows[0];
+    const invoiceData = typeof invoice.invoice_data === 'string' ? JSON.parse(invoice.invoice_data) : invoice.invoice_data;
+
+    // Update invoice data with current payment data to ensure PDF matches preview
+    const advancePayment = parseFloat(invoice.gcash_advance_amount || '0');
+    const cashTendered = parseFloat(invoice.cash_tendered_amount || '0');
+    const totalAmount = parseFloat(invoice.total_amount || '0');
+    const amountPaid = parseFloat(invoice.amount_paid || '0');
+
+    const remainingBalanceBeforePayment = Math.max(0, totalAmount - advancePayment);
+    const amountApplied = Math.min(cashTendered, remainingBalanceBeforePayment);
+    const changeAmount = Math.max(0, cashTendered - amountApplied);
+    const finalBalance = Math.max(0, totalAmount - amountPaid);
+
+    invoiceData.payment.advance_payment = advancePayment;
+    invoiceData.payment.cash_tendered = cashTendered;
+    invoiceData.payment.amount_applied = amountApplied;
+    invoiceData.payment.change_amount = changeAmount;
+    invoiceData.payment.final_balance = finalBalance;
+    invoiceData.payment.remaining_balance_before_payment = remainingBalanceBeforePayment;
+
+    // Add invoice number and date to the data
+    invoiceData.invoice_number = invoice.invoice_number;
+    invoiceData.invoice_date = invoice.invoice_date;
+
+    client.release();
+
+    // Generate PDF
+    const pdfBuffer = await generateInvoicePdf(invoiceData);
+
+    // Set response headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=invoice-${invoice.invoice_number}.pdf`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Accept-Ranges', 'none');
+
+    res.send(pdfBuffer);
+  } catch (err: any) {
+    try {
+      client.release();
+    } catch (releaseErr) {
+      console.error('Client release failed:', releaseErr);
+    }
+    console.error('PDF download error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, `Failed to download PDF: ${err.message}`));
   }
 });
 
