@@ -80,6 +80,13 @@ router.post('/generate/:paymentId', authenticate, requireSecretaryPasswordChange
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invoice can only be generated for paid payments'));
     }
 
+    // Ensure payment is fully paid (no remaining balance)
+    if (parseFloat(payment.amount_paid || '0') < parseFloat(payment.total_amount || '0')) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invoice cannot be generated for payments with remaining balance'));
+    }
+
     // Check if an ACTIVE invoice already exists for this payment
     const existingInvoiceResult = await client.query(
       'SELECT id, status FROM invoices WHERE payment_id = $1',
