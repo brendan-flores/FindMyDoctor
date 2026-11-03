@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { secretaryApi, Payment, PaymentCharge } from '@/lib/api/secretaryApi';
 import Toast from '@/components/ui/Toast';
 import InvoiceModal from '@/components/InvoiceModal';
@@ -24,6 +25,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function SecretaryPayments() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>('UNPAID');
   const [loading, setLoading] = useState(true);
@@ -123,6 +126,39 @@ export default function SecretaryPayments() {
     fetchPayments();
     fetchPaymentCounts();
   }, [activeTab]);
+
+  // Auto-open payment details modal if paymentId is in URL
+  useEffect(() => {
+    const paymentId = searchParams.get('paymentId');
+    if (paymentId) {
+      handleOpenPaymentFromUrl(paymentId);
+    }
+  }, [searchParams]);
+
+  const handleOpenPaymentFromUrl = async (paymentId: string) => {
+    setPaymentDetailsLoading(true);
+    try {
+      const paymentResponse = await secretaryApi.getPaymentById(paymentId);
+      setPaymentDetailsLoading(false);
+      if (paymentResponse.success && paymentResponse.data) {
+        setSelectedPayment(paymentResponse.data);
+        setShowDetailsModal(true);
+        // Switch to the correct tab based on payment status
+        if (paymentResponse.data.status) {
+          setActiveTab(paymentResponse.data.status as TabType);
+        }
+      } else {
+        setToastMessage(paymentResponse.error || 'Failed to load payment details');
+        setToastType('error');
+        setShowToast(true);
+      }
+    } catch (error) {
+      setPaymentDetailsLoading(false);
+      setToastMessage('Failed to load payment details');
+      setToastType('error');
+      setShowToast(true);
+    }
+  };
 
   // Auto-refresh payments every 60 seconds
   useEffect(() => {

@@ -232,7 +232,11 @@ export default function SecretaryDashboard() {
         {dashboardData?.paymentsNeedingAction && dashboardData.paymentsNeedingAction.length > 0 ? (
           <div className="space-y-3">
             {dashboardData.paymentsNeedingAction.map((payment, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+              <div
+                key={index}
+                onClick={() => router.push(`/secretary/payments?paymentId=${payment.id}`)}
+                className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 hover:border-slate-200 transition-colors"
+              >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="material-symbols-outlined text-[16px] text-slate-500">person</span>
