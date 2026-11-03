@@ -75,6 +75,7 @@ router.get('/', authenticate, requireSecretaryPasswordChange, async (req: AuthRe
     } else if (role === 'SECRETARY') {
       // For secretaries: show all patients with appointments OR existing conversations
       // Patients without conversations will have NULL conversation fields
+      // Show patients with booked (SCHEDULED, CONFIRMED, IN_PROGRESS) or completed appointments
       queryText = `
         SELECT DISTINCT ON (p.id)
                c.id, p.id as patient_id, c.secretary_id, c.doctor_id, c.status, c.created_at, c.updated_at,
@@ -87,8 +88,9 @@ router.get('/', authenticate, requireSecretaryPasswordChange, async (req: AuthRe
         WHERE EXISTS (
           SELECT 1 FROM appointments a
           WHERE a.patient_id = p.id AND a.doctor_id = d.id
+            AND a.status IN ('SCHEDULED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
         )
-        ORDER BY p.id, COALESCE(c.updated_at, (SELECT MAX(a.appointment_date) FROM appointments a WHERE a.patient_id = p.id AND a.doctor_id = d.id)) DESC
+        ORDER BY p.id, COALESCE(c.updated_at, NULL) DESC
       `;
       params.push(userId, userId);
     } else {
@@ -513,18 +515,36 @@ router.get('/patient/:patientId/appointment-summary', authenticate, requireSecre
     const doctorId = secretaryResult.rows[0].doctor_id;
 
     // Verify the patient has an appointment with this doctor
+    // Allow SCHEDULED, CONFIRMED, IN_PROGRESS, and COMPLETED appointments
     const appointmentCheck = await query(
-      `SELECT 1 FROM appointments
+      `SELECT status, appointment_date FROM appointments
        WHERE patient_id = $1 AND doctor_id = $2
+         AND status IN ('SCHEDULED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
+       ORDER BY appointment_date DESC
        LIMIT 1`,
       [patientId, doctorId]
     );
 
+    let appointmentStatus = null;
     if (appointmentCheck.rows.length === 0) {
-      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Patient has no appointment with this doctor'));
+      // Check if there's any appointment at all to determine status
+      const anyAppointment = await query(
+        `SELECT status FROM appointments
+         WHERE patient_id = $1 AND doctor_id = $2
+         ORDER BY appointment_date DESC
+         LIMIT 1`,
+        [patientId, doctorId]
+      );
+
+      if (anyAppointment.rows.length > 0) {
+        appointmentStatus = anyAppointment.rows[0].status;
+      }
+      // If no appointment at all, appointmentStatus remains null
+      // We'll still return patient details without appointment info
     }
 
     // Read-only: only the appointment fields the patient-info sheet needs
+    // Get the most recent appointment with valid status, or any appointment if none valid
     const summaryResult = await query(
       `SELECT
          p.id as patient_id,
@@ -546,9 +566,10 @@ router.get('/patient/:patientId/appointment-summary', authenticate, requireSecre
        JOIN users u ON u.id = p.user_id
        JOIN doctors d ON d.id = $2
        LEFT JOIN appointments a ON a.patient_id = p.id AND a.doctor_id = d.id
+         AND a.status IN ('SCHEDULED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
       WHERE p.id = $1
       ORDER BY
-        (ARRAY_POSITION(ARRAY['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS'], a.status) IS NOT NULL) DESC NULLS LAST,
+        CASE WHEN a.status IN ('SCHEDULED', 'CONFIRMED', 'IN_PROGRESS') THEN 0 ELSE 1 END,
         a.appointment_date DESC NULLS LAST
       LIMIT 1`,
       [patientId, doctorId]
@@ -575,6 +596,7 @@ router.get('/patient/:patientId/appointment-summary', authenticate, requireSecre
             queueNumber: row.queue_number ?? null,
           }
         : null,
+      appointmentStatus: appointmentStatus || null, // Include the last appointment status if not valid
       doctor: {
         firstName: row.doctor_first_name,
         lastName: row.doctor_last_name,
@@ -612,6 +634,7 @@ router.get('/:id/appointment-summary', authenticate, requireSecretaryPasswordCha
     }
 
     // Read-only: only the appointment fields the patient-info sheet needs
+    // Include SCHEDULED, CONFIRMED, IN_PROGRESS, and COMPLETED appointments
     const summaryResult = await query(
       `SELECT
          p.id as patient_id,
@@ -634,15 +657,32 @@ router.get('/:id/appointment-summary', authenticate, requireSecretaryPasswordCha
        JOIN users u ON u.id = p.user_id
        JOIN doctors d ON d.id = c.doctor_id
        LEFT JOIN appointments a ON a.patient_id = c.patient_id AND a.doctor_id = c.doctor_id
+         AND a.status IN ('SCHEDULED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
       WHERE c.id = $1
       ORDER BY
-        (ARRAY_POSITION(ARRAY['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS'], a.status) IS NOT NULL) DESC NULLS LAST,
+        CASE WHEN a.status IN ('SCHEDULED', 'CONFIRMED', 'IN_PROGRESS') THEN 0 ELSE 1 END,
         a.appointment_date DESC NULLS LAST
       LIMIT 1`,
       [id]
     );
 
     const row = summaryResult.rows[0];
+
+    // Check if there's any appointment at all to provide status info
+    let appointmentStatus = null;
+    if (!row.appointment_id) {
+      const anyAppointment = await query(
+        `SELECT status FROM appointments
+         WHERE patient_id = $1 AND doctor_id = $2
+         ORDER BY appointment_date DESC
+         LIMIT 1`,
+        [row.patient_id, conversation.doctor_id]
+      );
+
+      if (anyAppointment.rows.length > 0) {
+        appointmentStatus = anyAppointment.rows[0].status;
+      }
+    }
 
     const summary = {
       patient: {
@@ -663,6 +703,7 @@ router.get('/:id/appointment-summary', authenticate, requireSecretaryPasswordCha
             queueNumber: row.queue_number ?? null,
           }
         : null,
+      appointmentStatus: appointmentStatus || null, // Include the last appointment status if not valid
       doctor: {
         firstName: row.doctor_first_name,
         lastName: row.doctor_last_name,

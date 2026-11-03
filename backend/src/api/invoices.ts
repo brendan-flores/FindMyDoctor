@@ -513,6 +513,57 @@ router.get('/:id/pdf', authenticate, async (req: AuthRequest, res: Response) => 
   }
 });
 
+// Get all invoices for a patient (secretary only)
+router.get('/patient/:patientId', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { patientId } = req.params;
+    const userId = req.user!.id;
+
+    // Get the secretary's assigned doctor
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [userId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary not found'));
+    }
+
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    // Get all invoices for this patient with the assigned doctor, including appointment date
+    const result = await query(
+      `SELECT i.*, p.gcash_advance_amount, p.cash_tendered_amount, p.total_amount, p.amount_paid,
+              a.appointment_date, a.reason_for_visit
+       FROM invoices i
+       JOIN payments p ON i.payment_id = p.id
+       JOIN appointments a ON p.appointment_id = a.id
+       WHERE i.patient_id = $1 AND i.doctor_id = $2
+       ORDER BY a.appointment_date DESC NULLS LAST, i.invoice_date DESC`,
+      [patientId, assignedDoctorId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json(success([], 'No invoices found for this patient'));
+    }
+
+    const invoices = result.rows.map(row => {
+      const invoiceData = typeof row.invoice_data === 'string' ? JSON.parse(row.invoice_data) : row.invoice_data;
+      return {
+        ...row,
+        invoiceData,
+        appointment_date: row.appointment_date,
+        reason_for_visit: row.reason_for_visit,
+      };
+    });
+
+    res.json(success(invoices));
+  } catch (err: any) {
+    console.error('Error fetching patient invoices:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch patient invoices'));
+  }
+});
+
 // Get download URL for invoice (authorized short-lived signed URL)
 router.get('/:id/download-url', authenticate, async (req: AuthRequest, res: Response) => {
   try {
