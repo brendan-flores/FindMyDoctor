@@ -203,6 +203,8 @@ Secretaries can:
 - Verify payments.
 - Manage consultation payment status.
 - Add additional charges.
+- Generate invoices for paid payments.
+- Void and reissue invoices to correct errors (voided invoices remain in audit trail but are not downloadable).
 - View necessary patient information according to permissions.
 
 ## 5.5 Administrator

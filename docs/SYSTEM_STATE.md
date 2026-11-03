@@ -152,6 +152,23 @@ Current System State (October 2026):
 - Login OTP challenges expire after 5 minutes, support up to 5 failed attempts, and are marked as used after successful verification
 - PostgreSQL `login_otp_challenges` table stores server-side OTP challenge state with hashed challenge tokens and a `remember_me` column retained for schema compatibility (new challenges store `false`; it no longer grants device trust)
 - PostgreSQL `doctors` and `secretaries` tables include `two_factor_enabled` column (migration 013_add_two_factor_settings.sql) - optional 2FA, must be turned on by user
+
+## Invoice Voiding and Reissue
+- Invoices have a `status` field with values: ACTIVE (default) or VOID
+- Invoice voiding allows secretaries to correct invoice errors by voiding an invoice and generating a replacement
+- Voiding is irreversible - once VOID, an invoice cannot be reactivated or edited
+- Voided invoices remain in the database for audit trail purposes (invoice_data JSONB is preserved)
+- PDF download is blocked for VOID invoices (403 error: "Cannot download PDF for voided invoice")
+- Only one ACTIVE invoice per payment is enforced at the backend
+- POST /api/v1/invoices/generate/:paymentId rejects generation if an ACTIVE invoice already exists for the payment
+- POST /api/v1/invoices/:id/void is a SECRETARY-only endpoint to void invoices
+- Void endpoint validates secretary is assigned to the invoice's doctor before allowing voiding
+- GET /api/v1/invoices/by-payment/:paymentId filters by status (ACTIVE by default, optional ?includeVoid=true for audit purposes)
+- Secretary payments page displays invoice status badge (ACTIVE/VOID) and provides "Void Invoice" button with confirmation
+- Confirmation dialog message: "Paid invoices are voided and reissued, never edited. This action is irreversible."
+- Invoice modal shows status badge, disables PDF download for VOID invoices, and allows generating replacement invoice when VOID
+- Database migration: 040_add_invoice_status.sql adds status column with check constraint (ACTIVE, VOID) and index
+- Applied via npm run migrate:invoice-status
 - Secretary settings page at `/secretary/settings` groups cards into a labeled "Account" section (optional two-factor authentication toggle, Change password card reusing `POST /api/v1/auth/change-password`, and the Trusted Browsers card) and a "Clinic" section (Clinic Payment Settings with the GCash QR thumbnail, Active/Not uploaded status, and last-updated date from `doctors.gcash_qr_updated_at`, editable Invoice details form for clinic information used in invoice headers and footers, and a display-only "Coming soon" placeholder for GCash account details)
 - Secretary Invoice details allow secretaries to configure clinic-specific information (clinic name, address, contact number, footer line) that appears in invoice headers and footers for future invoice PDF generation
 - Invoice settings are stored in the `invoice_settings` table (migration 036_add_invoice_settings.sql) with `doctor_id` as primary key, scoped to the secretary's assigned doctor

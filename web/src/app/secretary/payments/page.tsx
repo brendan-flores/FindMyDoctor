@@ -41,6 +41,8 @@ export default function SecretaryPayments() {
   const [isFetchingReceiptUrl, setIsFetchingReceiptUrl] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [selectedPaymentForInvoice, setSelectedPaymentForInvoice] = useState<Payment | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [showVoidInvoiceDialog, setShowVoidInvoiceDialog] = useState(false);
   const [paymentCounts, setPaymentCounts] = useState({ unpaid: 0, pending: 0, paid: 0, rejected: 0, cancelled: 0 });
   const [showAddChargeModal, setShowAddChargeModal] = useState(false);
   const [showDeleteChargeDialog, setShowDeleteChargeDialog] = useState(false);
@@ -268,6 +270,36 @@ export default function SecretaryPayments() {
       setShowToast(true);
     }
     setActionLoading(false);
+  };
+
+  const handleRevertToUnpaid = async () => {
+    if (!selectedPayment) return;
+
+    setActionLoading(true);
+    setToastMessage('');
+    setToastType('success');
+
+    try {
+      const response = await secretaryApi.revertPaymentToUnpaid(selectedPayment.id);
+
+      if (response.success) {
+        setToastMessage('Payment reverted to unpaid successfully');
+        setShowToast(true);
+        setShowDetailsModal(false);
+        fetchPayments();
+        fetchPaymentCounts();
+      } else {
+        setToastMessage(response.error || 'Failed to revert payment to unpaid');
+        setToastType('error');
+        setShowToast(true);
+      }
+    } catch (error) {
+      setToastMessage('Failed to revert payment to unpaid');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleAddCharge = async () => {
@@ -581,9 +613,45 @@ export default function SecretaryPayments() {
     setIsFetchingReceiptUrl(false);
   };
 
-  const handleViewInvoice = (payment: Payment) => {
+  const handleViewInvoice = async (payment: Payment) => {
     setSelectedPaymentForInvoice(payment);
+    // Fetch invoice details to get status
+    const invoiceResponse = await secretaryApi.getInvoiceByPayment(payment.id);
+    if (invoiceResponse.success && invoiceResponse.data) {
+      setSelectedInvoice(invoiceResponse.data);
+    }
     setShowInvoiceModal(true);
+  };
+
+  const handleVoidInvoice = async () => {
+    if (!selectedInvoice) return;
+
+    setActionLoading(true);
+    setToastMessage('');
+    setToastType('success');
+
+    try {
+      const response = await secretaryApi.voidInvoice(selectedInvoice.id);
+
+      if (response.success) {
+        setToastMessage('Invoice voided successfully');
+        setShowToast(true);
+        setShowVoidInvoiceDialog(false);
+
+        // Clear selectedInvoice to allow generating a new invoice
+        setSelectedInvoice(null);
+      } else {
+        setToastMessage(response.error || 'Failed to void invoice');
+        setToastType('error');
+        setShowToast(true);
+      }
+    } catch (error) {
+      setToastMessage('Failed to void invoice');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const formatDate = (dateString?: string) => {
@@ -948,13 +1016,70 @@ export default function SecretaryPayments() {
                     <span className="text-slate-900 font-bold">{formatAmount(calculateBalance(selectedPayment))}</span>
                   </div>
                   {selectedPayment.status === 'PAID' && (
-                    <button
-                      onClick={() => handleViewInvoice(selectedPayment)}
-                      className="mt-3 w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">receipt_long</span>
-                      View Invoice
-                    </button>
+                    <>
+                      {calculateBalance(selectedPayment) > 0 ? (
+                        <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                          <p className="text-sm text-amber-700 flex items-center gap-2 mb-3">
+                            <span className="material-symbols-outlined text-[18px]">warning</span>
+                            Invoice cannot be generated due to remaining balance of {formatAmount(calculateBalance(selectedPayment))}
+                          </p>
+                          <button
+                            onClick={handleRevertToUnpaid}
+                            disabled={actionLoading}
+                            className="w-full px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">undo</span>
+                            {actionLoading ? 'Reverting...' : 'Revert to Unpaid'}
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          {selectedInvoice && (
+                            <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-slate-700">Invoice Status:</span>
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium border ${
+                                    selectedInvoice.status === 'ACTIVE'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : 'bg-red-50 text-red-700 border-red-200'
+                                  }`}>
+                                    {selectedInvoice.status}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="mt-2 flex gap-2">
+                                <button
+                                  onClick={() => handleViewInvoice(selectedPayment)}
+                                  className="flex-1 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">visibility</span>
+                                  View Invoice
+                                </button>
+                                {selectedInvoice.status === 'ACTIVE' && (
+                                  <button
+                                    onClick={() => setShowVoidInvoiceDialog(true)}
+                                    className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                  >
+                                    <span className="material-symbols-outlined text-[18px]">cancel</span>
+                                    Void Invoice
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {!selectedInvoice && (
+                            <button
+                              onClick={() => handleViewInvoice(selectedPayment)}
+                              className="mt-3 w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+                              View Invoice
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -1380,15 +1505,61 @@ export default function SecretaryPayments() {
         </div>
       )}
 
+      {/* Void Invoice Confirmation Dialog */}
+      {showVoidInvoiceDialog && selectedInvoice && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Void Invoice?</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Paid invoices are voided and reissued, never edited. This action is irreversible.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowVoidInvoiceDialog(false)}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleVoidInvoice}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                {actionLoading ? 'Voiding...' : 'Void Invoice'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Invoice Modal */}
       {showInvoiceModal && selectedPaymentForInvoice && (
         <InvoiceModal
           isOpen={showInvoiceModal}
-          onClose={() => {
+          onClose={async () => {
             setShowInvoiceModal(false);
             setSelectedPaymentForInvoice(null);
+            // Refresh invoice state when modal closes to capture any newly generated invoices
+            if (selectedPayment) {
+              const invoiceResponse = await secretaryApi.getInvoiceByPayment(selectedPayment.id);
+              if (invoiceResponse.success && invoiceResponse.data) {
+                setSelectedInvoice(invoiceResponse.data);
+              } else {
+                setSelectedInvoice(null);
+              }
+            }
           }}
           paymentId={selectedPaymentForInvoice.id}
+          onInvoiceGenerated={async () => {
+            // Refresh invoice state immediately after generation
+            if (selectedPayment) {
+              const invoiceResponse = await secretaryApi.getInvoiceByPayment(selectedPayment.id);
+              if (invoiceResponse.success && invoiceResponse.data) {
+                setSelectedInvoice(invoiceResponse.data);
+              }
+            }
+          }}
         />
       )}
 

@@ -334,6 +334,11 @@ export const secretaryApi = {
     return apiClient.patch<void>(`/payments/${paymentId}/payment-method`, { paymentMethod });
   },
 
+  // Payments: revert payment to unpaid (secretary only)
+  revertPaymentToUnpaid: async (paymentId: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/payments/${paymentId}/revert-unpaid`, {});
+  },
+
   // Payments: record walk-in payment (deprecated - use recordPayment instead)
   recordWalkInPayment: async (payload: {
     appointmentId: string;
@@ -404,6 +409,11 @@ export const secretaryApi = {
     const blob = await response.blob();
     return { success: true, data: blob };
   },
+
+  // Invoices: void invoice (secretary only)
+  voidInvoice: async (invoiceId: string): Promise<{ success: boolean; data?: Invoice; error?: string }> => {
+    return apiClient.post<Invoice>(`/invoices/${invoiceId}/void`);
+  },
 };
 
 // Payment charge (from payment_charges table)
@@ -471,6 +481,7 @@ export interface Invoice {
   change_amount: number;
   final_balance: number;
   invoice_data: InvoiceData;
+  status: 'ACTIVE' | 'VOID';
   created_at: string;
   updated_at: string;
 }
