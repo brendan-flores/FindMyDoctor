@@ -281,80 +281,165 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         // Invoice Content
         Flexible(
           child: SingleChildScrollView(
-            child: Padding(
+            child: Container(
+              color: const Color(0xFFF8FAFC),
               padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header section
-                  Text(
-                    'Find My Doctor',
-                    style: AppTextStyles.headlineMd.copyWith(
-                      color: const Color(0xFF1B5EB8),
-                      fontWeight: FontWeight.bold,
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header section - Logo + Clinic Info on left, Invoice # + Date on right
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Logo and clinic info
+                        Expanded(
+                          child: Row(
+                            children: [
+                              // Logo placeholder (64x64)
+                              Container(
+                                width: 64,
+                                height: 64,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1B5EB8),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.local_hospital,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Find My Doctor',
+                                      style: AppTextStyles.headlineMd.copyWith(
+                                        color: const Color(0xFF1B5EB8),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    if (data['clinic']?['name'] != null)
+                                      Text(
+                                        data['clinic']['name'],
+                                        style: AppTextStyles.bodySm,
+                                      ),
+                                    if (data['clinic']?['address'] != null)
+                                      Text(
+                                        data['clinic']['address'],
+                                        style: AppTextStyles.bodySm,
+                                      ),
+                                    if (data['clinic']?['contact_number'] != null)
+                                      Text(
+                                        'Contact: ${data['clinic']['contact_number']}',
+                                        style: AppTextStyles.bodySm,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // Invoice # and Date on right
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'INVOICE',
+                              style: AppTextStyles.headlineSm.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Invoice #: $invoiceNumber',
+                              style: AppTextStyles.bodySm,
+                            ),
+                            Text(
+                              'Date: ${_formatDate(invoiceDate)}',
+                              style: AppTextStyles.bodySm,
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          'INVOICE #$invoiceNumber',
-                          style: AppTextStyles.headlineSm.copyWith(
+                    const SizedBox(height: 32),
+
+                    // Bill To section
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Bill To:',
+                          style: AppTextStyles.bodySm.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          _formatDate(invoiceDate),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${data['patient']?['first_name'] ?? ''} ${data['patient']?['last_name'] ?? ''}',
                           style: AppTextStyles.bodySm,
-                          textAlign: TextAlign.right,
+                        ),
+                        if (data['patient']?['email'] != null)
+                          Text('Email: ${data['patient']['email']}', style: AppTextStyles.bodySm),
+                        if (data['patient']?['phone'] != null)
+                          Text('Phone: ${data['patient']['phone']}', style: AppTextStyles.bodySm),
+                        if (data['patient']?['address'] != null)
+                          Text('Address: ${data['patient']['address']}', style: AppTextStyles.bodySm),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Line separator
+                    Container(
+                      height: 1,
+                      color: const Color(0xFFE2E8F0),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Charges Table
+                    _buildChargesTable(data),
+                    const SizedBox(height: 16),
+
+                    // Totals
+                    _buildTotalsSection(data),
+                    const SizedBox(height: 24),
+
+                    // Footer
+                    Container(
+                      height: 1,
+                      color: const Color(0xFFE2E8F0),
+                    ),
+                    const SizedBox(height: 16),
+                    if (data['clinic']?['footer_line'] != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          data['clinic']['footer_line'],
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF64748B),
+                          ),
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Bill To
-                  Text(
-                    'Bill To: ${data['patient']?['first_name'] ?? ''} ${data['patient']?['last_name'] ?? ''}',
-                    style: AppTextStyles.bodyMd,
-                  ),
-                  const SizedBox(height: 8),
-                  if (data['patient']?['email'] != null)
-                    Text('Email: ${data['patient']['email']}', style: AppTextStyles.bodySm),
-                  if (data['patient']?['phone'] != null)
-                    Text('Phone: ${data['patient']['phone']}', style: AppTextStyles.bodySm),
-                  const SizedBox(height: 16),
-
-                  // Charges Table
-                  _buildChargesTable(data),
-                  const SizedBox(height: 16),
-
-                  // Totals
-                  _buildTotalsSection(data),
-                  const SizedBox(height: 16),
-
-                  // Footer
-                  if (data['clinic']?['footer_line'] != null)
-                    Text(
-                      data['clinic']['footer_line'],
-                      style: AppTextStyles.bodySm.copyWith(
-                        color: AppColors.secondary,
+                    const Text(
+                      'This is a computer-generated invoice.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF94A3B8),
                       ),
                       textAlign: TextAlign.center,
                     ),
-                  Text(
-                    'This is a computer-generated invoice.',
-                    style: AppTextStyles.bodySm.copyWith(
-                      color: AppColors.outline,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -435,49 +520,64 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
 
     return Column(
       children: [
-        // Table header
-        Row(
-          children: [
-            Expanded(
-              flex: 3,
-              child: Text(
-                'Description',
-                style: AppTextStyles.labelSm.copyWith(
-                  fontWeight: FontWeight.bold,
+        // Table header with border
+        Container(
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+          ),
+          child: const Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Text(
+                  'Description',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
               ),
-            ),
-            SizedBox(
-              width: 40,
-              child: Text(
-                'Qty',
-                style: AppTextStyles.labelSm.copyWith(
-                  fontWeight: FontWeight.bold,
+              SizedBox(
+                width: 80,
+                child: Text(
+                  'Qty',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
               ),
-            ),
-            SizedBox(
-              width: 60,
-              child: Text(
-                'Rate',
-                style: AppTextStyles.labelSm.copyWith(
-                  fontWeight: FontWeight.bold,
+              SizedBox(
+                width: 96,
+                child: Text(
+                  'Rate',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                  textAlign: TextAlign.right,
                 ),
-                textAlign: TextAlign.right,
               ),
-            ),
-            SizedBox(
-              width: 60,
-              child: Text(
-                'Amount',
-                style: AppTextStyles.labelSm.copyWith(
-                  fontWeight: FontWeight.bold,
+              SizedBox(
+                width: 96,
+                child: Text(
+                  'Amount',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                  textAlign: TextAlign.right,
                 ),
-                textAlign: TextAlign.right,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 8),
 
@@ -520,38 +620,55 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
   }
 
   Widget _buildChargeRow(String description, String quantity, String rate, String amount) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFF1F5F9)),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           Expanded(
             flex: 3,
             child: Text(
               description,
-              style: AppTextStyles.bodySm,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF334155),
+              ),
             ),
           ),
           SizedBox(
-            width: 40,
+            width: 80,
             child: Text(
               quantity,
-              style: AppTextStyles.bodySm,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF334155),
+              ),
               textAlign: TextAlign.center,
             ),
           ),
           SizedBox(
-            width: 60,
+            width: 96,
             child: Text(
               rate,
-              style: AppTextStyles.bodySm,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF334155),
+              ),
               textAlign: TextAlign.right,
             ),
           ),
           SizedBox(
-            width: 60,
+            width: 96,
             child: Text(
               amount,
-              style: AppTextStyles.bodySm,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF334155),
+              ),
               textAlign: TextAlign.right,
             ),
           ),
@@ -579,17 +696,23 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Flexible(
+            const Flexible(
               child: Text(
                 'Subtotal:',
-                style: AppTextStyles.bodySm,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF475569),
+                ),
               ),
             ),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
                 _formatCurrency(subtotal),
-                style: AppTextStyles.bodySm,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF475569),
+                ),
                 textAlign: TextAlign.right,
               ),
             ),
@@ -597,12 +720,20 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         ),
         const SizedBox(height: 8),
 
+        // Line separator
+        Container(
+          height: 1,
+          color: const Color(0xFFE2E8F0),
+        ),
+        const SizedBox(height: 8),
+
         // Payment Breakdown Section
-        Text(
+        const Text(
           'Payment Breakdown',
-          style: AppTextStyles.labelSm.copyWith(
+          style: TextStyle(
+            fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: AppColors.secondary,
+            color: Color(0xFF64748B),
             letterSpacing: 0.5,
           ),
         ),
@@ -611,25 +742,25 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         // GCash Advance Payment
         if (advancePayment > 0)
           Container(
-            padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(
-                color: AppColors.outline.withValues(alpha: 0.2),
-              ),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
               borderRadius: BorderRadius.circular(8),
-              color: AppColors.surfaceLow,
+              color: const Color(0xFFF8FAFC),
             ),
-            margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
+            margin: const EdgeInsets.only(bottom: 8),
             child: Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Flexible(
+                    const Flexible(
                       child: Text(
                         'GCash Advance Payment',
-                        style: AppTextStyles.bodySm.copyWith(
-                          fontWeight: FontWeight.w500,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1E293B),
                         ),
                       ),
                     ),
@@ -637,8 +768,10 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                     Flexible(
                       child: Text(
                         _formatCurrency(advancePayment),
-                        style: AppTextStyles.bodySm.copyWith(
-                          fontWeight: FontWeight.w500,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1E293B),
                         ),
                         textAlign: TextAlign.right,
                       ),
@@ -650,11 +783,12 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Flexible(
+                      const Flexible(
                         child: Text(
                           'Amount applied to balance',
-                          style: AppTextStyles.bodySm.copyWith(
-                            color: AppColors.secondary,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
                           ),
                         ),
                       ),
@@ -662,8 +796,9 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                       Flexible(
                         child: Text(
                           _formatCurrency(_parseDouble(payment['amount_applied'])),
-                          style: AppTextStyles.bodySm.copyWith(
-                            color: AppColors.secondary,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
                           ),
                           textAlign: TextAlign.right,
                         ),
@@ -678,23 +813,23 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         // Cash Payment at Clinic
         if (cashTendered > 0)
           Container(
-            padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(
-                color: AppColors.outline.withValues(alpha: 0.2),
-              ),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
               borderRadius: BorderRadius.circular(8),
-              color: AppColors.surfaceLow,
+              color: const Color(0xFFF8FAFC),
             ),
-            margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
+            margin: const EdgeInsets.only(bottom: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Flexible(
+                const Flexible(
                   child: Text(
                     'Cash Payment at Clinic',
-                    style: AppTextStyles.bodySm.copyWith(
-                      fontWeight: FontWeight.w500,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
                     ),
                   ),
                 ),
@@ -702,8 +837,10 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 Flexible(
                   child: Text(
                     _formatCurrency(cashTendered),
-                    style: AppTextStyles.bodySm.copyWith(
-                      fontWeight: FontWeight.w500,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
                     ),
                     textAlign: TextAlign.right,
                   ),
@@ -716,23 +853,26 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         if (changeAmount > 0) ...[
           const SizedBox(height: 8),
           Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: spacing.AppSpacing.gutterMd,
-              vertical: spacing.AppSpacing.gutterSm,
-            ),
+            height: 1,
+            color: const Color(0xFFA7F3D0),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.1),
+              color: const Color(0xFFECFDF5),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Flexible(
+                const Flexible(
                   child: Text(
                     'Change Returned',
-                    style: AppTextStyles.headlineSm.copyWith(
-                      color: Colors.green,
+                    style: TextStyle(
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      color: Color(0xFF059669),
                     ),
                   ),
                 ),
@@ -740,9 +880,10 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 Flexible(
                   child: Text(
                     _formatCurrency(changeAmount),
-                    style: AppTextStyles.headlineSm.copyWith(
-                      color: Colors.green,
+                    style: const TextStyle(
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      color: Color(0xFF059669),
                     ),
                     textAlign: TextAlign.right,
                   ),
@@ -755,7 +896,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         const SizedBox(height: 8),
         Container(
           height: 1,
-          color: AppColors.outline.withValues(alpha: 0.3),
+          color: const Color(0xFFCBD5E1),
         ),
         const SizedBox(height: 8),
 
@@ -763,11 +904,13 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Flexible(
+            const Flexible(
               child: Text(
                 'TOTAL PAID:',
-                style: AppTextStyles.headlineSm.copyWith(
+                style: TextStyle(
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
                 ),
               ),
             ),
@@ -775,8 +918,10 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
             Flexible(
               child: Text(
                 _formatCurrency(advancePayment + cashTendered),
-                style: AppTextStyles.headlineSm.copyWith(
+                style: const TextStyle(
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
                 ),
                 textAlign: TextAlign.right,
               ),
@@ -787,15 +932,16 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         // Remaining Balance
         if (finalBalance > 0)
           Padding(
-            padding: EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Flexible(
+                const Flexible(
                   child: Text(
                     'Remaining Balance:',
-                    style: AppTextStyles.bodySm.copyWith(
-                      color: Colors.red,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFFDC2626),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -804,8 +950,9 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 Flexible(
                   child: Text(
                     _formatCurrency(finalBalance),
-                    style: AppTextStyles.bodySm.copyWith(
-                      color: Colors.red,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFFDC2626),
                       fontWeight: FontWeight.w500,
                     ),
                     textAlign: TextAlign.right,
