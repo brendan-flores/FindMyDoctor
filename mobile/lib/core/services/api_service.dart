@@ -858,6 +858,13 @@ class ApiService {
     );
   }
 
+  Future<Map<String, dynamic>> getInvoiceById(String invoiceId) async {
+    return await get(
+      '${ApiConstants.invoices}/$invoiceId',
+      requireAuth: true,
+    );
+  }
+
   Future<List<int>> downloadInvoicePdf(String invoiceId) async {
     final client = _httpClient ?? http.Client();
     final response = await client.get(

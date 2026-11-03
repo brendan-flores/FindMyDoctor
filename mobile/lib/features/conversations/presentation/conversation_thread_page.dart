@@ -9,6 +9,7 @@ import '../../../core/widgets/app_header.dart';
 import '../../../core/services/api_service.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
+import '../../payments/presentation/invoice_bottom_sheet.dart';
 
 class ConversationThreadPage extends StatefulWidget {
   final String conversationId;
@@ -307,10 +308,11 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
     // Check if message is from current user (patient)
     final isFromPatient = message.senderUserId == _currentUserId;
     final isSelected = _selectedMessageId == message.id;
+    final isInvoice = message.isInvoice;
 
-    // Clean the message content - remove email if present
+    // Clean the message content - remove email if present (only for text messages)
     String cleanMessage = message.message;
-    if (cleanMessage.contains('@') &&
+    if (!isInvoice && cleanMessage.contains('@') &&
         RegExp(r'\S+@\S+\.\S+').hasMatch(cleanMessage)) {
       // Remove email pattern from message
       cleanMessage = cleanMessage
@@ -372,17 +374,19 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
                       spacing.AppSpacing.radiusLg,
                     ),
                   ),
-                  child: Text(
-                    cleanMessage,
-                    style: AppTextStyles.bodyMd.copyWith(
-                      color: isFromPatient
-                          ? AppColors.onPrimary
-                          : AppColors.onSurface,
-                    ),
-                    softWrap: true,
-                    overflow: TextOverflow.visible,
-                    textAlign: isFromPatient ? TextAlign.right : TextAlign.left,
-                  ),
+                  child: isInvoice
+                      ? _buildInvoiceMessage(message, isFromPatient)
+                      : Text(
+                          cleanMessage,
+                          style: AppTextStyles.bodyMd.copyWith(
+                            color: isFromPatient
+                                ? AppColors.onPrimary
+                                : AppColors.onSurface,
+                          ),
+                          softWrap: true,
+                          overflow: TextOverflow.visible,
+                          textAlign: isFromPatient ? TextAlign.right : TextAlign.left,
+                        ),
                 ),
               ),
               // Show timestamp only when message is selected
@@ -413,6 +417,59 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInvoiceMessage(Message message, bool isFromPatient) {
+    final invoiceNumber = message.invoice?.invoiceNumber ?? 'Unknown';
+    final invoiceId = message.invoiceId;
+
+    return InkWell(
+      onTap: () {
+        if (invoiceId != null) {
+          _showInvoiceViewer(invoiceId);
+        }
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.receipt_long,
+            size: 20,
+            color: isFromPatient ? AppColors.onPrimary : AppColors.onSurface,
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Invoice $invoiceNumber',
+                style: AppTextStyles.bodyMdMedium.copyWith(
+                  color: isFromPatient ? AppColors.onPrimary : AppColors.onSurface,
+                ),
+              ),
+              Text(
+                'Tap to view invoice',
+                style: AppTextStyles.labelSm.copyWith(
+                  color: isFromPatient
+                      ? AppColors.onPrimary.withOpacity(0.9)
+                      : AppColors.onSurface.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showInvoiceViewer(String invoiceId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => InvoiceBottomSheet(invoiceId: invoiceId),
     );
   }
 
