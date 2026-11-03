@@ -25,7 +25,6 @@ export default function SecretaryConversations() {
   const [isSending, setIsSending] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [threadError, setThreadError] = useState<string | null>(null);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [hoveredMessage, setHoveredMessage] = useState<{
     id: string;
@@ -81,7 +80,7 @@ export default function SecretaryConversations() {
       let summaryResponse;
       if (patientId) {
         // For patients without conversations, use patient ID to get summary
-        summaryResponse = await secretaryApi.getAppointmentSummary(patientId);
+        summaryResponse = await secretaryApi.getAppointmentSummaryByPatient(patientId);
       } else {
         // For existing conversations, use conversation ID
         summaryResponse = await secretaryApi.getAppointmentSummary(conversationId);
@@ -89,9 +88,6 @@ export default function SecretaryConversations() {
 
       if (summaryResponse.success && summaryResponse.data) {
         setSummary(summaryResponse.data);
-        setSummaryError(null);
-      } else {
-        setSummaryError(summaryResponse.error || 'Failed to fetch appointment summary');
       }
 
       // Only fetch messages if we have a conversation ID
@@ -157,7 +153,6 @@ export default function SecretaryConversations() {
             setSelectedId(newConversation.id);
             setSelectedConversation(newConversation);
             setSummary(null);
-            setSummaryError(null);
             // Fetch thread for the new conversation
             fetchThread(newConversation.id);
           }
@@ -172,7 +167,6 @@ export default function SecretaryConversations() {
     } else {
       setSelectedId(conversation.id);
       setSummary(null);
-      setSummaryError(null);
       fetchThread(conversation.id);
     }
   };
@@ -239,8 +233,8 @@ export default function SecretaryConversations() {
   };
 
   const handleOpenInvoicePicker = async () => {
-    if (!summary?.appointment?.appointmentId) {
-      setThreadError('No appointment found for this patient');
+    if (!selectedConversation?.patient_id) {
+      setThreadError('No patient selected');
       return;
     }
 
@@ -248,16 +242,10 @@ export default function SecretaryConversations() {
     setShowInvoicePicker(true);
 
     try {
-      // First get the payment for this appointment
-      const paymentResponse = await secretaryApi.getPayment(summary.appointment.appointmentId);
-      if (paymentResponse.success && paymentResponse.data) {
-        // Then get the invoice for this payment
-        const invoiceResponse = await secretaryApi.getInvoiceByPayment(paymentResponse.data.id);
-        if (invoiceResponse.success && invoiceResponse.data) {
-          setInvoices([invoiceResponse.data]);
-        } else {
-          setInvoices([]);
-        }
+      // Get all invoices for this patient with the secretary's assigned doctor
+      const response = await secretaryApi.getInvoicesByPatient(selectedConversation.patient_id);
+      if (response.success && response.data) {
+        setInvoices(response.data);
       } else {
         setInvoices([]);
       }
@@ -550,56 +538,90 @@ export default function SecretaryConversations() {
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {selectedConversation ? (
-              <>
-                {summaryError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
-                    {summaryError}
+              !summary ? (
+                <p className="text-xs text-slate-500">Loading patient details…</p>
+              ) : (
+                <>
+                  {/* Patient block */}
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Patient</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {summary.patient.firstName} {summary.patient.middleName ? `${summary.patient.middleName} ` : ''}
+                      {summary.patient.lastName}
+                    </p>
+                    <dl className="mt-2 space-y-1">
+                      {summary.patient.phone && (
+                        <div className="flex items-center gap-2 text-xs text-slate-600">
+                          <span className="material-symbols-outlined text-[16px] text-slate-400">call</span>
+                          {summary.patient.phone}
+                        </div>
+                      )}
+                      {summary.patient.email && (
+                        <div className="flex items-center gap-2 text-xs text-slate-600 break-all">
+                          <span className="material-symbols-outlined text-[16px] text-slate-400">mail</span>
+                          {summary.patient.email}
+                        </div>
+                      )}
+                      {summary.patient.dateOfBirth && (
+                        <div className="flex items-center gap-2 text-xs text-slate-600">
+                          <span className="material-symbols-outlined text-[16px] text-slate-400">cake</span>
+                          DOB: {formatDate(summary.patient.dateOfBirth)}
+                        </div>
+                      )}
+                    </dl>
                   </div>
-                )}
-                {!summary && !summaryError ? (
-                  <p className="text-xs text-slate-500">Loading patient details…</p>
-                ) : summary ? (
-                  <>
-                    {/* Patient block */}
+
+                  {/* Appointment block */}
+                  {summary.appointment ? (
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Patient</p>
-                      <p className="text-sm font-semibold text-slate-900">
-                        {summary.patient.firstName} {summary.patient.middleName ? `${summary.patient.middleName} ` : ''}
-                        {summary.patient.lastName}
-                      </p>
-                      <dl className="mt-2 space-y-1">
-                        {summary.patient.phone && (
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Appointment</p>
+                      <dl className="space-y-1">
+                        {summary.appointment.appointmentDate && (
                           <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <span className="material-symbols-outlined text-[16px] text-slate-400">call</span>
-                            {summary.patient.phone}
+                            <span className="material-symbols-outlined text-[16px] text-slate-400">calendar_today</span>
+                            {formatDate(summary.appointment.appointmentDate)}
                           </div>
                         )}
-                        {summary.patient.email && (
-                          <div className="flex items-center gap-2 text-xs text-slate-600 break-all">
-                            <span className="material-symbols-outlined text-[16px] text-slate-400">mail</span>
-                            {summary.patient.email}
+                        {summary.appointment.status && (
+                          <div className="flex items-center gap-2 text-xs text-slate-600">
+                            <span className="material-symbols-outlined text-[16px] text-slate-400">info</span>
+                            Status: {summary.appointment.status}
                           </div>
                         )}
-                        {summary.patient.dateOfBirth && (
+                        {summary.appointment.reasonForVisit && (
                           <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <span className="material-symbols-outlined text-[16px] text-slate-400">cake</span>
-                            DOB: {formatDate(summary.patient.dateOfBirth)}
+                            <span className="material-symbols-outlined text-[16px] text-slate-400">medical_services</span>
+                            {summary.appointment.reasonForVisit}
+                          </div>
+                        )}
+                        {summary.appointment.queueNumber && (
+                          <div className="flex items-center gap-2 text-xs text-slate-600">
+                            <span className="material-symbols-outlined text-[16px] text-slate-400">tag</span>
+                            Queue #{summary.appointment.queueNumber}
                           </div>
                         )}
                       </dl>
                     </div>
-
-                    {/* Doctor block */}
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Clinic</p>
-                      <p className="text-sm font-semibold text-slate-900">
-                        Dr. {summary.doctor.firstName} {summary.doctor.lastName}
-                      </p>
-                      <p className="text-xs text-slate-600 mt-0.5">{summary.doctor.practiceName}</p>
+                  ) : summary.appointmentStatus ? (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-lg text-xs">
+                      No active appointment (last appointment status: {summary.appointmentStatus})
                     </div>
-                  </>
-                ) : null}
-              </>
+                  ) : (
+                    <div className="bg-slate-50 border border-slate-200 text-slate-600 px-3 py-2 rounded-lg text-xs">
+                      No appointment on record
+                    </div>
+                  )}
+
+                  {/* Doctor block */}
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Clinic</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      Dr. {summary.doctor.firstName} {summary.doctor.lastName}
+                    </p>
+                    <p className="text-xs text-slate-600 mt-0.5">{summary.doctor.practiceName}</p>
+                  </div>
+                </>
+              )
             ) : (
               <div className="flex flex-col items-center justify-center text-center pt-12">
                 <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">badge</span>
@@ -639,6 +661,11 @@ export default function SecretaryConversations() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{invoice.invoice_number}</p>
+                          {invoice.appointment_date && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              {new Date(invoice.appointment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                          )}
                           <p className="text-xs text-slate-500 mt-1">
                             Total: ₱{typeof invoice.total_amount === 'string' ? parseFloat(invoice.total_amount).toFixed(2) : invoice.total_amount.toFixed(2)}
                           </p>

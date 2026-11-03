@@ -410,6 +410,11 @@ export const secretaryApi = {
     return apiClient.get<{ downloadUrl: string; expiresAt: string }>(`/invoices/${invoiceId}/download-url`);
   },
 
+  // Invoices: get all invoices for a patient (secretary only)
+  getInvoicesByPatient: async (patientId: string): Promise<{ success: boolean; data?: Invoice[]; error?: string }> => {
+    return apiClient.get<Invoice[]>(`/invoices/patient/${patientId}`);
+  },
+
   // Conversations: get conversations for secretary
   getConversations: async (): Promise<{ success: boolean; data?: Conversation[]; error?: string }> => {
     return apiClient.get<Conversation[]>('/conversations');
@@ -449,8 +454,13 @@ export const secretaryApi = {
     return apiClient.patch<void>(`/conversations/${conversationId}/read`, {});
   },
 
-  // Conversations: get appointment summary for patient (for patients without conversations)
-  getAppointmentSummary: async (patientId: string): Promise<{ success: boolean; data?: any; error?: string }> => {
+  // Conversations: get appointment summary for conversation (by conversation ID)
+  getAppointmentSummary: async (conversationId: string): Promise<{ success: boolean; data?: any; error?: string }> => {
+    return apiClient.get<any>(`/conversations/${conversationId}/appointment-summary`);
+  },
+
+  // Conversations: get appointment summary for patient (by patient ID, for patients without conversations)
+  getAppointmentSummaryByPatient: async (patientId: string): Promise<{ success: boolean; data?: any; error?: string }> => {
     return apiClient.get<any>(`/conversations/patient/${patientId}/appointment-summary`);
   },
 };
@@ -522,6 +532,9 @@ export interface Invoice {
   invoice_data: InvoiceData;
   created_at: string;
   updated_at: string;
+  // Appointment details (joined from payment->appointment)
+  appointment_date?: string;
+  reason_for_visit?: string;
 }
 
 // Invoice data (JSONB field)
@@ -633,6 +646,7 @@ export interface AppointmentSummary {
     reasonForVisit: string | null;
     queueNumber: number | null;
   } | null;
+  appointmentStatus: string | null; // Last appointment status if not in valid status
   doctor: {
     firstName: string;
     lastName: string;
