@@ -4,6 +4,50 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.30 (October 30, 2026)
+
+**Purpose:** Replace dashboard placeholder sections with live action items to help doctors and secretaries identify and complete pending work (missing records and unsent invoices).
+
+**Significant Features:**
+- Doctor dashboard "Needs a Record" section:
+  - Replaced placeholder with live data showing completed consultations missing visit records or prescriptions.
+  - Backend query identifies queue entries with status COMPLETED that have no visit record or no prescription.
+  - Results scoped to the authenticated doctor.
+  - Each entry shows patient name, appointment date, and badges for missing record and/or missing prescription.
+  - Entries link to `/doctor/appointments/[id]` for quick access to complete the record.
+  - Empty state displays "No consultations needing records" when none exist.
+- Secretary dashboard "Payments Needing Action" section:
+  - Extended existing section to include PAID payments that have no ACTIVE invoice.
+  - Backend query now includes PAID payments where invoice is NULL or status is VOID.
+  - Results scoped to the secretary's assigned doctor.
+  - New entries display with green/emerald "Paid — invoice not sent" status badge.
+  - All entries (existing PENDING_VERIFICATION, UNPAID, and new PAID without invoice) link to `/secretary/payments`.
+- Backend API changes:
+  - Extended `GET /api/v1/doctors/me/dashboard` to include `consultationsNeedingRecords` array with appointment details and missing record/prescription flags.
+  - Extended `GET /api/v1/secretaries/me/dashboard` to include `invoiceNotSent` flag in `paymentsNeedingAction` entries.
+- Frontend type updates:
+  - Updated `DoctorDashboard` interface in `web/src/lib/api/doctorApi.ts` to include `consultationsNeedingRecords` field.
+  - Updated `SecretaryDashboard` interface in `web/src/lib/api/secretaryApi.ts` to include `invoiceNotSent` field in payment entries.
+- Frontend UI changes:
+  - Replaced amber placeholder banner in `/web/src/app/doctor/dashboard/page.tsx` with table showing consultations needing records.
+  - Updated `/web/src/app/secretary/dashboard/page.tsx` to display "Paid — invoice not sent" entries with appropriate styling.
+
+**Improvements:**
+- Doctors can now quickly identify completed consultations that need visit records or prescriptions.
+- Secretaries can identify paid payments that need invoices generated.
+- Action items are scoped to the respective user's assigned doctor for data isolation.
+- Items automatically disappear from the list once the relevant action is taken (record created, prescription created, or invoice generated).
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (non-breaking API additions; existing dashboard functionality unchanged).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.30 and added version entry to `VERSION_HISTORY.md`.
+
+---
+
 ### 01.29 (October 30, 2026)
 
 **Purpose:** Add invoice voiding and reissue workflow to allow secretaries to correct invoice errors by voiding an invoice and generating a replacement, preserving audit trail integrity.

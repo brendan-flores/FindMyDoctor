@@ -880,12 +880,18 @@ router.get('/me/dashboard', authenticate, authorize('SECRETARY'), async (req: Au
       query(
         `SELECT p.id, p.appointment_id, p.status, p.payment_method, p.total_amount,
                 p.created_at, pat.first_name as patient_first_name, pat.last_name as patient_last_name,
-                a.appointment_date, a.status as appointment_status
+                a.appointment_date, a.status as appointment_status,
+                CASE WHEN i.id IS NULL OR i.status = 'VOID' THEN true ELSE false END as invoice_not_sent
          FROM payments p
          JOIN patients pat ON p.patient_id = pat.id
          JOIN appointments a ON p.appointment_id = a.id
+         LEFT JOIN invoices i ON p.id = i.payment_id
          WHERE a.doctor_id = $1
-           AND (p.status = 'PENDING_VERIFICATION' OR (p.status = 'UNPAID' AND a.status = 'COMPLETED'))
+           AND (
+             p.status = 'PENDING_VERIFICATION' OR
+             (p.status = 'UNPAID' AND a.status = 'COMPLETED') OR
+             (p.status = 'PAID' AND (i.id IS NULL OR i.status = 'VOID'))
+           )
          ORDER BY
            CASE WHEN p.status = 'PENDING_VERIFICATION' THEN 0 ELSE 1 END,
            p.created_at ASC
@@ -950,6 +956,7 @@ router.get('/me/dashboard', authenticate, authorize('SECRETARY'), async (req: Au
         patientName: `${row.patient_first_name} ${row.patient_last_name}`,
         appointmentDate: row.appointment_date,
         appointmentStatus: row.appointment_status,
+        invoiceNotSent: row.invoice_not_sent,
       })),
       recentConversations: conversationsResult.rows.map(row => ({
         id: row.id,

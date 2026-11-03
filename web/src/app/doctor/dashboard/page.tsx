@@ -306,18 +306,57 @@ export default function DoctorDashboard() {
         )}
       </div>
 
-      {/* Needs a Record - TODO State */}
+      {/* Needs a Record */}
       <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
         <h3 className="text-xl font-bold text-slate-800 mb-4">Needs a Record</h3>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined text-amber-600 text-2xl">info</span>
-            <div>
-              <p className="text-sm font-semibold text-amber-900 mb-1">Feature Not Yet Implemented</p>
-              <p className="text-xs text-amber-700">This section will show completed consultations without visit records or prescriptions once the data structure is established.</p>
-            </div>
+        {dashboardData?.consultationsNeedingRecords && dashboardData.consultationsNeedingRecords.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Patient</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Missing</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dashboardData.consultationsNeedingRecords.map((consultation, index) => (
+                  <tr
+                    key={index}
+                    className="cursor-pointer hover:bg-slate-50 transition-colors"
+                    onClick={() => router.push(`/doctor/appointments/${consultation.appointmentId}`)}
+                  >
+                    <td className="py-3 px-4 text-sm font-medium text-slate-900">{consultation.patientName}</td>
+                    <td className="py-3 px-4 text-sm text-slate-700">{new Date(consultation.appointmentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                    <td className="py-3 px-4">
+                      <div className="flex gap-1">
+                        {consultation.missingRecord && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                            Record
+                          </span>
+                        )}
+                        {consultation.missingPrescription && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                            Prescription
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-sm text-[#1A62CD] font-medium hover:underline">View Appointment →</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        ) : (
+          <div className="text-center py-8">
+            <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">check_circle</span>
+            <p className="text-slate-600 font-medium">No consultations needing records</p>
+          </div>
+        )}
       </div>
 
       {/* Upcoming Appointments */}
