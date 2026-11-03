@@ -334,6 +334,11 @@ export const secretaryApi = {
     return apiClient.patch<void>(`/payments/${paymentId}/payment-method`, { paymentMethod });
   },
 
+  // Payments: revert payment to unpaid (secretary only)
+  revertPaymentToUnpaid: async (paymentId: string): Promise<{ success: boolean; error?: string }> => {
+    return apiClient.patch<void>(`/payments/${paymentId}/revert-unpaid`, {});
+  },
+
   // Payments: record walk-in payment (deprecated - use recordPayment instead)
   recordWalkInPayment: async (payload: {
     appointmentId: string;

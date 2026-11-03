@@ -7,9 +7,10 @@ interface InvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   paymentId: string;
+  onInvoiceGenerated?: () => void;
 }
 
-export default function InvoiceModal({ isOpen, onClose, paymentId }: InvoiceModalProps) {
+export default function InvoiceModal({ isOpen, onClose, paymentId, onInvoiceGenerated }: InvoiceModalProps) {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -79,6 +80,10 @@ export default function InvoiceModal({ isOpen, onClose, paymentId }: InvoiceModa
         setInvoice(response.data);
         setShowGenerateSuccess(true);
         setTimeout(() => setShowGenerateSuccess(false), 3000);
+        // Notify parent component that invoice was generated
+        if (onInvoiceGenerated) {
+          onInvoiceGenerated();
+        }
       } else {
         setError(response.error || 'Failed to generate invoice');
       }
@@ -120,33 +125,45 @@ export default function InvoiceModal({ isOpen, onClose, paymentId }: InvoiceModa
   }
 
   if (error || !invoice) {
+    const isRemainingBalanceError = error && error.toLowerCase().includes('remaining balance');
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
           <h3 className="text-lg font-bold text-slate-900 mb-2">
-            {invoice && invoice.status === 'VOID' ? 'Invoice Voided' : 'No Invoice'}
+            {invoice && invoice.status === 'VOID' ? 'Invoice Voided' : isRemainingBalanceError ? 'Cannot Generate Invoice' : 'No Invoice'}
           </h3>
           <p className="text-sm text-slate-600 mb-4">
             {invoice && invoice.status === 'VOID'
               ? 'This invoice has been voided. You can generate a new invoice.'
               : error || 'No invoice generated yet for this payment.'}
           </p>
-          <div className="flex gap-3">
+          {!isRemainingBalanceError && (
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                disabled={isGenerating}
+                className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleGenerateInvoice}
+                disabled={isGenerating}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                {isGenerating ? 'Generating...' : 'Generate Invoice'}
+              </button>
+            </div>
+          )}
+          {isRemainingBalanceError && (
             <button
               onClick={onClose}
               disabled={isGenerating}
-              className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              className="w-full px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
             >
               Close
             </button>
-            <button
-              onClick={handleGenerateInvoice}
-              disabled={isGenerating}
-              className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-            >
-              {isGenerating ? 'Generating...' : 'Generate Invoice'}
-            </button>
-          </div>
+          )}
           {showGenerateSuccess && (
             <div className="mt-3 bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-2 rounded-lg text-sm">
               Invoice generated successfully!
