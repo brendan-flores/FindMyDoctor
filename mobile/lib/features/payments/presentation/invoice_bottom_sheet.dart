@@ -291,86 +291,112 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Header section - Logo + Clinic Info on left, Invoice # + Date on right
-                    Row(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Logo and clinic info
-                        Expanded(
-                          child: Row(
-                            children: [
-                              // Logo placeholder (64x64)
-                              Container(
-                                width: 64,
-                                height: 64,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF1B5EB8),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.local_hospital,
-                                  color: Colors.white,
-                                  size: 32,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Find My Doctor',
-                                      style: AppTextStyles.headlineMd.copyWith(
-                                        color: const Color(0xFF1B5EB8),
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    if (data['clinic']?['name'] != null)
-                                      Text(
-                                        data['clinic']['name'],
-                                        style: AppTextStyles.bodySm,
-                                      ),
-                                    if (data['clinic']?['address'] != null)
-                                      Text(
-                                        data['clinic']['address'],
-                                        style: AppTextStyles.bodySm,
-                                      ),
-                                    if (data['clinic']?['contact_number'] != null)
-                                      Text(
-                                        'Contact: ${data['clinic']['contact_number']}',
-                                        style: AppTextStyles.bodySm,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        // Invoice # and Date on right
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                        Row(
                           children: [
-                            Text(
-                              'INVOICE',
-                              style: AppTextStyles.headlineSm.copyWith(
-                                fontWeight: FontWeight.bold,
+                            // Logo placeholder (smaller for mobile)
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1B5EB8),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.local_hospital,
+                                color: Colors.white,
+                                size: 24,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Invoice #: $invoiceNumber',
-                              style: AppTextStyles.bodySm,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Find My Doctor',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      color: Color(0xFF1B5EB8),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  if (data['clinic']?['name'] != null)
+                                    Text(
+                                      data['clinic']['name'],
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  if (data['clinic']?['address'] != null)
+                                    Text(
+                                      data['clinic']['address'],
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  if (data['clinic']?['contact_number'] != null)
+                                    Text(
+                                      'Contact: ${data['clinic']['contact_number']}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
+                              ),
                             ),
-                            Text(
-                              'Date: ${_formatDate(invoiceDate)}',
-                              style: AppTextStyles.bodySm,
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // Invoice # and Date on right
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'INVOICE',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'Invoice #: $invoiceNumber',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                                Text(
+                                  _formatDate(invoiceDate),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
 
                     // Bill To section
                     Column(
@@ -530,22 +556,22 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
           child: const Row(
             children: [
               Expanded(
-                flex: 3,
+                flex: 5,
                 child: Text(
                   'Description',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF0F172A),
                   ),
                 ),
               ),
               SizedBox(
-                width: 80,
+                width: 40,
                 child: Text(
                   'Qty',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF0F172A),
                   ),
@@ -553,11 +579,11 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 ),
               ),
               SizedBox(
-                width: 96,
+                width: 60,
                 child: Text(
                   'Rate',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF0F172A),
                   ),
@@ -565,11 +591,11 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 ),
               ),
               SizedBox(
-                width: 96,
+                width: 60,
                 child: Text(
                   'Amount',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF0F172A),
                   ),
@@ -630,46 +656,52 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
       child: Row(
         children: [
           Expanded(
-            flex: 3,
+            flex: 5,
             child: Text(
               description,
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 color: Color(0xFF334155),
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           SizedBox(
-            width: 80,
+            width: 40,
             child: Text(
               quantity,
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 color: Color(0xFF334155),
               ),
               textAlign: TextAlign.center,
             ),
           ),
           SizedBox(
-            width: 96,
+            width: 60,
             child: Text(
               rate,
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 color: Color(0xFF334155),
               ),
               textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           SizedBox(
-            width: 96,
+            width: 60,
             child: Text(
               amount,
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 color: Color(0xFF334155),
               ),
               textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
