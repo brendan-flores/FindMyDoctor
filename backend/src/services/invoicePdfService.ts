@@ -35,9 +35,9 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
       const formatDate = (date: string | Date): string => {
         const d = new Date(date);
         return d.toLocaleDateString('en-PH', {
-          year: 'numeric',
-          month: 'long',
+          month: 'short',
           day: 'numeric',
+          year: 'numeric',
           hour: '2-digit',
           minute: '2-digit',
         });
@@ -108,8 +108,11 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
       };
 
       // ===== HEADER =====
-      const x = 30;
-      const w = 535;
+      // A4 page is 595 points wide at 72 DPI
+      // 16mm margins = 45.35 points each side
+      // Usable width = 595 - 2*45.35 = 504.3 points
+      const x = 45;
+      const w = 505;
       let y = 50;
 
       // Logo
@@ -121,27 +124,35 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
       // Branding
       doc.fontSize(20).font('Helvetica-Bold').fillColor('#1b5eb8').text('Find My Doctor', x + 75, y + 20);
 
-      // Clinic info
+      // Clinic info (left side)
       doc.fontSize(10).font('Helvetica').fillColor('#64748b');
       let cy = y + 50;
       if (invoiceData.clinic.name) {
-        doc.text(invoiceData.clinic.name, x + 75, cy);
+        doc.text(invoiceData.clinic.name, x + 75, cy, { width: 200, ellipsis: true });
         cy += 13;
       }
       if (invoiceData.clinic.address) {
-        doc.text(invoiceData.clinic.address, x + 75, cy);
+        doc.text(invoiceData.clinic.address, x + 75, cy, { width: 200, ellipsis: true });
         cy += 13;
       }
       if (invoiceData.clinic.contact_number) {
-        doc.text(`Contact: ${invoiceData.clinic.contact_number}`, x + 75, cy);
+        doc.text(`Contact: ${invoiceData.clinic.contact_number}`, x + 75, cy, { width: 200, ellipsis: true });
         cy += 13;
       }
 
-      // Invoice info (right)
-      doc.fontSize(16).font('Helvetica-Bold').fillColor('#0f172a').text('INVOICE', x + w, y + 20, { align: 'right' });
+      // Invoice info (right side) - aligned with divider lines
+      // Right block right edge should end at x + w (550) to match divider lines
+      // With align: 'right' and width, position must be: rightEdge - width
+      const rightEdge = x + w; // 550
+      const rightBlockWidth = 120;
+      const rightBlockX = rightEdge - rightBlockWidth; // 550 - 120 = 430
+
+      doc.fontSize(16).font('Helvetica-Bold').fillColor('#0f172a');
+      doc.text('INVOICE', rightBlockX, y + 20, { align: 'right', width: rightBlockWidth });
+
       doc.fontSize(10).font('Helvetica').fillColor('#64748b');
-      doc.text(`Invoice #: ${invoiceData.invoice_number}`, x + w, y + 40, { align: 'right' });
-      doc.text(`Date: ${formatDate(invoiceData.invoice_date)}`, x + w, y + 55, { align: 'right' });
+      doc.text(`Invoice #: ${invoiceData.invoice_number}`, rightBlockX, y + 40, { align: 'right', width: rightBlockWidth });
+      doc.text(`Date: ${formatDate(invoiceData.invoice_date)}`, rightBlockX, y + 55, { align: 'right', width: rightBlockWidth });
 
       // ===== BILL TO =====
       y = Math.max(cy + 20, y + 80);
@@ -159,7 +170,7 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
         y += 13;
       }
       if (invoiceData.patient.address) {
-        const lines = wrapText(invoiceData.patient.address, 440, 10);
+        const lines = wrapText(invoiceData.patient.address, 405, 10);
         lines.forEach((line) => {
           doc.text(`Address: ${line}`, x, y);
           y += 13;
@@ -174,26 +185,27 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
       // ===== TABLE =====
       doc.fontSize(10).font('Helvetica-Bold').fillColor('#0f172a');
       doc.text('Description', x, y);
-      doc.text('Qty', x + 240, y, { width: 50, align: 'center' });
-      doc.text('Rate', x + 300, y, { width: 60, align: 'right' });
-      doc.text('Amount', x + 370, y, { width: 90, align: 'right' });
+      doc.text('Qty', x + 200, y, { width: 50, align: 'center' });
+      doc.text('Rate', x + 250, y, { width: 90, align: 'center' });
+      doc.text('Amount', x + 340, y, { width: 100, align: 'center' });
 
       y += 12;
       doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(x, y).lineTo(x + w, y).stroke();
       y += 10;
 
       const drawRow = (desc: string, qty: string, rate: string, amt: string) => {
-        const lines = wrapText(desc, 220, 10);
+        const lines = wrapText(desc, 195, 10);
         const height = Math.max(24, lines.length * 12);
-        
+
         doc.fontSize(10).font('Helvetica').fillColor('#334155');
         lines.forEach((line, i) => doc.text(line, x, y + 8 + (i * 12)));
-        
+
         const ry = y + 8;
-        doc.text(qty, x + 240, ry, { width: 50, align: 'center' });
-        doc.text(rate, x + 300, ry, { width: 60, align: 'right' });
-        doc.text(amt, x + 370, ry, { width: 90, align: 'right' });
-        
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#334155');
+        doc.text(qty, x + 200, ry, { width: 50, align: 'center' });
+        doc.text(rate, x + 250, ry, { width: 90, align: 'center' });
+        doc.text(amt, x + 340, ry, { width: 100, align: 'center' });
+
         y += height;
         doc.strokeColor('#f1f5f9').lineWidth(0.5).moveTo(x, y).lineTo(x + w, y).stroke();
         y += 10;
@@ -218,7 +230,8 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
       y += 20;
       doc.fontSize(10).font('Helvetica').fillColor('#475569');
       doc.text('Subtotal:', x, y);
-      doc.text(formatCurrency(invoiceData.payment.subtotal), x + w, y, { align: 'right' });
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#475569');
+      doc.text(formatCurrency(invoiceData.payment.subtotal), x + 340, y, { width: 100, align: 'center' });
       y += 15;
 
       doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(x, y).lineTo(x + w, y).stroke();
@@ -231,13 +244,13 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
         drawBox(x, y, w, 28, '#f8fafc', '#e2e8f0');
         doc.fontSize(10).font('Helvetica-Bold').fillColor('#1e293b');
         doc.text('GCash Advance Payment', x + 10, y + 10);
-        doc.text(formatCurrency(invoiceData.payment.advance_payment), x + w - 10, y + 10, { align: 'right' });
+        doc.text(formatCurrency(invoiceData.payment.advance_payment), x + 340, y + 10, { width: 100, align: 'center' });
         y += 28;
 
         if (invoiceData.payment.amount_applied > 0) {
           doc.fontSize(9).font('Helvetica').fillColor('#64748b');
           doc.text('Amount applied to balance', x + 10, y + 8);
-          doc.text(formatCurrency(invoiceData.payment.amount_applied), x + w - 10, y + 8, { align: 'right' });
+          doc.text(formatCurrency(invoiceData.payment.amount_applied), x + 340, y + 8, { width: 100, align: 'center' });
           y += 15;
         }
       }
@@ -246,7 +259,7 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
         drawBox(x, y, w, 28, '#f8fafc', '#e2e8f0');
         doc.fontSize(10).font('Helvetica-Bold').fillColor('#1e293b');
         doc.text('Cash Payment at Clinic', x + 10, y + 10);
-        doc.text(formatCurrency(invoiceData.payment.cash_tendered), x + w - 10, y + 10, { align: 'right' });
+        doc.text(formatCurrency(invoiceData.payment.cash_tendered), x + 340, y + 10, { width: 100, align: 'center' });
         y += 28;
       }
 
@@ -256,7 +269,7 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
         drawBox(x, y, w, 28, '#ecfdf5', '#a7f3d0');
         doc.fontSize(12).font('Helvetica-Bold').fillColor('#059669');
         doc.text('Change Returned', x + 10, y + 10);
-        doc.text(formatCurrency(invoiceData.payment.change_amount), x + w - 10, y + 10, { align: 'right' });
+        doc.text(formatCurrency(invoiceData.payment.change_amount), x + 340, y + 10, { width: 100, align: 'center' });
         y += 28;
       }
 
@@ -265,13 +278,13 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
 
       doc.fontSize(12).font('Helvetica-Bold').fillColor('#0f172a');
       doc.text('TOTAL PAID:', x, y);
-      doc.text(formatCurrency(invoiceData.payment.advance_payment + invoiceData.payment.cash_tendered), x + w, y, { align: 'right' });
+      doc.text(formatCurrency(invoiceData.payment.advance_payment + invoiceData.payment.cash_tendered), x + 340, y, { width: 100, align: 'center' });
       y += 15;
 
       if (invoiceData.payment.final_balance > 0) {
         doc.fontSize(10).font('Helvetica').fillColor('#dc2626');
         doc.text('Remaining Balance:', x, y);
-        doc.text(formatCurrency(invoiceData.payment.final_balance), x + w, y, { align: 'right' });
+        doc.text(formatCurrency(invoiceData.payment.final_balance), x + 340, y, { width: 100, align: 'center' });
         y += 15;
       }
 

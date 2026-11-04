@@ -297,19 +297,11 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                         // Logo and clinic info
                         Row(
                           children: [
-                            // Logo placeholder (smaller for mobile)
-                            Container(
+                            // Logo from cross.png
+                            Image.asset(
+                              'assets/images/cross.png',
                               width: 48,
                               height: 48,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1B5EB8),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.local_hospital,
-                                color: Colors.white,
-                                size: 24,
-                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -473,7 +465,11 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
 
         // Footer buttons
         Container(
-          padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
+          padding: EdgeInsets.only(
+            left: spacing.AppSpacing.gutterMd,
+            right: spacing.AppSpacing.gutterMd,
+            top: spacing.AppSpacing.gutterMd,
+          ),
           decoration: BoxDecoration(
             color: AppColors.surface,
             border: Border(
@@ -482,57 +478,58 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
               ),
             ),
           ),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Wrap(
-              alignment: WrapAlignment.end,
-              spacing: spacing.AppSpacing.gutterMd,
-              runSpacing: spacing.AppSpacing.gutterSm,
-              children: [
-                OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(
-                    // The global theme sets an infinite minimum width, which
-                    // overflows the footer on narrow screens.
-                    minimumSize: const Size(0, spacing.AppSpacing.buttonHeight),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: spacing.AppSpacing.gutterLg,
-                      vertical: spacing.AppSpacing.gutterMd,
-                    ),
-                  ),
-                  child: const Text('Done'),
-                ),
-                ElevatedButton(
-                  onPressed: _isDownloading ? null : _downloadInvoice,
-                  style: ElevatedButton.styleFrom(
-                    // Prevent the global infinite minimum width from forcing
-                    // an unbounded width in the footer.
-                    minimumSize: const Size(0, spacing.AppSpacing.buttonHeight),
-                    backgroundColor: AppColors.primary,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: spacing.AppSpacing.gutterLg,
-                      vertical: spacing.AppSpacing.gutterMd,
-                    ),
-                  ),
-                  child: _isDownloading
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.download, size: 18),
-                            SizedBox(width: 8),
-                            Text('Download'),
-                          ],
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: spacing.AppSpacing.gutterLg,
+                          vertical: spacing.AppSpacing.gutterMd,
+                        ),
                       ),
-                ),
-              ],
+                      child: const Text('Done'),
+                    ),
+                  ),
+                  const SizedBox(width: spacing.AppSpacing.gutterMd),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isDownloading ? null : _downloadInvoice,
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                        backgroundColor: AppColors.primary,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: spacing.AppSpacing.gutterLg,
+                          vertical: spacing.AppSpacing.gutterMd,
+                        ),
+                      ),
+                      child: _isDownloading
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.download, size: 18),
+                                SizedBox(width: 8),
+                                Text('Download'),
+                              ],
+                          ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -571,7 +568,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 child: Text(
                   'Qty',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF0F172A),
                   ),
@@ -583,11 +580,11 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 child: Text(
                   'Rate',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF0F172A),
                   ),
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.center,
                 ),
               ),
               SizedBox(
@@ -595,11 +592,11 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 child: Text(
                   'Amount',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF0F172A),
                   ),
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.center,
                 ),
               ),
             ],
@@ -672,7 +669,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
             child: Text(
               quantity,
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 color: Color(0xFF334155),
               ),
               textAlign: TextAlign.center,
@@ -683,10 +680,10 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
             child: Text(
               rate,
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 color: Color(0xFF334155),
               ),
-              textAlign: TextAlign.right,
+              textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -696,10 +693,10 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
             child: Text(
               amount,
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 color: Color(0xFF334155),
               ),
-              textAlign: TextAlign.right,
+              textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -745,7 +742,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                   fontSize: 14,
                   color: Color(0xFF475569),
                 ),
-                textAlign: TextAlign.right,
+                textAlign: TextAlign.center,
               ),
             ),
           ],
@@ -874,7 +871,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                       fontWeight: FontWeight.w600,
                       color: Color(0xFF1E293B),
                     ),
-                    textAlign: TextAlign.right,
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ],
@@ -917,7 +914,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF059669),
                     ),
-                    textAlign: TextAlign.right,
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ],
@@ -955,7 +952,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF0F172A),
                 ),
-                textAlign: TextAlign.right,
+                textAlign: TextAlign.center,
               ),
             ),
           ],
@@ -987,7 +984,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                       color: Color(0xFFDC2626),
                       fontWeight: FontWeight.w500,
                     ),
-                    textAlign: TextAlign.right,
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ],
