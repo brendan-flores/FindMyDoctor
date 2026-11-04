@@ -134,8 +134,8 @@ export default function InvoiceModal({ isOpen, onClose, paymentId }: InvoiceModa
         </div>
 
         {/* Invoice Content */}
-        <div className="p-6 bg-slate-50">
-          <div className="bg-white rounded-lg shadow-sm p-8 max-w-3xl mx-auto">
+        <div className="p-4 bg-slate-50">
+          <div className="bg-white rounded-lg shadow-sm p-4 max-w-3xl mx-auto">
             {/* Header */}
             <div className="flex justify-between items-start mb-8">
               <div className="flex items-start gap-4">
@@ -174,32 +174,32 @@ export default function InvoiceModal({ isOpen, onClose, paymentId }: InvoiceModa
 
             {/* Charges Table */}
             <div className="mb-6">
-              <table className="w-full text-sm">
+              <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    <th className="text-left py-2 font-semibold text-slate-900">Description</th>
-                    <th className="text-center py-2 font-semibold text-slate-900 w-20">Qty</th>
-                    <th className="text-center py-2 font-semibold text-slate-900 w-28">Rate</th>
-                    <th className="text-center py-2 font-semibold text-slate-900 w-32">Amount</th>
+                    <th className="text-left py-2 pr-2 font-semibold text-slate-900 whitespace-nowrap">Description</th>
+                    <th className="text-center py-2 font-semibold text-slate-900 w-7">Qty</th>
+                    <th className="text-right py-2 font-semibold text-slate-900 w-18">Rate</th>
+                    <th className="text-right py-2 font-semibold text-slate-900 w-18">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr className="border-b border-slate-100">
-                    <td className="py-2 text-slate-700">Consultation Fee</td>
+                    <td className="py-2 pr-2 text-slate-700 whitespace-nowrap">Consultation Fee</td>
                     <td className="py-2 text-center text-slate-700">1</td>
-                    <td className="py-2 text-center text-slate-700">{formatCurrency(data.payment.consultation_amount)}</td>
-                    <td className="py-2 text-center text-slate-700">{formatCurrency(data.payment.consultation_amount)}</td>
+                    <td className="py-2 text-right text-slate-700 whitespace-nowrap">{formatCurrency(data.payment.consultation_amount)}</td>
+                    <td className="py-2 text-right text-slate-700 whitespace-nowrap">{formatCurrency(data.payment.consultation_amount)}</td>
                   </tr>
                   {data.charges.map((charge, index) => (
                     <tr key={index} className="border-b border-slate-100">
-                      <td className="py-2 text-slate-700">{charge.description}</td>
+                      <td className="py-2 pr-2 text-slate-700 whitespace-nowrap">{charge.description}</td>
                       <td className="py-2 text-center text-slate-700">
                         {charge.charge_type === 'MEDICINE' ? (charge.quantity || 1) : '-'}
                       </td>
-                      <td className="py-2 text-center text-slate-700">
+                      <td className="py-2 text-right text-slate-700 whitespace-nowrap">
                         {charge.charge_type === 'MEDICINE' ? formatCurrency(charge.unit_price || charge.amount) : '-'}
                       </td>
-                      <td className="py-2 text-center text-slate-700">{formatCurrency(charge.amount)}</td>
+                      <td className="py-2 text-right text-slate-700 whitespace-nowrap">{formatCurrency(charge.amount)}</td>
                     </tr>
                   ))}
                 </tbody>

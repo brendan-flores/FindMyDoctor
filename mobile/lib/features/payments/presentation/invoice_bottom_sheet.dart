@@ -283,10 +283,10 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
           child: SingleChildScrollView(
             child: Container(
               color: const Color(0xFFF8FAFC),
-              padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
+              padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
               child: Container(
                 color: Colors.white,
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -553,18 +553,25 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
           child: const Row(
             children: [
               Expanded(
-                flex: 5,
-                child: Text(
-                  'Description',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
+                flex: 1,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Description',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                    maxLines: 1,
+                    softWrap: false,
                   ),
                 ),
               ),
+              SizedBox(width: 4),
               SizedBox(
-                width: 40,
+                width: 28,
                 child: Text(
                   'Qty',
                   style: TextStyle(
@@ -576,7 +583,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 ),
               ),
               SizedBox(
-                width: 60,
+                width: 72,
                 child: Text(
                   'Rate',
                   style: TextStyle(
@@ -584,11 +591,11 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF0F172A),
                   ),
-                  textAlign: TextAlign.center,
+                  textAlign: TextAlign.right,
                 ),
               ),
               SizedBox(
-                width: 60,
+                width: 72,
                 child: Text(
                   'Amount',
                   style: TextStyle(
@@ -596,7 +603,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF0F172A),
                   ),
-                  textAlign: TextAlign.center,
+                  textAlign: TextAlign.right,
                 ),
               ),
             ],
@@ -653,19 +660,24 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
       child: Row(
         children: [
           Expanded(
-            flex: 5,
-            child: Text(
-              description,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF334155),
+            flex: 1,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                description,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF334155),
+                ),
+                maxLines: 1,
+                softWrap: false,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
+          SizedBox(width: 4),
           SizedBox(
-            width: 40,
+            width: 28,
             child: Text(
               quantity,
               style: const TextStyle(
@@ -676,29 +688,25 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
             ),
           ),
           SizedBox(
-            width: 60,
+            width: 72,
             child: Text(
               rate,
               style: const TextStyle(
                 fontSize: 12,
                 color: Color(0xFF334155),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
             ),
           ),
           SizedBox(
-            width: 60,
+            width: 72,
             child: Text(
               amount,
               style: const TextStyle(
                 fontSize: 12,
                 color: Color(0xFF334155),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
             ),
           ),
         ],

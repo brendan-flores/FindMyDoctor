@@ -109,106 +109,112 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
 
       // ===== HEADER =====
       // A4 page is 595 points wide at 72 DPI
-      // 16mm margins = 45.35 points each side
-      // Usable width = 595 - 2*45.35 = 504.3 points
-      const x = 45;
-      const w = 505;
-      let y = 50;
+      // 40pt margins = 40 points each side
+      // Usable width = 595 - 2*40 = 515 points
+      const x = 40;
+      const w = 515;
+      let y = 32;
 
-      // Logo
+      // Logo - scaled up 1.3x
       const logoPath = path.join(process.cwd(), 'public', 'logo', 'cross.png');
       if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, x, y, { width: 64, height: 64 });
+        doc.image(logoPath, x, y, { width: 80, height: 80 });
       }
 
-      // Branding
-      doc.fontSize(20).font('Helvetica-Bold').fillColor('#1b5eb8').text('Find My Doctor', x + 75, y + 20);
+      // Branding - scaled up 1.3x
+      doc.fontSize(26).font('Helvetica-Bold').fillColor('#1b5eb8').text('Find My Doctor', x + 90, y + 25);
 
-      // Clinic info (left side)
-      doc.fontSize(10).font('Helvetica').fillColor('#64748b');
-      let cy = y + 50;
+      // Clinic info (left side) - scaled up 1.3x
+      doc.fontSize(13).font('Helvetica').fillColor('#64748b');
+      let cy = y + 65;
       if (invoiceData.clinic.name) {
-        doc.text(invoiceData.clinic.name, x + 75, cy, { width: 200, ellipsis: true });
-        cy += 13;
+        doc.text(invoiceData.clinic.name, x + 90, cy, { width: 260, ellipsis: true });
+        cy += 17;
       }
       if (invoiceData.clinic.address) {
-        doc.text(invoiceData.clinic.address, x + 75, cy, { width: 200, ellipsis: true });
-        cy += 13;
+        doc.text(invoiceData.clinic.address, x + 90, cy, { width: 260, ellipsis: true });
+        cy += 17;
       }
       if (invoiceData.clinic.contact_number) {
-        doc.text(`Contact: ${invoiceData.clinic.contact_number}`, x + 75, cy, { width: 200, ellipsis: true });
-        cy += 13;
+        doc.text(`Contact: ${invoiceData.clinic.contact_number}`, x + 90, cy, { width: 260, ellipsis: true });
+        cy += 17;
       }
 
-      // Invoice info (right side) - aligned with divider lines
-      // Right block right edge should end at x + w (550) to match divider lines
-      // With align: 'right' and width, position must be: rightEdge - width
-      const rightEdge = x + w; // 550
-      const rightBlockWidth = 120;
-      const rightBlockX = rightEdge - rightBlockWidth; // 550 - 120 = 430
+      // Invoice info (right side) - scaled up 1.3x
+      // Right block aligned with right margin
+      const rightEdge = x + w; // 555
+      const rightBlockWidth = 160;
+      const rightBlockX = rightEdge - rightBlockWidth; // 555 - 160 = 395
 
-      doc.fontSize(16).font('Helvetica-Bold').fillColor('#0f172a');
-      doc.text('INVOICE', rightBlockX, y + 20, { align: 'right', width: rightBlockWidth });
+      doc.fontSize(21).font('Helvetica-Bold').fillColor('#0f172a');
+      doc.text('INVOICE', rightBlockX, y + 25, { align: 'right', width: rightBlockWidth });
 
-      doc.fontSize(10).font('Helvetica').fillColor('#64748b');
-      doc.text(`Invoice #: ${invoiceData.invoice_number}`, rightBlockX, y + 40, { align: 'right', width: rightBlockWidth });
-      doc.text(`Date: ${formatDate(invoiceData.invoice_date)}`, rightBlockX, y + 55, { align: 'right', width: rightBlockWidth });
+      doc.fontSize(13).font('Helvetica').fillColor('#64748b');
+      doc.text(`Invoice #: ${invoiceData.invoice_number}`, rightBlockX, y + 52, { align: 'right', width: rightBlockWidth });
+      doc.text(`Date: ${formatDate(invoiceData.invoice_date)}`, rightBlockX, y + 72, { align: 'right', width: rightBlockWidth });
 
       // ===== BILL TO =====
-      y = Math.max(cy + 20, y + 80);
-      doc.fontSize(10).font('Helvetica-Bold').fillColor('#0f172a').text('Bill To:', x, y);
-      doc.fontSize(10).font('Helvetica').fillColor('#64748b');
-      y += 15;
+      y = Math.max(cy + 26, y + 104);
+      doc.fontSize(13).font('Helvetica-Bold').fillColor('#0f172a').text('Bill To:', x, y);
+      doc.fontSize(13).font('Helvetica').fillColor('#64748b');
+      y += 20;
       doc.text(`${invoiceData.patient.first_name} ${invoiceData.patient.last_name}`, x, y);
-      y += 13;
+      y += 17;
       if (invoiceData.patient.email) {
         doc.text(`Email: ${invoiceData.patient.email}`, x, y);
-        y += 13;
+        y += 17;
       }
       if (invoiceData.patient.phone) {
         doc.text(`Phone: ${invoiceData.patient.phone}`, x, y);
-        y += 13;
+        y += 17;
       }
       if (invoiceData.patient.address) {
-        const lines = wrapText(invoiceData.patient.address, 405, 10);
+        const lines = wrapText(invoiceData.patient.address, 350, 13);
         lines.forEach((line) => {
           doc.text(`Address: ${line}`, x, y);
-          y += 13;
+          y += 17;
         });
       }
 
-      // Separator
-      y += 20;
-      doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(x, y).lineTo(x + w, y).stroke();
-      y += 20;
+      // Separator - scaled up 1.3x
+      y += 26;
+      doc.strokeColor('#e2e8f0').lineWidth(0.65).moveTo(x, y).lineTo(x + w, y).stroke();
+      y += 26;
 
       // ===== TABLE =====
-      doc.fontSize(10).font('Helvetica-Bold').fillColor('#0f172a');
-      doc.text('Description', x, y);
-      doc.text('Qty', x + 200, y, { width: 50, align: 'center' });
-      doc.text('Rate', x + 250, y, { width: 90, align: 'center' });
-      doc.text('Amount', x + 340, y, { width: 100, align: 'center' });
+      // Column widths based on percentages: Description 40%, Qty 10%, Rate 25%, Amount 25%
+      // 515pt * 0.40 = 206pt, 515pt * 0.10 = 51.5pt, 515pt * 0.25 = 128.75pt
+      const descWidth = 206;
+      const qtyWidth = 52;
+      const rateWidth = 129;
+      const amountWidth = 129;
 
-      y += 12;
-      doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(x, y).lineTo(x + w, y).stroke();
-      y += 10;
+      doc.fontSize(13).font('Helvetica-Bold').fillColor('#0f172a');
+      doc.text('Description', x, y);
+      doc.text('Qty', x + descWidth, y, { width: qtyWidth, align: 'center' });
+      doc.text('Rate', x + descWidth + qtyWidth, y, { width: rateWidth, align: 'right' });
+      doc.text('Amount', x + descWidth + qtyWidth + rateWidth, y, { width: amountWidth, align: 'right' });
+
+      y += 16;
+      doc.strokeColor('#e2e8f0').lineWidth(0.65).moveTo(x, y).lineTo(x + w, y).stroke();
+      y += 13;
 
       const drawRow = (desc: string, qty: string, rate: string, amt: string) => {
-        const lines = wrapText(desc, 195, 10);
-        const height = Math.max(24, lines.length * 12);
+        const lines = wrapText(desc, descWidth - 10, 13);
+        const height = Math.max(31, lines.length * 16);
 
-        doc.fontSize(10).font('Helvetica').fillColor('#334155');
-        lines.forEach((line, i) => doc.text(line, x, y + 8 + (i * 12)));
+        doc.fontSize(13).font('Helvetica').fillColor('#334155');
+        lines.forEach((line, i) => doc.text(line, x, y + 10 + (i * 16)));
 
-        const ry = y + 8;
-        doc.fontSize(9).font('Helvetica-Bold').fillColor('#334155');
-        doc.text(qty, x + 200, ry, { width: 50, align: 'center' });
-        doc.text(rate, x + 250, ry, { width: 90, align: 'center' });
-        doc.text(amt, x + 340, ry, { width: 100, align: 'center' });
+        const ry = y + 10;
+        doc.fontSize(12).font('Helvetica-Bold').fillColor('#334155');
+        doc.text(qty, x + descWidth, ry, { width: qtyWidth, align: 'center' });
+        doc.text(rate, x + descWidth + qtyWidth, ry, { width: rateWidth, align: 'right' });
+        doc.text(amt, x + descWidth + qtyWidth + rateWidth, ry, { width: amountWidth, align: 'right' });
 
         y += height;
-        doc.strokeColor('#f1f5f9').lineWidth(0.5).moveTo(x, y).lineTo(x + w, y).stroke();
-        y += 10;
+        doc.strokeColor('#f1f5f9').lineWidth(0.65).moveTo(x, y).lineTo(x + w, y).stroke();
+        y += 13;
       };
 
       drawRow('Consultation Fee', '1', formatCurrency(invoiceData.payment.consultation_amount), formatCurrency(invoiceData.payment.consultation_amount));
@@ -227,78 +233,82 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
       }
 
       // ===== TOTALS =====
-      y += 20;
-      doc.fontSize(10).font('Helvetica').fillColor('#475569');
+      y += 26;
+      // Label takes 75% (descWidth + qtyWidth + rateWidth = 206 + 52 + 129 = 387), value takes 25% (amountWidth = 129)
+      const labelWidth = descWidth + qtyWidth + rateWidth;
+      const valueWidth = amountWidth;
+      
+      doc.fontSize(13).font('Helvetica').fillColor('#475569');
       doc.text('Subtotal:', x, y);
-      doc.fontSize(9).font('Helvetica-Bold').fillColor('#475569');
-      doc.text(formatCurrency(invoiceData.payment.subtotal), x + 340, y, { width: 100, align: 'center' });
-      y += 15;
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('#475569');
+      doc.text(formatCurrency(invoiceData.payment.subtotal), x + labelWidth, y, { width: valueWidth, align: 'right' });
+      y += 20;
 
-      doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(x, y).lineTo(x + w, y).stroke();
-      y += 15;
+      doc.strokeColor('#e2e8f0').lineWidth(0.65).moveTo(x, y).lineTo(x + w, y).stroke();
+      y += 20;
 
-      doc.fontSize(9).font('Helvetica-Bold').fillColor('#64748b').text('Payment Breakdown', x, y);
-      y += 15;
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('#64748b').text('Payment Breakdown', x, y);
+      y += 20;
 
       if (invoiceData.payment.advance_payment > 0) {
-        drawBox(x, y, w, 28, '#f8fafc', '#e2e8f0');
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#1e293b');
-        doc.text('GCash Advance Payment', x + 10, y + 10);
-        doc.text(formatCurrency(invoiceData.payment.advance_payment), x + 340, y + 10, { width: 100, align: 'center' });
-        y += 28;
+        drawBox(x, y, w, 35, '#f8fafc', '#e2e8f0');
+        doc.fontSize(13).font('Helvetica-Bold').fillColor('#1e293b');
+        doc.text('GCash Advance Payment', x + 13, y + 12);
+        doc.text(formatCurrency(invoiceData.payment.advance_payment), x + labelWidth, y + 12, { width: valueWidth, align: 'right' });
+        y += 35;
 
         if (invoiceData.payment.amount_applied > 0) {
-          doc.fontSize(9).font('Helvetica').fillColor('#64748b');
-          doc.text('Amount applied to balance', x + 10, y + 8);
-          doc.text(formatCurrency(invoiceData.payment.amount_applied), x + 340, y + 8, { width: 100, align: 'center' });
-          y += 15;
+          doc.fontSize(12).font('Helvetica').fillColor('#64748b');
+          doc.text('Amount applied to balance', x + 13, y + 10);
+          doc.text(formatCurrency(invoiceData.payment.amount_applied), x + labelWidth, y + 10, { width: valueWidth, align: 'right' });
+          y += 20;
         }
       }
 
       if (invoiceData.payment.cash_tendered > 0) {
-        drawBox(x, y, w, 28, '#f8fafc', '#e2e8f0');
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#1e293b');
-        doc.text('Cash Payment at Clinic', x + 10, y + 10);
-        doc.text(formatCurrency(invoiceData.payment.cash_tendered), x + 340, y + 10, { width: 100, align: 'center' });
-        y += 28;
+        drawBox(x, y, w, 35, '#f8fafc', '#e2e8f0');
+        doc.fontSize(13).font('Helvetica-Bold').fillColor('#1e293b');
+        doc.text('Cash Payment at Clinic', x + 13, y + 12);
+        doc.text(formatCurrency(invoiceData.payment.cash_tendered), x + labelWidth, y + 12, { width: valueWidth, align: 'right' });
+        y += 35;
       }
 
       if (invoiceData.payment.change_amount > 0) {
-        doc.strokeColor('#a7f3d0').lineWidth(0.5).moveTo(x, y + 8).lineTo(x + w, y + 8).stroke();
-        y += 10;
-        drawBox(x, y, w, 28, '#ecfdf5', '#a7f3d0');
-        doc.fontSize(12).font('Helvetica-Bold').fillColor('#059669');
-        doc.text('Change Returned', x + 10, y + 10);
-        doc.text(formatCurrency(invoiceData.payment.change_amount), x + 340, y + 10, { width: 100, align: 'center' });
-        y += 28;
+        doc.strokeColor('#a7f3d0').lineWidth(0.65).moveTo(x, y + 10).lineTo(x + w, y + 10).stroke();
+        y += 13;
+        drawBox(x, y, w, 35, '#ecfdf5', '#a7f3d0');
+        doc.fontSize(15).font('Helvetica-Bold').fillColor('#059669');
+        doc.text('Change Returned', x + 13, y + 12);
+        doc.text(formatCurrency(invoiceData.payment.change_amount), x + labelWidth, y + 12, { width: valueWidth, align: 'right' });
+        y += 35;
       }
 
-      doc.strokeColor('#cbd5e1').lineWidth(0.5).moveTo(x, y + 8).lineTo(x + w, y + 8).stroke();
-      y += 10;
+      doc.strokeColor('#cbd5e1').lineWidth(0.65).moveTo(x, y + 10).lineTo(x + w, y + 10).stroke();
+      y += 13;
 
-      doc.fontSize(12).font('Helvetica-Bold').fillColor('#0f172a');
+      doc.fontSize(15).font('Helvetica-Bold').fillColor('#0f172a');
       doc.text('TOTAL PAID:', x, y);
-      doc.text(formatCurrency(invoiceData.payment.advance_payment + invoiceData.payment.cash_tendered), x + 340, y, { width: 100, align: 'center' });
-      y += 15;
+      doc.text(formatCurrency(invoiceData.payment.advance_payment + invoiceData.payment.cash_tendered), x + labelWidth, y, { width: valueWidth, align: 'right' });
+      y += 20;
 
       if (invoiceData.payment.final_balance > 0) {
-        doc.fontSize(10).font('Helvetica').fillColor('#dc2626');
+        doc.fontSize(13).font('Helvetica').fillColor('#dc2626');
         doc.text('Remaining Balance:', x, y);
-        doc.text(formatCurrency(invoiceData.payment.final_balance), x + 340, y, { width: 100, align: 'center' });
-        y += 15;
+        doc.text(formatCurrency(invoiceData.payment.final_balance), x + labelWidth, y, { width: valueWidth, align: 'right' });
+        y += 20;
       }
 
       // ===== FOOTER =====
-      y += 20;
-      doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(x, y).lineTo(x + w, y).stroke();
-      y += 20;
+      y += 35;
+      doc.strokeColor('#e2e8f0').lineWidth(0.65).moveTo(x, y).lineTo(x + w, y).stroke();
+      y += 35;
 
-      doc.fontSize(10).font('Helvetica').fillColor('#64748b');
+      doc.fontSize(13).font('Helvetica').fillColor('#64748b');
       if (invoiceData.clinic.footer_line) {
         doc.text(invoiceData.clinic.footer_line, x, y, { width: w, align: 'center' });
-        y += 13;
+        y += 17;
       }
-      doc.fontSize(9).font('Helvetica').fillColor('#94a3b8');
+      doc.fontSize(12).font('Helvetica').fillColor('#94a3b8');
       doc.text('This is a computer-generated invoice.', x, y, { width: w, align: 'center' });
 
       doc.end();
