@@ -195,7 +195,16 @@ router.get('/:id', authenticate, requirePasswordChange, authorize('PATIENT'), as
 
     const result = await query(
       `SELECT
-        w.*,
+        w.id,
+        w.patient_id,
+        w.doctor_id,
+        to_char(w.waitlist_date, 'YYYY-MM-DD') AS waitlist_date,
+        w.status,
+        w.position,
+        w.offered_at,
+        w.expires_at,
+        w.created_at,
+        w.updated_at,
         d.first_name as doctor_first_name,
         d.last_name as doctor_last_name,
         d.specialty,

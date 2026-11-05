@@ -81,6 +81,9 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     }
     _fetchAvailability();
     _fetchGcashQr();
+    if (_selectedDate != null) {
+      _fetchWaitlistStatus();
+    }
   }
 
   Future<void> _fetchWaitlistStatus() async {
@@ -323,6 +326,10 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedStatus = _selectedDate != null
+        ? (_getDateAvailability(_selectedDate!)?['status'] as String?)
+        : null;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -348,8 +355,10 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                     if (_selectedDate != null) _buildDateInfoSection(),
                     const SizedBox(height: spacing.AppSpacing.gutterLg),
                     _buildQueueSummary(),
-                    const SizedBox(height: spacing.AppSpacing.gutterLg),
-                    _buildPaymentMethodSelection(),
+                    if (selectedStatus != 'FULL') ...[
+                      const SizedBox(height: spacing.AppSpacing.gutterLg),
+                      _buildPaymentMethodSelection(),
+                    ],
                     const SizedBox(height: spacing.AppSpacing.gutter3xl),
                   ],
                 ),
@@ -761,7 +770,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     if (status == 'FULL') {
       // If patient has an active waitlist entry, show status
       if (_waitlistStatus != null) {
-        final waitlistStatus = _waitlistStatus;
+        final waitlistStatus = _waitlistStatus!;
         final waitlistPosition = waitlistStatus['position'];
         final waitlistStatusText = waitlistStatus['status']; // WAITING or OFFERED
         final isOffered = waitlistStatusText == 'OFFERED';
@@ -797,20 +806,6 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                   color: AppColors.secondary,
                 ),
               ),
-              if (isOffered) ...[
-                const SizedBox(height: spacing.AppSpacing.gutterMd),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => _bookFromWaitlist(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.onPrimary,
-                    ),
-                    child: const Text('Book Now'),
-                  ),
-                ),
-              ],
               const SizedBox(height: spacing.AppSpacing.gutterMd),
               TextButton(
                 onPressed: () => Navigator.pushNamed(context, '/waitlist'),
@@ -854,18 +849,6 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
               'All slots are fully booked. Join the waitlist to be notified when a slot becomes available.',
               style: AppTextStyles.bodyMd.copyWith(
                 color: AppColors.secondary,
-              ),
-            ),
-            const SizedBox(height: spacing.AppSpacing.gutterMd),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => _joinWaitlist(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.onPrimary,
-                ),
-                child: const Text('Join Waitlist'),
               ),
             ),
           ],
@@ -1428,6 +1411,26 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   Future<void> _handleBookingConfirmation() async {
     if (_selectedDate == null) return;
 
+    // A FULL date can only be joined through the waitlist. Never start the
+    // regular booking flow from a stale or disabled CTA.
+    final availability = _getDateAvailability(_selectedDate!);
+    final status = availability?['status'] as String?;
+    if (status != 'AVAILABLE') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              status == 'FULL'
+                  ? 'This date is fully booked. Join the waitlist to be notified when a slot opens.'
+                  : 'This date is not available for booking.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
     if (mounted) {
       setState(() {
         _isCheckingRecord = true;
@@ -1515,10 +1518,63 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     }
   }
 
+  Widget _buildWaitlistBottomBar() {
+    final waitlistStatusText = _waitlistStatus?['status']?.toString();
+    final isOffered = waitlistStatusText == 'OFFERED';
+    final isWaiting = waitlistStatusText == 'WAITING';
+
+    // An existing WAITING entry already holds the patient's place, so there is
+    // no join action for this date.
+    if (isWaiting && !_isLoadingWaitlist) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLowest.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(spacing.AppSpacing.radiusLg),
+          topRight: Radius.circular(spacing.AppSpacing.radiusLg),
+        ),
+        border: Border(
+          top: BorderSide(color: AppColors.slate200.withValues(alpha: 0.8)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.slate800.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: PrimaryButton(
+          text: _isLoadingWaitlist
+              ? 'Checking waitlist...'
+              : (isOffered ? 'Book Now' : 'Join Waitlist'),
+          onPressed: _isLoadingWaitlist
+              ? null
+              : (isOffered ? _bookFromWaitlist : _joinWaitlist),
+          icon: Icon(
+            isOffered ? Icons.event_available : Icons.hourglass_empty,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBottomConfirmationBar() {
     final availability = _selectedDate != null ? _getDateAvailability(_selectedDate!) : null;
     final status = availability?['status'] as String?;
     final isAlreadyBooked = status == 'ALREADY_BOOKED';
+
+    // Fully booked dates expose only the waitlist action, positioned in the
+    // same bottom slot used by Continue Booking.
+    if (status == 'FULL') {
+      return _buildWaitlistBottomBar();
+    }
 
     return Container(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
