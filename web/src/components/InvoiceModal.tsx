@@ -7,14 +7,16 @@ interface InvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   paymentId: string;
+  onInvoiceGenerated?: () => void;
 }
 
-export default function InvoiceModal({ isOpen, onClose, paymentId }: InvoiceModalProps) {
+export default function InvoiceModal({ isOpen, onClose, paymentId, onInvoiceGenerated }: InvoiceModalProps) {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showGenerateSuccess, setShowGenerateSuccess] = useState(false);
 
   useEffect(() => {
     if (isOpen && paymentId) {
@@ -68,6 +70,30 @@ export default function InvoiceModal({ isOpen, onClose, paymentId }: InvoiceModa
     }
   };
 
+  const handleGenerateInvoice = async () => {
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const response = await secretaryApi.generateInvoice(paymentId);
+      if (response.success && response.data) {
+        setInvoice(response.data);
+        setShowGenerateSuccess(true);
+        setTimeout(() => setShowGenerateSuccess(false), 3000);
+        // Notify parent component that invoice was generated
+        if (onInvoiceGenerated) {
+          onInvoiceGenerated();
+        }
+      } else {
+        setError(response.error || 'Failed to generate invoice');
+      }
+    } catch (err) {
+      setError('Failed to generate invoice');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const formatCurrency = (amount: number): string => {
     return `₱${amount.toFixed(2)}`;
   };
@@ -99,19 +125,50 @@ export default function InvoiceModal({ isOpen, onClose, paymentId }: InvoiceModa
   }
 
   if (error || !invoice) {
+    const isRemainingBalanceError = error && error.toLowerCase().includes('remaining balance');
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
-          <h3 className="text-lg font-bold text-slate-900 mb-2">Error</h3>
-          <p className="text-sm text-slate-600 mb-4">{error || 'Failed to load invoice'}</p>
-          <div className="flex gap-3">
+          <h3 className="text-lg font-bold text-slate-900 mb-2">
+            {invoice && invoice.status === 'VOID' ? 'Invoice Voided' : isRemainingBalanceError ? 'Cannot Generate Invoice' : 'No Invoice'}
+          </h3>
+          <p className="text-sm text-slate-600 mb-4">
+            {invoice && invoice.status === 'VOID'
+              ? 'This invoice has been voided. You can generate a new invoice.'
+              : error || 'No invoice generated yet for this payment.'}
+          </p>
+          {!isRemainingBalanceError && (
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                disabled={isGenerating}
+                className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleGenerateInvoice}
+                disabled={isGenerating}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                {isGenerating ? 'Generating...' : 'Generate Invoice'}
+              </button>
+            </div>
+          )}
+          {isRemainingBalanceError && (
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium"
+              disabled={isGenerating}
+              className="w-full px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
             >
               Close
             </button>
-          </div>
+          )}
+          {showGenerateSuccess && (
+            <div className="mt-3 bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-2 rounded-lg text-sm">
+              Invoice generated successfully!
+            </div>
+          )}
         </div>
       </div>
     );
@@ -124,7 +181,18 @@ export default function InvoiceModal({ isOpen, onClose, paymentId }: InvoiceModa
       <div className="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="p-6 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-          <h3 className="text-lg font-bold text-slate-900">Invoice Preview</h3>
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-bold text-slate-900">Invoice Preview</h3>
+            {invoice && (
+              <span className={`px-2 py-1 rounded-full text-xs font-medium border ${
+                invoice.status === 'ACTIVE'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-red-50 text-red-700 border-red-200'
+              }`}>
+                {invoice.status}
+              </span>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -134,8 +202,8 @@ export default function InvoiceModal({ isOpen, onClose, paymentId }: InvoiceModa
         </div>
 
         {/* Invoice Content */}
-        <div className="p-6 bg-slate-50">
-          <div className="bg-white rounded-lg shadow-sm p-8 max-w-3xl mx-auto">
+        <div className="p-4 bg-slate-50">
+          <div className="bg-white rounded-lg shadow-sm p-4 max-w-3xl mx-auto">
             {/* Header */}
             <div className="flex justify-between items-start mb-8">
               <div className="flex items-start gap-4">
@@ -174,32 +242,32 @@ export default function InvoiceModal({ isOpen, onClose, paymentId }: InvoiceModa
 
             {/* Charges Table */}
             <div className="mb-6">
-              <table className="w-full text-sm">
+              <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    <th className="text-left py-2 font-semibold text-slate-900">Description</th>
-                    <th className="text-center py-2 font-semibold text-slate-900 w-20">Qty</th>
-                    <th className="text-right py-2 font-semibold text-slate-900 w-24">Rate</th>
-                    <th className="text-right py-2 font-semibold text-slate-900 w-24">Amount</th>
+                    <th className="text-left py-2 pr-2 font-semibold text-slate-900 whitespace-nowrap">Description</th>
+                    <th className="text-center py-2 font-semibold text-slate-900 w-7">Qty</th>
+                    <th className="text-right py-2 font-semibold text-slate-900 w-18">Rate</th>
+                    <th className="text-right py-2 font-semibold text-slate-900 w-18">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr className="border-b border-slate-100">
-                    <td className="py-2 text-slate-700">Consultation Fee</td>
+                    <td className="py-2 pr-2 text-slate-700 whitespace-nowrap">Consultation Fee</td>
                     <td className="py-2 text-center text-slate-700">1</td>
-                    <td className="py-2 text-right text-slate-700">{formatCurrency(data.payment.consultation_amount)}</td>
-                    <td className="py-2 text-right text-slate-700">{formatCurrency(data.payment.consultation_amount)}</td>
+                    <td className="py-2 text-right text-slate-700 whitespace-nowrap">{formatCurrency(data.payment.consultation_amount)}</td>
+                    <td className="py-2 text-right text-slate-700 whitespace-nowrap">{formatCurrency(data.payment.consultation_amount)}</td>
                   </tr>
                   {data.charges.map((charge, index) => (
                     <tr key={index} className="border-b border-slate-100">
-                      <td className="py-2 text-slate-700">{charge.description}</td>
+                      <td className="py-2 pr-2 text-slate-700 whitespace-nowrap">{charge.description}</td>
                       <td className="py-2 text-center text-slate-700">
                         {charge.charge_type === 'MEDICINE' ? (charge.quantity || 1) : '-'}
                       </td>
-                      <td className="py-2 text-right text-slate-700">
+                      <td className="py-2 text-right text-slate-700 whitespace-nowrap">
                         {charge.charge_type === 'MEDICINE' ? formatCurrency(charge.unit_price || charge.amount) : '-'}
                       </td>
-                      <td className="py-2 text-right text-slate-700">{formatCurrency(charge.amount)}</td>
+                      <td className="py-2 text-right text-slate-700 whitespace-nowrap">{formatCurrency(charge.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -280,31 +348,42 @@ export default function InvoiceModal({ isOpen, onClose, paymentId }: InvoiceModa
         </div>
 
         {/* Footer Buttons */}
-        <div className="p-6 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
+        <div className="px-4 py-3 border-t border-slate-200 flex flex-row items-center gap-3 flex-shrink-0" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
           <button
             onClick={onClose}
             disabled={isDownloading}
-            className="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+            className="flex-1 h-12 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium whitespace-nowrap"
           >
             Done
           </button>
-          <button
-            onClick={handleDownload}
-            disabled={isDownloading}
-            className="px-6 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center gap-2"
-          >
-            {isDownloading ? (
-              <>
-                <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Downloading...
-              </>
-            ) : (
-              <>
-                <span className="material-symbols-outlined text-[18px]">download</span>
-                Download
-              </>
-            )}
-          </button>
+          {invoice && invoice.status === 'ACTIVE' ? (
+            <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="px-6 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center gap-2"
+            >
+              {isDownloading ? (
+                <>
+                  <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-[18px]">download</span>
+                  Download
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              disabled
+              className="px-6 py-2.5 bg-slate-300 text-slate-500 rounded-lg cursor-not-allowed transition-colors text-sm font-medium flex items-center gap-2"
+              title="Cannot download voided invoice"
+            >
+              <span className="material-symbols-outlined text-[18px]">block</span>
+              Voided - Cannot Download
+            </button>
+          )}
         </div>
       </div>
     </div>

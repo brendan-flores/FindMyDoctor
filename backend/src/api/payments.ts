@@ -754,14 +754,19 @@ router.patch('/:id/mark-paid', authenticate, requireSecretaryPasswordChange, req
       [payment.patient_user_id, id]
     );
 
-    // Automatically generate invoice for the paid payment
+    // Automatically generate invoice for the paid payment (only if fully paid)
     // Check if invoice already exists
     const existingInvoiceResult = await client.query(
       'SELECT id FROM invoices WHERE payment_id = $1',
       [id]
     );
 
-    if (existingInvoiceResult.rows.length === 0) {
+    // Only generate invoice if payment is fully paid (no remaining balance)
+    const totalAmount = parseFloat(payment.total_amount || '0');
+    const amountPaid = parseFloat(payment.amount_paid || '0');
+    const isFullyPaid = amountPaid >= totalAmount;
+
+    if (existingInvoiceResult.rows.length === 0 && isFullyPaid) {
       // Get invoice settings for the doctor
       const invoiceSettingsResult = await client.query(
         'SELECT clinic_name, address, contact_number, footer_line FROM invoice_settings WHERE doctor_id = $1',
@@ -1115,13 +1120,23 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
     console.log('[Add Charge] New total:', newTotal);
     console.log('[Add Charge] Payment ID:', id);
 
-    // Update payment totals (do not reset amount_paid or change status)
-    const updateResult = await client.query(
-      `UPDATE payments
-       SET total_additional_charges = $1, total_amount = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3`,
-      [totalCharges, newTotal, id]
-    );
+    // Update payment totals and revert status to UNPAID if there's now a remaining balance
+    const currentAmountPaid = parseFloat(payment.amount_paid || '0');
+    const hasRemainingBalance = newTotal > currentAmountPaid;
+
+    let updateQuery = 'UPDATE payments SET total_additional_charges = $1, total_amount = $2, updated_at = CURRENT_TIMESTAMP';
+    const updateParams = [totalCharges, newTotal];
+
+    // If payment was PAID and now has a remaining balance, revert to UNPAID
+    if (payment.status === 'PAID' && hasRemainingBalance) {
+      updateQuery += ', status = $3';
+      updateParams.push('UNPAID');
+    }
+
+    updateQuery += ' WHERE id = $' + (updateParams.length + 1);
+    updateParams.push(id);
+
+    const updateResult = await client.query(updateQuery, updateParams);
 
     console.log('[Add Charge] Update result rowCount:', updateResult.rowCount);
 
@@ -1252,12 +1267,23 @@ router.delete('/:id/charges/:chargeId', authenticate, requireSecretaryPasswordCh
     const newTotal = payment.consultation_amount + totalCharges;
 
     // Update payment totals
-    await client.query(
-      `UPDATE payments
-       SET total_additional_charges = $1, total_amount = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3`,
-      [totalCharges, newTotal, id]
-    );
+    // If payment was UNPAID and is now fully paid, update to PAID
+    const currentAmountPaid = parseFloat(payment.amount_paid || '0');
+    const isNowFullyPaid = newTotal <= currentAmountPaid && currentAmountPaid > 0;
+
+    let updateQuery = 'UPDATE payments SET total_additional_charges = $1, total_amount = $2, updated_at = CURRENT_TIMESTAMP';
+    const updateParams = [totalCharges, newTotal];
+
+    // If payment was UNPAID and is now fully paid, update to PAID
+    if (payment.status === 'UNPAID' && isNowFullyPaid) {
+      updateQuery += ', status = $3';
+      updateParams.push('PAID');
+    }
+
+    updateQuery += ' WHERE id = $' + (updateParams.length + 1);
+    updateParams.push(id);
+
+    await client.query(updateQuery, updateParams);
 
     await client.query('COMMIT');
     client.release();
@@ -1356,6 +1382,84 @@ router.patch('/:id/payment-method', authenticate, requireSecretaryPasswordChange
       console.error('Rollback failed:', rollbackErr);
     }
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update payment method'));
+  }
+});
+
+// Revert payment to unpaid (secretary only)
+router.patch('/:id/revert-unpaid', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    const { id } = req.params;
+    const secretaryId = req.user!.id;
+
+    await client.query('BEGIN');
+
+    // Get secretary's assigned doctor
+    const secretaryResult = await client.query(
+      'SELECT id, doctor_id FROM secretaries WHERE user_id = $1',
+      [secretaryId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    // Get payment with doctor assignment check (lock row for update)
+    const paymentResult = await client.query(
+      `SELECT p.*, a.doctor_id
+       FROM payments p
+       JOIN appointments a ON p.appointment_id = a.id
+       WHERE p.id = $1
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (paymentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Payment not found'));
+    }
+
+    const payment = paymentResult.rows[0];
+
+    // Verify payment belongs to secretary's assigned doctor
+    if (payment.doctor_id !== assignedDoctorId) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only revert payments for your assigned doctor'));
+    }
+
+    // Only allow reverting PAID payments
+    if (payment.status !== 'PAID') {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Only PAID payments can be reverted to unpaid'));
+    }
+
+    // Update payment status to UNPAID
+    await client.query(
+      `UPDATE payments
+       SET status = 'UNPAID', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+    client.release();
+
+    res.json(success(null, 'Payment reverted to unpaid successfully'));
+  } catch (err: any) {
+    try {
+      await client.query('ROLLBACK');
+      client.release();
+    } catch (rollbackErr) {
+      console.error('Rollback failed:', rollbackErr);
+    }
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to revert payment to unpaid'));
   }
 });
 

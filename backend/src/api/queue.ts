@@ -148,20 +148,55 @@ router.post('/:date/next', authenticate, requireSecretaryPasswordChange, require
 
 // Update queue status
 router.patch('/:id/status', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
     const { status } = req.body;
     const role = req.user!.role;
     const userId = req.user!.id;
 
     if (!status) {
+      await client.query('ROLLBACK');
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Status is required'));
     }
 
     const validStatuses = ['WAITING', 'CALLED', 'NOT_PRESENT', 'SKIPPED', 'IN_CHECKUP', 'COMPLETED', 'CANCELLED', 'NO_SHOW'];
     if (!validStatuses.includes(status)) {
+      await client.query('ROLLBACK');
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid status'));
     }
+
+    // Get current queue entry details before updating
+    let getQuery = '';
+    const getParams = [id];
+
+    if (role === 'SECRETARY') {
+      getQuery = `SELECT q.*, a.id as appointment_id, a.status as appointment_status
+                  FROM queue_entries q
+                  LEFT JOIN appointments a ON q.appointment_id = a.id
+                  WHERE q.id = $1 AND q.doctor_id = (SELECT doctor_id FROM secretaries WHERE user_id = $2)`;
+      getParams.push(userId);
+    } else {
+      // DOCTOR
+      getQuery = `SELECT q.*, a.id as appointment_id, a.status as appointment_status
+                  FROM queue_entries q
+                  LEFT JOIN appointments a ON q.appointment_id = a.id
+                  WHERE q.id = $1 AND q.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)`;
+      getParams.push(userId);
+    }
+
+    const currentEntryResult = await client.query(getQuery, getParams);
+
+    if (currentEntryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Queue entry not found or access denied'));
+    }
+
+    const currentEntry = currentEntryResult.rows[0];
+    const previousStatus = currentEntry.status;
 
     // Build query with secretary-to-doctor assignment check
     let updateQuery = 'UPDATE queue_entries SET status = $1, updated_at = CURRENT_TIMESTAMP';
@@ -184,15 +219,45 @@ router.patch('/:id/status', authenticate, requireSecretaryPasswordChange, requir
       params.push(id, userId);
     }
 
-    const result = await query(updateQuery, params);
+    const result = await client.query(updateQuery, params);
 
     if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Queue entry not found or access denied'));
     }
 
+    // Handle capacity update when cancelling an appointment
+    // Only decrement capacity if:
+    // 1. New status is CANCELLED or NO_SHOW
+    // 2. Previous status was not already CANCELLED or NO_SHOW (to avoid double-decrement)
+    if ((status === 'CANCELLED' || status === 'NO_SHOW') &&
+        previousStatus !== 'CANCELLED' && previousStatus !== 'NO_SHOW') {
+
+      // Update associated appointment status if it exists
+      if (currentEntry.appointment_id) {
+        await client.query(
+          "UPDATE appointments SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+          [status, currentEntry.appointment_id]
+        );
+      }
+
+      // Decrement daily capacity
+      const queueDate = currentEntry.queue_date;
+      await client.query(
+        'UPDATE daily_capacities SET registered_count = registered_count - 1 WHERE doctor_id = $1 AND date = $2',
+        [currentEntry.doctor_id, queueDate]
+      );
+    }
+
+    await client.query('COMMIT');
+
     res.json(success(null, 'Queue status updated'));
   } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Queue status update error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update queue status'));
+  } finally {
+    client.release();
   }
 });
 

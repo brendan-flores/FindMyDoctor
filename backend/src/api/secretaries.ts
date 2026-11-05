@@ -880,12 +880,18 @@ router.get('/me/dashboard', authenticate, authorize('SECRETARY'), async (req: Au
       query(
         `SELECT p.id, p.appointment_id, p.status, p.payment_method, p.total_amount,
                 p.created_at, pat.first_name as patient_first_name, pat.last_name as patient_last_name,
-                a.appointment_date, a.status as appointment_status
+                a.appointment_date, a.status as appointment_status,
+                CASE WHEN i.id IS NULL OR i.status = 'VOID' THEN true ELSE false END as invoice_not_sent
          FROM payments p
          JOIN patients pat ON p.patient_id = pat.id
          JOIN appointments a ON p.appointment_id = a.id
+         LEFT JOIN invoices i ON p.id = i.payment_id
          WHERE a.doctor_id = $1
-           AND (p.status = 'PENDING_VERIFICATION' OR (p.status = 'UNPAID' AND a.status = 'COMPLETED'))
+           AND (
+             p.status = 'PENDING_VERIFICATION' OR
+             (p.status = 'UNPAID' AND a.status = 'COMPLETED') OR
+             (p.status = 'PAID' AND (i.id IS NULL OR i.status = 'VOID'))
+           )
          ORDER BY
            CASE WHEN p.status = 'PENDING_VERIFICATION' THEN 0 ELSE 1 END,
            p.created_at ASC
@@ -950,6 +956,7 @@ router.get('/me/dashboard', authenticate, authorize('SECRETARY'), async (req: Au
         patientName: `${row.patient_first_name} ${row.patient_last_name}`,
         appointmentDate: row.appointment_date,
         appointmentStatus: row.appointment_status,
+        invoiceNotSent: row.invoice_not_sent,
       })),
       recentConversations: conversationsResult.rows.map(row => ({
         id: row.id,
@@ -1092,6 +1099,75 @@ router.put('/me/invoice-details', authenticate, authorize('SECRETARY'), async (r
   } catch (err: any) {
     console.error('Invoice details update error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update invoice details'));
+  }
+});
+
+// ============================================
+// TEMPORARY: Fix registered_count sync
+// ============================================
+
+// Fix registered_count to match actual active queue entries
+// This endpoint recalculates the registered_count for all dates
+// to match the count of queue entries that are NOT cancelled or no_show
+router.post('/fix-registered-count', authenticate, authorize('SECRETARY', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const userId = req.user!.id;
+    const role = req.user!.role;
+
+    let doctorId: string | null = null;
+
+    if (role === 'SECRETARY') {
+      const secretaryResult = await client.query(
+        'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+        [userId]
+      );
+
+      if (secretaryResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+      }
+
+      doctorId = secretaryResult.rows[0].doctor_id;
+    }
+
+    // Update registered_count for all daily_capacities records
+    // If secretary, only for their assigned doctor; if admin, for all doctors
+    let updateQuery = `
+      UPDATE daily_capacities dc
+      SET registered_count = (
+        SELECT COUNT(*)
+        FROM queue_entries q
+        WHERE q.doctor_id = dc.doctor_id
+          AND q.queue_date = dc.date
+          AND q.status NOT IN ('CANCELLED', 'NO_SHOW')
+      )
+    `;
+
+    const params: any[] = [];
+
+    if (doctorId) {
+      updateQuery += ' WHERE dc.doctor_id = $1';
+      params.push(doctorId);
+    }
+
+    const result = await client.query(updateQuery, params);
+
+    await client.query('COMMIT');
+
+    res.json(success({
+      updatedRows: result.rowCount,
+      message: 'Registered count has been synchronized with active queue entries'
+    }, 'Registered count fixed successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Fix registered count error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fix registered count'));
+  } finally {
+    client.release();
   }
 });
 

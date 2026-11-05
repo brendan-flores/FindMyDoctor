@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { config } from './config';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
-import { authenticate } from './middleware/auth';
+import { authenticate, authorize } from './middleware/auth';
 import { apiLimiter, authLimiter } from './middleware/rateLimit';
 import { pool } from './database/connection';
 import path from 'path';
@@ -31,6 +31,7 @@ import adminRouter from './api/admin.js';
 import gcashQrRouter from './api/gcashQr.js';
 import invoicesRouter from './api/invoices.js';
 import patientDoctorsRouter from './api/patientDoctors.js';
+import waitlistsRouter from './api/waitlists.js';
 
 const app = express();
 const apiVersion = config.app.apiVersion;
@@ -131,6 +132,7 @@ app.use(`/api/${apiVersion}/notifications`, authenticate, notificationsRouter);
 app.use(`/api/${apiVersion}/gcash-qr`, authenticate, gcashQrRouter);
 app.use(`/api/${apiVersion}/invoices`, authenticate, invoicesRouter);
 app.use(`/api/${apiVersion}/admin`, authenticate, adminRouter);
+app.use(`/api/${apiVersion}/waitlists`, authenticate, authorize('PATIENT'), waitlistsRouter);
 
 // Error handling
 app.use(notFoundHandler);

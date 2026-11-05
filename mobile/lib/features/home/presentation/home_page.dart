@@ -47,6 +47,7 @@ class _HomePageState extends State<HomePage> {
   bool _isLoadingConversations = true;
   int _totalUnreadCount = 0;
   int _notificationUnreadCount = 0;
+  int _waitlistCount = 0;
   String? _userName;
   String? _userEmail;
   bool _accountInfoFailed = false;
@@ -74,6 +75,8 @@ class _HomePageState extends State<HomePage> {
     _loadConversations();
     // Load notification unread count
     _loadNotificationUnreadCount();
+    // Load waitlist count
+    _loadWaitlistCount();
   }
 
   Future<void> _loadUserInfo() async {
@@ -229,6 +232,21 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _loadWaitlistCount() async {
+    try {
+      final response = await _apiService.getWaitlistCount();
+      if (response['success'] == true && response['data'] != null) {
+        final count = response['data']['count'] as int? ?? 0;
+        if (!mounted) return;
+        setState(() {
+          _waitlistCount = count;
+        });
+      }
+    } catch (e) {
+      // Silently fail - waitlist count not critical
+    }
+  }
+
   Future<void> _logout() async {
     await _apiService.logout();
     Navigator.of(context).pushReplacementNamed('/login');
@@ -363,7 +381,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildAppointmentsContent() {
-    return const AppointmentsPage();
+    return AppointmentsPage(
+      onNavigateToWaitlist: () {
+        Navigator.pushNamed(context, '/waitlist');
+      },
+      onWaitlistCountUpdate: () {
+        _loadWaitlistCount();
+      },
+    );
   }
 
   Widget _buildChatContent() {
@@ -1784,7 +1809,7 @@ class _HomePageState extends State<HomePage> {
             children: [
               _buildNavItem(Icons.home, 'Home', 0),
               _buildNavItem(Icons.local_hospital, 'Doctors', 1),
-              _buildNavItem(Icons.calendar_month, 'Appointments', 2),
+              _buildNavItem(Icons.calendar_month, 'Appointments', 2, unreadCount: _waitlistCount),
               _buildNavItem(Icons.chat_bubble, 'Chat', 3, unreadCount: _totalUnreadCount),
               _buildNavItem(Icons.account_circle, 'Profile', 4),
             ],

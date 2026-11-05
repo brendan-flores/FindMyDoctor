@@ -203,6 +203,8 @@ Secretaries can:
 - Verify payments.
 - Manage consultation payment status.
 - Add additional charges.
+- Generate invoices for paid payments.
+- Void and reissue invoices to correct errors (voided invoices remain in audit trail but are not downloadable).
 - View necessary patient information according to permissions.
 
 ## 5.5 Administrator
@@ -443,6 +445,8 @@ the schedule becomes:
 **FULL**
 
 The system must prevent additional regular online bookings and walk-in registrations for that date.
+
+In the mobile app, a FULL date shows only the waitlist option. The regular Continue Booking action and payment-method selector must not be displayed or usable for that date. The Join Waitlist action occupies the bottom booking action position where Continue Booking normally appears; patients may join the waitlist and are notified when a slot becomes available.
 
 ---
 
@@ -767,6 +771,8 @@ Notifications may be generated for:
 - Prescription availability.
 - Payment verification.
 - Waitlist updates.
+
+When a waitlist slot becomes available, the promoted patient receives a WAITLIST_UPDATE notification. Tapping it from either the notifications page or the header notification dropdown opens the doctor's schedule with the offered waitlist date preselected so the patient can book immediately. Payment-related notifications similarly open the related payment screen from either surface, and dropdown messages are shown in full without truncation.
 
 Chat notifications are sent only to the message recipient (never the sender), use generic titles and bodies, and never include message content. Patient-sent messages notify the secretaries assigned to the conversation's doctor; secretary-sent messages notify the patient. Registered device tokens may receive an additional FCM/APNs push with the same generic payload; provider credentials remain on the backend.
 

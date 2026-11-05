@@ -693,7 +693,7 @@ Profile
 
 There is no direct doctor-chat screen.
 
-The mobile patient Doctor Profile screen (`/doctor-profile`) is opened from "View Profile" on a doctor card and is patient-only (the shared route guard redirects unauthenticated users to login and keeps secretaries on the secretary home). It loads `GET /api/v1/patient/doctors/:id/profile` and shows only public professional information plus availability: photo, display name, specialty, credentials, consultation fee, years of experience, today's availability and remaining slots, next available date, expandable biography, languages, weekly working hours (Schedule section always shown regardless of today's availability, with today's row marked as "Today"), clinic name/address/room, and a Google Maps search link (no map API key). Private fields (email, phone, PRC license, approval status, account status) and other patients' data are never returned or displayed. The sticky "Book appointment" action enters the existing `/doctor-schedule` booking flow, including the doctor-specific patient-record check. Empty optional sections are hidden, except the Schedule section which is always shown with "Schedule not available yet" when no schedule is configured. The screen provides loading, retryable error, and generic not-found states. There is no waitlist UI because the waitlist feature has no endpoints or screens.
+The mobile patient Doctor Profile screen (`/doctor-profile`) is opened from "View Profile" on a doctor card and is patient-only (the shared route guard redirects unauthenticated users to login and keeps secretaries on the secretary home). It loads `GET /api/v1/patient/doctors/:id/profile` and shows only public professional information plus availability: photo, display name, specialty, credentials, consultation fee, years of experience, today's availability and remaining slots, next available date, expandable biography, languages, weekly working hours (Schedule section always shown regardless of today's availability, with today's row marked as "Today"), clinic name/address/room, and a Google Maps search link (no map API key). Private fields (email, phone, PRC license, approval status, account status) and other patients' data are never returned or displayed. The sticky "Book appointment" action enters the existing `/doctor-schedule` booking flow, including the doctor-specific patient-record check. Empty optional sections are hidden, except the Schedule section which is always shown with "Schedule not available yet" when no schedule is configured. The screen provides loading, retryable error, and generic not-found states. When a doctor's date is FULL, the schedule screen exposes only the waitlist action (Join Waitlist, waitlist status, or Book Now for an OFFERED entry), hides the payment-method selector, and hides the regular Continue Booking action so a full date can never enter the booking flow. Join Waitlist occupies the bottom action slot normally used by Continue Booking. Patients can track and leave entries from `/waitlist`. A `WAITLIST_UPDATE` notification opens `/doctor-schedule` with the offered waitlist date preselected.
 
 ---
 
@@ -1747,6 +1747,8 @@ Notifications may be generated when:
 - A confirmed exception or break-period change affects dates with active appointments.
 - Waitlist status changes.
 
+When a cancellation or reschedule frees a slot, the waitlist promotion service offers it to the next waiting patient, creates a `WAITLIST_UPDATE` notification whose `related_entity_id` is the waitlist entry id, and the mobile notification opens `/doctor-schedule` for that entry's doctor with `defaultDate` set to the offered `waitlist_date` (YYYY-MM-DD). The schedule route receives the doctor id, name, specialty, clinic, consultation fee, and professional photo so the correct doctor's availability is shown with that date preselected. This navigation is available from both the full notifications page and the header notification dropdown. Payment-related notifications open the payment screen for the related appointment from either surface, and the dropdown displays full notification messages without line truncation.
+
 Chat notifications are sent only to recipients (never the sender) with generic titles, bodies, and push payloads that never include message content, and are additionally delivered as FCM/APNs pushes to the recipient's registered device tokens when push credentials are configured.
 
 ---
@@ -1766,6 +1768,19 @@ GET  /patient/doctors/:id/profile
 ```
 
 Patient-only (a PATIENT token is required; SECRETARY, DOCTOR, ADMIN, and anonymous callers are rejected). The endpoint returns only the public professional whitelist (`id`, `displayName`, `photoUrl`, `specialty`, `credentials`, `practiceName`, `practiceAddress`, `roomNumber`, `yearsOfExperience`, `consultationFee`, `areasOfExpertise`, `languagesSpoken`, `biography`) plus `availability` (`availableToday`, `slotsLeftToday`, `nextAvailableDate`, `consultationDurationMinutes`, `workingDays`). Availability reuses the scheduling and capacity services in the clinic timezone (Asia/Manila), so breaks are never bookable and a fully booked day resolves the next available date. Only doctors with `approval_status = 'ACTIVE'`, `is_approved = true`, and an active linked user account are returned; every other id receives the same generic `404 Doctor not found`. Private fields (email, contact number, PRC license, approval/account status), queue contents, and other patient data are never returned.
+
+### Waitlist
+
+```text
+POST   /waitlists
+GET    /waitlists/me
+GET    /waitlists/check?doctorId=:doctorId&waitlistDate=YYYY-MM-DD
+GET    /waitlists/count
+GET    /waitlists/:id
+DELETE /waitlists/:id
+```
+
+All waitlist endpoints are PATIENT-only and resolve the patient from the authenticated user; a waitlist entry is returned only to its owner. `GET /waitlists/:id` returns the waitlist entry (including doctor id, date-only `waitlist_date`, status, position, and offer expiry) with the doctor's name, specialty, and practice name. Joining is allowed only when the date is genuinely FULL, the date is in the future, and the patient has no active entry for the same doctor and date. Leaving a WAITING entry recalculates the positions of the remaining entries.
 
 ### Capacity
 

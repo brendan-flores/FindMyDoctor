@@ -2,6 +2,8 @@ import { query } from '../../database/connection';
 import { sendPushToUser } from '../../services/pushService';
 import { createNotification } from '../../api/notifications';
 
+export type NotificationType = 'NEW_PATIENT_MESSAGE' | 'NEW_SECRETARY_MESSAGE' | 'INVOICE_AVAILABLE';
+
 /**
  * Conversation authorization and notification helpers for the
  * patient–secretary chat module.
@@ -156,6 +158,61 @@ export async function notifyMessageRecipients(
         body: notification.message,
         data: {
           type: notification.type,
+          conversationId: String(conversation.id),
+        },
+      });
+    } catch (pushErr) {
+      console.error('Push delivery failed:', pushErr);
+    }
+  }
+}
+
+/**
+ * Notify the patient when an invoice is sent via chat.
+ * Only the patient in the conversation receives an INVOICE_AVAILABLE notification.
+ */
+export async function notifyInvoiceRecipients(
+  senderUserId: string,
+  conversation: AuthorizedConversation,
+  invoiceId: string
+): Promise<void> {
+  const notification = {
+    type: 'INVOICE_AVAILABLE',
+    title: 'Invoice Available',
+    message: 'You have received an invoice from the clinic.',
+  };
+
+  // Get the patient's user ID
+  const recipientQuery = `
+    SELECT p.user_id
+    FROM patients p
+    WHERE p.id = $1 AND p.user_id <> $2
+  `;
+  const recipientParams = [conversation.patient_id, senderUserId];
+
+  const recipientsResult = await query(recipientQuery, recipientParams);
+
+  for (const recipient of recipientsResult.rows) {
+    if (!recipient.user_id) {
+      continue;
+    }
+    await createNotification(
+      recipient.user_id,
+      notification.type,
+      notification.title,
+      notification.message,
+      'invoice',
+      invoiceId
+    );
+
+    // Best-effort push delivery to the patient's registered devices
+    try {
+      await sendPushToUser(recipient.user_id, {
+        title: notification.title,
+        body: notification.message,
+        data: {
+          type: notification.type,
+          invoiceId: invoiceId,
           conversationId: String(conversation.id),
         },
       });

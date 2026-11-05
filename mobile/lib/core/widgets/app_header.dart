@@ -5,6 +5,7 @@ import '../theme/app_spacing.dart' as spacing;
 import '../theme/app_text_styles.dart';
 import '../services/api_service.dart';
 import '../../features/notifications/models/notification.dart' as notif_model;
+import '../../features/payments/presentation/payment_screen.dart';
 
 class AppHeader extends StatefulWidget implements PreferredSizeWidget {
   final String? title;
@@ -224,11 +225,11 @@ class _AppHeaderState extends State<AppHeader> {
                                       itemBuilder: (context, index) {
                                         final notification = _notifications[index];
                                         return InkWell(
-                                          onTap: () {
-                                            _handleNotificationItemClick(
+                                          onTap: () async {
+                                            _closeDropdown();
+                                            await _handleNotificationItemClick(
                                               notification,
                                             );
-                                            _closeDropdown();
                                           },
                                           child: Padding(
                                             padding: EdgeInsets.all(
@@ -319,9 +320,6 @@ class _AppHeaderState extends State<AppHeader> {
                                                               color:
                                                                   AppColors.secondary,
                                                             ),
-                                                        maxLines: 2,
-                                                        overflow:
-                                                            TextOverflow.ellipsis,
                                                       ),
                                                       const SizedBox(
                                                         height: spacing
@@ -510,11 +508,167 @@ class _AppHeaderState extends State<AppHeader> {
     }
   }
 
-  void _handleNotificationItemClick(notif_model.Notification notification) {
-    if (!notification.isRead) {
-      _markAsRead(notification);
+  /// Normalizes a backend waitlist date into the `yyyy-MM-dd` format expected
+  /// by the doctor schedule route.
+  String _normalizeWaitlistDate(dynamic value) {
+    final raw = value?.toString().trim() ?? '';
+    if (raw.isEmpty) return '';
+
+    final match = RegExp(r'^\d{4}-\d{2}-\d{2}').firstMatch(raw);
+    if (match != null) {
+      return match.group(0)!;
     }
 
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return '';
+
+    final year = parsed.year.toString().padLeft(4, '0');
+    final month = parsed.month.toString().padLeft(2, '0');
+    final day = parsed.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
+  }
+
+  /// Formats the doctor's consultation fee for the schedule screen.
+  String? _formatConsultationFee(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toStringAsFixed(0);
+
+    final parsed = double.tryParse(value.toString());
+    return parsed != null ? parsed.toStringAsFixed(0) : value.toString();
+  }
+
+  /// Opens a WAITLIST_UPDATE notification on the doctor's schedule with the
+  /// offered date preselected.
+  Future<void> _openWaitlistSlot(notif_model.Notification notification) async {
+    final waitlistId = notification.relatedEntityId?.toString();
+    if (waitlistId == null || waitlistId.isEmpty) {
+      _openWaitlistFallback();
+      return;
+    }
+
+    try {
+      final waitlistResponse = await _apiService.getWaitlistEntry(waitlistId);
+      final waitlistData = waitlistResponse['success'] == true
+          ? waitlistResponse['data']
+          : null;
+
+      if (waitlistData is! Map) {
+        _openWaitlistFallback();
+        return;
+      }
+
+      final waitlist = Map<String, dynamic>.from(waitlistData);
+      final doctorId = waitlist['doctor_id']?.toString() ?? '';
+      final waitlistDate = _normalizeWaitlistDate(waitlist['waitlist_date']);
+
+      if (doctorId.isEmpty || waitlistDate.isEmpty) {
+        _openWaitlistFallback();
+        return;
+      }
+
+      Map<String, dynamic>? doctor;
+      try {
+        final doctorResponse = await _apiService.getDoctor(doctorId);
+        if (doctorResponse['success'] == true &&
+            doctorResponse['data'] is Map) {
+          doctor = Map<String, dynamic>.from(doctorResponse['data'] as Map);
+        }
+      } catch (_) {
+        // Fall back to the doctor details embedded in the waitlist entry.
+      }
+
+      if (!mounted) return;
+
+      final firstName = doctor?['first_name']?.toString() ??
+          waitlist['doctor_first_name']?.toString() ??
+          '';
+      final lastName = doctor?['last_name']?.toString() ??
+          waitlist['doctor_last_name']?.toString() ??
+          '';
+      final doctorName = '$firstName $lastName'.trim();
+
+      Navigator.pushNamed(
+        context,
+        '/doctor-schedule',
+        arguments: {
+          'doctorId': doctorId,
+          'doctorName': doctorName.isEmpty ? null : doctorName,
+          'specialty': doctor?['specialty']?.toString() ??
+              waitlist['specialty']?.toString(),
+          'clinic': doctor?['practice_name']?.toString() ??
+              waitlist['practice_name']?.toString(),
+          'consultationFee':
+              _formatConsultationFee(doctor?['consultation_fee']),
+          'professionalPhotoUrl':
+              doctor?['professional_photo_url']?.toString(),
+          'defaultDate': waitlistDate,
+        },
+      );
+    } catch (_) {
+      _openWaitlistFallback();
+    }
+  }
+
+  void _openWaitlistFallback() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Unable to open the available slot. Showing your waitlist.',
+        ),
+      ),
+    );
+    Navigator.pushNamed(context, '/waitlist');
+  }
+
+  /// Opens payment details for payment-related notifications.
+  Future<void> _openPaymentDetails(
+    notif_model.Notification notification,
+  ) async {
+    final paymentId = notification.relatedEntityId?.toString();
+    if (paymentId == null || paymentId.isEmpty) return;
+
+    try {
+      final paymentResponse = await _apiService.getPaymentById(paymentId);
+      if (paymentResponse['success'] == true &&
+          paymentResponse['data'] != null) {
+        final paymentData = paymentResponse['data'];
+        final appointmentId = paymentData['appointment_id']?.toString();
+        if (appointmentId != null && appointmentId.isNotEmpty && mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => PaymentScreen(
+                appointmentId: appointmentId,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      // Silently fail - notification remains marked as read.
+    }
+  }
+
+  Future<void> _handleNotificationItemClick(
+    notif_model.Notification notification,
+  ) async {
+    if (!notification.isRead) {
+      await _markAsRead(notification);
+    }
+
+    final type = notification.type;
+    final isWaitlistNotification = type == 'WAITLIST_UPDATE';
+    final isPaymentNotification = type == 'ADDITIONAL_CHARGE_ADDED' ||
+        type == 'PAYMENT_VERIFIED' ||
+        type == 'PAYMENT_REJECTED';
+
+    if (isWaitlistNotification) {
+      await _openWaitlistSlot(notification);
+    } else if (isPaymentNotification) {
+      await _openPaymentDetails(notification);
+    }
+
+    if (!mounted) return;
     if (widget.onNotificationItemTap != null) {
       widget.onNotificationItemTap!(notification);
     }

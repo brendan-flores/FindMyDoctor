@@ -1099,6 +1099,7 @@ router.get('/me/dashboard', authenticate, authorize('DOCTOR'), async (req: AuthR
       breaksResult,
       exceptionsResult,
       dailyCapacityResult,
+      consultationsNeedingRecordsResult,
     ] = await Promise.all([
       query(
         `SELECT
@@ -1162,6 +1163,21 @@ router.get('/me/dashboard', authenticate, authorize('DOCTOR'), async (req: AuthR
          WHERE doctor_id = $1 AND date = $2`,
         [doctorId, targetDate]
       ),
+      query(
+        `SELECT q.appointment_id, p.first_name, p.last_name, a.appointment_date,
+                CASE WHEN v.id IS NULL THEN true ELSE false END as missing_record,
+                CASE WHEN pr.id IS NULL THEN true ELSE false END as missing_prescription
+         FROM queue_entries q
+         JOIN patients p ON q.patient_id = p.id
+         LEFT JOIN appointments a ON q.appointment_id = a.id
+         LEFT JOIN visits v ON q.appointment_id = v.appointment_id
+         LEFT JOIN prescriptions pr ON v.id = pr.visit_id
+         WHERE q.doctor_id = $1 AND q.status = 'COMPLETED'
+           AND (v.id IS NULL OR pr.id IS NULL)
+         ORDER BY q.completed_at DESC NULLS LAST, q.queue_date DESC
+         LIMIT 10`,
+        [doctorId]
+      ),
     ]);
 
     const appointmentCounts = appointmentCountsResult.rows[0];
@@ -1212,6 +1228,13 @@ router.get('/me/dashboard', authenticate, authorize('DOCTOR'), async (req: AuthR
         reason: row.reason_for_visit,
         status: row.status,
         queueNumber: row.queue_number,
+      })),
+      consultationsNeedingRecords: consultationsNeedingRecordsResult.rows.map(row => ({
+        appointmentId: row.appointment_id,
+        patientName: `${row.first_name} ${row.last_name}`,
+        appointmentDate: row.appointment_date,
+        missingRecord: row.missing_record,
+        missingPrescription: row.missing_prescription,
       })),
       todaySchedule: {
         workingHours: workingHoursResult.rows.map(row => ({

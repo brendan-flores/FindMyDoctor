@@ -67,6 +67,120 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
+  /// Normalizes a backend waitlist date into the `yyyy-MM-dd` format expected
+  /// by the doctor schedule route. The waitlist endpoint returns a date-only
+  /// value, so the calendar date is kept as-is without timezone conversion.
+  String _normalizeWaitlistDate(dynamic value) {
+    final raw = value?.toString().trim() ?? '';
+    if (raw.isEmpty) return '';
+
+    final match = RegExp(r'^\d{4}-\d{2}-\d{2}').firstMatch(raw);
+    if (match != null) {
+      return match.group(0)!;
+    }
+
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return '';
+
+    final year = parsed.year.toString().padLeft(4, '0');
+    final month = parsed.month.toString().padLeft(2, '0');
+    final day = parsed.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
+  }
+
+  /// Formats the doctor's consultation fee for the schedule screen.
+  String? _formatConsultationFee(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toStringAsFixed(0);
+
+    final parsed = double.tryParse(value.toString());
+    return parsed != null ? parsed.toStringAsFixed(0) : value.toString();
+  }
+
+  /// Opens the availability notification directly on the doctor's schedule so
+  /// the patient can book the slot that just became available.
+  Future<void> _openWaitlistSlot(Map<String, dynamic> notification) async {
+    final waitlistId = notification['related_entity_id']?.toString();
+    if (waitlistId == null || waitlistId.isEmpty) {
+      Navigator.pushNamed(context, '/waitlist');
+      return;
+    }
+
+    try {
+      final waitlistResponse = await _apiService.getWaitlistEntry(waitlistId);
+      final waitlistData = waitlistResponse['success'] == true
+          ? waitlistResponse['data']
+          : null;
+
+      if (waitlistData is! Map) {
+        _openWaitlistFallback();
+        return;
+      }
+
+      final waitlist = Map<String, dynamic>.from(waitlistData);
+      final doctorId = waitlist['doctor_id']?.toString() ?? '';
+      final waitlistDate = _normalizeWaitlistDate(waitlist['waitlist_date']);
+
+      if (doctorId.isEmpty || waitlistDate.isEmpty) {
+        _openWaitlistFallback();
+        return;
+      }
+
+      Map<String, dynamic>? doctor;
+      try {
+        final doctorResponse = await _apiService.getDoctor(doctorId);
+        if (doctorResponse['success'] == true &&
+            doctorResponse['data'] is Map) {
+          doctor = Map<String, dynamic>.from(doctorResponse['data'] as Map);
+        }
+      } catch (_) {
+        // Fall back to the doctor details embedded in the waitlist entry.
+      }
+
+      if (!mounted) return;
+
+      final firstName = doctor?['first_name']?.toString() ??
+          waitlist['doctor_first_name']?.toString() ??
+          '';
+      final lastName = doctor?['last_name']?.toString() ??
+          waitlist['doctor_last_name']?.toString() ??
+          '';
+      final doctorName = '$firstName $lastName'.trim();
+
+      Navigator.pushNamed(
+        context,
+        '/doctor-schedule',
+        arguments: {
+          'doctorId': doctorId,
+          'doctorName': doctorName.isEmpty ? null : doctorName,
+          'specialty': doctor?['specialty']?.toString() ??
+              waitlist['specialty']?.toString(),
+          'clinic': doctor?['practice_name']?.toString() ??
+              waitlist['practice_name']?.toString(),
+          'consultationFee':
+              _formatConsultationFee(doctor?['consultation_fee']),
+          'professionalPhotoUrl':
+              doctor?['professional_photo_url']?.toString(),
+          'defaultDate': waitlistDate,
+        },
+      );
+    } catch (_) {
+      _openWaitlistFallback();
+    }
+  }
+
+  void _openWaitlistFallback() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Unable to open the available slot. Showing your waitlist.',
+        ),
+      ),
+    );
+    Navigator.pushNamed(context, '/waitlist');
+  }
+
   Future<void> _markAllAsRead() async {
     try {
       await _apiService.markAllNotificationsRead();
@@ -182,6 +296,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         final message = notification['message'] ?? '';
                         final type = notification['type']?.toString();
                         final isPaymentNotification = type == 'ADDITIONAL_CHARGE_ADDED' || type == 'PAYMENT_VERIFIED' || type == 'PAYMENT_REJECTED';
+                        final isWaitlistNotification = type == 'WAITLIST_UPDATE';
 
                         return Card(
                           margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
@@ -190,6 +305,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             onTap: () async {
                               if (!isRead) {
                                 await _markAsRead(notification['id']);
+                              }
+
+                              // Handle waitlist notifications - open the newly
+                              // available slot on the doctor's schedule.
+                              if (isWaitlistNotification) {
+                                await _openWaitlistSlot(notification);
+                                return;
                               }
 
                               // Handle payment-related notifications - navigate to payment details
@@ -261,6 +383,41 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                           color: AppColors.primary,
                                           fontWeight: FontWeight.w600,
                                         ),
+                                      ),
+                                    ),
+                                  if (isWaitlistNotification)
+                                    Padding(
+                                      padding: EdgeInsets.only(top: spacing.AppSpacing.gutterXs),
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            'Tap to book your slot',
+                                            style: AppTextStyles.labelSm.copyWith(
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(width: spacing.AppSpacing.gutterSm),
+                                          Expanded(
+                                            child: OutlinedButton(
+                                              onPressed: () async {
+                                                if (!isRead) {
+                                                  await _markAsRead(notification['id']);
+                                                }
+                                                await _openWaitlistSlot(notification);
+                                              },
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: AppColors.primary,
+                                                side: BorderSide(color: AppColors.primary),
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: spacing.AppSpacing.gutterSm,
+                                                  vertical: spacing.AppSpacing.gutterXs,
+                                                ),
+                                              ),
+                                              child: const Text('Book Now'),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   const SizedBox(height: spacing.AppSpacing.gutterXs),

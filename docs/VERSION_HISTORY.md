@@ -4,6 +4,260 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.33 (November 6, 2026)
+
+**Purpose:** Bring the header notification dropdown to parity with the full notifications page navigation and show complete notification messages.
+
+**Significant Changes:**
+- Mobile header notification dropdown (`app_header.dart`):
+  - `WAITLIST_UPDATE` items now fetch the waitlist entry and doctor profile, then open `/doctor-schedule` with the offered date preselected and the correct doctor details.
+  - Payment-related items (`ADDITIONAL_CHARGE_ADDED`, `PAYMENT_VERIFIED`, `PAYMENT_REJECTED`) now fetch the payment and open `PaymentScreen` with the related appointment id.
+  - The parent `onNotificationItemTap` callback still runs after the dropdown's own navigation.
+  - The dropdown closes before navigation starts.
+  - Notification messages are no longer truncated with `maxLines: 2` and ellipsis; the full message is displayed.
+- Documentation and testing plan updated for the dropdown navigation behavior.
+
+---
+
+### 01.32 (November 6, 2026)
+
+**Purpose:** Improve the waitlist booking experience by hiding regular booking for FULL dates and routing slot-availability notifications directly to the offered doctor schedule date.
+
+**Significant Changes:**
+- Mobile doctor schedule (`doctor_schedule_page.dart`):
+  - Fully booked dates hide both the "Continue Booking" action and the payment-method selector.
+  - The Join Waitlist action now occupies the bottom bar position normally used by Continue Booking; existing `WAITING` entries show their status and `OFFERED` entries show Book Now in that position.
+  - `_handleBookingConfirmation` now rejects any date whose availability status is not `AVAILABLE`, including `FULL`.
+- Mobile notifications (`notifications_page.dart`):
+  - `WAITLIST_UPDATE` notifications now fetch the waitlist entry from `GET /api/v1/waitlists/:id` and the doctor profile from `GET /api/v1/doctors/:id`.
+  - Navigation goes to `/doctor-schedule` with doctor id, name, specialty, clinic, consultation fee, professional photo, and the offered `waitlist_date` as `defaultDate`.
+  - Both the notification card tap and the "Book Now" action use the new flow; lookup failures fall back to `/waitlist`.
+- Backend waitlists (`waitlists.ts`):
+  - `GET /api/v1/waitlists/:id` now returns `waitlist_date` as a date-only `YYYY-MM-DD` string so the schedule date is preselected without timezone shifts.
+- Documentation:
+  - Updated PRD, architecture, and system state to describe FULL-date booking behavior and waitlist notification navigation.
+
+---
+
+### 01.31 (November 5, 2026)
+
+**Purpose:** Implement a complete Patient Waitlist feature allowing patients to join waitlists when appointments are fully booked, with automatic promotion when slots become available, 24-hour offer expiration, and full mobile UI integration.
+
+**Significant Features:**
+- Database schema for waitlists:
+  - Created `waitlists` table with fields: id, patient_id, doctor_id, waitlist_date, status (WAITING, OFFERED, CONVERTED, EXPIRED, CANCELLED), position, offered_at, expires_at, created_at, updated_at.
+  - Unique constraint on (patient_id, doctor_id, waitlist_date) to prevent duplicate waitlist entries.
+  - Foreign keys to patients and doctors tables.
+  - Indexes on (doctor_id, waitlist_date, status) for efficient querying and on patient_id for user-specific queries.
+  - Trigger for auto-updating updated_at timestamp.
+  - Migration file: `backend/database/041_add_waitlists.sql`.
+  - Migration applied via `npm run migrate:waitlists`.
+- Backend waitlist API endpoints (PATIENT-only):
+  - `POST /api/v1/waitlists/` - Join a waitlist. Validates doctor exists and is active, requested date is in the future, schedule is genuinely FULL, and patient has no existing active entry for same doctor/date. Creates waitlist entry with status WAITING and calculates position.
+  - `GET /api/v1/waitlists/me` - View authenticated patient's waitlist entries with doctor details (name, specialty, practice_name), ordered by waitlist_date DESC, then position ASC.
+  - `GET /api/v1/waitlists/:id` - View individual entry with ownership verification through patient record linked to authenticated user.
+  - `DELETE /api/v1/waitlists/:id` - Leave a waitlist. Updates status to CANCELLED and recalculates positions for remaining WAITING entries.
+- Waitlist promotion service:
+  - Created `backend/src/modules/waitlists/waitlistPromotionService.ts` with reusable service for waitlist promotion.
+  - `promoteNextPatient(doctorId, date)` function called when an appointment is cancelled or rescheduled (slot becomes available). Finds the earliest WAITING patient, updates status to OFFERED, sets offered_at to CURRENT_TIMESTAMP, sets expires_at to offered_at + 24 hours, creates notification with type 'WAITLIST_UPDATE'.
+  - `expireOfferedWaitlists()` function can be called periodically. Finds all OFFERED entries where expires_at < CURRENT_TIMESTAMP, updates status to EXPIRED, recalculates positions for remaining WAITING entries, and tries to promote the next patient.
+  - `recalculatePositions(doctorId, date)` function recalculates positions for WAITING entries when a patient leaves or is promoted to maintain queue order.
+- Integration with appointment cancellation/rescheduling:
+  - Modified `PATCH /api/v1/appointments/:id/cancel` endpoint to call `promoteNextPatient(doctorId, appointmentDate)` after capacity is decremented and queue is reassigned.
+  - Modified `PATCH /api/v1/appointments/:id/reschedule` endpoint to call `promoteNextPatient(doctorId, oldAppointmentDate)` when the old date's capacity becomes available after rescheduling.
+- WAITLIST_UPDATE notification type:
+  - Added 'WAITLIST_UPDATE' to NotificationTypes constant in `backend/src/api/notifications.ts`.
+  - Notifications sent when a patient is promoted from WAITING to OFFERED status.
+- Mobile API service extension:
+  - Added waitlist API methods to `mobile/lib/core/services/api_service.dart`:
+    - `joinWaitlist({doctorId, waitlistDate})` - Join a waitlist.
+    - `getMyWaitlists()` - Get patient's waitlist entries.
+    - `getWaitlistEntry(String id)` - Get single waitlist entry.
+    - `leaveWaitlist(String id)` - Leave a waitlist.
+- Mobile waitlist model:
+  - Created `mobile/lib/features/waitlist/models/waitlist.dart` with Waitlist data model including all fields and helper methods (isWaiting, isOffered, isConverted, isExpired, isCancelled, isActive).
+- Mobile waitlist screen:
+  - Created `mobile/lib/features/waitlist/presentation/waitlist_page.dart` with complete waitlist screen displaying patient's waitlist entries.
+  - Features: pull-to-refresh, list of waitlist entries with doctor info, waitlist date, position, status, time since joined, leave waitlist functionality with confirmation dialog, loading states, empty state, error states with retry button, status-specific UI rendering.
+- Mobile navigation integration:
+  - Added `/waitlist` route to `mobile/lib/main.dart` pointing to WaitlistPage.
+  - Added "My Waitlists" button in Appointments page header with navigation to waitlist screen.
+  - Updated doctor schedule page to show "Join waitlist" action button when date is FULL with confirmation dialog.
+  - Updated notifications page to handle WAITLIST_UPDATE notification type with deep-link to waitlist screen.
+
+**Improvements:**
+- Patients can now join waitlists when a doctor's schedule is fully booked instead of being blocked from booking.
+- Automatic promotion system ensures patients are notified when slots become available.
+- 24-hour offer expiration with automatic next-patient promotion keeps waitlists moving efficiently.
+- Complete mobile UI integration provides seamless waitlist management for patients.
+- Position recalculation maintains accurate queue ordering as patients leave or are promoted.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature only; existing appointment and notification functionality unchanged).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.31, added version entry to `VERSION_HISTORY.md`, and `backend/package.json` (added migrate:waitlists script).
+
+---
+
+### 01.30 (October 31, 2026)
+
+**Purpose:** Enable secretaries to send generated invoices to patients through chat with an INVOICE message type that stores a reference to the invoice rather than the PDF itself, with patient notification and secure download access enforcement.
+
+**Significant Features:**
+- Database schema for invoice messages:
+  - Added `message_type` column to `messages` table with values 'TEXT' (default) or 'INVOICE'.
+  - Added `invoice_id` nullable foreign key column to `messages` table referencing `invoices` table.
+  - Added index on `invoice_id` for efficient lookups.
+  - Migration file: `backend/database/038_add_message_type.sql`.
+  - Migration applied via `npm run migrate:message-type`.
+- Backend message endpoint updates:
+  - Extended `POST /api/v1/conversations/:id/messages` to accept `{ message, messageType: 'INVOICE', invoiceId }`.
+  - INVOICE messages are SECRETARY-only; regular text messages remain unchanged.
+  - DOCTOR and ADMIN roles remain denied on all `/api/v1/conversations/*` routes.
+  - Message responses include `message_type` and invoice summary (invoice number and status) for INVOICE messages.
+  - Updated `GET /api/v1/conversations/:id/messages` to join with `invoices` table and include invoice summary in message responses.
+- Invoice download URL endpoint:
+  - Added `GET /api/v1/invoices/:id/download-url` to return an authorized short-lived signed URL (15-minute expiry).
+  - Authorization: Only the patient in the conversation or the secretary for their assigned doctor may get the URL.
+  - Enforces conversation membership through patient-doctor association verification.
+  - Added `GET /api/v1/invoices/:id/download` public endpoint with token verification for actual PDF download.
+- INVOICE_AVAILABLE notification:
+  - When an INVOICE message is posted, creates an `INVOICE_AVAILABLE` patient notification.
+  - Sends best-effort push notification to the patient with generic title and body (no invoice content).
+  - Notification added to `conversationService.ts` with `notifyInvoiceRecipients()` function.
+- Web secretary conversations page updates:
+  - Added "Send Invoice" button in the message composer next to the text input.
+  - Added invoice picker modal showing available invoices for the patient's appointment.
+  - Secretary can select an invoice to send as an INVOICE message.
+  - Invoice messages render as distinct bubbles with receipt icon and invoice number.
+  - Updated `ConversationMessage` interface to include `message_type`, `invoice_id`, and `invoice` summary.
+  - Updated `AppointmentSummary` interface to include `appointmentId` for invoice lookup.
+- Web API client updates:
+  - Added conversation API methods to `secretaryApi.ts`: `getConversations()`, `createConversation()`, `getConversation()`, `getMessages()`, `sendMessage()`, `sendInvoiceMessage()`, `markMessagesAsRead()`, `getAppointmentSummary()`.
+  - Added invoice download URL method: `getInvoiceDownloadUrl()`.
+  - Removed duplicate `conversationApi` export; consolidated all methods into `secretaryApi`.
+
+**Improvements:**
+- Secretaries can now send invoices directly to patients through chat without requiring patients to navigate to a separate invoices page.
+- Secure download access enforced through conversation membership and short-lived signed URLs.
+- Invoice messages are clearly distinguished from text messages in the chat thread.
+- Patient notification when invoice is sent improves communication and transparency.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature only; existing message endpoints remain backward compatible with TEXT messages as default).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md`, `VERSION_HISTORY.md`, and `backend/package.json` (added migrate:message-type script).
+
+---
+
+### 01.29 (October 30, 2026)
+
+**Purpose:** Replace dashboard placeholder sections with live action items to help doctors and secretaries identify and complete pending work (missing records and unsent invoices).
+
+**Significant Features:**
+- Doctor dashboard "Needs a Record" section:
+  - Replaced placeholder with live data showing completed consultations missing visit records or prescriptions.
+  - Backend query identifies queue entries with status COMPLETED that have no visit record or no prescription.
+  - Results scoped to the authenticated doctor.
+  - Each entry shows patient name, appointment date, and badges for missing record and/or missing prescription.
+  - Entries link to `/doctor/appointments/[id]` for quick access to complete the record.
+  - Empty state displays "No consultations needing records" when none exist.
+- Secretary dashboard "Payments Needing Action" section:
+  - Extended existing section to include PAID payments that have no ACTIVE invoice.
+  - Backend query now includes PAID payments where invoice is NULL or status is VOID.
+  - Results scoped to the secretary's assigned doctor.
+  - New entries display with green/emerald "Paid — invoice not sent" status badge.
+  - All entries (existing PENDING_VERIFICATION, UNPAID, and new PAID without invoice) link to `/secretary/payments`.
+- Backend API changes:
+  - Extended `GET /api/v1/doctors/me/dashboard` to include `consultationsNeedingRecords` array with appointment details and missing record/prescription flags.
+  - Extended `GET /api/v1/secretaries/me/dashboard` to include `invoiceNotSent` flag in `paymentsNeedingAction` entries.
+- Frontend type updates:
+  - Updated `DoctorDashboard` interface in `web/src/lib/api/doctorApi.ts` to include `consultationsNeedingRecords` field.
+  - Updated `SecretaryDashboard` interface in `web/src/lib/api/secretaryApi.ts` to include `invoiceNotSent` field in payment entries.
+- Frontend UI changes:
+  - Replaced amber placeholder banner in `/web/src/app/doctor/dashboard/page.tsx` with table showing consultations needing records.
+  - Updated `/web/src/app/secretary/dashboard/page.tsx` to display "Paid — invoice not sent" entries with appropriate styling.
+
+**Improvements:**
+- Doctors can now quickly identify completed consultations that need visit records or prescriptions.
+- Secretaries can identify paid payments that need invoices generated.
+- Action items are scoped to the respective user's assigned doctor for data isolation.
+- Items automatically disappear from the list once the relevant action is taken (record created, prescription created, or invoice generated).
+
+**Breaking Changes:** None (non-breaking API additions; existing dashboard functionality unchanged).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.29 and added version entry to `VERSION_HISTORY.md`.
+
+---
+
+### 01.28 (October 30, 2026)
+
+**Purpose:** Add invoice voiding and reissue workflow to allow secretaries to correct invoice errors by voiding an invoice and generating a replacement, preserving audit trail integrity.
+
+**Significant Features:**
+- Invoice status field and voiding workflow:
+  - Added `status` column to `invoices` table with values: ACTIVE (default), VOID.
+  - Database constraint ensures only valid status values.
+  - Migration file: `backend/database/040_add_invoice_status.sql`.
+  - Migration applied via `npm run migrate:invoice-status`.
+- Secretary-only invoice voiding API endpoint:
+  - `POST /api/v1/invoices/:id/void`: Marks an invoice as VOID (irreversible).
+  - Validates secretary is assigned to the invoice's doctor.
+  - Rejects voiding already-voided invoices.
+  - Preserves invoice data for audit trail (PDF data remains but is not downloadable).
+- Invoice generation prevention:
+  - Modified `POST /api/v1/invoices/generate/:paymentId` to prevent duplicate ACTIVE invoices.
+  - Returns error if an ACTIVE invoice already exists for the payment.
+  - Allows generating new ACTIVE invoice after voiding the existing one.
+- Invoice status filtering:
+  - Modified `GET /api/v1/invoices/by-payment/:paymentId` to filter by status.
+  - By default, only returns ACTIVE invoices.
+  - Optional `?includeVoid=true` query parameter returns all invoices (for audit purposes).
+- PDF download restriction:
+  - Modified `GET /api/v1/invoices/:id/pdf` to reject PDF downloads for VOID invoices.
+  - Returns 403 error with message: "Cannot download PDF for voided invoice".
+- Frontend invoice status display:
+  - Added `status` field to `Invoice` interface in `web/src/lib/api/secretaryApi.ts`.
+  - Added `voidInvoice()` method to secretary API client.
+  - Updated secretary payments page (`/secretary/payments`) to display invoice status (ACTIVE/VOID badge).
+  - Added "Void Invoice" button for ACTIVE invoices with confirmation dialog.
+  - Confirmation message: "Paid invoices are voided and reissued, never edited. This action is irreversible."
+  - Voided invoices re-enable the "Generate Invoice" button for reissue.
+- Invoice modal updates:
+  - Updated `InvoiceModal` component to display invoice status badge.
+  - Disabled PDF download button for VOID invoices with tooltip.
+  - Added "Generate Invoice" button when invoice is VOID to enable reissue.
+  - Shows success message after generating replacement invoice.
+
+**Improvements:**
+- Secretaries can now correct invoice errors without compromising audit trail integrity.
+- One ACTIVE invoice per payment enforced at backend to prevent confusion.
+- Voided invoices remain in database for audit purposes but are not downloadable.
+- Clear visual indicators (status badges, disabled buttons) guide users through void-and-reissue workflow.
+- Irreversible voiding with confirmation prevents accidental errors.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature only; existing invoice functionality unchanged).
+
+**Documentation Updates:**
+- Updated `docs/prd.md` to add invoice voiding to secretary capabilities.
+- Updated `docs/architecture-essentials.md` to include invoices table with status field in required database concepts.
+- Added migration reference to architecture-essentials migration list.
+- Updated `CURRENT_VERSION.md` to 01.28.
+- Added version entry to `VERSION_HISTORY.md`.
+- Updated `backend/package.json` to add `migrate:invoice-status` script.
+
+---
+
 ### 01.27 (October 27, 2026)
 
 **Purpose:** Add secretary settings for clinic information that appears in invoice headers and footers, scoped to the assigned doctor, enabling each doctor or clinic to have separate invoice details for future invoice PDF generation.

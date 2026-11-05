@@ -152,6 +152,23 @@ Current System State (October 2026):
 - Login OTP challenges expire after 5 minutes, support up to 5 failed attempts, and are marked as used after successful verification
 - PostgreSQL `login_otp_challenges` table stores server-side OTP challenge state with hashed challenge tokens and a `remember_me` column retained for schema compatibility (new challenges store `false`; it no longer grants device trust)
 - PostgreSQL `doctors` and `secretaries` tables include `two_factor_enabled` column (migration 013_add_two_factor_settings.sql) - optional 2FA, must be turned on by user
+
+## Invoice Voiding and Reissue
+- Invoices have a `status` field with values: ACTIVE (default) or VOID
+- Invoice voiding allows secretaries to correct invoice errors by voiding an invoice and generating a replacement
+- Voiding is irreversible - once VOID, an invoice cannot be reactivated or edited
+- Voided invoices remain in the database for audit trail purposes (invoice_data JSONB is preserved)
+- PDF download is blocked for VOID invoices (403 error: "Cannot download PDF for voided invoice")
+- Only one ACTIVE invoice per payment is enforced at the backend
+- POST /api/v1/invoices/generate/:paymentId rejects generation if an ACTIVE invoice already exists for the payment
+- POST /api/v1/invoices/:id/void is a SECRETARY-only endpoint to void invoices
+- Void endpoint validates secretary is assigned to the invoice's doctor before allowing voiding
+- GET /api/v1/invoices/by-payment/:paymentId filters by status (ACTIVE by default, optional ?includeVoid=true for audit purposes)
+- Secretary payments page displays invoice status badge (ACTIVE/VOID) and provides "Void Invoice" button with confirmation
+- Confirmation dialog message: "Paid invoices are voided and reissued, never edited. This action is irreversible."
+- Invoice modal shows status badge, disables PDF download for VOID invoices, and allows generating replacement invoice when VOID
+- Database migration: 040_add_invoice_status.sql adds status column with check constraint (ACTIVE, VOID) and index
+- Applied via npm run migrate:invoice-status
 - Secretary settings page at `/secretary/settings` groups cards into a labeled "Account" section (optional two-factor authentication toggle, Change password card reusing `POST /api/v1/auth/change-password`, and the Trusted Browsers card) and a "Clinic" section (Clinic Payment Settings with the GCash QR thumbnail, Active/Not uploaded status, and last-updated date from `doctors.gcash_qr_updated_at`, editable Invoice details form for clinic information used in invoice headers and footers, and a display-only "Coming soon" placeholder for GCash account details)
 - Secretary Invoice details allow secretaries to configure clinic-specific information (clinic name, address, contact number, footer line) that appears in invoice headers and footers for future invoice PDF generation
 - Invoice settings are stored in the `invoice_settings` table (migration 036_add_invoice_settings.sql) with `doctor_id` as primary key, scoped to the secretary's assigned doctor
@@ -583,6 +600,7 @@ Current System State (October 2026):
 - Mobile app startup authentication check always resolves initialization (falling back to the login screen if token/storage reads fail) so the startup progress indicator cannot hang
 - Mobile appointment screens parse PostgreSQL `DECIMAL`/`NUMERIC` values (for example `doctors.consultation_fee`, which `pg` returns as a JSON string such as `"500.00"`) through the shared helpers in `mobile/lib/core/utils/json_parsers.dart` (`parseNum`, `parseInt`, `parseString`) instead of casting to `num?`; numeric strings, real numbers, `null`, empty strings, and invalid values all render safely (`₱---` / `N/A` placeholders) and the Appointments page no longer throws `type 'String' is not a subtype of type 'num?'`
 - Mobile appointment date/timestamp fields are parsed with `DateTime.tryParse` on a safely parsed string, and payment status/method empty strings are treated as absent so no blank payment badge is rendered
+- Mobile invoice viewer (`InvoiceBottomSheet`) accepts either a payment ID or invoice ID, matches the web invoice summary layout, and downloads the invoice as a PDF via `GET /api/v1/invoices/:id/pdf`; the PDF is saved to the phone's user-visible files through `FileSaveService` (`Downloads/FindMyDoctor` on Android via the `com.example.mobile/files` MediaStore method channel implemented in `MainActivity.kt`, and the Files app under On My iPhone > Mobile on iOS via file sharing enabled in `Info.plist`); when the Android save channel is unavailable the app falls back to the system share sheet so the user can still store the PDF in Files
 - Mobile patient Profile tab is grouped into labeled Account / Security / Notifications / About / Log Out sections: an account summary card opens the standalone read-only `PatientProfilePage` (route `/patient-profile`), Change password reuses `ChangePasswordPage` and returns to Profile on success, a push-notifications switch reflects a persisted `push_notifications_enabled` preference (default ON), the About section shows the runtime app version (via `package_info_plus`) and a "Privacy notice" row (route `/privacy-notice`, static screen), and Log Out keeps the previous logout behavior with no confirmation dialog
 - The mobile push-notifications switch registers this device's token through `POST /api/v1/notifications/device-tokens` when enabled and removes it through `DELETE /api/v1/notifications/device-tokens/:id` when disabled; the preference is stored locally via SharedPreferences, the OS notification permission is requested on first enable with a "open settings" hint when denied, and startup auto-registration for users who never opened the Profile screen still counts the preference (default ON) so nothing silently re-enables after the user turned it off
 - Unauthenticated requests for `/patient-profile` or `/privacy-notice` are bounced to the login page by the shared route guard (same handling as other authenticated routes); secretaries are kept on the chat-first home for these routes
