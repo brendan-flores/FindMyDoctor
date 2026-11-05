@@ -182,6 +182,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         final message = notification['message'] ?? '';
                         final type = notification['type']?.toString();
                         final isPaymentNotification = type == 'ADDITIONAL_CHARGE_ADDED' || type == 'PAYMENT_VERIFIED' || type == 'PAYMENT_REJECTED';
+                        final isWaitlistNotification = type == 'WAITLIST_UPDATE';
 
                         return Card(
                           margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
@@ -190,6 +191,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             onTap: () async {
                               if (!isRead) {
                                 await _markAsRead(notification['id']);
+                              }
+
+                              // Handle waitlist notifications - navigate to waitlist page
+                              if (isWaitlistNotification) {
+                                Navigator.pushNamed(context, '/waitlist');
+                                return;
                               }
 
                               // Handle payment-related notifications - navigate to payment details
@@ -261,6 +268,41 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                           color: AppColors.primary,
                                           fontWeight: FontWeight.w600,
                                         ),
+                                      ),
+                                    ),
+                                  if (isWaitlistNotification)
+                                    Padding(
+                                      padding: EdgeInsets.only(top: spacing.AppSpacing.gutterXs),
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            'Tap to view waitlist',
+                                            style: AppTextStyles.labelSm.copyWith(
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(width: spacing.AppSpacing.gutterSm),
+                                          Expanded(
+                                            child: OutlinedButton(
+                                              onPressed: () async {
+                                                if (!isRead) {
+                                                  await _markAsRead(notification['id']);
+                                                }
+                                                Navigator.pushNamed(context, '/waitlist');
+                                              },
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: AppColors.primary,
+                                                side: BorderSide(color: AppColors.primary),
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: spacing.AppSpacing.gutterSm,
+                                                  vertical: spacing.AppSpacing.gutterXs,
+                                                ),
+                                              ),
+                                              child: const Text('View'),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   const SizedBox(height: spacing.AppSpacing.gutterXs),

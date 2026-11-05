@@ -25,6 +25,7 @@ import '../features/conversations/presentation/ai_conversation_history_page.dart
 import '../features/payments/presentation/payment_screen.dart';
 import '../features/notifications/presentation/notifications_page.dart';
 import '../features/secretary/presentation/secretary_home_page.dart';
+import '../features/waitlist/presentation/waitlist_page.dart';
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -184,6 +185,7 @@ class MyAppState extends State<MyApp> {
           case '/conversation-thread':
           case '/ai-conversation':
           case '/ai-conversation-history':
+          case '/waitlist':
             // Protect all authenticated routes - enforce password change requirement
             if (!_isAuthenticated) {
               return MaterialPageRoute(builder: (context) => const LoginPage());
@@ -231,6 +233,7 @@ class MyAppState extends State<MyApp> {
                     clinic: args?['clinic'],
                     consultationFee: args?['consultationFee'],
                     professionalPhotoUrl: args?['professionalPhotoUrl'],
+                    defaultDate: args?['defaultDate'],
                   ),
                 );
               case '/booking-confirmation':
@@ -317,6 +320,10 @@ class MyAppState extends State<MyApp> {
               case '/notifications':
                 return MaterialPageRoute(
                   builder: (context) => const NotificationsPage(),
+                );
+              case '/waitlist':
+                return MaterialPageRoute(
+                  builder: (context) => const WaitlistPage(),
                 );
               case '/payment':
                 final args = settings.arguments as Map<String, dynamic>?;

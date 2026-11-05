@@ -894,6 +894,56 @@ class ApiService {
       }
     }
   }
+
+  // ===========================
+  // WAITLIST METHODS
+  // ===========================
+
+  // Join a waitlist
+  Future<Map<String, dynamic>> joinWaitlist({
+    required String doctorId,
+    required String waitlistDate,
+  }) async {
+    return await post(
+      '/waitlists',
+      body: {
+        'doctorId': doctorId,
+        'waitlistDate': waitlistDate,
+      },
+      requireAuth: true,
+    );
+  }
+
+  // Get patient's waitlist entries
+  Future<Map<String, dynamic>> getMyWaitlists() async {
+    return await get('/waitlists/me', requireAuth: true);
+  }
+
+  // Get single waitlist entry
+  Future<Map<String, dynamic>> getWaitlistEntry(String id) async {
+    return await get('/waitlists/$id', requireAuth: true);
+  }
+
+  // Leave a waitlist
+  Future<Map<String, dynamic>> leaveWaitlist(String id) async {
+    return await delete('/waitlists/$id', requireAuth: true);
+  }
+
+  // Check waitlist status for specific doctor and date
+  Future<Map<String, dynamic>> checkWaitlistStatus({
+    required String doctorId,
+    required String waitlistDate,
+  }) async {
+    return await get(
+      '/waitlists/check?doctorId=$doctorId&waitlistDate=$waitlistDate',
+      requireAuth: true,
+    );
+  }
+
+  // Get waitlist count for authenticated patient
+  Future<Map<String, dynamic>> getWaitlistCount() async {
+    return await get('/waitlists/count', requireAuth: true);
+  }
 }
 
 // Custom exception for API errors

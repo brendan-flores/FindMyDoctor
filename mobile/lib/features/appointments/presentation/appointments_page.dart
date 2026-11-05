@@ -13,8 +13,10 @@ import '../../payments/presentation/invoice_bottom_sheet.dart';
 
 class AppointmentsPage extends StatefulWidget {
   final ApiService? apiService;
+  final VoidCallback? onNavigateToWaitlist;
+  final VoidCallback? onWaitlistCountUpdate;
 
-  const AppointmentsPage({super.key, this.apiService});
+  const AppointmentsPage({super.key, this.apiService, this.onNavigateToWaitlist, this.onWaitlistCountUpdate});
 
   @override
   State<AppointmentsPage> createState() => _AppointmentsPageState();
@@ -28,11 +30,16 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
   bool _isLoading = true;
   String? _errorMessage;
 
+  // Waitlist state
+  List<dynamic> _waitlists = [];
+  bool _isLoadingWaitlists = true;
+
   @override
   void initState() {
     super.initState();
     _apiService = widget.apiService ?? ApiService();
     _fetchAppointments();
+    _fetchWaitlists();
   }
 
   Future<void> _fetchAppointments() async {
@@ -91,6 +98,33 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     }
   }
 
+  Future<void> _fetchWaitlists() async {
+    setState(() {
+      _isLoadingWaitlists = true;
+    });
+
+    try {
+      final response = await _apiService.getMyWaitlists();
+      if (response['success'] == true && response['data'] != null) {
+        final waitlists = response['data'] as List;
+        setState(() {
+          _waitlists = waitlists;
+          _isLoadingWaitlists = false;
+        });
+      } else {
+        setState(() {
+          _waitlists = [];
+          _isLoadingWaitlists = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _waitlists = [];
+        _isLoadingWaitlists = false;
+      });
+    }
+  }
+
   Future<void> _navigateToDetail(String appointmentId) async {
     final result = await Navigator.push(
       context,
@@ -131,6 +165,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                       _buildSearchBar(),
                       const SizedBox(height: spacing.AppSpacing.gutterLg),
                       _buildFilterTabs(),
+                      const SizedBox(height: spacing.AppSpacing.gutterLg),
+                      _buildWaitlistSection(),
                       const SizedBox(height: spacing.AppSpacing.gutterLg),
                       _buildAppointmentsList(),
                       const SizedBox(height: spacing.AppSpacing.gutter3xl),
@@ -179,6 +215,21 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                 ),
               ],
             ),
+            if (widget.onNavigateToWaitlist != null)
+              TextButton.icon(
+                onPressed: widget.onNavigateToWaitlist,
+                icon: Icon(
+                  Icons.hourglass_empty,
+                  size: spacing.AppSpacing.iconSm,
+                  color: AppColors.primary,
+                ),
+                label: Text(
+                  'My Waitlists',
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
           ],
         ),
         const SizedBox(height: spacing.AppSpacing.gutterXs),
@@ -348,6 +399,158 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildWaitlistSection() {
+    if (_isLoadingWaitlists) {
+      return const SizedBox.shrink();
+    }
+
+    if (_waitlists.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.hourglass_empty,
+              color: AppColors.primary,
+              size: spacing.AppSpacing.iconMd,
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterSm),
+            Text(
+              'Active Waitlists',
+              style: AppTextStyles.headlineSm,
+            ),
+          ],
+        ),
+        const SizedBox(height: spacing.AppSpacing.gutterMd),
+        ..._waitlists.map((waitlist) => _buildWaitlistCard(waitlist)).toList(),
+      ],
+    );
+  }
+
+  Widget _buildWaitlistCard(dynamic waitlist) {
+    final status = waitlist['status'] as String;
+    final position = waitlist['position'] as int;
+    final doctorName = '${waitlist['doctor_first_name']} ${waitlist['doctor_last_name']}';
+    final doctorSpecialty = waitlist['specialty'] as String?;
+    final waitlistDate = waitlist['waitlist_date'] as String;
+    final isOffered = status == 'OFFERED';
+
+    return AppCard(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      doctorName,
+                      style: AppTextStyles.bodyMdMedium,
+                    ),
+                    if (doctorSpecialty != null)
+                      Text(
+                        doctorSpecialty,
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.secondary,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: spacing.AppSpacing.gutterSm,
+                  vertical: spacing.AppSpacing.gutterXs,
+                ),
+                decoration: BoxDecoration(
+                  color: isOffered
+                      ? AppColors.primary.withValues(alpha: 0.1)
+                      : AppColors.tertiary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                ),
+                child: Text(
+                  isOffered ? 'Offered' : 'Position #$position',
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: isOffered ? AppColors.primary : AppColors.tertiary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_today,
+                size: spacing.AppSpacing.iconSm,
+                color: AppColors.secondary,
+              ),
+              const SizedBox(width: spacing.AppSpacing.gutterXs),
+              Text(
+                DateFormat('MMM dd, yyyy').format(DateTime.parse(waitlistDate)),
+                style: AppTextStyles.labelSm.copyWith(
+                  color: AppColors.secondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          if (isOffered)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _bookFromWaitlist(waitlist),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                ),
+                child: const Text('Book Now'),
+              ),
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: widget.onNavigateToWaitlist,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                ),
+                child: const Text('View Details'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _bookFromWaitlist(dynamic waitlist) async {
+    final doctorId = waitlist['doctor_id'] as String;
+    final doctorName = '${waitlist['doctor_first_name']} ${waitlist['doctor_last_name']}';
+    final waitlistDate = waitlist['waitlist_date'] as String;
+
+    Navigator.of(context).pushNamed(
+      '/doctor-schedule',
+      arguments: {
+        'doctorId': doctorId,
+        'doctorName': doctorName,
+        'specialty': waitlist['specialty'],
+        'clinic': waitlist['practice_name'],
+        'consultationFee': null,
+        'defaultDate': waitlistDate,
+      },
     );
   }
 

@@ -1102,4 +1102,73 @@ router.put('/me/invoice-details', authenticate, authorize('SECRETARY'), async (r
   }
 });
 
+// ============================================
+// TEMPORARY: Fix registered_count sync
+// ============================================
+
+// Fix registered_count to match actual active queue entries
+// This endpoint recalculates the registered_count for all dates
+// to match the count of queue entries that are NOT cancelled or no_show
+router.post('/fix-registered-count', authenticate, authorize('SECRETARY', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const userId = req.user!.id;
+    const role = req.user!.role;
+
+    let doctorId: string | null = null;
+
+    if (role === 'SECRETARY') {
+      const secretaryResult = await client.query(
+        'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+        [userId]
+      );
+
+      if (secretaryResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+      }
+
+      doctorId = secretaryResult.rows[0].doctor_id;
+    }
+
+    // Update registered_count for all daily_capacities records
+    // If secretary, only for their assigned doctor; if admin, for all doctors
+    let updateQuery = `
+      UPDATE daily_capacities dc
+      SET registered_count = (
+        SELECT COUNT(*)
+        FROM queue_entries q
+        WHERE q.doctor_id = dc.doctor_id
+          AND q.queue_date = dc.date
+          AND q.status NOT IN ('CANCELLED', 'NO_SHOW')
+      )
+    `;
+
+    const params: any[] = [];
+
+    if (doctorId) {
+      updateQuery += ' WHERE dc.doctor_id = $1';
+      params.push(doctorId);
+    }
+
+    const result = await client.query(updateQuery, params);
+
+    await client.query('COMMIT');
+
+    res.json(success({
+      updatedRows: result.rowCount,
+      message: 'Registered count has been synchronized with active queue entries'
+    }, 'Registered count fixed successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Fix registered count error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fix registered count'));
+  } finally {
+    client.release();
+  }
+});
+
 export default router;

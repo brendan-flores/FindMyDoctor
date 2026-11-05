@@ -42,10 +42,11 @@ jest.mock('../middleware/auth', () => ({
 
 jest.mock('../modules/availability/availabilityService', () => ({
   calculateAvailability: jest.fn(),
+  invalidateAvailabilityCache: jest.fn(),
 }));
 
 const { query, getClient } = require('../database/connection');
-const { calculateAvailability } = require('../modules/availability/availabilityService');
+const { calculateAvailability, invalidateAvailabilityCache } = require('../modules/availability/availabilityService');
 
 describe('Appointment Booking with Completion Status', () => {
   let app: express.Application;

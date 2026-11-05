@@ -291,13 +291,37 @@ describe('Queue API Security', () => {
 
   describe('PATCH /api/v1/queue/:id/status', () => {
     it('should enforce secretary\'s assigned doctor in WHERE clause', async () => {
-      query.mockImplementation((sql: string, params: any[]) => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const mockQueueEntry = {
+        id: 'queue-1',
+        status: 'WAITING',
+        queue_date: '2024-12-01',
+        doctor_id: 'assigned-doctor-id',
+        appointment_id: null,
+        appointment_status: null
+      };
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT q.*, a.id as appointment_id')) {
+          return Promise.resolve({ rows: [mockQueueEntry] });
+        }
         if (sql.includes('UPDATE queue_entries') && sql.includes('doctor_id = (SELECT doctor_id FROM secretaries')) {
           expect(params[1]).toBe('queue-1');
           expect(params[2]).toBe('test-secretary-id');
           return Promise.resolve({ rowCount: 1 });
         }
-        return Promise.resolve({ rows: [] });
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve();
       });
 
       const response = await request(app)
@@ -310,13 +334,37 @@ describe('Queue API Security', () => {
     it('should enforce doctor\'s user_id in WHERE clause', async () => {
       mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
 
-      query.mockImplementation((sql: string, params: any[]) => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const mockQueueEntry = {
+        id: 'queue-1',
+        status: 'WAITING',
+        queue_date: '2024-12-01',
+        doctor_id: 'doctor-1',
+        appointment_id: null,
+        appointment_status: null
+      };
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT q.*, a.id as appointment_id')) {
+          return Promise.resolve({ rows: [mockQueueEntry] });
+        }
         if (sql.includes('UPDATE queue_entries') && sql.includes('doctor_id = (SELECT id FROM doctors WHERE user_id =')) {
           expect(params[1]).toBe('queue-1');
           expect(params[2]).toBe('doctor-user-id');
           return Promise.resolve({ rowCount: 1 });
         }
-        return Promise.resolve({ rows: [] });
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve();
       });
 
       const response = await request(app)
@@ -327,11 +375,23 @@ describe('Queue API Security', () => {
     });
 
     it('should return 404 when secretary tries to update another doctor\'s queue entry', async () => {
-      query.mockImplementation((sql: string, params: any[]) => {
-        if (sql.includes('UPDATE queue_entries')) {
-          return Promise.resolve({ rowCount: 0 });
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
         }
-        return Promise.resolve({ rows: [] });
+        if (sql.includes('SELECT q.*, a.id as appointment_id')) {
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.includes('ROLLBACK')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve();
       });
 
       const response = await request(app)
@@ -349,6 +409,196 @@ describe('Queue API Security', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.error.message).toContain('Invalid status');
+    });
+
+    it('should decrement capacity when cancelling a queue entry', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const mockQueueEntry = {
+        id: 'queue-1',
+        status: 'WAITING',
+        queue_date: '2024-12-01',
+        doctor_id: 'doctor-1',
+        appointment_id: 'appointment-1',
+        appointment_status: 'SCHEDULED'
+      };
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT q.*, a.id as appointment_id')) {
+          return Promise.resolve({ rows: [mockQueueEntry] });
+        }
+        if (sql.includes('UPDATE queue_entries')) {
+          return Promise.resolve({ rowCount: 1 });
+        }
+        if (sql.includes('UPDATE appointments')) {
+          return Promise.resolve({ rowCount: 1 });
+        }
+        if (sql.includes('UPDATE daily_capacities')) {
+          expect(params[0]).toBe('doctor-1');
+          expect(params[1]).toBe('2024-12-01');
+          expect(sql).toContain('registered_count = registered_count - 1');
+          return Promise.resolve({ rowCount: 1 });
+        }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve();
+      });
+
+      const response = await request(app)
+        .patch('/api/v1/queue/queue-1/status')
+        .send({ status: 'CANCELLED' });
+
+      expect(response.status).toBe(200);
+      expect(mockClient.query).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE daily_capacities'),
+        expect.arrayContaining(['doctor-1', '2024-12-01'])
+      );
+    });
+
+    it('should decrement capacity when marking queue entry as NO_SHOW', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const mockQueueEntry = {
+        id: 'queue-1',
+        status: 'WAITING',
+        queue_date: '2024-12-01',
+        doctor_id: 'doctor-1',
+        appointment_id: 'appointment-1',
+        appointment_status: 'SCHEDULED'
+      };
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT q.*, a.id as appointment_id')) {
+          return Promise.resolve({ rows: [mockQueueEntry] });
+        }
+        if (sql.includes('UPDATE queue_entries')) {
+          return Promise.resolve({ rowCount: 1 });
+        }
+        if (sql.includes('UPDATE appointments')) {
+          return Promise.resolve({ rowCount: 1 });
+        }
+        if (sql.includes('UPDATE daily_capacities')) {
+          expect(sql).toContain('registered_count = registered_count - 1');
+          return Promise.resolve({ rowCount: 1 });
+        }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve();
+      });
+
+      const response = await request(app)
+        .patch('/api/v1/queue/queue-1/status')
+        .send({ status: 'NO_SHOW' });
+
+      expect(response.status).toBe(200);
+      expect(mockClient.query).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE daily_capacities'),
+        expect.arrayContaining(['doctor-1', '2024-12-01'])
+      );
+    });
+
+    it('should not decrement capacity when status is already CANCELLED', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const mockQueueEntry = {
+        id: 'queue-1',
+        status: 'CANCELLED',
+        queue_date: '2024-12-01',
+        doctor_id: 'doctor-1',
+        appointment_id: 'appointment-1',
+        appointment_status: 'CANCELLED'
+      };
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT q.*, a.id as appointment_id')) {
+          return Promise.resolve({ rows: [mockQueueEntry] });
+        }
+        if (sql.includes('UPDATE queue_entries')) {
+          return Promise.resolve({ rowCount: 1 });
+        }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve();
+      });
+
+      const response = await request(app)
+        .patch('/api/v1/queue/queue-1/status')
+        .send({ status: 'CANCELLED' });
+
+      expect(response.status).toBe(200);
+      // Verify that daily_capacities update was NOT called
+      const capacityUpdateCalls = mockClient.query.mock.calls.filter(call =>
+        call[0].includes('UPDATE daily_capacities')
+      );
+      expect(capacityUpdateCalls.length).toBe(0);
+    });
+
+    it('should not decrement capacity for non-cancellation status changes', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const mockQueueEntry = {
+        id: 'queue-1',
+        status: 'WAITING',
+        queue_date: '2024-12-01',
+        doctor_id: 'doctor-1',
+        appointment_id: 'appointment-1',
+        appointment_status: 'SCHEDULED'
+      };
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT q.*, a.id as appointment_id')) {
+          return Promise.resolve({ rows: [mockQueueEntry] });
+        }
+        if (sql.includes('UPDATE queue_entries')) {
+          return Promise.resolve({ rowCount: 1 });
+        }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve();
+      });
+
+      const response = await request(app)
+        .patch('/api/v1/queue/queue-1/status')
+        .send({ status: 'CALLED' });
+
+      expect(response.status).toBe(200);
+      // Verify that daily_capacities update was NOT called
+      const capacityUpdateCalls = mockClient.query.mock.calls.filter(call =>
+        call[0].includes('UPDATE daily_capacities')
+      );
+      expect(capacityUpdateCalls.length).toBe(0);
     });
   });
 

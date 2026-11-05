@@ -4,6 +4,69 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.31 (November 5, 2026)
+
+**Purpose:** Implement a complete Patient Waitlist feature allowing patients to join waitlists when appointments are fully booked, with automatic promotion when slots become available, 24-hour offer expiration, and full mobile UI integration.
+
+**Significant Features:**
+- Database schema for waitlists:
+  - Created `waitlists` table with fields: id, patient_id, doctor_id, waitlist_date, status (WAITING, OFFERED, CONVERTED, EXPIRED, CANCELLED), position, offered_at, expires_at, created_at, updated_at.
+  - Unique constraint on (patient_id, doctor_id, waitlist_date) to prevent duplicate waitlist entries.
+  - Foreign keys to patients and doctors tables.
+  - Indexes on (doctor_id, waitlist_date, status) for efficient querying and on patient_id for user-specific queries.
+  - Trigger for auto-updating updated_at timestamp.
+  - Migration file: `backend/database/041_add_waitlists.sql`.
+  - Migration applied via `npm run migrate:waitlists`.
+- Backend waitlist API endpoints (PATIENT-only):
+  - `POST /api/v1/waitlists/` - Join a waitlist. Validates doctor exists and is active, requested date is in the future, schedule is genuinely FULL, and patient has no existing active entry for same doctor/date. Creates waitlist entry with status WAITING and calculates position.
+  - `GET /api/v1/waitlists/me` - View authenticated patient's waitlist entries with doctor details (name, specialty, practice_name), ordered by waitlist_date DESC, then position ASC.
+  - `GET /api/v1/waitlists/:id` - View individual entry with ownership verification through patient record linked to authenticated user.
+  - `DELETE /api/v1/waitlists/:id` - Leave a waitlist. Updates status to CANCELLED and recalculates positions for remaining WAITING entries.
+- Waitlist promotion service:
+  - Created `backend/src/modules/waitlists/waitlistPromotionService.ts` with reusable service for waitlist promotion.
+  - `promoteNextPatient(doctorId, date)` function called when an appointment is cancelled or rescheduled (slot becomes available). Finds the earliest WAITING patient, updates status to OFFERED, sets offered_at to CURRENT_TIMESTAMP, sets expires_at to offered_at + 24 hours, creates notification with type 'WAITLIST_UPDATE'.
+  - `expireOfferedWaitlists()` function can be called periodically. Finds all OFFERED entries where expires_at < CURRENT_TIMESTAMP, updates status to EXPIRED, recalculates positions for remaining WAITING entries, and tries to promote the next patient.
+  - `recalculatePositions(doctorId, date)` function recalculates positions for WAITING entries when a patient leaves or is promoted to maintain queue order.
+- Integration with appointment cancellation/rescheduling:
+  - Modified `PATCH /api/v1/appointments/:id/cancel` endpoint to call `promoteNextPatient(doctorId, appointmentDate)` after capacity is decremented and queue is reassigned.
+  - Modified `PATCH /api/v1/appointments/:id/reschedule` endpoint to call `promoteNextPatient(doctorId, oldAppointmentDate)` when the old date's capacity becomes available after rescheduling.
+- WAITLIST_UPDATE notification type:
+  - Added 'WAITLIST_UPDATE' to NotificationTypes constant in `backend/src/api/notifications.ts`.
+  - Notifications sent when a patient is promoted from WAITING to OFFERED status.
+- Mobile API service extension:
+  - Added waitlist API methods to `mobile/lib/core/services/api_service.dart`:
+    - `joinWaitlist({doctorId, waitlistDate})` - Join a waitlist.
+    - `getMyWaitlists()` - Get patient's waitlist entries.
+    - `getWaitlistEntry(String id)` - Get single waitlist entry.
+    - `leaveWaitlist(String id)` - Leave a waitlist.
+- Mobile waitlist model:
+  - Created `mobile/lib/features/waitlist/models/waitlist.dart` with Waitlist data model including all fields and helper methods (isWaiting, isOffered, isConverted, isExpired, isCancelled, isActive).
+- Mobile waitlist screen:
+  - Created `mobile/lib/features/waitlist/presentation/waitlist_page.dart` with complete waitlist screen displaying patient's waitlist entries.
+  - Features: pull-to-refresh, list of waitlist entries with doctor info, waitlist date, position, status, time since joined, leave waitlist functionality with confirmation dialog, loading states, empty state, error states with retry button, status-specific UI rendering.
+- Mobile navigation integration:
+  - Added `/waitlist` route to `mobile/lib/main.dart` pointing to WaitlistPage.
+  - Added "My Waitlists" button in Appointments page header with navigation to waitlist screen.
+  - Updated doctor schedule page to show "Join waitlist" action button when date is FULL with confirmation dialog.
+  - Updated notifications page to handle WAITLIST_UPDATE notification type with deep-link to waitlist screen.
+
+**Improvements:**
+- Patients can now join waitlists when a doctor's schedule is fully booked instead of being blocked from booking.
+- Automatic promotion system ensures patients are notified when slots become available.
+- 24-hour offer expiration with automatic next-patient promotion keeps waitlists moving efficiently.
+- Complete mobile UI integration provides seamless waitlist management for patients.
+- Position recalculation maintains accurate queue ordering as patients leave or are promoted.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature only; existing appointment and notification functionality unchanged).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.31, added version entry to `VERSION_HISTORY.md`, and `backend/package.json` (added migrate:waitlists script).
+
+---
+
 ### 01.30 (October 31, 2026)
 
 **Purpose:** Enable secretaries to send generated invoices to patients through chat with an INVOICE message type that stores a reference to the invoice rather than the PDF itself, with patient notification and secure download access enforcement.

@@ -21,6 +21,7 @@ class DoctorSchedulePage extends StatefulWidget {
   final String? clinic;
   final String? consultationFee;
   final String? professionalPhotoUrl;
+  final String? defaultDate;
 
   const DoctorSchedulePage({
     super.key,
@@ -30,6 +31,7 @@ class DoctorSchedulePage extends StatefulWidget {
     this.clinic,
     this.consultationFee,
     this.professionalPhotoUrl,
+    this.defaultDate,
   });
 
   @override
@@ -51,6 +53,10 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   bool _isCheckingRecord = false;
   String? _errorMessage;
 
+  // Waitlist status
+  Map<String, dynamic>? _waitlistStatus;
+  bool _isLoadingWaitlist = false;
+
   // Week navigation
   DateTime _currentWeekStart = DateTime.now();
 
@@ -60,10 +66,46 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   @override
   void initState() {
     super.initState();
-    _selectedDate = null;
-    _currentWeekStart = _getStartOfWeek(DateTime.now());
+    // If defaultDate is provided, set it as selected date
+    if (widget.defaultDate != null) {
+      _selectedDate = DateTime.tryParse(widget.defaultDate!);
+      // Set week start to the week containing the default date
+      if (_selectedDate != null) {
+        _currentWeekStart = _getStartOfWeek(_selectedDate!);
+      } else {
+        _currentWeekStart = _getStartOfWeek(DateTime.now());
+      }
+    } else {
+      _selectedDate = null;
+      _currentWeekStart = _getStartOfWeek(DateTime.now());
+    }
     _fetchAvailability();
     _fetchGcashQr();
+  }
+
+  Future<void> _fetchWaitlistStatus() async {
+    if (_selectedDate == null) return;
+
+    setState(() {
+      _isLoadingWaitlist = true;
+    });
+
+    try {
+      final response = await _apiService.checkWaitlistStatus(
+        doctorId: widget.doctorId,
+        waitlistDate: DateFormat('yyyy-MM-dd').format(_selectedDate!),
+      );
+
+      setState(() {
+        _waitlistStatus = response['success'] == true ? response['data'] : null;
+        _isLoadingWaitlist = false;
+      });
+    } catch (e) {
+      setState(() {
+        _waitlistStatus = null;
+        _isLoadingWaitlist = false;
+      });
+    }
   }
 
   DateTime _getStartOfWeek(DateTime date) {
@@ -666,11 +708,12 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
     }
 
     return GestureDetector(
-      onTap: isAvailable
+      onTap: isAvailable || isFull
           ? () {
               setState(() {
                 _selectedDate = date;
               });
+              _fetchWaitlistStatus();
             }
           : null,
       child: Container(
@@ -713,6 +756,122 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
 
     final status = availability['status'] as String?;
     final capacity = availability['capacity'] as Map?;
+
+    // Show waitlist join option when date is FULL
+    if (status == 'FULL') {
+      // If patient has an active waitlist entry, show status
+      if (_waitlistStatus != null) {
+        final waitlistStatus = _waitlistStatus;
+        final waitlistPosition = waitlistStatus['position'];
+        final waitlistStatusText = waitlistStatus['status']; // WAITING or OFFERED
+        final isOffered = waitlistStatusText == 'OFFERED';
+
+        return AppCard(
+          padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isOffered ? Icons.star : Icons.hourglass_empty,
+                    color: isOffered ? AppColors.primary : AppColors.tertiary,
+                    size: spacing.AppSpacing.iconMd,
+                  ),
+                  const SizedBox(width: spacing.AppSpacing.gutterSm),
+                  Text(
+                    isOffered ? 'You\'re Next in Line!' : 'You\'re on the Waitlist',
+                    style: AppTextStyles.headlineSm.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: isOffered ? AppColors.primary : AppColors.tertiary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: spacing.AppSpacing.gutterSm),
+              Text(
+                isOffered
+                    ? 'A slot is available! Book within 24 hours to secure it.'
+                    : 'Position #$waitlistPosition. You\'ll be notified when a slot becomes available.',
+                style: AppTextStyles.bodyMd.copyWith(
+                  color: AppColors.secondary,
+                ),
+              ),
+              if (isOffered) ...[
+                const SizedBox(height: spacing.AppSpacing.gutterMd),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => _bookFromWaitlist(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.onPrimary,
+                    ),
+                    child: const Text('Book Now'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: spacing.AppSpacing.gutterMd),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, '/waitlist'),
+                child: Text(
+                  'View Full Waitlist',
+                  style: AppTextStyles.bodySm.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      // Otherwise show join waitlist option
+      return AppCard(
+        padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.hourglass_empty,
+                  color: AppColors.primary,
+                  size: spacing.AppSpacing.iconMd,
+                ),
+                const SizedBox(width: spacing.AppSpacing.gutterSm),
+                Text(
+                  'Fully Booked',
+                  style: AppTextStyles.headlineSm.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: spacing.AppSpacing.gutterSm),
+            Text(
+              'All slots are fully booked. Join the waitlist to be notified when a slot becomes available.',
+              style: AppTextStyles.bodyMd.copyWith(
+                color: AppColors.secondary,
+              ),
+            ),
+            const SizedBox(height: spacing.AppSpacing.gutterMd),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _joinWaitlist(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                ),
+                child: const Text('Join Waitlist'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     // Show message if patient already has an appointment on this date
     if (status == 'ALREADY_BOOKED') {
@@ -870,6 +1029,75 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
         ],
       ),
     );
+  }
+
+  Future<void> _joinWaitlist() async {
+    if (_selectedDate == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Join Waitlist'),
+        content: Text('Join waitlist for ${DateFormat('MMM dd, yyyy').format(_selectedDate!)}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Join'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final response = await _apiService.joinWaitlist(
+          doctorId: widget.doctorId,
+          waitlistDate: DateFormat('yyyy-MM-dd').format(_selectedDate!),
+        );
+
+        if (response['success'] == true) {
+          final position = response['data']?['position'];
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('You\'ve joined the waitlist. Position: #$position. You\'ll be notified when a slot becomes available and you\'re next in line.'),
+              backgroundColor: AppColors.primary,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          // Refresh waitlist status instead of navigating away
+          await _fetchWaitlistStatus();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response['error']?['message'] ?? 'Failed to join waitlist'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to join waitlist: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _bookFromWaitlist() async {
+    // When status is OFFERED, the date is already selected
+    // The user can proceed with booking - the date is now available
+    // Re-check availability to confirm the slot is still available
+    await _fetchAvailability();
+    // Clear waitlist status so the UI shows the available slot
+    setState(() {
+      _waitlistStatus = null;
+    });
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {

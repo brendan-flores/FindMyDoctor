@@ -4,6 +4,7 @@ import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requirePasswordChange } from '../middleware/auth';
 import { calculateAvailability, invalidateAvailabilityCache } from '../modules/availability/availabilityService';
 import { toClinicDateString } from '../utils/date';
+import { promoteNextPatient } from '../modules/waitlists/waitlistPromotionService';
 
 const router = Router();
 
@@ -602,6 +603,14 @@ router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATI
 
     await client.query('COMMIT');
 
+    // Promote next patient from waitlist (after transaction commits)
+    try {
+      await promoteNextPatient(appointment.doctor_id, appointmentDate);
+    } catch (promotionError) {
+      console.error('Waitlist promotion error (non-blocking):', promotionError);
+      // Don't fail the cancellation if promotion fails
+    }
+
     res.json(success(null, 'Appointment cancelled successfully'));
   } catch (err: any) {
     await client.query('ROLLBACK');
@@ -614,54 +623,86 @@ router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATI
 
 // Reschedule appointment
 router.patch('/:id/reschedule', authenticate, requirePasswordChange, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
     const { newAppointmentDate } = req.body;
     const userId = req.user!.id;
 
     if (!newAppointmentDate) {
+      await client.query('ROLLBACK');
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'New appointment date is required'));
     }
 
     // Get current appointment
-    const appointmentResult = await query(
-      `SELECT * FROM appointments 
+    const appointmentResult = await client.query(
+      `SELECT * FROM appointments
        WHERE id = $1 AND patient_id = (SELECT id FROM patients WHERE user_id = $2)`,
       [id, userId]
     );
 
     if (appointmentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Appointment not found'));
     }
 
     const appointment = appointmentResult.rows[0];
+    const oldDateOnly = toClinicDateString(new Date(appointment.appointment_date));
 
     // Check capacity for new date
     const newDateOnly = toClinicDateString(new Date(newAppointmentDate));
-    const capacityResult = await query(
+    const capacityResult = await client.query(
       'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
       [appointment.doctor_id, newDateOnly]
     );
 
     if (capacityResult.rows.length === 0 || capacityResult.rows[0].registered_count >= capacityResult.rows[0].final_capacity) {
+      await client.query('ROLLBACK');
       return res.status(400).json(error(ErrorCodes.CAPACITY_FULL, 'No available slots for the new date'));
     }
 
     // Update appointment
-    await query(
+    await client.query(
       'UPDATE appointments SET appointment_date = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [newAppointmentDate, id]
     );
 
     // Update queue entry
-    await query(
+    await client.query(
       'UPDATE queue_entries SET queue_date = $1, updated_at = CURRENT_TIMESTAMP WHERE appointment_id = $2',
       [newDateOnly, id]
     );
 
+    // Update registered_count: decrement for old date, increment for new date
+    await client.query(
+      'UPDATE daily_capacities SET registered_count = registered_count - 1 WHERE doctor_id = $1 AND date = $2',
+      [appointment.doctor_id, oldDateOnly]
+    );
+
+    await client.query(
+      'UPDATE daily_capacities SET registered_count = registered_count + 1 WHERE doctor_id = $1 AND date = $2',
+      [appointment.doctor_id, newDateOnly]
+    );
+
+    await client.query('COMMIT');
+
+    // Promote next patient from waitlist for the old date (after transaction commits)
+    try {
+      await promoteNextPatient(appointment.doctor_id, oldDateOnly);
+    } catch (promotionError) {
+      console.error('Waitlist promotion error (non-blocking):', promotionError);
+      // Don't fail the reschedule if promotion fails
+    }
+
     res.json(success(null, 'Appointment rescheduled successfully'));
   } catch (err: any) {
+    await client.query('ROLLBACK');
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to reschedule appointment'));
+  } finally {
+    client.release();
   }
 });
 
