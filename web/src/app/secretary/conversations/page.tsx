@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  conversationApi,
+  secretaryApi,
   Conversation,
   ConversationMessage,
   AppointmentSummary,
+  Invoice,
+  Payment,
 } from '@/lib/api/secretaryApi';
 
 const MESSAGES_POLL_MS = 30000;
@@ -23,7 +25,6 @@ export default function SecretaryConversations() {
   const [isSending, setIsSending] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [threadError, setThreadError] = useState<string | null>(null);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [hoveredMessage, setHoveredMessage] = useState<{
     id: string;
@@ -32,6 +33,9 @@ export default function SecretaryConversations() {
     isOwn: boolean;
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [showInvoicePicker, setShowInvoicePicker] = useState(false);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -50,7 +54,7 @@ export default function SecretaryConversations() {
   }, []);
 
   const fetchConversations = useCallback(async () => {
-    const response = await conversationApi.getConversations();
+    const response = await secretaryApi.getConversations();
     if (response.success && response.data) {
       const getActivityTime = (conversation: Conversation) => {
         const timestamp = conversation.last_message_sent_at ?? conversation.updated_at;
@@ -76,22 +80,19 @@ export default function SecretaryConversations() {
       let summaryResponse;
       if (patientId) {
         // For patients without conversations, use patient ID to get summary
-        summaryResponse = await conversationApi.getAppointmentSummaryByPatientId(patientId);
+        summaryResponse = await secretaryApi.getAppointmentSummaryByPatient(patientId);
       } else {
         // For existing conversations, use conversation ID
-        summaryResponse = await conversationApi.getAppointmentSummary(conversationId);
+        summaryResponse = await secretaryApi.getAppointmentSummary(conversationId);
       }
 
       if (summaryResponse.success && summaryResponse.data) {
         setSummary(summaryResponse.data);
-        setSummaryError(null);
-      } else {
-        setSummaryError(summaryResponse.error || 'Failed to fetch appointment summary');
       }
 
       // Only fetch messages if we have a conversation ID
       if (!patientId) {
-        const messagesResponse = await conversationApi.getMessages(conversationId);
+        const messagesResponse = await secretaryApi.getMessages(conversationId);
         if (messagesResponse.success && messagesResponse.data) {
           setMessages(messagesResponse.data);
         } else {
@@ -99,7 +100,7 @@ export default function SecretaryConversations() {
         }
 
         // Mark incoming messages as read, then refresh badges
-        const readResponse = await conversationApi.markAsRead(conversationId);
+        const readResponse = await secretaryApi.markMessagesAsRead(conversationId);
         if (readResponse.success) {
           fetchConversations();
         }
@@ -124,7 +125,7 @@ export default function SecretaryConversations() {
     const interval = setInterval(() => {
       fetchConversations();
       if (selectedId) {
-        conversationApi.getMessages(selectedId).then((response) => {
+        secretaryApi.getMessages(selectedId).then((response) => {
           if (response.success && response.data) {
             setMessages(response.data);
           }
@@ -140,11 +141,11 @@ export default function SecretaryConversations() {
 
   const handleSelectConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
-    
+
     // If conversation doesn't exist (patient without messages), create one first
     if (!conversation.id) {
       try {
-        const createResponse = await conversationApi.createConversation({ patientId: conversation.patient_id });
+        const createResponse = await secretaryApi.createConversation(conversation.patient_id);
         if (createResponse.success && createResponse.data) {
           // Select the newly created conversation
           const newConversation = createResponse.data;
@@ -152,7 +153,6 @@ export default function SecretaryConversations() {
             setSelectedId(newConversation.id);
             setSelectedConversation(newConversation);
             setSummary(null);
-            setSummaryError(null);
             // Fetch thread for the new conversation
             fetchThread(newConversation.id);
           }
@@ -167,7 +167,6 @@ export default function SecretaryConversations() {
     } else {
       setSelectedId(conversation.id);
       setSummary(null);
-      setSummaryError(null);
       fetchThread(conversation.id);
     }
   };
@@ -181,11 +180,11 @@ export default function SecretaryConversations() {
     setIsSending(true);
 
     try {
-      const response = await conversationApi.sendMessage(selectedId, message);
+      const response = await secretaryApi.sendMessage(selectedId, message);
 
       if (response.success) {
         setDraft('');
-        const messagesResponse = await conversationApi.getMessages(selectedId);
+        const messagesResponse = await secretaryApi.getMessages(selectedId);
         if (messagesResponse.success && messagesResponse.data) {
           setMessages(messagesResponse.data);
         } else {
@@ -200,6 +199,60 @@ export default function SecretaryConversations() {
       setThreadError('Network error occurred');
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleSendInvoice = async (invoiceId: string) => {
+    if (!selectedId || isSending) {
+      return;
+    }
+
+    setIsSending(true);
+    setShowInvoicePicker(false);
+
+    try {
+      const response = await secretaryApi.sendInvoiceMessage(selectedId, invoiceId);
+
+      if (response.success) {
+        const messagesResponse = await secretaryApi.getMessages(selectedId);
+        if (messagesResponse.success && messagesResponse.data) {
+          setMessages(messagesResponse.data);
+        } else {
+          setThreadError(messagesResponse.error || 'Failed to refresh messages');
+        }
+        // Update the preview/unread state in the conversation list
+        fetchConversations();
+      } else {
+        setThreadError(response.error || 'Failed to send invoice');
+      }
+    } catch {
+      setThreadError('Network error occurred');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleOpenInvoicePicker = async () => {
+    if (!selectedConversation?.patient_id) {
+      setThreadError('No patient selected');
+      return;
+    }
+
+    setIsLoadingInvoices(true);
+    setShowInvoicePicker(true);
+
+    try {
+      // Get all invoices for this patient with the secretary's assigned doctor
+      const response = await secretaryApi.getInvoicesByPatient(selectedConversation.patient_id);
+      if (response.success && response.data) {
+        setInvoices(response.data);
+      } else {
+        setInvoices([]);
+      }
+    } catch {
+      setThreadError('Failed to load invoices');
+    } finally {
+      setIsLoadingInvoices(false);
     }
   };
 
@@ -370,6 +423,8 @@ export default function SecretaryConversations() {
                   messages.map((message) => {
                     const isOwn = message.sender_user_id === currentUserId;
                     const isHovered = hoveredMessage?.id === message.id;
+                    const isInvoice = message.message_type === 'INVOICE';
+
                     return (
                       <div key={message.id} className={`flex w-full min-w-0 items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                         {!isOwn && (
@@ -395,7 +450,17 @@ export default function SecretaryConversations() {
                             }}
                             onMouseLeave={() => setHoveredMessage(null)}
                           >
-                            <p className="text-sm text-justify whitespace-pre-wrap break-words">{message.message}</p>
+                            {isInvoice ? (
+                              <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+                                <div>
+                                  <p className="text-sm font-medium">Invoice {message.invoice?.invoice_number}</p>
+                                  <p className="text-xs opacity-90">Tap to view invoice</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-justify whitespace-pre-wrap break-words">{message.message}</p>
+                            )}
                           </div>
                           {isHovered && typeof document !== 'undefined' && createPortal(
                             <div
@@ -423,6 +488,15 @@ export default function SecretaryConversations() {
               {/* Composer */}
               <div className="border-t border-slate-100 p-3">
                 <div className="flex items-end gap-2">
+                  <button
+                    onClick={handleOpenInvoicePicker}
+                    disabled={isSending}
+                    className="px-3 py-2 rounded-lg text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    title="Send invoice to patient"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+                    <span className="hidden sm:inline">Send Invoice</span>
+                  </button>
                   <textarea
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
@@ -464,56 +538,90 @@ export default function SecretaryConversations() {
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {selectedConversation ? (
-              <>
-                {summaryError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
-                    {summaryError}
+              !summary ? (
+                <p className="text-xs text-slate-500">Loading patient details…</p>
+              ) : (
+                <>
+                  {/* Patient block */}
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Patient</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {summary.patient.firstName} {summary.patient.middleName ? `${summary.patient.middleName} ` : ''}
+                      {summary.patient.lastName}
+                    </p>
+                    <dl className="mt-2 space-y-1">
+                      {summary.patient.phone && (
+                        <div className="flex items-center gap-2 text-xs text-slate-600">
+                          <span className="material-symbols-outlined text-[16px] text-slate-400">call</span>
+                          {summary.patient.phone}
+                        </div>
+                      )}
+                      {summary.patient.email && (
+                        <div className="flex items-center gap-2 text-xs text-slate-600 break-all">
+                          <span className="material-symbols-outlined text-[16px] text-slate-400">mail</span>
+                          {summary.patient.email}
+                        </div>
+                      )}
+                      {summary.patient.dateOfBirth && (
+                        <div className="flex items-center gap-2 text-xs text-slate-600">
+                          <span className="material-symbols-outlined text-[16px] text-slate-400">cake</span>
+                          DOB: {formatDate(summary.patient.dateOfBirth)}
+                        </div>
+                      )}
+                    </dl>
                   </div>
-                )}
-                {!summary && !summaryError ? (
-                  <p className="text-xs text-slate-500">Loading patient details…</p>
-                ) : summary ? (
-                  <>
-                    {/* Patient block */}
+
+                  {/* Appointment block */}
+                  {summary.appointment ? (
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Patient</p>
-                      <p className="text-sm font-semibold text-slate-900">
-                        {summary.patient.firstName} {summary.patient.middleName ? `${summary.patient.middleName} ` : ''}
-                        {summary.patient.lastName}
-                      </p>
-                      <dl className="mt-2 space-y-1">
-                        {summary.patient.phone && (
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Appointment</p>
+                      <dl className="space-y-1">
+                        {summary.appointment.appointmentDate && (
                           <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <span className="material-symbols-outlined text-[16px] text-slate-400">call</span>
-                            {summary.patient.phone}
+                            <span className="material-symbols-outlined text-[16px] text-slate-400">calendar_today</span>
+                            {formatDate(summary.appointment.appointmentDate)}
                           </div>
                         )}
-                        {summary.patient.email && (
-                          <div className="flex items-center gap-2 text-xs text-slate-600 break-all">
-                            <span className="material-symbols-outlined text-[16px] text-slate-400">mail</span>
-                            {summary.patient.email}
+                        {summary.appointment.status && (
+                          <div className="flex items-center gap-2 text-xs text-slate-600">
+                            <span className="material-symbols-outlined text-[16px] text-slate-400">info</span>
+                            Status: {summary.appointment.status}
                           </div>
                         )}
-                        {summary.patient.dateOfBirth && (
+                        {summary.appointment.reasonForVisit && (
                           <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <span className="material-symbols-outlined text-[16px] text-slate-400">cake</span>
-                            DOB: {formatDate(summary.patient.dateOfBirth)}
+                            <span className="material-symbols-outlined text-[16px] text-slate-400">medical_services</span>
+                            {summary.appointment.reasonForVisit}
+                          </div>
+                        )}
+                        {summary.appointment.queueNumber && (
+                          <div className="flex items-center gap-2 text-xs text-slate-600">
+                            <span className="material-symbols-outlined text-[16px] text-slate-400">tag</span>
+                            Queue #{summary.appointment.queueNumber}
                           </div>
                         )}
                       </dl>
                     </div>
-
-                    {/* Doctor block */}
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Clinic</p>
-                      <p className="text-sm font-semibold text-slate-900">
-                        Dr. {summary.doctor.firstName} {summary.doctor.lastName}
-                      </p>
-                      <p className="text-xs text-slate-600 mt-0.5">{summary.doctor.practiceName}</p>
+                  ) : summary.appointmentStatus ? (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-lg text-xs">
+                      No active appointment (last appointment status: {summary.appointmentStatus})
                     </div>
-                  </>
-                ) : null}
-              </>
+                  ) : (
+                    <div className="bg-slate-50 border border-slate-200 text-slate-600 px-3 py-2 rounded-lg text-xs">
+                      No appointment on record
+                    </div>
+                  )}
+
+                  {/* Doctor block */}
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Clinic</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      Dr. {summary.doctor.firstName} {summary.doctor.lastName}
+                    </p>
+                    <p className="text-xs text-slate-600 mt-0.5">{summary.doctor.practiceName}</p>
+                  </div>
+                </>
+              )
             ) : (
               <div className="flex flex-col items-center justify-center text-center pt-12">
                 <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">badge</span>
@@ -523,6 +631,56 @@ export default function SecretaryConversations() {
           </div>
         </div>
       </div>
+
+      {/* Invoice Picker Modal */}
+      {showInvoicePicker && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">Send Invoice to Patient</h3>
+              <button
+                onClick={() => setShowInvoicePicker(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {isLoadingInvoices ? (
+                <p className="text-xs text-slate-500 text-center py-4">Loading invoices…</p>
+              ) : invoices.length === 0 ? (
+                <p className="text-xs text-slate-500 text-center py-4">No invoices available for this appointment.</p>
+              ) : (
+                <div className="space-y-2">
+                  {invoices.map((invoice) => (
+                    <button
+                      key={invoice.id}
+                      onClick={() => handleSendInvoice(invoice.id)}
+                      className="w-full text-left px-4 py-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{invoice.invoice_number}</p>
+                          {invoice.appointment_date && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              {new Date(invoice.appointment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                          )}
+                          <p className="text-xs text-slate-500 mt-1">
+                            Total: ₱{typeof invoice.total_amount === 'string' ? parseFloat(invoice.total_amount).toFixed(2) : invoice.total_amount.toFixed(2)}
+                          </p>
+                        </div>
+                        <span className="material-symbols-outlined text-slate-400 text-[20px]">send</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

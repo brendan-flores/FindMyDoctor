@@ -2,6 +2,10 @@
     package="com.example.mobile">
     <!-- Internet permission for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Legacy only: Android 10+ saves invoices through MediaStore/Downloads. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application
         android:label="mobile"

@@ -4,7 +4,61 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
-### 01.30 (October 30, 2026)
+### 01.30 (October 31, 2026)
+
+**Purpose:** Enable secretaries to send generated invoices to patients through chat with an INVOICE message type that stores a reference to the invoice rather than the PDF itself, with patient notification and secure download access enforcement.
+
+**Significant Features:**
+- Database schema for invoice messages:
+  - Added `message_type` column to `messages` table with values 'TEXT' (default) or 'INVOICE'.
+  - Added `invoice_id` nullable foreign key column to `messages` table referencing `invoices` table.
+  - Added index on `invoice_id` for efficient lookups.
+  - Migration file: `backend/database/038_add_message_type.sql`.
+  - Migration applied via `npm run migrate:message-type`.
+- Backend message endpoint updates:
+  - Extended `POST /api/v1/conversations/:id/messages` to accept `{ message, messageType: 'INVOICE', invoiceId }`.
+  - INVOICE messages are SECRETARY-only; regular text messages remain unchanged.
+  - DOCTOR and ADMIN roles remain denied on all `/api/v1/conversations/*` routes.
+  - Message responses include `message_type` and invoice summary (invoice number and status) for INVOICE messages.
+  - Updated `GET /api/v1/conversations/:id/messages` to join with `invoices` table and include invoice summary in message responses.
+- Invoice download URL endpoint:
+  - Added `GET /api/v1/invoices/:id/download-url` to return an authorized short-lived signed URL (15-minute expiry).
+  - Authorization: Only the patient in the conversation or the secretary for their assigned doctor may get the URL.
+  - Enforces conversation membership through patient-doctor association verification.
+  - Added `GET /api/v1/invoices/:id/download` public endpoint with token verification for actual PDF download.
+- INVOICE_AVAILABLE notification:
+  - When an INVOICE message is posted, creates an `INVOICE_AVAILABLE` patient notification.
+  - Sends best-effort push notification to the patient with generic title and body (no invoice content).
+  - Notification added to `conversationService.ts` with `notifyInvoiceRecipients()` function.
+- Web secretary conversations page updates:
+  - Added "Send Invoice" button in the message composer next to the text input.
+  - Added invoice picker modal showing available invoices for the patient's appointment.
+  - Secretary can select an invoice to send as an INVOICE message.
+  - Invoice messages render as distinct bubbles with receipt icon and invoice number.
+  - Updated `ConversationMessage` interface to include `message_type`, `invoice_id`, and `invoice` summary.
+  - Updated `AppointmentSummary` interface to include `appointmentId` for invoice lookup.
+- Web API client updates:
+  - Added conversation API methods to `secretaryApi.ts`: `getConversations()`, `createConversation()`, `getConversation()`, `getMessages()`, `sendMessage()`, `sendInvoiceMessage()`, `markMessagesAsRead()`, `getAppointmentSummary()`.
+  - Added invoice download URL method: `getInvoiceDownloadUrl()`.
+  - Removed duplicate `conversationApi` export; consolidated all methods into `secretaryApi`.
+
+**Improvements:**
+- Secretaries can now send invoices directly to patients through chat without requiring patients to navigate to a separate invoices page.
+- Secure download access enforced through conversation membership and short-lived signed URLs.
+- Invoice messages are clearly distinguished from text messages in the chat thread.
+- Patient notification when invoice is sent improves communication and transparency.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature only; existing message endpoints remain backward compatible with TEXT messages as default).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md`, `VERSION_HISTORY.md`, and `backend/package.json` (added migrate:message-type script).
+
+---
+
+### 01.29 (October 30, 2026)
 
 **Purpose:** Replace dashboard placeholder sections with live action items to help doctors and secretaries identify and complete pending work (missing records and unsent invoices).
 
@@ -38,17 +92,13 @@ This document contains the complete version history for the FindMyDoctor applica
 - Action items are scoped to the respective user's assigned doctor for data isolation.
 - Items automatically disappear from the list once the relevant action is taken (record created, prescription created, or invoice generated).
 
-**Bug Fixes:** None
-
-**Removed/Modified Functionality:** None
-
 **Breaking Changes:** None (non-breaking API additions; existing dashboard functionality unchanged).
 
-**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.30 and added version entry to `VERSION_HISTORY.md`.
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.29 and added version entry to `VERSION_HISTORY.md`.
 
 ---
 
-### 01.29 (October 30, 2026)
+### 01.28 (October 30, 2026)
 
 **Purpose:** Add invoice voiding and reissue workflow to allow secretaries to correct invoice errors by voiding an invoice and generating a replacement, preserving audit trail integrity.
 
@@ -104,7 +154,7 @@ This document contains the complete version history for the FindMyDoctor applica
 - Updated `docs/prd.md` to add invoice voiding to secretary capabilities.
 - Updated `docs/architecture-essentials.md` to include invoices table with status field in required database concepts.
 - Added migration reference to architecture-essentials migration list.
-- Updated `CURRENT_VERSION.md` to 01.29.
+- Updated `CURRENT_VERSION.md` to 01.28.
 - Added version entry to `VERSION_HISTORY.md`.
 - Updated `backend/package.json` to add `migrate:invoice-status` script.
 
