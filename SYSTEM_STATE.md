@@ -2,9 +2,9 @@
 
 This document tracks the current state of the FindMyDoctor application, including key features, workflows, and system configurations.
 
-**Current Version:** 01.30
+**Current Version:** 01.33
 
-**Last Updated:** October 30, 2026
+**Last Updated:** November 6, 2026
 
 ---
 
@@ -127,6 +127,30 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 
 ---
 
+## Waitlist Booking and Notifications
+
+**FULL dates in mobile booking:**
+- The doctor schedule screen shows the waitlist card only when the selected date is `FULL`.
+- For `FULL` dates, the payment-method selector is hidden and the Join Waitlist action occupies the bottom action bar normally used by Continue Booking.
+- Existing `WAITING` entries show their status without a join action; `OFFERED` entries show Book Now in the bottom action bar.
+- The booking handler rejects any non-`AVAILABLE` status.
+
+**Slot-available notification navigation:**
+- `WAITLIST_UPDATE` notifications are created when the promotion service offers a freed slot to the next waiting patient.
+- `related_entity_id` stores the waitlist entry id.
+- Tapping the notification or its "Book Now" action fetches `GET /api/v1/waitlists/:id`, then `GET /api/v1/doctors/:id`, and opens `/doctor-schedule` with the doctor id, name, specialty, clinic, consultation fee, photo, and the offered `waitlist_date` as `defaultDate`.
+- `GET /api/v1/waitlists/:id` returns `waitlist_date` as a date-only `YYYY-MM-DD` string to avoid timezone shifts when preselecting the date.
+- If the waitlist or doctor lookup fails, the app falls back to `/waitlist`.
+
+**Notification dropdown:**
+- The header dropdown performs the same navigation as the full notifications page.
+- `WAITLIST_UPDATE` items open `/doctor-schedule` with the offered waitlist date preselected.
+- Payment-related items (`ADDITIONAL_CHARGE_ADDED`, `PAYMENT_VERIFIED`, `PAYMENT_REJECTED`) open `PaymentScreen` using the payment's appointment id.
+- The dropdown closes before navigation, and the parent `onNotificationItemTap` callback runs afterwards.
+- Notification messages display in full without a line limit or ellipsis.
+
+---
+
 ## Payment Workflow
 
 **Payment Status Flow:**
@@ -194,6 +218,9 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 See `docs/VERSION_HISTORY.md` for complete version history.
 
 **Recent Versions:**
+- 01.33: Notification dropdown navigation and full message display
+- 01.32: Waitlist slot notification opens doctor schedule with date preselected; FULL dates show only the bottom Join Waitlist action
+- 01.31: Patient waitlist feature with automatic promotion and 24-hour offers
 - 01.30: Dashboard action items (missing records, unsent invoices)
 - 01.29: Invoice voiding and reissue workflow
 - 01.27: Secretary invoice settings

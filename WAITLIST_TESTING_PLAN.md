@@ -34,7 +34,11 @@ Implemented a complete waitlist feature allowing patients to join waitlists when
 - Expected: Doctor profile page loads with schedule information
 
 **Step 3:** Tap on a date that shows as "Fully Booked"
-- Expected: Date info section shows "Fully Booked" message with "Join Waitlist" button
+- Expected:
+  - Date info section shows the "Fully Booked" message
+  - The payment method selector is hidden
+  - "Continue Booking" is not shown
+  - "Join Waitlist" appears in the bottom action bar where "Continue Booking" normally appears
 
 **Step 4:** Tap "Join Waitlist" button
 - Expected: Confirmation dialog appears asking to join waitlist for the selected date
@@ -42,7 +46,7 @@ Implemented a complete waitlist feature allowing patients to join waitlists when
 **Step 5:** Confirm by tapping "Join"
 - Expected: 
   - Success snackbar appears: "You've joined the waitlist. Position: #X. You'll be notified when a slot becomes available and you're next in line."
-  - UI updates to show waitlist status instead of "Join Waitlist" button
+  - UI updates to show waitlist status instead of the bottom "Join Waitlist" action
   - Shows "You're on the Waitlist" with position number
   - "View Full Waitlist" button appears
 
@@ -125,13 +129,19 @@ Implemented a complete waitlist feature allowing patients to join waitlists when
 - Expected:
   - New notification appears with title "You're Next in Line!"
   - Message: "A slot is now available! You're position #1. Book within 24 hours to secure your appointment."
-  - "View" button is visible in the notification card
+  - "Book Now" button is visible in the notification card
 
 **Step 2:** Tap notification
-- Expected: Navigates to waitlist page
+- Expected: Opens the doctor's schedule page with the offered waitlist date preselected and the correct doctor details
 
-**Step 3:** Tap "View" button in notification
-- Expected: Navigates to waitlist page
+**Step 3:** Tap "Book Now" button in notification
+- Expected: Opens the doctor's schedule page with the offered waitlist date preselected and the correct doctor details
+
+**Step 4:** Open the header notification dropdown and tap the same notification
+- Expected:
+  - The dropdown closes
+  - The doctor's schedule page opens with the offered waitlist date preselected
+  - The full notification message is visible in the dropdown without ellipsis truncation
 
 ### Test 6: Multiple Waitlists
 

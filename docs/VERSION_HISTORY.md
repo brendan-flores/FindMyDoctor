@@ -4,6 +4,41 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.33 (November 6, 2026)
+
+**Purpose:** Bring the header notification dropdown to parity with the full notifications page navigation and show complete notification messages.
+
+**Significant Changes:**
+- Mobile header notification dropdown (`app_header.dart`):
+  - `WAITLIST_UPDATE` items now fetch the waitlist entry and doctor profile, then open `/doctor-schedule` with the offered date preselected and the correct doctor details.
+  - Payment-related items (`ADDITIONAL_CHARGE_ADDED`, `PAYMENT_VERIFIED`, `PAYMENT_REJECTED`) now fetch the payment and open `PaymentScreen` with the related appointment id.
+  - The parent `onNotificationItemTap` callback still runs after the dropdown's own navigation.
+  - The dropdown closes before navigation starts.
+  - Notification messages are no longer truncated with `maxLines: 2` and ellipsis; the full message is displayed.
+- Documentation and testing plan updated for the dropdown navigation behavior.
+
+---
+
+### 01.32 (November 6, 2026)
+
+**Purpose:** Improve the waitlist booking experience by hiding regular booking for FULL dates and routing slot-availability notifications directly to the offered doctor schedule date.
+
+**Significant Changes:**
+- Mobile doctor schedule (`doctor_schedule_page.dart`):
+  - Fully booked dates hide both the "Continue Booking" action and the payment-method selector.
+  - The Join Waitlist action now occupies the bottom bar position normally used by Continue Booking; existing `WAITING` entries show their status and `OFFERED` entries show Book Now in that position.
+  - `_handleBookingConfirmation` now rejects any date whose availability status is not `AVAILABLE`, including `FULL`.
+- Mobile notifications (`notifications_page.dart`):
+  - `WAITLIST_UPDATE` notifications now fetch the waitlist entry from `GET /api/v1/waitlists/:id` and the doctor profile from `GET /api/v1/doctors/:id`.
+  - Navigation goes to `/doctor-schedule` with doctor id, name, specialty, clinic, consultation fee, professional photo, and the offered `waitlist_date` as `defaultDate`.
+  - Both the notification card tap and the "Book Now" action use the new flow; lookup failures fall back to `/waitlist`.
+- Backend waitlists (`waitlists.ts`):
+  - `GET /api/v1/waitlists/:id` now returns `waitlist_date` as a date-only `YYYY-MM-DD` string so the schedule date is preselected without timezone shifts.
+- Documentation:
+  - Updated PRD, architecture, and system state to describe FULL-date booking behavior and waitlist notification navigation.
+
+---
+
 ### 01.31 (November 5, 2026)
 
 **Purpose:** Implement a complete Patient Waitlist feature allowing patients to join waitlists when appointments are fully booked, with automatic promotion when slots become available, 24-hour offer expiration, and full mobile UI integration.
