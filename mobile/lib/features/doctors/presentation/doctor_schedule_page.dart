@@ -47,6 +47,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   bool _isDownloading = false;
   bool _isLoadingQr = true;
   String? _qrUrl;
+  String? _accountName;
+  String? _accountNumber;
 
   Map<String, dynamic>? _availabilityData;
   bool _isLoading = true;
@@ -231,6 +233,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
         if (mounted) {
           setState(() {
             _qrUrl = response['data']['qrUrl'];
+            _accountName = response['data']['accountName'];
+            _accountNumber = response['data']['accountNumber'];
             _isLoadingQr = false;
           });
         }
@@ -1196,32 +1200,84 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                           child: CircularProgressIndicator(),
                         )
                       : _qrUrl != null
-                          ? Image.network(
-                              _qrUrl!,
-                              width: 200,
-                              height: 200,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.qr_code_2,
-                                        size: 80,
-                                        color: AppColors.secondary,
+                          ? Column(
+                              children: [
+                                Image.network(
+                                  _qrUrl!,
+                                  width: 200,
+                                  height: 200,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.qr_code_2,
+                                            size: 80,
+                                            color: AppColors.secondary,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'QR code not available',
+                                            style: AppTextStyles.labelSm.copyWith(
+                                              color: AppColors.secondary,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'QR code not available',
-                                        style: AppTextStyles.labelSm.copyWith(
-                                          color: AppColors.secondary,
-                                        ),
-                                      ),
-                                    ],
+                                    );
+                                  },
+                                ),
+                                if (_accountName != null || _accountNumber != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 16),
+                                    child: Column(
+                                      children: [
+                                        if (_accountName != null)
+                                          Padding(
+                                            padding: const EdgeInsets.only(bottom: 4),
+                                            child: Text(
+                                              _accountName!,
+                                              style: AppTextStyles.bodyMd.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.primary,
+                                              ),
+                                            ),
+                                          ),
+                                        if (_accountNumber != null)
+                                          InkWell(
+                                            onTap: () {
+                                              Clipboard.setData(ClipboardData(text: _accountNumber!));
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Account number copied'),
+                                                  duration: Duration(seconds: 2),
+                                                ),
+                                              );
+                                            },
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  _accountNumber!,
+                                                  style: AppTextStyles.bodyMd.copyWith(
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Icon(
+                                                  Icons.copy,
+                                                  size: 16,
+                                                  color: AppColors.primary,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                   ),
-                                );
-                              },
+                              ],
                             )
                           : Center(
                               child: Column(

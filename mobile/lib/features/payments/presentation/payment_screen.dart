@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
@@ -40,11 +41,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Map<String, dynamic>? _paymentData;
   String? _errorMessage;
   bool _hasUploadedReceipt = false;
+  String? _qrUrl;
+  String? _accountName;
+  String? _accountNumber;
+  bool _isLoadingQr = true;
 
   @override
   void initState() {
     super.initState();
     _fetchPaymentDetails();
+    if (widget.doctorId != null) {
+      _fetchGcashQr();
+    }
   }
 
   Future<void> _fetchPaymentDetails() async {
@@ -104,6 +112,39 @@ class _PaymentScreenState extends State<PaymentScreen> {
         setState(() {
           _errorMessage = 'Failed to load payment details: $e';
           _isLoadingPayment = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchGcashQr() async {
+    if (widget.doctorId == null) return;
+
+    try {
+      final response = await _apiService.getGcashQr(doctorId: widget.doctorId!);
+
+      if (response['success'] == true && response['data'] != null) {
+        if (mounted) {
+          setState(() {
+            _qrUrl = response['data']['qrUrl'];
+            _accountName = response['data']['accountName'];
+            _accountNumber = response['data']['accountNumber'];
+            _isLoadingQr = false;
+          });
+        }
+      } else {
+        // QR code not configured
+        if (mounted) {
+          setState(() {
+            _isLoadingQr = false;
+          });
+        }
+      }
+    } catch (e) {
+      // QR code not available
+      if (mounted) {
+        setState(() {
+          _isLoadingQr = false;
         });
       }
     }
@@ -471,6 +512,82 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             ],
           ),
+          const SizedBox(height: spacing.AppSpacing.gutterLg),
+          // Show GCash account details if available
+          if (!_isLoadingQr && (_accountName != null || _accountNumber != null))
+            Container(
+              padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLow,
+                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+                border: Border.all(color: AppColors.surfaceContainerHighest),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'GCash Account Details',
+                    style: AppTextStyles.labelSm.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(height: spacing.AppSpacing.gutterSm),
+                  if (_accountName != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        _accountName!,
+                        style: AppTextStyles.bodyMd.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  if (_accountNumber != null)
+                    InkWell(
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: _accountNumber!));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Account number copied'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _accountNumber!,
+                            style: AppTextStyles.bodyMd,
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.copy,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          if (!_isLoadingQr && _accountName == null && _accountNumber == null)
+            Container(
+              padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLow,
+                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+                border: Border.all(color: AppColors.surfaceContainerHighest),
+              ),
+              child: Text(
+                'GCash account details not available',
+                style: AppTextStyles.labelSm.copyWith(
+                  color: AppColors.secondary,
+                ),
+              ),
+            ),
           const SizedBox(height: spacing.AppSpacing.gutterLg),
           PrimaryButton(
             text: 'Select Receipt Image',

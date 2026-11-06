@@ -4,6 +4,51 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.35 (November 6, 2026)
+
+**Purpose:** Enable secretaries to configure GCash account details for their assigned doctor, which patients will see alongside the GCash QR code when making payments.
+
+**Significant Features:**
+- Database schema for GCash account details:
+  - Added `gcash_account_name` (VARCHAR(100)) and `gcash_account_number` (VARCHAR(20)) nullable columns to `doctors` table.
+  - Migration file: `backend/database/042_add_gcash_account_details.sql`.
+  - Migration applied and consolidated schema updated.
+- Backend API extensions:
+  - Extended `GET /api/v1/gcash-qr/doctor/:doctorId` (SECRETARY-only) to return `gcashAccountName` and `gcashAccountNumber` alongside existing QR data.
+  - Added `POST /api/v1/gcash-qr/doctor/:doctorId` (SECRETARY-only) to accept and update GCash account details with validation:
+    - Account name must be at least 2 characters and at most 100 characters.
+    - Account number must match Philippine mobile format: `09XXXXXXXXX` or `+639XXXXXXXXX`.
+    - Account number is normalized to `09XXXXXXXXX` format before storage.
+    - If QR code is configured, both account name and number must be provided (incomplete info rejected).
+    - Secretaries can only manage account details for their assigned doctor.
+  - Extended public `GET /api/v1/payments/gcash-qr?doctorId=` (unauthenticated) to return `qrUrl`, `accountName`, and `accountNumber` for patient display, with no private doctor or patient data exposed.
+- Web secretary settings implementation:
+  - Replaced "Coming soon" placeholder in `/secretary/settings` with editable GCash account details form.
+  - Form loads current saved values, tracks unsaved changes, validates inputs, and displays success/error feedback.
+  - Updated `/secretary/settings/gcash-qr` to display saved account name and number as read-only summary beside QR code controls.
+- Mobile app implementation:
+  - Updated `ApiService.getGcashQr` to parse new `accountName` and `accountNumber` fields.
+  - Displayed GCash account name and number beside QR code in booking payment section (`/doctor-schedule`).
+  - Displayed GCash account name and number beside QR code in payment screen (`/payment`).
+  - Added copy-to-clipboard functionality for account number with visual feedback.
+  - Provided appropriate fallback behavior when QR or account details are missing.
+
+**Improvements:**
+- Patients can now see GCash account details (name and number) alongside the QR code when making payments.
+- Copy-to-clipboard functionality makes it easy for patients to copy the account number.
+- Secretaries have full control over GCash account details with proper validation.
+- Public endpoint remains secure, exposing only payment-display information.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (non-breaking API additions; existing GCash QR functionality unchanged).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.35, added version entry to `VERSION_HISTORY.md`, and `SYSTEM_STATE.md` with GCash account details section.
+
+---
+
 ### 01.34 (November 6, 2026)
 
 **Purpose:** Make the PostgreSQL schema reproducible and the migration process safe to rerun, and close the gap between the schema the application expects and the schema present in the configured database.
