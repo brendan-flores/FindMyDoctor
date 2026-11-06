@@ -2,7 +2,7 @@
 
 This document tracks the current state of the FindMyDoctor application, including key features, workflows, and system configurations.
 
-**Current Version:** 01.33
+**Current Version:** 01.34
 
 **Last Updated:** November 6, 2026
 
@@ -190,6 +190,7 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 
 **Required Tables:**
 - users, patients, doctors, secretaries
+- patient_doctor_associations
 - doctor_schedules, doctor_unavailability, daily_capacities
 - appointments, queue_entries
 - visits, prescriptions, prescription_items
@@ -200,6 +201,18 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 - pending_doctor_signups, pending_patient_signups
 - login_otp_challenges, trusted_browsers
 - invoice_settings
+- schema_migrations (migration runner tracking)
+
+**Patient Required Fields:**
+- `patients.middle_name` (nullable)
+- `patients.sex` (`VARCHAR(20) NOT NULL DEFAULT 'NOT_SPECIFIED'`)
+- `patient_doctor_associations` links a patient to a doctor before the first appointment and carries `details_completion_status` (PENDING, COMPLETE)
+
+**Migration Runner:**
+- `npm run migrate` (`backend/src/database/migrate.ts`) is the single schema entry point.
+- It discovers numbered `.sql` files, records applied files in `schema_migrations` (keyed by filename), skips already-recorded files, runs each pending migration inside its own transaction, and verifies required columns/tables after applying.
+- Migrations `001`–`041` are baselined (recorded, never executed) because several are destructive or non-idempotent; `consolidated_schema.sql` is the complete idempotent schema that is actually applied.
+- The runner refuses `--force`, never drops tables or data, and supports `--dry-run`. It is safe to rerun.
 
 **Invoice Status:**
 - Added in migration 040_add_invoice_status.sql
@@ -218,6 +231,7 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 See `docs/VERSION_HISTORY.md` for complete version history.
 
 **Recent Versions:**
+- 01.34: Consolidated idempotent schema migration and tracked, rerunnable migration runner
 - 01.33: Notification dropdown navigation and full message display
 - 01.32: Waitlist slot notification opens doctor schedule with date preselected; FULL dates show only the bottom Join Waitlist action
 - 01.31: Patient waitlist feature with automatic promotion and 24-hour offers

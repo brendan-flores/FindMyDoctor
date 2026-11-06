@@ -4,6 +4,34 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.34 (November 6, 2026)
+
+**Purpose:** Make the PostgreSQL schema reproducible and the migration process safe to rerun, and close the gap between the schema the application expects and the schema present in the configured database.
+
+**Significant Changes:**
+- New consolidated migration `backend/database/consolidated_schema.sql`:
+  - Complete, idempotent description of the application schema (32 public tables including `schema_migrations`), generated from the live database catalog and extended with objects required by application code that were missing.
+  - Creates missing tables, columns, indexes, constraints, and triggers; never drops tables, columns, or data.
+  - Verified to apply cleanly twice in a row and to build the full schema from an empty database inside a rolled-back validation schema (31 application tables, 343 columns, 49 foreign keys).
+- Rewritten migration runner `backend/src/database/migrate.ts`:
+  - ESM-safe path resolution (`fileURLToPath`) so `npm run migrate` works under `tsx`.
+  - Tracks applied migrations in `schema_migrations`, keyed by `filename` because multiple historical files share numeric prefixes.
+  - Skips files already recorded, supports partially migrated databases, runs each pending migration in its own transaction, rolls back and stops on failure, and verifies required columns/tables after applying.
+  - Records migrations `001`–`041` as baselined (never executed) because several are destructive, insert sample data, or are not idempotent; the files are preserved for history.
+  - Refuses `--force`, supports `--dry-run`, logs the non-secret target database label, and warns (without re-applying) when a recorded file's checksum changes.
+- Schema corrections required by the application:
+  - Added `patients.middle_name` (nullable).
+  - Added `patients.sex` as `VARCHAR(20) NOT NULL DEFAULT 'NOT_SPECIFIED'` so the default value fits (the historical `VARCHAR(10)` definition cannot hold `NOT_SPECIFIED`).
+  - Added `patient_doctor_associations` with `details_completion_status` (PENDING, COMPLETE), indexes, and `updated_at` trigger.
+  - Added `schema_migrations` for runner tracking.
+- Verification:
+  - `npm run migrate` applied successfully and reruns report `applied: 0, skipped: 53, pending: 0`.
+  - End-to-end HTTP checks passed twice for patient, doctor, secretary, and admin registration/login/profile and role access (24/24), with database row assertions.
+  - Backend TypeScript check and Jest suite show no new failures; the same pre-existing failing suites and `payments.ts` type errors remain.
+- Documentation updated: `SYSTEM_STATE.md`, `docs/SYSTEM_STATE.md`, `docs/architecture.md`, and `docs/architecture-essentials.md`.
+
+---
+
 ### 01.33 (November 6, 2026)
 
 **Purpose:** Bring the header notification dropdown to parity with the full notifications page navigation and show complete notification messages.

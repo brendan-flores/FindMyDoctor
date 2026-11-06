@@ -63,12 +63,12 @@ Current System State (October 2026):
 - Doctor profile completion status transitions: INCOMPLETE → COMPLETE (when required fields filled) → SUBMITTED (when doctor submits for review)
 - Doctor approval workflow: PENDING → ACTIVE (approved) or REJECTED, with profile_completion_status tracked separately
 - Doctor rejection and resubmission workflow: PENDING → REJECTED (with rejection_reason) → Doctor logs in → corrects profile → resubmits → PENDING → Admin approves → ACTIVE
-- PENDING Doctors cannot log in while awaiting administrator approval
+- PENDING Doctors may log in only while `profile_completion_status` is not `'SUBMITTED'`, so they can complete and submit their profile; PENDING + `SUBMITTED` accounts are blocked with an "awaiting administrator approval" message
 - REJECTED Doctors may authenticate specifically to correct and resubmit their application (they are not active/patient-visible)
 - REJECTED Doctors can view their rejection reason via `GET /api/v1/doctors/me` (returns `approval_status` and `rejection_reason`)
 - REJECTED Doctors can edit their profile and resubmit via `POST /api/v1/doctors/me/profile/submit`, which restores `approval_status` to 'PENDING' and clears `rejection_reason`
 - REJECTED Doctors are routed to `/doctor-profile` after login to view rejection reason and correct their profile
-- Doctor profile submission validates required fields: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic
+- Doctor profile submission validates only professional fields: verified email, specialty, credentials, PRC license number, hospital/clinic; personal details (first name, middle name, last name, contact number) are owned by sign-up and are neither edited nor re-validated on `/doctor-profile`
 - Admin approval endpoint `PATCH /api/v1/admin/doctors/:id/approve` explicitly rejects approving doctors with `approval_status = 'REJECTED'` (requires resubmission first)
 - Rejected doctors have `approval_status = 'REJECTED'` and `rejection_reason` set; they can correct their profile and resubmit using the existing onboarding flow
 
@@ -76,15 +76,20 @@ Current System State (October 2026):
 - Web Doctor signup flow: `/doctor-signup` (basic fields) → OTP verification → `/doctor-profile` (professional fields + schedule) → submit for approval
 - Web Doctor signup redirects to `/doctor-profile` after successful OTP verification, not to dashboard
 - Web Doctor profile page at `/doctor-profile` (no slash) is the profile completion page used after OTP verification during initial registration
-- Web Doctor profile page allows doctors to complete their professional profile with 13 fields: professional photo (PNG upload, max 4MB), specialty, credentials, PRC license, hospital/clinic, room number, years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule
+- Web Doctor profile page allows doctors to complete their professional profile with: professional photo (PNG upload, max 4MB), specialty, credentials, PRC license, hospital/clinic, room number (shown only when the selected hospital/clinic assigns room numbers), years of experience, areas of expertise, biography, consultation fee, consultation type, languages spoken, available schedule
+- Web Doctor profile page does not display or edit sign-up personal details (first name, middle name, last name, email, contact number); those remain owned by the sign-up flow
+- Web Doctor profile page has a single Submit for Approval button that stays disabled until all required professional fields are complete; the page validates only those fields on submit
 - Web Doctor profile page includes schedule management UI using existing schedule APIs (GET/POST/PUT/DELETE `/api/v1/doctors/me/schedules`)
 - Web Doctor profile page includes PNG photo upload with client-side validation (PNG only, max 4MB) and server-side validation via `POST /api/v1/doctors/me/photo` endpoint
 - Web Doctor profile page includes photo preview after successful upload and ability to remove photo
 - Web Doctor profile page supports saving draft profiles and submitting for approval with validation
 - Web Doctor profile page explicitly handles REJECTED state: shows rejection banner with reason, allows profile editing, allows resubmission, does not lock form when `profile_completion_status === 'SUBMITTED'` if `approval_status === 'REJECTED'`
-- Web Doctor profile page shows submission confirmation modal after successful profile submission with title "Profile Submitted Successfully!", message stating "Your professional profile has been submitted successfully. Once approved, your doctor profile will be displayed to patients in the FindMyDoctor mobile app.", and "Go to Dashboard" button redirecting to `/doctor/dashboard`
+- Web Doctor profile page shows submission confirmation modal after successful profile submission with title "Profile Submitted Successfully!", a message stating the doctor can sign in once an administrator approves the account, and a "Continue to Login" button that signs the doctor out and redirects to `/doctor-login`
+- Visiting `/doctor-profile` while `approval_status = 'PENDING'` and `profile_completion_status = 'SUBMITTED'` signs the doctor out and redirects to `/doctor-login`
 - Web Doctor login stores the session in role-scoped `doctor_token`, `doctor_refreshToken`, and `doctor_user` localStorage keys; the dashboard must read the role-scoped token (with the legacy generic `token` fallback) before checking approval status
-- Web Doctor login page routes authenticated Doctors based on approval_status: ACTIVE → `/doctor/dashboard`, REJECTED → `/doctor-profile`
+- Web Doctor login page routes authenticated Doctors based on approval_status: ACTIVE → `/doctor/dashboard`, REJECTED → `/doctor-profile`, PENDING with an unsubmitted profile → `/doctor-profile` to finish onboarding
+- After OTP verification the backend sets role-scoped `doctor_accessToken`/`doctor_refreshToken` cookies and returns the refresh token plus session metadata, so a token from a previous/deleted account cannot override the newly created doctor session
+- The web API client resolves the in-memory/role-scoped localStorage token before falling back to cookies, preventing a stale `doctor_accessToken` cookie from being reused after sign-up or login
 - Active Doctors can view their own personal and professional registration details on the read-only Doctor Portal page at `/doctor/profile` (with slash); it excludes schedule management and uses the authenticated `GET /api/v1/doctors/me` endpoint
 - The authenticated `GET /api/v1/doctors/me` endpoint includes the doctor's account email for display on their own profile page
 - The `/doctor/profile` page (with slash) features an Edit Profile button that toggles inline edit mode for updating profile information
@@ -509,6 +514,18 @@ Current System State (October 2026):
 - Database migration `028_add_device_tokens.sql` adds the `device_tokens` table associating authenticated users' FCM/APNs push tokens with their owning user (unique on provider+token with one active owner per token; re-registration reassigns the token); applied via `npm run migrate:device-tokens`
 - Database migration `018_add_daily_capacities.sql` adds `daily_capacities` table for storing calculated and configured daily capacity values
 - Doctor registration uses separate first name, middle name (optional), and last name fields instead of a single full name field
+- `patients.middle_name` (nullable) and `patients.sex` (`VARCHAR(20) NOT NULL DEFAULT 'NOT_SPECIFIED'`) are required by patient registration; `patient_doctor_associations` stores the persistent patient-doctor relationship and its `details_completion_status` (PENDING, COMPLETE)
+- `schema_migrations` records which migration files have been applied (primary key `filename`, plus `version`, `checksum`, `applied_at`, `execution_time_ms`, `note`)
+
+## Database Migrations
+- `npm run migrate` (`backend/src/database/migrate.ts`) is the single schema entry point and replaces ad-hoc per-feature `apply*.ts` execution for schema setup
+- The runner discovers `backend/database/NNN_*.sql` files, loads applied rows from `schema_migrations`, skips files already recorded, and applies each pending file inside its own transaction; a failure rolls back that file and stops the run
+- Migrations `001`–`041` are recorded as baselined (note: superseded by `consolidated_schema.sql`) and are never executed by the runner, because several are destructive (`004_clear_all_data.sql`), insert sample data, or are not idempotent
+- `consolidated_schema.sql` is the complete idempotent schema applied to every environment: it creates missing tables, columns, indexes, constraints, and triggers but never drops tables, columns, or data; it is verified to apply cleanly on an empty schema and to be safe to rerun
+- After applying, the runner verifies required columns (`patients.middle_name`, `patients.sex`) and tables (`patient_doctor_associations`, `waitlists`, `schema_migrations`) exist
+- `--dry-run` reports what would be applied without writing; `--force` is refused by design; checksum mismatches on already-recorded files produce a warning but are never re-applied automatically
+- Historical migration files are preserved for audit; do not re-run them manually against an existing database
+- The configured development database was migrated and verified on 2026-11-06; reruns report `applied: 0, skipped: <all>, pending: 0`
 
 ## Doctor Schedule Management
 - Doctor schedule management feature allows doctors to create, view, edit, deactivate, and reactivate recurring weekly working hours

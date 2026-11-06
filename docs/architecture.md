@@ -323,8 +323,8 @@ The doctor sign-up page at `/doctor-signup` creates a doctor account through a t
 - Basic information (first_name, middle_name, last_name, contact_number) is stored in the doctors table.
 - Professional information fields (specialty, credentials, PRC license number, hospital/clinic, etc.) are NOT collected at this stage.
 - Registered doctors are created with `approval_status = 'PENDING'`, `is_approved = false`, and `profile_completion_status = 'INCOMPLETE'`, so they must complete their professional profile and wait for administrator approval before accessing the system.
-- After successful OTP verification, the backend returns an access token which is stored in localStorage using the existing authentication mechanism.
-- The doctor is automatically redirected to `/doctor-profile` to complete their professional profile.
+- After successful OTP verification, the backend returns an access token, a refresh token, and session metadata, and sets the role-scoped `doctor_accessToken`/`doctor_refreshToken` cookies. Replacing these cookies is required so a token from a previous account cannot override the new doctor session.
+- The web client clears any leftover auth before installing the new session, and the doctor is automatically redirected to `/doctor-profile` to complete their professional profile.
 - Duplicate email returns `409`; a successful verification returns an access token and redirects to profile completion.
 - PostgreSQL is the single source of truth for doctor accounts, credentials and profile data. Supabase stores no application account or profile data.
 
@@ -332,12 +332,13 @@ The doctor sign-up page at `/doctor-signup` creates a doctor account through a t
 
 After successful OTP verification, doctors must complete their professional profile at `/doctor-profile`:
 
-- **Profile Page:** `/doctor-profile` allows doctors to complete their professional profile with 12 fields:
+- **Profile Page:** `/doctor-profile` allows doctors to complete their professional profile with 13 fields:
   - Professional Photo (PNG upload, max 4MB, client and server validation)
   - Specialty (required for submission)
   - Credentials (required for submission, multi-select)
   - PRC License Number (required for submission, 7 digits)
   - Hospital/Clinic (required for submission, searchable dropdown)
+  - Room Number (shown only when the selected hospital/clinic assigns room numbers; cleared when a facility without assigned rooms is selected)
   - Years of Experience
   - Areas of Expertise (comma-separated)
   - Short Biography
@@ -346,6 +347,9 @@ After successful OTP verification, doctors must complete their professional prof
   - Languages Spoken (comma-separated)
   - Available Schedule (using existing schedule APIs)
 
+- **Personal Details:** First name, middle name, last name, email, and contact number are collected during sign-up. The profile page does not display, edit, or re-validate them.
+- **Submit Gate:** The single Submit for Approval button stays disabled until the required professional fields (specialty, credentials, valid PRC license, hospital/clinic) are complete. The page validates only those fields on submit.
+
 - **Schedule Management:** The backend provides GET/POST/PUT/DELETE schedule APIs; the current profile UI uses GET/POST/DELETE:
   - `GET /api/v1/doctors/me/schedules` - List current schedules
   - `POST /api/v1/doctors/me/schedules` - Add new schedule
@@ -353,7 +357,7 @@ After successful OTP verification, doctors must complete their professional prof
   - `DELETE /api/v1/doctors/me/schedules/:id` - Delete schedule
 
 - **Profile Update Endpoint:** `PUT /api/v1/doctors/me/profile` (requires Doctor authentication)
-  - Accepts professional profile fields: professional_photo_url, specialty, credentials, prc_license_number, practice_name, years_of_experience, areas_of_expertise, biography, consultation_fee, consultation_type, languages_spoken
+  - Accepts professional profile fields: professional_photo_url, specialty, credentials, prc_license_number, practice_name, room_number, years_of_experience, areas_of_expertise, biography, consultation_fee, consultation_type, languages_spoken
   - Validates PRC license number format (7 digits) and uniqueness
   - Automatically updates `profile_completion_status` to 'COMPLETE' when all required fields are present
   - Allows partial updates (field-by-field or multiple fields at once)
@@ -381,12 +385,14 @@ After successful OTP verification, doctors must complete their professional prof
   - Returns success/error response in the project's standard format
 
 - **Profile Submission Endpoint:** `POST /api/v1/doctors/me/profile/submit` (requires Doctor authentication)
-  - Validates required fields before submission: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic
+  - Validates the professional fields required for submission: verified email, specialty, credentials, PRC license number, hospital/clinic
+  - Does not re-validate personal details (first/middle/last name, contact number), because sign-up owns those fields and the profile page does not edit or display them
   - Sets `profile_completion_status = 'SUBMITTED'` and `profile_submitted_at` to current timestamp
   - Keeps `approval_status = 'PENDING'` (does not approve the doctor)
   - Returns message directing doctor to wait for admin approval
   - Shows a confirmation modal with title "Profile Submitted Successfully!" after successful submission
-  - Modal states that the profile will be displayed to patients after approval and includes "Go to Dashboard" button that redirects to `/doctor/dashboard`
+  - Modal states that the profile will be displayed to patients after approval and includes a "Continue to Login" button that signs the doctor out (clearing the session and role-scoped cookies) and redirects to `/doctor-login`
+- A PENDING doctor whose profile is already submitted is redirected from `/doctor-profile` to `/doctor-login`, because the profile cannot be edited and login is blocked until approval
 
 - **Profile Completion Status Transitions:**
   - `INCOMPLETE` - Initial state after OTP verification, professional information not yet collected
@@ -402,7 +408,7 @@ After a doctor completes self-registration, email OTP verification, and profile 
 - The doctor account is created with `approval_status = 'PENDING'`, `is_approved = false`, and `profile_completion_status = 'INCOMPLETE'`.
 - The doctor must complete their professional profile and submit it for review.
 - After profile submission, `profile_completion_status` becomes 'SUBMITTED' but `approval_status` remains 'PENDING'.
-- The doctor cannot log in or access the Doctor Dashboard while in PENDING status.
+- The doctor cannot log in or access the Doctor Dashboard after submitting the profile (PENDING + SUBMITTED); PENDING doctors with an unsubmitted profile may log in and are routed to `/doctor-profile` to finish onboarding.
 - Administrators can view pending doctors through the Admin Doctors page at `/admin/doctors`.
 - Administrators can review complete doctor information and either:
   - Approve the doctor: Sets `approval_status = 'ACTIVE'` and `is_approved = true`, allowing the doctor to log in and access the Doctor Dashboard.
@@ -439,7 +445,8 @@ When a doctor is rejected:
 - The web Doctor login page routes authenticated Doctors based on approval_status:
   - ACTIVE → `/doctor/dashboard`
   - REJECTED → `/doctor-profile`
-  - PENDING → blocked by backend (should not reach frontend login routing)
+  - PENDING with `profile_completion_status !== 'SUBMITTED'` → `/doctor-profile` to finish onboarding
+  - PENDING with `profile_completion_status === 'SUBMITTED'` → rejected by the backend login endpoint with "awaiting administrator approval"
 
 Administrator-provisioned doctor and secretary accounts remain supported and now hash passwords with bcrypt as well.
 
@@ -2266,7 +2273,7 @@ Since Tailwind CSS is already configured, shadcn/ui components can be added as n
 ### Database Layer
 - **Database**: PostgreSQL
 - **ORM**: To be determined (Prisma, TypeORM, or raw SQL)
-- **Migrations**: Database migration system
+- **Migrations**: `npm run migrate` (`backend/src/database/migrate.ts`). Tracks applied files in `schema_migrations`, skips recorded files, runs each pending migration in its own transaction, and verifies required schema after applying. `001`–`041` are baselined as superseded; the idempotent `consolidated_schema.sql` is the schema that is actually applied. Rerunnable; never drops tables, columns, or data; `--force` is refused.
 - **Connection Pooling**: To be configured
 
 ### External Services
