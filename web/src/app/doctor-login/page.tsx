@@ -119,11 +119,16 @@ export default function DoctorLogin() {
         } else if (approvalStatus === 'REJECTED') {
           router.push('/doctor-profile');
         } else if (approvalStatus === 'PENDING') {
-          // PENDING should not normally reach here since backend blocks login
-          // Handle defensively
-          setError('Your account is awaiting administrator approval');
-          localStorage.removeItem('doctor_user');
-          apiClient.clearToken();
+          // A doctor who has not submitted the professional profile yet must
+          // complete it. PENDING + SUBMITTED is rejected by the login endpoint,
+          // so this branch means the profile still needs to be finished.
+          if (response.data.profile_completion_status !== 'SUBMITTED') {
+            router.push('/doctor-profile');
+          } else {
+            setError('Your account is awaiting administrator approval');
+            localStorage.removeItem('doctor_user');
+            apiClient.clearToken();
+          }
         } else {
           setError('Invalid account status');
           localStorage.removeItem('doctor_user');

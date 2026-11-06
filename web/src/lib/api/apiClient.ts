@@ -28,6 +28,8 @@ interface ApiResponse<T> {
   errorCode?: string;
   message?: string;
   httpStatus?: number;
+  /** Raw response body, kept for diagnostics (e.g. failed uploads). */
+  body?: unknown;
 }
 
 export interface SessionMetadata {
@@ -60,7 +62,7 @@ function parseErrorResponse<T>(status: number, text: string): ApiResponse<T> {
     const json = JSON.parse(text);
     const normalized = normalizeApiResponse<T>(json);
     if (normalized && normalized.error) {
-      return { ...normalized, httpStatus: status };
+      return { ...normalized, httpStatus: status, body: json };
     }
   } catch {
     // not valid JSON
@@ -69,6 +71,7 @@ function parseErrorResponse<T>(status: number, text: string): ApiResponse<T> {
     success: false,
     error: `Server error (${status}): ${text}`,
     httpStatus: status,
+    body: text,
   };
 }
 
@@ -365,39 +368,54 @@ class ApiClient {
   }
 
   /**
-   * Read the current portal's stored access token. Role-scoped cookies and
-   * localStorage keys take precedence; legacy global keys remain as a fallback
-   * for sessions created before the role-scoped change.
+   * Resolve the access token for the current portal.
+   *
+   * The in-memory token written by login/signup/refresh is the freshest value
+   * for this portal, so it wins. A role cookie left over from a previous
+   * account must never override a token the app has just issued. Cookies stay
+   * as a fallback for HttpOnly sessions when local storage is empty.
    */
-  getStoredToken(): string | null {
+  private resolveAuthToken(): string | null {
+    if (this.token && this.token !== 'undefined' && this.token !== 'null') {
+      return this.token;
+    }
+
     if (typeof window === 'undefined') return null;
 
-    // Check role-scoped cookie first
+    // Role-scoped localStorage is written by this client for every session.
+    const scopedToken = localStorage.getItem(this.storageKey('token'));
+    if (scopedToken && scopedToken !== 'undefined' && scopedToken !== 'null') {
+      return scopedToken;
+    }
+
+    // Role-scoped cookie (HttpOnly in production).
     const scopedCookieName = this.role ? `${this.role}_accessToken` : 'accessToken';
     const scopedCookieToken = this.getCookie(scopedCookieName);
     if (scopedCookieToken && scopedCookieToken !== 'undefined' && scopedCookieToken !== 'null') {
       return scopedCookieToken;
     }
 
-    // Fallback to global cookie
+    // Fallback to the global cookie.
     const cookieToken = this.getCookie('accessToken');
     if (cookieToken && cookieToken !== 'undefined' && cookieToken !== 'null') {
       return cookieToken;
     }
 
-    // Check role-scoped localStorage
-    const scopedToken = localStorage.getItem(this.storageKey('token'));
-    if (scopedToken && scopedToken !== 'undefined' && scopedToken !== 'null') {
-      return scopedToken;
-    }
-
-    // Fallback to legacy global localStorage
+    // Legacy global localStorage key.
     const legacyToken = localStorage.getItem('token');
     if (legacyToken && legacyToken !== 'undefined' && legacyToken !== 'null') {
       return legacyToken;
     }
 
-    return this.token;
+    return null;
+  }
+
+  /**
+   * Read the current portal's stored access token. Role-scoped localStorage and
+   * the in-memory token take precedence; cookies remain a fallback.
+   */
+  getStoredToken(): string | null {
+    return this.resolveAuthToken();
   }
 
   private subscribeTokenRefresh(callback: (token: string | null) => void) {
@@ -555,9 +573,9 @@ class ApiClient {
       ...this.portalHeaders(),
     };
 
-    // Prefer token from cookies (HttpOnly), fall back to localStorage (for backward compatibility)
-    const cookieToken = this.getCookie('accessToken');
-    const tokenToUse = cookieToken || this.token;
+    // Prefer the in-memory/storage token; cookies are only a fallback so a
+    // stale role cookie cannot override a freshly issued token.
+    const tokenToUse = this.resolveAuthToken();
 
     if (tokenToUse && tokenToUse !== 'undefined' && tokenToUse !== 'null') {
       headers['Authorization'] = `Bearer ${tokenToUse}`;
@@ -753,8 +771,7 @@ class ApiClient {
 
       // Add Authorization header if not provided
       if (!headers['Authorization']) {
-        const cookieToken = this.getCookie('accessToken');
-        const tokenToUse = cookieToken || this.token;
+        const tokenToUse = this.resolveAuthToken();
         if (tokenToUse && tokenToUse !== 'undefined' && tokenToUse !== 'null') {
           headers['Authorization'] = `Bearer ${tokenToUse}`;
         }
@@ -781,8 +798,7 @@ class ApiClient {
             ...(options?.headers as Record<string, string> || {}),
           };
           if (!retryHeaders['Authorization']) {
-            const cookieToken = this.getCookie('accessToken');
-            const tokenToUse = cookieToken || this.token;
+            const tokenToUse = this.resolveAuthToken();
             if (tokenToUse && tokenToUse !== 'undefined' && tokenToUse !== 'null') {
               retryHeaders['Authorization'] = `Bearer ${tokenToUse}`;
             }

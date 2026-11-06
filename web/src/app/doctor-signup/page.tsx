@@ -413,15 +413,31 @@ export default function DoctorSignupOtp() {
 
       const authData = response.data;
 
-      // Store token in localStorage using existing authentication mechanism
-      localStorage.setItem('token', authData.accessToken);
+      // Clear any auth left over from a previous session before installing the
+      // token for the account that was just created. Otherwise a stale
+      // role-scoped token/cookie can be sent to /doctors/me and produce a
+      // misleading "Doctor profile not found" error.
+      apiClient.clearToken();
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('doctor_user');
+
+      apiClient.setToken(
+        authData.accessToken,
+        authData.refreshToken,
+        authData.session || null
+      );
+
+      // Keep the doctor-scoped user record used by the doctor portal layout.
+      localStorage.setItem('doctor_user', JSON.stringify(authData.user));
       localStorage.setItem('user', JSON.stringify(authData.user));
-      apiClient.setToken(authData.accessToken);
 
       setOtpStatus('idle');
 
       // Redirect to doctor profile completion page
-      router.push('/doctor-profile');
+      // Use replace() so the signup page is not added to browser history,
+      // preventing "back" from profile from going to signup
+      router.replace('/doctor-profile');
     } catch (error) {
       console.error('OTP verification error:', error);
 

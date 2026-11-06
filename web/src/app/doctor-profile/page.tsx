@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
+import { authApi } from '@/lib/api/authApi';
 import { doctorApi } from '@/lib/api/doctorApi';
 import type { DoctorProfile, UpdateProfileRequest } from '@/lib/api/doctorApi';
 import { CEBU_FACILITIES } from '@/data/cebuFacilities';
@@ -23,6 +24,7 @@ export default function DoctorProfile() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [error, setError] = useState('');
+  const [profileNotFound, setProfileNotFound] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
@@ -34,6 +36,7 @@ export default function DoctorProfile() {
     credentials: '',
     prc_license_number: '',
     practice_name: '',
+    room_number: '',
     years_of_experience: '',
     areas_of_expertise: '',
     biography: '',
@@ -104,9 +107,28 @@ export default function DoctorProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Clear every trace of the doctor session. The profile page is outside the
+   * `/doctor` layout, so it must sign out explicitly instead of relying on the
+   * dashboard guard.
+   */
+  const clearDoctorSession = () => {
+    apiClient.clearToken();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('doctor_token');
+      localStorage.removeItem('doctor_refreshToken');
+      localStorage.removeItem('doctor_user');
+      localStorage.removeItem('doctor_session');
+    }
+  };
+
   const loadProfile = async () => {
     setIsLoading(true);
     setError('');
+    setProfileNotFound(false);
 
     try {
       const token = apiClient.getStoredToken();
@@ -120,6 +142,19 @@ export default function DoctorProfile() {
       const response = await doctorApi.getProfile();
 
       if (response.success && response.data) {
+        // A PENDING doctor whose profile is already submitted cannot sign in or
+        // change anything while awaiting approval, so send them back to login
+        // instead of showing a stale onboarding form (or looping through the
+        // dashboard).
+        if (
+          response.data.approval_status === 'PENDING' &&
+          response.data.profile_completion_status === 'SUBMITTED'
+        ) {
+          clearDoctorSession();
+          router.replace('/doctor-login');
+          return;
+        }
+
         setProfile(response.data);
         setFormData({
           professional_photo_url: response.data.professional_photo_url || '',
@@ -127,6 +162,7 @@ export default function DoctorProfile() {
           credentials: response.data.credentials || '',
           prc_license_number: response.data.prc_license_number || '',
           practice_name: response.data.practice_name || '',
+          room_number: response.data.room_number || '',
           years_of_experience: response.data.years_of_experience?.toString() || '',
           areas_of_expertise: response.data.areas_of_expertise || '',
           biography: response.data.biography || '',
@@ -141,7 +177,16 @@ export default function DoctorProfile() {
           );
         }
       } else {
-        setError(response.error || 'Failed to load profile');
+        // A 404 here means the current token does not belong to an existing
+        // doctor record (most commonly a stale token from a previous account).
+        const notFound =
+          response.httpStatus === 404 || response.error === 'Doctor profile not found';
+        setProfileNotFound(notFound);
+        setError(
+          notFound
+            ? 'We could not find a doctor profile for the current session. Please sign out and sign in again.'
+            : response.error || 'Failed to load profile'
+        );
       }
     } catch (err) {
       console.error('Load profile error:', err);
@@ -207,8 +252,6 @@ export default function DoctorProfile() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    console.log('File selected:', file.name, file.type, file.size);
-
     // Client-side validation
     if (file.type !== 'image/png') {
       setError('Only PNG files are allowed');
@@ -222,46 +265,42 @@ export default function DoctorProfile() {
 
     // Show immediate preview before upload
     const previewUrl = URL.createObjectURL(file);
-    console.log('Preview URL created:', previewUrl);
     setPhotoPreview(previewUrl);
 
     setIsUploadingPhoto(true);
     setError('');
 
     try {
-      const token = apiClient.getStoredToken();
-      if (!token) {
-        router.push('/doctor-login');
-        return;
-      }
-
       const uploadFormData = new FormData();
       uploadFormData.append('photo', file);
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/doctors/me/photo`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: uploadFormData,
-      });
+      const response = await apiClient.post<{ photoUrl?: string }>(
+        '/doctors/me/photo',
+        uploadFormData,
+        { isFormData: true },
+      );
 
-      const data = await response.json();
-      console.log('Upload response:', data);
-
-      if (response.ok && data.success) {
+      if (response.success && response.data) {
         // Keep the blob URL as preview (it always works)
         // Only update the form data with the server URL
-        setFormData({ ...formData, professional_photo_url: data.data.photoUrl });
-        console.log('Photo uploaded, keeping blob preview:', previewUrl);
+        setFormData({ ...formData, professional_photo_url: response.data.photoUrl || '' });
         setSuccessMessage('Photo uploaded successfully');
         setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         // Clean up the temporary preview URL on error
         URL.revokeObjectURL(previewUrl);
         setPhotoPreview(null);
-        console.error('Upload error details:', data);
-        setError(data.error?.message || data.error || 'Failed to upload photo. Please try again.');
+        console.error('Photo upload failed:', {
+          httpStatus: response.httpStatus,
+          error: response.error,
+          errorCode: response.errorCode,
+          body: response.body,
+        });
+        const serverMessage =
+          response.error ||
+          response.errorCode ||
+          `Server returned ${response.httpStatus ?? 'unknown'}`;
+        setError(`Photo upload failed: ${serverMessage}`);
       }
     } catch (err) {
       console.error('Photo upload error:', err);
@@ -298,15 +337,8 @@ export default function DoctorProfile() {
   };
 
   const validateForSubmission = (): string => {
-    if (!profile?.first_name) {
-      return 'First Name is required';
-    }
-    if (!profile?.last_name) {
-      return 'Last Name is required';
-    }
-    if (!profile?.contact_number) {
-      return 'Contact Number is required';
-    }
+    // Personal details are collected during sign-up and are not edited on this
+    // page, so only the professional profile fields are validated here.
     if (!formData.specialty.trim()) {
       return 'Specialty is required';
     }
@@ -344,6 +376,7 @@ export default function DoctorProfile() {
         credentials: formData.credentials || undefined,
         prc_license_number: formData.prc_license_number || undefined,
         practice_name: formData.practice_name || undefined,
+        room_number: formData.room_number,
         years_of_experience: formData.years_of_experience ? parseInt(formData.years_of_experience) : undefined,
         areas_of_expertise: formData.areas_of_expertise || undefined,
         biography: formData.biography || undefined,
@@ -363,8 +396,12 @@ export default function DoctorProfile() {
       const response = await doctorApi.submitProfile();
 
       if (response.success) {
-        // Reload profile to get updated status
-        await loadProfile();
+        // Reflect the submitted status locally instead of reloading the profile:
+        // a submitted PENDING profile is redirected to the login page, which
+        // would close this confirmation modal immediately.
+        setProfile((current) =>
+          current ? { ...current, profile_completion_status: 'SUBMITTED' } : current
+        );
         // Show confirmation modal
         setShowSubmissionModal(true);
       } else {
@@ -378,9 +415,30 @@ export default function DoctorProfile() {
     }
   };
 
-  const handleModalContinue = () => {
+  /**
+   * After a successful submission the account is PENDING and cannot sign in
+   * until an administrator approves it. Clear the session and send the doctor
+   * to the login page instead of the dashboard.
+   */
+  const handleModalContinue = async () => {
     setShowSubmissionModal(false);
-    router.push('/doctor/dashboard');
+    try {
+      await authApi.logout();
+    } catch {
+      // Ignore logout call failures - the local session is cleared regardless.
+    }
+    clearDoctorSession();
+    router.replace('/doctor-login');
+  };
+
+  const handleReauthenticate = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // Ignore logout call failures - the local session is cleared regardless.
+    }
+    clearDoctorSession();
+    router.replace('/doctor-login');
   };
 
   if (isLoading) {
@@ -402,6 +460,14 @@ export default function DoctorProfile() {
   // When REJECTED, allow editing even if profile_completion_status is SUBMITTED
   const canEdit = !isProfileSubmitted || isRejected;
   const canSubmit = !isProfileSubmitted || isRejected;
+
+  // Personal details are owned by the sign-up flow. They are not edited or
+  // displayed here, and only the professional fields gate submission.
+  const isProfileReadyToSubmit =
+    Boolean(formData.specialty.trim()) &&
+    Boolean(formData.credentials.trim()) &&
+    PRC_LICENSE_PATTERN.test(formData.prc_license_number.trim()) &&
+    Boolean(formData.practice_name.trim());
 
   return (
     <div className="min-h-screen bg-[#F3F5F9]">
@@ -463,7 +529,16 @@ export default function DoctorProfile() {
 
             {error && (
               <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                {error}
+                <p>{error}</p>
+                {profileNotFound && (
+                  <button
+                    type="button"
+                    onClick={handleReauthenticate}
+                    className="mt-3 inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
+                  >
+                    Sign out and sign in again
+                  </button>
+                )}
               </div>
             )}
 
@@ -529,7 +604,7 @@ export default function DoctorProfile() {
                       className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#1A62CD] file:text-white hover:file:bg-[#0D3B75] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                      JPEG, PNG, GIF, WebP, BMP (max 4MB)
+                      PNG only (max 4MB)
                     </p>
                   </div>
                 </div>
@@ -602,7 +677,12 @@ export default function DoctorProfile() {
                 <SearchableSelect
                   value={formData.practice_name}
                   onChange={(val) => {
-                    setFormData({ ...formData, practice_name: val });
+                    const facility = CEBU_FACILITIES.find((f) => f.name === val);
+                    setFormData({
+                      ...formData,
+                      practice_name: val,
+                      room_number: facility?.hasRoomNumber ? formData.room_number : '',
+                    });
                     setError('');
                   }}
                   options={cebuFacilityOptions}
@@ -610,6 +690,29 @@ export default function DoctorProfile() {
                   noResultsText="No matching hospital or clinic found in Cebu"
                 />
               </div>
+
+              {/* Room Number (only for facilities that assign rooms) */}
+              {selectedFacility?.hasRoomNumber && (
+                <div>
+                  <label className="block text-[15px] font-semibold text-[#334155] mb-2">
+                    Room Number
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.room_number}
+                    onChange={(e) => {
+                      setFormData({ ...formData, room_number: e.target.value });
+                      setError('');
+                    }}
+                    placeholder="e.g., Room 406, Suite 302"
+                    maxLength={50}
+                    className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  />
+                  <p className="mt-2 text-[13px] text-[#64748B]">
+                    This facility assigns consultation rooms. Enter your room or suite number.
+                  </p>
+                </div>
+              )}
 
               {/* Years of Experience */}
               <div>
@@ -802,14 +905,21 @@ export default function DoctorProfile() {
               {/* Buttons */}
               <div className="pt-4">
                 {canSubmit && (
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={isSubmitting}
-                    className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
-                  </button>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={isSubmitting || !isProfileReadyToSubmit}
+                      className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
+                    </button>
+                    {!isProfileReadyToSubmit && (
+                      <p className="mt-2 text-center text-xs text-[#64748B]">
+                        Complete the required professional fields to submit.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -838,13 +948,15 @@ export default function DoctorProfile() {
                 Profile Submitted Successfully!
               </h2>
               <p className="text-[#64748B] text-[15px] leading-relaxed mb-6">
-                Your professional profile has been submitted successfully. Once approved, your doctor profile will be displayed to patients in the FindMyDoctor mobile app.
+                Your professional profile has been submitted successfully. You can sign in to the
+                doctor portal once an administrator approves your account. Your profile will then
+                be displayed to patients in the FindMyDoctor mobile app.
               </p>
               <button
                 onClick={handleModalContinue}
                 className="w-full py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#1A62CD] hover:bg-[#0D3B75] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1A62CD] transition-colors duration-150"
               >
-                Go to Dashboard
+                Continue to Login
               </button>
             </div>
           </div>
