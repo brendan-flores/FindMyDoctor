@@ -85,8 +85,8 @@ describe('AuthService - Login Behavior', () => {
             }]
           });
         }
-        if (sql.includes('SELECT approval_status FROM doctors')) {
-          return Promise.resolve({ rows: [{ approval_status: 'ACTIVE' }] });
+        if (sql.includes('profile_completion_status FROM doctors')) {
+          return Promise.resolve({ rows: [{ approval_status: 'ACTIVE', profile_completion_status: 'SUBMITTED' }] });
         }
         if (sql.includes('SELECT two_factor_enabled FROM doctors')) {
           return Promise.resolve({ rows: [{ two_factor_enabled: false }] });
@@ -302,7 +302,7 @@ describe('AuthService - Login Behavior', () => {
   });
 
   describe('DOCTOR Special Requirements', () => {
-    it('should reject DOCTOR login with PENDING approval status', async () => {
+    it('should reject DOCTOR login with PENDING approval status after profile submission', async () => {
       query.mockImplementation((sql: string, params: any[]) => {
         if (sql.includes('SELECT * FROM users')) {
           return Promise.resolve({
@@ -316,8 +316,8 @@ describe('AuthService - Login Behavior', () => {
             }]
           });
         }
-        if (sql.includes('SELECT approval_status FROM doctors')) {
-          return Promise.resolve({ rows: [{ approval_status: 'PENDING' }] });
+        if (sql.includes('profile_completion_status FROM doctors')) {
+          return Promise.resolve({ rows: [{ approval_status: 'PENDING', profile_completion_status: 'SUBMITTED' }] });
         }
         return Promise.resolve({ rows: [] });
       });
@@ -336,6 +336,43 @@ describe('AuthService - Login Behavior', () => {
       });
     });
 
+    it('should allow DOCTOR login with PENDING approval status before profile submission', async () => {
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT * FROM users')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'doctor-id',
+              email: 'doctor@example.com',
+              password_hash: '$2a$10$hashedpassword',
+              role: 'DOCTOR',
+              is_active: true,
+              must_change_password: false
+            }]
+          });
+        }
+        if (sql.includes('profile_completion_status FROM doctors')) {
+          return Promise.resolve({
+            rows: [{ approval_status: 'PENDING', profile_completion_status: 'INCOMPLETE' }]
+          });
+        }
+        if (sql.includes('SELECT two_factor_enabled FROM doctors')) {
+          return Promise.resolve({ rows: [{ two_factor_enabled: false }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      bcrypt.compare.mockResolvedValue(true);
+
+      const result = await login({
+        email: 'doctor@example.com',
+        password: 'password123',
+        expectedRole: 'DOCTOR'
+      });
+
+      expect(result.user.role).toBe('DOCTOR');
+      expect(result.accessToken).toBeDefined();
+    });
+
     it('should allow DOCTOR login with REJECTED approval status (to allow profile correction)', async () => {
       query.mockImplementation((sql: string, params: any[]) => {
         if (sql.includes('SELECT * FROM users')) {
@@ -350,8 +387,8 @@ describe('AuthService - Login Behavior', () => {
             }]
           });
         }
-        if (sql.includes('SELECT approval_status FROM doctors')) {
-          return Promise.resolve({ rows: [{ approval_status: 'REJECTED' }] });
+        if (sql.includes('profile_completion_status FROM doctors')) {
+          return Promise.resolve({ rows: [{ approval_status: 'REJECTED', profile_completion_status: 'INCOMPLETE' }] });
         }
         if (sql.includes('SELECT two_factor_enabled FROM doctors')) {
           return Promise.resolve({ rows: [{ two_factor_enabled: false }] });

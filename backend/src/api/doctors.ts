@@ -1593,11 +1593,11 @@ router.post('/me/profile/submit', authenticate, authorize('DOCTOR'), async (req:
 
     const user = userResult.rows[0];
 
-    // Validate required fields before submission
+    // Validate required professional fields before submission.
+    // Personal details (first/middle/last name, contact number, email) are
+    // captured and owned by the sign-up flow, shown read-only on the profile
+    // page, and therefore are not re-validated here.
     const requiredFields = [
-      { field: 'first_name', value: doctor.first_name, name: 'First Name' },
-      { field: 'last_name', value: doctor.last_name, name: 'Last Name' },
-      { field: 'contact_number', value: doctor.contact_number, name: 'Contact Number' },
       { field: 'specialty', value: doctor.specialty, name: 'Specialty' },
       { field: 'credentials', value: doctor.credentials, name: 'Credentials' },
       { field: 'prc_license_number', value: doctor.prc_license_number, name: 'PRC License Number' },

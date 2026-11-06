@@ -140,14 +140,18 @@ export async function login(data: LoginData) {
   // Check doctor approval status
   if (user.role === 'DOCTOR') {
     const doctorResult = await query(
-      'SELECT approval_status FROM doctors WHERE user_id = $1',
+      'SELECT approval_status, profile_completion_status FROM doctors WHERE user_id = $1',
       [user.id]
     );
 
     if (doctorResult.rows.length > 0) {
-      const approvalStatus = doctorResult.rows[0].approval_status;
+      const { approval_status: approvalStatus, profile_completion_status: profileStatus } =
+        doctorResult.rows[0];
 
-      if (approvalStatus === 'PENDING') {
+      // PENDING doctors may sign in until they have submitted their profile so
+      // they can complete and submit it. Once submitted, they wait for admin
+      // approval and cannot sign in.
+      if (approvalStatus === 'PENDING' && profileStatus === 'SUBMITTED') {
         throw {
           code: ErrorCodes.DOCTOR_PENDING_APPROVAL,
           message: 'Your account is awaiting administrator approval'

@@ -4,7 +4,9 @@ import { success, error, ErrorCodes } from '../utils/response';
 import { query, getClient } from '../database/connection';
 import bcrypt from 'bcryptjs';
 import { config } from '../config';
-import { generateAccessToken } from '../modules/auth/authService';
+import { generateAccessToken, generateRefreshToken } from '../modules/auth/authService';
+import { getSessionPolicy, buildSessionResponse } from '../modules/auth/sessionPolicy';
+import { setSessionCookies } from '../modules/auth/cookies';
 
 /*
  * Doctor sign-up OTP flow
@@ -234,7 +236,7 @@ router.post('/verify', async (req: Request, res: Response) => {
     const userResult = await client.query(
       `INSERT INTO users (email, password_hash, role, must_change_password, email_verified, email_verified_at)
        VALUES ($1, $2, 'DOCTOR', false, true, CURRENT_TIMESTAMP)
-       RETURNING id, email, role, must_change_password, email_verified`,
+       RETURNING id, email, role, must_change_password, email_verified, session_version`,
       [email, pending.password_hash]
     );
 
@@ -268,8 +270,21 @@ router.post('/verify', async (req: Request, res: Response) => {
 
     await client.query('COMMIT');
 
-    // Generate access token for the newly created doctor
-    const accessToken = generateAccessToken(user);
+    // Generate the doctor's session. Writing the role-scoped cookies here is
+    // deliberate: sign-up is unauthenticated, so a cookie left over from a
+    // previously deleted account would otherwise keep overriding the token for
+    // the account that was just created.
+    const sessionContext = { rememberMe: false, sessionStartMs: Date.now() };
+    const accessToken = generateAccessToken(user, sessionContext);
+    const refreshToken = generateRefreshToken(user, sessionContext);
+    const session = buildSessionResponse(user.role, sessionContext.rememberMe);
+
+    setSessionCookies(
+      res,
+      user.role,
+      { accessToken, refreshToken },
+      getSessionPolicy(user.role, sessionContext.rememberMe)
+    );
 
     // Return success message with access token - doctor is automatically authenticated
     return res.status(201).json(
@@ -278,6 +293,8 @@ router.post('/verify', async (req: Request, res: Response) => {
           user: { id: user.id, email: user.email, role: user.role },
           doctor: doctorResult.rows[0],
           accessToken: accessToken,
+          refreshToken: refreshToken,
+          session: session,
         },
         'Doctor account created successfully. Please complete your professional profile to submit for administrator approval.'
       )
