@@ -78,6 +78,7 @@ class ApiConstants {
 
   // Queue endpoints
   static const String queue = '/queue';
+  static const String queueTodayMe = '/queue/today/me';
   static const String queueNext = '/next';
   static const String queueStatus = '/status';
   static const String queueStartCheckup = '/start-checkup';

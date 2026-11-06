@@ -16,6 +16,8 @@ import '../features/doctors/presentation/doctor_schedule_page.dart';
 import '../features/doctors/presentation/doctors_page.dart';
 import '../features/doctors/presentation/doctor_profile_page.dart';
 import '../features/appointments/presentation/booking_confirmation_page.dart';
+import '../features/appointments/presentation/appointment_detail_page.dart';
+import '../features/appointments/presentation/reschedule_page.dart';
 import '../features/patients/presentation/patient_details_page.dart';
 import '../features/patients/presentation/patient_profile_page.dart';
 import '../features/settings/presentation/privacy_notice_page.dart';
@@ -186,9 +188,10 @@ class MyAppState extends State<MyApp> {
           case '/ai-conversation':
           case '/ai-conversation-history':
           case '/waitlist':
+          case '/reschedule':
+          case '/appointment-detail':
             // Protect all authenticated routes - enforce password change requirement
-            if (!_isAuthenticated) {
-              return MaterialPageRoute(builder: (context) => const LoginPage());
+            if (!_isAuthenticated) {              return MaterialPageRoute(builder: (context) => const LoginPage());
             }
             if (_mustChangePassword) {
               return MaterialPageRoute(
@@ -324,6 +327,20 @@ class MyAppState extends State<MyApp> {
               case '/waitlist':
                 return MaterialPageRoute(
                   builder: (context) => const WaitlistPage(),
+                );
+              case '/reschedule':
+                final args = settings.arguments as Map<String, dynamic>?;
+                return MaterialPageRoute(
+                  builder: (context) => ReschedulePage(
+                    appointmentId: args?['appointmentId']?.toString() ?? '',
+                  ),
+                );
+              case '/appointment-detail':
+                final args = settings.arguments as Map<String, dynamic>?;
+                return MaterialPageRoute(
+                  builder: (context) => AppointmentDetailPage(
+                    appointmentId: args?['appointmentId']?.toString() ?? '',
+                  ),
                 );
               case '/payment':
                 final args = settings.arguments as Map<String, dynamic>?;

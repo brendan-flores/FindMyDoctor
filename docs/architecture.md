@@ -1024,6 +1024,22 @@ Payment is intentionally separate from basic reservation creation.
 
 Patients select a date for their appointment (no specific time slot). Queue numbers are assigned based on first-come-first-served order for the selected date.
 
+### Rescheduling and Cancellation
+
+`PATCH /api/v1/appointments/:id/reschedule` and `PATCH /api/v1/appointments/:id/cancel` are patient-only, transactional operations.
+
+**Authorization.** Both endpoints load the appointment by id first, then compare `patient_id` with the authenticated patient. A missing appointment returns 404; another patient's appointment returns 403 and changes nothing.
+
+**Reschedule eligibility.** The appointment must be `SCHEDULED`, not in the past, and not started (queue entry still `WAITING`, no `started_at`). The target date must differ from the current date and resolve to `AVAILABLE` from the availability service, which already covers working hours, breaks, date-specific exceptions, and `daily_capacities`.
+
+**Queue and capacity accounting.** Both dates are locked in sorted order through the shared queue lock (`modules/queue/queueService.ts`, the same advisory-lock key used by booking and walk-ins), both `daily_capacities` rows are re-read `FOR UPDATE`, and capacity is re-checked under lock. The queue entry moves to `MAX(queue_number)+1` on the new date; the original date is renumbered so its remaining numbers stay sequential. `registered_count` decreases on the old date and increases on the new date.
+
+**Cancellation.** The queue entry is deleted, the original date is renumbered, capacity is released, CASH payments are deleted, GCASH payments are marked `CANCELLED`, and the freed slot is offered to the next waitlisted patient after commit.
+
+**Notifications.** The patient receives `APPOINTMENT_RESCHEDULED` (old and new schedule) or `APPOINTMENT_CANCELLED`. Patients whose queue numbers shift receive `QUEUE_UPDATED`.
+
+**Queue numbering.** Queue numbers are positional. Renumbering shifts higher numbers down by one in ascending order while the date's advisory lock is held, which keeps the UNIQUE `(queue_date, doctor_id, queue_number)` constraint satisfied without a temporary gap.
+
 ### Doctor-Specific Patient Record Validation
 
 Before confirming an appointment, the system must validate whether the patient has an existing record with the selected doctor.
@@ -1754,6 +1770,8 @@ Notifications may be generated when:
 - A confirmed exception or break-period change affects dates with active appointments.
 - Waitlist status changes.
 
+Cancellation and rescheduling create `APPOINTMENT_CANCELLED` and `APPOINTMENT_RESCHEDULED` notifications with `related_entity_type = 'appointment'` and the appointment id as `related_entity_id`. The reschedule message contains both the old and new schedules (date and queue number). Tapping either notification from the notifications page opens the related appointment detail screen. Patients whose queue numbers shift after a cancellation or reschedule receive `QUEUE_UPDATED`.
+
 When a cancellation or reschedule frees a slot, the waitlist promotion service offers it to the next waiting patient, creates a `WAITLIST_UPDATE` notification whose `related_entity_id` is the waitlist entry id, and the mobile notification opens `/doctor-schedule` for that entry's doctor with `defaultDate` set to the offered `waitlist_date` (YYYY-MM-DD). The schedule route receives the doctor id, name, specialty, clinic, consultation fee, and professional photo so the correct doctor's availability is shown with that date preselected. This navigation is available from both the full notifications page and the header notification dropdown. Payment-related notifications open the payment screen for the related appointment from either surface, and the dropdown displays full notification messages without line truncation.
 
 Chat notifications are sent only to recipients (never the sender) with generic titles, bodies, and push payloads that never include message content, and are additionally delivered as FCM/APNs pushes to the recipient's registered device tokens when push credentials are configured.
@@ -1822,11 +1840,25 @@ Secretary schedule endpoints use the `secretaries.doctor_id` ownership check. We
 ### Queue
 
 ```text
+GET   /queue/today/me
 GET   /queue/:date
 GET   /queue/:date/patient/:patientId
 POST  /queue/:date/next
 PATCH /queue/:id/status
 ```
+
+`GET /queue/today/me` is PATIENT-only and resolves the patient from the token. It returns `{ date, queues: [...] }` for the clinic's current date, where every entry carries the queue number and status, the current now-serving number, the number of patients ahead, the estimated wait (patients ahead × consultation duration), and the doctor's name, specialty, practice, room, photo, and consultation fee. An empty `queues` list means the patient has no queue today.
+
+`GET /queue/:date/patient/:patientId` is scoped: a patient may read only their own entry (403 otherwise), a doctor only entries for their own doctor, a secretary only for their assigned doctor, and an admin any entry. Invalid dates return 400 and missing entries 404.
+
+### Appointment Changes
+
+```text
+PATCH /appointments/:id/reschedule
+PATCH /appointments/:id/cancel
+```
+
+Both are PATIENT-only and return 403 when the appointment belongs to another patient. Rescheduling validates the target date against the doctor's availability and capacity, moves the queue entry to the new date, renumbers the old date, updates both daily capacities, and sends `APPOINTMENT_RESCHEDULED`; cancellation releases capacity, renumbers the queue, sends `APPOINTMENT_CANCELLED`, and promotes the next waitlisted patient for that date.
 
 ### Walk-in
 

@@ -297,6 +297,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         final type = notification['type']?.toString();
                         final isPaymentNotification = type == 'ADDITIONAL_CHARGE_ADDED' || type == 'PAYMENT_VERIFIED' || type == 'PAYMENT_REJECTED';
                         final isWaitlistNotification = type == 'WAITLIST_UPDATE';
+                        final isAppointmentNotification = type == 'APPOINTMENT_CANCELLED' ||
+                            type == 'APPOINTMENT_RESCHEDULED';
 
                         return Card(
                           margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
@@ -311,6 +313,20 @@ class _NotificationsPageState extends State<NotificationsPage> {
                               // available slot on the doctor's schedule.
                               if (isWaitlistNotification) {
                                 await _openWaitlistSlot(notification);
+                                return;
+                              }
+
+                              // Cancellation / reschedule notifications deep-link
+                              // to the related appointment.
+                              if (isAppointmentNotification) {
+                                final appointmentId = notification['related_entity_id']?.toString();
+                                if (appointmentId != null && appointmentId.isNotEmpty) {
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/appointment-detail',
+                                    arguments: {'appointmentId': appointmentId},
+                                  );
+                                }
                                 return;
                               }
 
@@ -418,6 +434,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                             ),
                                           ),
                                         ],
+                                      ),
+                                    ),
+                                  if (isAppointmentNotification)
+                                    Padding(
+                                      padding: EdgeInsets.only(top: spacing.AppSpacing.gutterXs),
+                                      child: Text(
+                                        'Tap to view appointment',
+                                        style: AppTextStyles.labelSm.copyWith(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                   const SizedBox(height: spacing.AppSpacing.gutterXs),

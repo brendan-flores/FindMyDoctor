@@ -3,8 +3,13 @@ import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requirePasswordChange } from '../middleware/auth';
 import { calculateAvailability, invalidateAvailabilityCache } from '../modules/availability/availabilityService';
-import { toClinicDateString } from '../utils/date';
+import { getClinicDate, toClinicDateString } from '../utils/date';
 import { promoteNextPatient } from '../modules/waitlists/waitlistPromotionService';
+import {
+  acquireQueueLocks,
+  nextQueueNumber,
+  renumberQueueAfterRemoval,
+} from '../modules/queue/queueService';
 
 const router = Router();
 
@@ -483,13 +488,26 @@ router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATI
     const { id } = req.params;
     const userId = req.user!.id;
 
-    // Verify ownership and get appointment details
+    // Load the appointment first, then authorise it, so a patient targeting
+    // another patient's appointment gets 403 instead of a silent 404.
+    const patientResult = await client.query(
+      'SELECT id FROM patients WHERE user_id = $1',
+      [userId]
+    );
+
+    if (patientResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Patient profile not found'));
+    }
+
+    const patientId = patientResult.rows[0].id;
+
     const appointmentResult = await client.query(
       `SELECT a.*, q.queue_number, q.queue_date
        FROM appointments a
        LEFT JOIN queue_entries q ON a.id = q.appointment_id
-       WHERE a.id = $1 AND a.patient_id = (SELECT id FROM patients WHERE user_id = $2)`,
-      [id, userId]
+       WHERE a.id = $1`,
+      [id]
     );
 
     if (appointmentResult.rows.length === 0) {
@@ -499,6 +517,11 @@ router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATI
 
     const appointment = appointmentResult.rows[0];
 
+    if (appointment.patient_id !== patientId) {
+      await client.query('ROLLBACK');
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only cancel your own appointments'));
+    }
+
     if (appointment.status === 'CANCELLED' || appointment.status === 'COMPLETED') {
       await client.query('ROLLBACK');
       return res.status(400).json(error(ErrorCodes.INVALID_APPOINTMENT_STATUS, 'Cannot cancel this appointment'));
@@ -506,16 +529,16 @@ router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATI
 
     const appointmentDate = toClinicDateString(new Date(appointment.appointment_date));
     const cancelledQueueNumber = appointment.queue_number;
-    const queueDate = appointment.queue_date;
+    // `queue_date` arrives as a Date from the driver; normalise it to the same
+    // YYYY-MM-DD key used by booking/walk-ins so the advisory lock is shared.
+    const queueDate = appointment.queue_date
+      ? toClinicDateString(new Date(appointment.queue_date))
+      : null;
 
-    // Acquire advisory lock for queue reassignment
-    const lockHash = `md5(${appointment.doctor_id}::text || ${queueDate}::text)`;
-    const lockResult = await client.query(
-      `SELECT pg_try_advisory_xact_lock(hashtext($1)) as lock_acquired`,
-      [lockHash]
-    );
+    // Serialise queue reassignment for this doctor/date.
+    const lockAcquired = await acquireQueueLocks(client, appointment.doctor_id, queueDate ? [queueDate] : []);
 
-    if (!lockResult.rows[0].lock_acquired) {
+    if (!lockAcquired) {
       await client.query('ROLLBACK');
       return res.status(429).json(error(ErrorCodes.SERVER_ERROR, 'System is busy, please try again'));
     }
@@ -555,50 +578,24 @@ router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATI
       [id]
     );
 
-    // Reassign queue numbers for patients with higher queue numbers
-    if (cancelledQueueNumber) {
-      // Get all affected queue entries (those with higher queue numbers)
-      const affectedEntriesResult = await client.query(
-        `SELECT q.id, q.patient_id, q.queue_number as old_queue_number
-         FROM queue_entries q
-         WHERE q.queue_date = $1
-         AND q.doctor_id = $2
-         AND q.queue_number > $3
-         AND q.status NOT IN ('CANCELLED', 'NO_SHOW')
-         ORDER BY q.queue_number ASC`,
-        [queueDate, appointment.doctor_id, cancelledQueueNumber]
-      );
-
-      // Update queue numbers for affected entries
-      for (const entry of affectedEntriesResult.rows) {
-        const newQueueNumber = entry.old_queue_number - 1;
-        await client.query(
-          `UPDATE queue_entries
-           SET queue_number = $1, updated_at = CURRENT_TIMESTAMP
-           WHERE id = $2`,
-          [newQueueNumber, entry.id]
-        );
-
-        // Send notification to affected user
-        await client.query(
-          `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
-           VALUES (
-             (SELECT user_id FROM patients WHERE id = $1),
-             'QUEUE_UPDATED',
-             'Queue Number Updated',
-             'Your queue number has been updated from ${entry.old_queue_number} to ${newQueueNumber}',
-             'queue',
-             $2
-           )`,
-          [entry.patient_id, entry.id]
-        );
-      }
-    }
+    // Close the gap left by the cancelled entry and notify affected patients
+    await renumberQueueAfterRemoval(client, appointment.doctor_id, queueDate ?? '', cancelledQueueNumber);
 
     // Update capacity
     await client.query(
       'UPDATE daily_capacities SET registered_count = registered_count - 1 WHERE doctor_id = $1 AND date = $2',
       [appointment.doctor_id, appointmentDate]
+    );
+
+    // Notify the patient whose appointment was cancelled
+    const cancellationMessage = cancelledQueueNumber
+      ? `Your appointment on ${appointmentDate} has been cancelled. Queue number #${cancelledQueueNumber} has been released.`
+      : `Your appointment on ${appointmentDate} has been cancelled.`;
+
+    await client.query(
+      `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
+       VALUES ($1, 'APPOINTMENT_CANCELLED', 'Appointment Cancelled', $2, 'appointment', $3)`,
+      [userId, cancellationMessage, id]
     );
 
     await client.query('COMMIT');
@@ -622,6 +619,10 @@ router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATI
 });
 
 // Reschedule appointment
+// Transactional flow: validate the target date against the doctor's schedule
+// and capacity, move the appointment's queue entry to the end of the new
+// date's queue, close the gap on the old date, keep both daily capacities in
+// sync, and notify the patient with the old and new schedules.
 router.patch('/:id/reschedule', authenticate, requirePasswordChange, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
   const client = await getClient();
 
@@ -637,11 +638,30 @@ router.patch('/:id/reschedule', authenticate, requirePasswordChange, authorize('
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'New appointment date is required'));
     }
 
-    // Get current appointment
+    // Load the appointment first, then authorise it, so a patient targeting
+    // another patient's appointment gets 403 instead of a silent 404.
+    const patientResult = await client.query(
+      'SELECT id FROM patients WHERE user_id = $1',
+      [userId]
+    );
+
+    if (patientResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Patient profile not found'));
+    }
+
+    const patientId = patientResult.rows[0].id;
+
     const appointmentResult = await client.query(
-      `SELECT * FROM appointments
-       WHERE id = $1 AND patient_id = (SELECT id FROM patients WHERE user_id = $2)`,
-      [id, userId]
+      `SELECT a.*,
+              d.first_name as doctor_first_name, d.last_name as doctor_last_name,
+              q.id as queue_entry_id, q.queue_number, q.queue_date,
+              q.status as queue_status, q.started_at
+       FROM appointments a
+       JOIN doctors d ON a.doctor_id = d.id
+       LEFT JOIN queue_entries q ON a.id = q.appointment_id
+       WHERE a.id = $1`,
+      [id]
     );
 
     if (appointmentResult.rows.length === 0) {
@@ -650,41 +670,180 @@ router.patch('/:id/reschedule', authenticate, requirePasswordChange, authorize('
     }
 
     const appointment = appointmentResult.rows[0];
-    const oldDateOnly = toClinicDateString(new Date(appointment.appointment_date));
 
-    // Check capacity for new date
-    const newDateOnly = toClinicDateString(new Date(newAppointmentDate));
-    const capacityResult = await client.query(
-      'SELECT * FROM daily_capacities WHERE doctor_id = $1 AND date = $2',
-      [appointment.doctor_id, newDateOnly]
+    if (appointment.patient_id !== patientId) {
+      await client.query('ROLLBACK');
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only reschedule your own appointments'));
+    }
+
+    if (appointment.status === 'CANCELLED' || appointment.status === 'COMPLETED' || appointment.status === 'NO_SHOW') {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.INVALID_APPOINTMENT_STATUS, 'Only scheduled appointments can be rescheduled'));
+    }
+
+    // A patient cannot move a visit that has already started.
+    const startedQueueStatuses = ['CALLED', 'IN_CHECKUP', 'COMPLETED'];
+    if (appointment.started_at || startedQueueStatuses.includes(appointment.queue_status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.INVALID_APPOINTMENT_STATUS, 'This appointment has already started'));
+    }
+
+    const parsedNewDate = new Date(newAppointmentDate);
+    if (Number.isNaN(parsedNewDate.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid appointment date'));
+    }
+
+    const oldDateOnly = toClinicDateString(new Date(appointment.appointment_date));
+    const newDateOnly = toClinicDateString(parsedNewDate);
+    const today = getClinicDate();
+
+    if (newDateOnly === oldDateOnly) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'The new date must be different from the current appointment date'));
+    }
+
+    if (newDateOnly < today) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot reschedule to a past date'));
+    }
+
+    // Validate the target date against working hours, breaks, exceptions and
+    // capacity before touching any data.
+    const availability = await calculateAvailability(appointment.doctor_id, newDateOnly, patientId);
+
+    if (availability.status === 'ALREADY_BOOKED') {
+      await client.query('ROLLBACK');
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'You already have an appointment with this doctor on this date'));
+    }
+
+    if (availability.status !== 'AVAILABLE') {
+      await client.query('ROLLBACK');
+      const statusMessage = {
+        'FULL': 'No available slots for the new date',
+        'UNAVAILABLE': 'Doctor is not available on this date',
+        'PAST': 'Cannot reschedule to a past date',
+        'NON_WORKING': 'Doctor is not working on this date'
+      }[availability.status] || 'Date not available';
+      const statusCode = availability.status === 'FULL'
+        ? ErrorCodes.CAPACITY_FULL
+        : ErrorCodes.APPOINTMENT_SLOT_UNAVAILABLE;
+      return res.status(400).json(error(statusCode, statusMessage));
+    }
+
+    // Lock both dates (sorted inside the helper) so concurrent bookings,
+    // walk-ins, cancellations and reschedules cannot interleave.
+    const lockAcquired = await acquireQueueLocks(
+      client,
+      appointment.doctor_id,
+      [oldDateOnly, newDateOnly]
     );
 
-    if (capacityResult.rows.length === 0 || capacityResult.rows[0].registered_count >= capacityResult.rows[0].final_capacity) {
+    if (!lockAcquired) {
+      await client.query('ROLLBACK');
+      return res.status(429).json(error(ErrorCodes.SERVER_ERROR, 'System is busy, please try again'));
+    }
+
+    // Re-read both capacity rows under lock; availability above may be stale.
+    const capacityResult = await client.query(
+      `SELECT date, final_capacity, registered_count
+       FROM daily_capacities
+       WHERE doctor_id = $1 AND date = ANY($2::date[])
+       FOR UPDATE`,
+      [appointment.doctor_id, [oldDateOnly, newDateOnly]]
+    );
+
+    const capacityByDate: Record<string, any> = {};
+    for (const row of capacityResult.rows) {
+      capacityByDate[toClinicDateString(new Date(row.date))] = row;
+    }
+
+    const newCapacity = capacityByDate[newDateOnly];
+
+    if (!newCapacity) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.APPOINTMENT_SLOT_UNAVAILABLE, 'No capacity configured for the new date'));
+    }
+
+    if (Number(newCapacity.registered_count) >= Number(newCapacity.final_capacity)) {
       await client.query('ROLLBACK');
       return res.status(400).json(error(ErrorCodes.CAPACITY_FULL, 'No available slots for the new date'));
     }
 
-    // Update appointment
-    await client.query(
-      'UPDATE appointments SET appointment_date = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [newAppointmentDate, id]
+    // Reject a second visit with the same doctor on the target date.
+    const conflictResult = await client.query(
+      `SELECT id FROM appointments
+       WHERE patient_id = $1 AND doctor_id = $2
+       AND DATE(appointment_date) = $3
+       AND id <> $4
+       AND status NOT IN ('CANCELLED', 'NO_SHOW')`,
+      [patientId, appointment.doctor_id, newDateOnly, id]
     );
 
-    // Update queue entry
+    if (conflictResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'You already have an appointment with this doctor on this date'));
+    }
+
+    // Move the queue entry to the end of the new date's queue.
+    let newQueueNumber: number | null = null;
+
+    if (appointment.queue_entry_id) {
+      newQueueNumber = await nextQueueNumber(client, appointment.doctor_id, newDateOnly);
+
+      await client.query(
+        `UPDATE queue_entries
+         SET queue_date = $1,
+             queue_number = $2,
+             status = 'WAITING',
+             called_at = NULL,
+             started_at = NULL,
+             completed_at = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`,
+        [newDateOnly, newQueueNumber, appointment.queue_entry_id]
+      );
+
+      // The moved entry now leaves a gap at its old position.
+      await renumberQueueAfterRemoval(
+        client,
+        appointment.doctor_id,
+        oldDateOnly,
+        appointment.queue_number
+      );
+    }
+
     await client.query(
-      'UPDATE queue_entries SET queue_date = $1, updated_at = CURRENT_TIMESTAMP WHERE appointment_id = $2',
+      'UPDATE appointments SET appointment_date = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [newDateOnly, id]
     );
 
     // Update registered_count: decrement for old date, increment for new date
     await client.query(
-      'UPDATE daily_capacities SET registered_count = registered_count - 1 WHERE doctor_id = $1 AND date = $2',
+      'UPDATE daily_capacities SET registered_count = GREATEST(registered_count - 1, 0) WHERE doctor_id = $1 AND date = $2',
       [appointment.doctor_id, oldDateOnly]
     );
 
     await client.query(
       'UPDATE daily_capacities SET registered_count = registered_count + 1 WHERE doctor_id = $1 AND date = $2',
       [appointment.doctor_id, newDateOnly]
+    );
+
+    // Notify the patient with both schedules (old and new).
+    const doctorName = `Dr. ${appointment.doctor_first_name} ${appointment.doctor_last_name}`.trim();
+    const oldSchedule = appointment.queue_number
+      ? `${oldDateOnly} (queue #${appointment.queue_number})`
+      : oldDateOnly;
+    const newSchedule = newQueueNumber
+      ? `${newDateOnly} (queue #${newQueueNumber})`
+      : newDateOnly;
+    const rescheduleMessage =
+      `Your appointment with ${doctorName} has been rescheduled from ${oldSchedule} to ${newSchedule}.`;
+
+    await client.query(
+      `INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
+       VALUES ($1, 'APPOINTMENT_RESCHEDULED', 'Appointment Rescheduled', $2, 'appointment', $3)`,
+      [userId, rescheduleMessage, id]
     );
 
     await client.query('COMMIT');
@@ -697,9 +856,16 @@ router.patch('/:id/reschedule', authenticate, requirePasswordChange, authorize('
       // Don't fail the reschedule if promotion fails
     }
 
-    res.json(success(null, 'Appointment rescheduled successfully'));
+    res.json(success({
+      appointmentId: id,
+      previousDate: oldDateOnly,
+      previousQueueNumber: appointment.queue_number ?? null,
+      appointmentDate: newDateOnly,
+      queueNumber: newQueueNumber,
+    }, 'Appointment rescheduled successfully'));
   } catch (err: any) {
     await client.query('ROLLBACK');
+    console.error('Appointment reschedule error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to reschedule appointment'));
   } finally {
     client.release();

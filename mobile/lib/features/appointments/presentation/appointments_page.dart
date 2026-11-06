@@ -34,12 +34,38 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
   List<dynamic> _waitlists = [];
   bool _isLoadingWaitlists = true;
 
+  // Today's live queue (one entry per doctor the patient is seeing today)
+  List<Map<String, dynamic>> _todayQueues = [];
+
   @override
   void initState() {
     super.initState();
     _apiService = widget.apiService ?? ApiService();
     _fetchAppointments();
     _fetchWaitlists();
+    _fetchTodayQueue();
+  }
+
+  Future<void> _fetchTodayQueue() async {
+    try {
+      final response = await _apiService.getMyQueueToday();
+      if (!mounted) return;
+
+      if (response['success'] == true && response['data'] is Map) {
+        final queues = (response['data']['queues'] as List?) ?? [];
+        final entries = <Map<String, dynamic>>[];
+        for (final item in queues) {
+          if (item is Map) {
+            entries.add(Map<String, dynamic>.from(item));
+          }
+        }
+        setState(() {
+          _todayQueues = entries;
+        });
+      }
+    } catch (_) {
+      // Today's queue is supplementary - the appointment list must still render.
+    }
   }
 
   Future<void> _fetchAppointments() async {
@@ -142,6 +168,27 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     }
   }
 
+  Future<void> _navigateToReschedule(String appointmentId) async {
+    final result = await Navigator.pushNamed(
+      context,
+      '/reschedule',
+      arguments: {'appointmentId': appointmentId},
+    );
+
+    if (result == true) {
+      _fetchAppointments();
+      _fetchTodayQueue();
+    }
+  }
+
+  Future<void> _refreshAll() async {
+    await Future.wait([
+      _fetchAppointments(),
+      _fetchWaitlists(),
+      _fetchTodayQueue(),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -151,7 +198,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
           const AppHeader(showNotifications: true, showProfile: true),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: _fetchAppointments,
+              onRefresh: _refreshAll,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Padding(
@@ -166,6 +213,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                       const SizedBox(height: spacing.AppSpacing.gutterLg),
                       _buildFilterTabs(),
                       const SizedBox(height: spacing.AppSpacing.gutterLg),
+                      _buildTodayQueueSection(),
                       _buildWaitlistSection(),
                       const SizedBox(height: spacing.AppSpacing.gutterLg),
                       _buildAppointmentsList(),
@@ -396,6 +444,100 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayQueueSection() {
+    if (_todayQueues.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.confirmation_number_outlined,
+              color: AppColors.primary,
+              size: spacing.AppSpacing.iconMd,
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterSm),
+            Text(
+              'Today\'s Queue',
+              style: AppTextStyles.headlineSm,
+            ),
+          ],
+        ),
+        const SizedBox(height: spacing.AppSpacing.gutterMd),
+        ..._todayQueues.map((entry) => _buildTodayQueueCard(entry)),
+        const SizedBox(height: spacing.AppSpacing.gutterLg),
+      ],
+    );
+  }
+
+  Widget _buildTodayQueueCard(Map<String, dynamic> entry) {
+    final queueNumber = parseInt(entry['queueNumber']);
+    final nowServing = parseInt(entry['nowServing']);
+    final patientsAhead = parseInt(entry['patientsAhead']) ?? 0;
+    final estimatedWait = parseInt(entry['estimatedWaitMinutes']) ?? 0;
+    final doctorName = parseString(entry['doctorName']) ?? 'Your doctor';
+    final appointmentId = parseString(entry['appointmentId']);
+    final queueStatus = parseString(entry['queueStatus']);
+    final isCalled = queueStatus == 'CALLED' || queueStatus == 'IN_CHECKUP';
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
+      child: AppCard(
+        padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+        onTap: appointmentId != null
+            ? () => _navigateToDetail(appointmentId)
+            : null,
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+              ),
+              child: Center(
+                child: Text(
+                  queueNumber != null ? '#$queueNumber' : '#--',
+                  style: AppTextStyles.queueNum.copyWith(
+                    fontSize: 20,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(doctorName, style: AppTextStyles.bodyMdMedium),
+                  const SizedBox(height: 2),
+                  Text(
+                    isCalled
+                        ? 'It\'s your turn'
+                        : 'Now serving ${nowServing != null ? '#$nowServing' : '—'} • '
+                            '$patientsAhead ${patientsAhead == 1 ? 'patient' : 'patients'} ahead'
+                            '${estimatedWait > 0 ? ' • ~$estimatedWait min' : ''}',
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: isCalled ? AppColors.primary : AppColors.secondary,
+                      fontWeight:
+                          isCalled ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppColors.outline),
           ],
         ),
       ),
@@ -998,7 +1140,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                       borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
                     ),
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () => _navigateToDetail(appointmentId),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryContainer,
                         foregroundColor: AppColors.onPrimary,
@@ -1055,6 +1197,21 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: spacing.AppSpacing.gutterSm),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _navigateToReschedule(appointmentId),
+                icon: const Icon(Icons.event_repeat, size: 18),
+                label: const Text('Reschedule appointment'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.AppSpacing.gutterSm,
+                  ),
+                ),
+              ),
             ),
           ],
         ],

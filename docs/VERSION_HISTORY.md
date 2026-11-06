@@ -4,6 +4,36 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.35 (November 6, 2026)
+
+**Purpose:** Let patients reschedule or cancel their own appointments without breaking queue and capacity accounting, and give them a live, trustworthy view of today's queue.
+
+**Significant Changes:**
+- Rescheduling rebuilt as a transactional patient flow (`PATCH /api/v1/appointments/:id/reschedule`):
+  - Loads the appointment first and returns 403 for another patient's appointment, 404 when missing.
+  - Rejects cancelled/completed/no-show appointments, past dates, the current date, and visits that have already started.
+  - Validates the target date through the availability service (working hours, breaks, exceptions, capacity) with `CAPACITY_FULL`, `APPOINTMENT_SLOT_UNAVAILABLE`, and `CONFLICT` responses.
+  - Locks both dates through the shared queue lock, re-reads both `daily_capacities` rows `FOR UPDATE`, moves the queue entry to the end of the new date's queue, renumbers the old date, and adjusts `registered_count` on both dates.
+  - Sends `APPOINTMENT_RESCHEDULED` with the old and new schedule, and promotes the next waitlisted patient for the released date.
+- Cancellation (`PATCH /api/v1/appointments/:id/cancel`) hardened while preserving existing behaviour:
+  - Returns 403 for another patient's appointment.
+  - Sends `APPOINTMENT_CANCELLED` to the patient.
+  - Queue renumbering and waitlist promotion moved onto the shared queue helper so they cannot drift from rescheduling.
+- New shared queue module `backend/src/modules/queue/queueService.ts`:
+  - Preserves the exact advisory-lock key used by booking and walk-ins, takes multiple date locks in sorted order (deadlock-free), allocates `MAX(queue_number)+1`, and performs the ascending renumbering.
+- New `GET /api/v1/queue/today/me` (patient-only): resolves the patient from the token and returns queue number/status, now-serving number, patients ahead, estimated wait, and doctor information for today's queue.
+- Secured `GET /api/v1/queue/:date/patient/:patientId`: patients may only read their own entry (403 otherwise); doctors and secretaries are scoped to their doctor; admins may read any.
+- Mobile:
+  - New `/reschedule` page with availability calendar, appointment summary, confirmation dialog, fully-booked waitlist option, and clear unavailable/full states.
+  - New `LiveQueueCard` with manual refresh, 30-second polling, lifecycle-aware pause/resume, and auto-stop when the visit ends.
+  - Appointments tab shows today's queue summary, wires the queue-pass action, and adds a reschedule action to scheduled appointments.
+  - Appointment detail shows the live card on the appointment date and offers reschedule alongside cancel.
+  - `APPOINTMENT_CANCELLED` / `APPOINTMENT_RESCHEDULED` notifications deep-link to the appointment detail screen via the new `/appointment-detail` route.
+- No database migration: notification types are unconstrained `varchar` and all queue/appointment columns already existed. `consolidated_schema.sql` is unchanged.
+- Verification: 12 new reschedule/cancellation Jest tests and 8 new queue tests pass; backend type-check shows only the pre-existing `payments.ts` errors.
+
+---
+
 ### 01.34 (November 6, 2026)
 
 **Purpose:** Make the PostgreSQL schema reproducible and the migration process safe to rerun, and close the gap between the schema the application expects and the schema present in the configured database.

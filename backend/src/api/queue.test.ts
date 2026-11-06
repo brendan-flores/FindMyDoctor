@@ -30,6 +30,7 @@ jest.mock('../middleware/auth', () => ({
   },
   requireSecretaryPasswordChange: (req: any, res: any, next: any) => next(),
   requireSecretaryProfileCompletion: (req: any, res: any, next: any) => next(),
+  requirePasswordChange: (req: any, res: any, next: any) => next(),
 }));
 
 const { query, getClient } = require('../database/connection');
@@ -724,6 +725,185 @@ describe('Queue API Security', () => {
 
       expect(response.status).toBe(404);
       expect(response.body.error.message).toContain('Queue entry not found or access denied');
+    });
+  });
+
+  describe('GET /api/v1/queue/today/me', () => {
+    beforeEach(() => {
+      mockUser = { id: 'patient-user-1', role: 'PATIENT' };
+    });
+
+    it('should identify the patient from the token and return the live queue card', async () => {
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+          expect(params).toEqual(['patient-user-1']);
+          return Promise.resolve({ rows: [{ id: 'patient-1' }] });
+        }
+        if (sql.includes('FROM queue_entries q') && sql.includes('patients_ahead')) {
+          expect(params).toEqual(['patient-1', expect.any(String)]);
+          return Promise.resolve({
+            rows: [{
+              queue_entry_id: 'queue-1',
+              appointment_id: 'apt-1',
+              queue_number: 5,
+              queue_status: 'WAITING',
+              queue_date: params[1],
+              doctor_id: 'doctor-1',
+              doctor_first_name: 'Maria',
+              doctor_last_name: 'Santos',
+              specialty: 'Cardiology',
+              practice_name: 'Heart Clinic',
+              room_number: '412',
+              professional_photo_url: null,
+              consultation_fee: '500.00',
+              consultation_duration_minutes: 30,
+              now_serving: 3,
+              patients_ahead: '2',
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app).get('/api/v1/queue/today/me');
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.queues).toHaveLength(1);
+
+      const entry = response.body.data.queues[0];
+      expect(entry.queueNumber).toBe(5);
+      expect(entry.queueStatus).toBe('WAITING');
+      expect(entry.nowServing).toBe(3);
+      expect(entry.patientsAhead).toBe(2);
+      expect(entry.estimatedWaitMinutes).toBe(60);
+      expect(entry.doctorName).toBe('Dr. Maria Santos');
+      expect(entry.roomNumber).toBe('412');
+    });
+
+    it('should default the wait estimate to 30 minutes per patient when capacity is missing', async () => {
+      query.mockImplementation((sql: string) => {
+        if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'patient-1' }] });
+        }
+        if (sql.includes('patients_ahead')) {
+          return Promise.resolve({
+            rows: [{
+              queue_entry_id: 'queue-1',
+              appointment_id: 'apt-1',
+              queue_number: 2,
+              queue_status: 'WAITING',
+              queue_date: '2026-11-06',
+              doctor_id: 'doctor-1',
+              doctor_first_name: 'Maria',
+              doctor_last_name: 'Santos',
+              consultation_duration_minutes: null,
+              now_serving: null,
+              patients_ahead: '1',
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app).get('/api/v1/queue/today/me');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.queues[0].estimatedWaitMinutes).toBe(30);
+      expect(response.body.data.queues[0].nowServing).toBeNull();
+    });
+
+    it('should return an empty list when the patient has no queue today', async () => {
+      query.mockImplementation((sql: string) => {
+        if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'patient-1' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app).get('/api/v1/queue/today/me');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.queues).toEqual([]);
+    });
+
+    it('should reject non-patient roles', async () => {
+      mockUser = { id: 'doctor-user-1', role: 'DOCTOR' };
+
+      const response = await request(app).get('/api/v1/queue/today/me');
+
+      expect(response.status).toBe(403);
+    });
+  });
+
+  describe('GET /api/v1/queue/:date/patient/:patientId authorization', () => {
+    it('should allow a patient to read their own queue entry', async () => {
+      mockUser = { id: 'patient-user-1', role: 'PATIENT' };
+
+      query.mockImplementation((sql: string) => {
+        if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'patient-1' }] });
+        }
+        if (sql.includes('FROM queue_entries q')) {
+          return Promise.resolve({ rows: [{ id: 'queue-1', doctor_id: 'doctor-1', queue_number: 5 }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app).get('/api/v1/queue/2026-11-06/patient/patient-1');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.queue_number).toBe(5);
+    });
+
+    it('should return 403 when a patient requests another patient\'s queue entry', async () => {
+      mockUser = { id: 'patient-user-1', role: 'PATIENT' };
+
+      query.mockImplementation((sql: string) => {
+        if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'patient-1' }] });
+        }
+        return Promise.resolve({ rows: [{ id: 'queue-1', doctor_id: 'doctor-1' }] });
+      });
+
+      const response = await request(app).get('/api/v1/queue/2026-11-06/patient/patient-2');
+
+      expect(response.status).toBe(403);
+      expect(response.body.error.code).toBe('FORBIDDEN');
+    });
+
+    it('should return 403 when a doctor requests another doctor\'s queue entry', async () => {
+      mockUser = { id: 'doctor-user-1', role: 'DOCTOR' };
+
+      query.mockImplementation((sql: string) => {
+        if (sql.includes('SELECT id FROM doctors WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'doctor-1' }] });
+        }
+        if (sql.includes('FROM queue_entries q')) {
+          return Promise.resolve({ rows: [{ id: 'queue-1', doctor_id: 'doctor-2' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app).get('/api/v1/queue/2026-11-06/patient/patient-2');
+
+      expect(response.status).toBe(403);
+      expect(response.body.error.code).toBe('FORBIDDEN');
+    });
+
+    it('should return 404 when no queue entry exists for that date and patient', async () => {
+      mockUser = { id: 'doctor-user-1', role: 'DOCTOR' };
+
+      query.mockImplementation((sql: string) => {
+        if (sql.includes('SELECT id FROM doctors WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'doctor-1' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app).get('/api/v1/queue/2026-11-06/patient/patient-2');
+
+      expect(response.status).toBe(404);
     });
   });
 });

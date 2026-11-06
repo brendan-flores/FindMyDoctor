@@ -1,9 +1,100 @@
 import { Router, Response } from 'express';
 import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
-import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, requireSecretaryProfileCompletion } from '../middleware/auth';
+import { AuthRequest, authenticate, authorize, requirePasswordChange, requireSecretaryPasswordChange, requireSecretaryProfileCompletion } from '../middleware/auth';
+import { getClinicDate } from '../utils/date';
 
 const router = Router();
+
+// Get the authenticated patient's live queue for today.
+// The patient is identified from the token - never from a client-supplied id.
+router.get('/today/me', authenticate, requirePasswordChange, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const today = getClinicDate();
+
+    const patientResult = await query(
+      'SELECT id FROM patients WHERE user_id = $1',
+      [userId]
+    );
+
+    if (patientResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Patient profile not found'));
+    }
+
+    const patientId = patientResult.rows[0].id;
+
+    const result = await query(
+      `SELECT q.id as queue_entry_id,
+              q.appointment_id,
+              q.queue_number,
+              q.status as queue_status,
+              q.queue_date,
+              q.doctor_id,
+              d.first_name as doctor_first_name,
+              d.last_name as doctor_last_name,
+              d.specialty,
+              d.practice_name,
+              d.room_number,
+              d.professional_photo_url,
+              d.consultation_fee,
+              dc.consultation_duration_minutes,
+              COALESCE(
+                (SELECT MAX(q2.queue_number)
+                 FROM queue_entries q2
+                 WHERE q2.queue_date = q.queue_date
+                 AND q2.doctor_id = q.doctor_id
+                 AND q2.status IN ('CALLED', 'IN_CHECKUP')),
+                (SELECT MAX(q3.queue_number)
+                 FROM queue_entries q3
+                 WHERE q3.queue_date = q.queue_date
+                 AND q3.doctor_id = q.doctor_id
+                 AND q3.status = 'COMPLETED')
+              ) as now_serving,
+              (SELECT COUNT(*)
+               FROM queue_entries q4
+               WHERE q4.queue_date = q.queue_date
+               AND q4.doctor_id = q.doctor_id
+               AND q4.queue_number < q.queue_number
+               AND q4.status IN ('WAITING', 'CALLED')) as patients_ahead
+       FROM queue_entries q
+       JOIN doctors d ON q.doctor_id = d.id
+       LEFT JOIN daily_capacities dc
+         ON dc.doctor_id = q.doctor_id AND dc.date = q.queue_date
+       WHERE q.patient_id = $1 AND q.queue_date = $2
+       ORDER BY q.queue_number`,
+      [patientId, today]
+    );
+
+    const queues = result.rows.map((row: any) => {
+      const duration = Number(row.consultation_duration_minutes ?? 30);
+      const patientsAhead = Number(row.patients_ahead ?? 0);
+
+      return {
+        queueEntryId: row.queue_entry_id,
+        appointmentId: row.appointment_id,
+        queueNumber: row.queue_number,
+        queueStatus: row.queue_status,
+        doctorId: row.doctor_id,
+        doctorName: `Dr. ${row.doctor_first_name} ${row.doctor_last_name}`.trim(),
+        specialty: row.specialty,
+        practiceName: row.practice_name,
+        roomNumber: row.room_number,
+        professionalPhotoUrl: row.professional_photo_url,
+        consultationFee: row.consultation_fee,
+        nowServing: row.now_serving === null ? null : Number(row.now_serving),
+        patientsAhead,
+        estimatedWaitMinutes: patientsAhead * duration,
+        consultationDurationMinutes: duration,
+      };
+    });
+
+    res.json(success({ date: today, queues }));
+  } catch (err: any) {
+    console.error('Error fetching today\'s queue:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch today\'s queue'));
+  }
+});
 
 // Get queue for a specific date
 router.get('/:date', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('DOCTOR', 'SECRETARY', 'ADMIN'), async (req: AuthRequest, res: Response) => {
@@ -58,10 +149,60 @@ router.get('/:date', authenticate, requireSecretaryPasswordChange, requireSecret
   }
 });
 
-// Get patient's queue position
+// Get patient's queue position.
+// Patients may only read their own entry; doctors and secretaries are scoped to
+// the doctor/date they are responsible for. Unauthorised access returns 403.
 router.get('/:date/patient/:patientId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { date, patientId } = req.params;
+    const role = req.user!.role;
+    const userId = req.user!.id;
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Date must be in YYYY-MM-DD format'));
+    }
+
+    // Resolve who the caller is allowed to look at.
+    let scopedDoctorId: string | null = null;
+
+    if (role === 'PATIENT') {
+      const ownPatientResult = await query(
+        'SELECT id FROM patients WHERE user_id = $1',
+        [userId]
+      );
+
+      if (ownPatientResult.rows.length === 0) {
+        return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Patient profile not found'));
+      }
+
+      if (ownPatientResult.rows[0].id !== patientId) {
+        return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only access your own queue information'));
+      }
+    } else if (role === 'DOCTOR') {
+      const doctorResult = await query(
+        'SELECT id FROM doctors WHERE user_id = $1',
+        [userId]
+      );
+
+      if (doctorResult.rows.length === 0) {
+        return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Doctor profile not found'));
+      }
+
+      scopedDoctorId = doctorResult.rows[0].id;
+    } else if (role === 'SECRETARY') {
+      const secretaryResult = await query(
+        'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+        [userId]
+      );
+
+      if (secretaryResult.rows.length === 0) {
+        return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+      }
+
+      scopedDoctorId = secretaryResult.rows[0].doctor_id;
+    } else if (role !== 'ADMIN') {
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Invalid role for queue access'));
+    }
 
     const result = await query(
       `SELECT q.*, d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.specialty,
@@ -74,6 +215,11 @@ router.get('/:date/patient/:patientId', authenticate, async (req: AuthRequest, r
 
     if (result.rows.length === 0) {
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Queue entry not found'));
+    }
+
+    // Patients only ever match their own entry above; staff must match scope.
+    if (scopedDoctorId && result.rows.some((row: any) => row.doctor_id !== scopedDoctorId)) {
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only access queue entries for your assigned doctor'));
     }
 
     res.json(success(result.rows[0]));

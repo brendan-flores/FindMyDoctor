@@ -357,6 +357,8 @@ Local mobile state
 
 The backend/database is responsible for queue assignment.
 
+Queue numbers are positional. When a queue entry is removed by a cancellation or reschedule, higher numbers on that doctor/date shift down by one in ascending order while the doctor/date advisory lock is held, so the remaining queue stays sequential and unique. Queue entries are never renumbered from the client.
+
 ---
 
 # 16. Queue Status Rules
@@ -377,6 +379,8 @@ NO_SHOW
 Important:
 
 > Skipping a patient must not automatically delete the queue record.
+
+Patients can view only their own live queue (identified by the authenticated token). Any request for another patient's appointment or queue information must return HTTP 403; this is enforced by the backend, not by hiding UI.
 
 ---
 
@@ -597,6 +601,8 @@ Doctor-Specific Patient Record
 
 before creating a reservation.
 
+A reschedule must re-validate the same conditions as a new booking (valid schedule, capacity, no conflict) for the target date, release the original slot, and update both dates' capacity. A patient may only reschedule or cancel their own appointment; another patient's appointment returns HTTP 403.
+
 ### Doctor-Specific Patient Record Check
 
 Before confirming an appointment, the system must verify whether the patient has an existing record with the selected doctor (such as a previous appointment or completed consultation). If no record exists with that specific doctor, the system must prompt the patient to provide required details through the backend API before proceeding with reservation. The mobile application must never connect directly to PostgreSQL for record checks or updates.
@@ -629,6 +635,8 @@ Protect these operations against simultaneous requests:
 
 ```text
 Appointment Creation
+Appointment Cancellation
+Appointment Rescheduling
 Queue Number Assignment
 Capacity Consumption
 Walk-in Registration

@@ -125,6 +125,31 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 - Next Patient, Start Checkup, Skip/Not Present, Complete Checkup
 - All status transitions handled by backend
 
+**Patient-facing queue endpoints:**
+- `GET /api/v1/queue/today/me` (patient-only) resolves the patient from the bearer token and returns today's queue for every doctor the patient is scheduled with: `queueNumber`, `queueStatus`, `nowServing`, `patientsAhead`, `estimatedWaitMinutes`, `consultationDurationMinutes`, and doctor information (name, specialty, practice, room, photo, fee).
+- `nowServing` is the highest `queue_number` with status `CALLED`/`IN_CHECKUP`, falling back to the highest `COMPLETED`; `null` means the clinic has not started.
+- `patientsAhead` counts lower queue numbers still in `WAITING`/`CALLED`; `estimatedWaitMinutes` = `patientsAhead × consultation_duration_minutes` (default 30) from `daily_capacities`.
+- `GET /api/v1/queue/:date/patient/:patientId` is scoped: patients may read only their own entry (403 otherwise), doctors only entries for their own doctor, secretaries only for their assigned doctor, admins any. Invalid dates return 400, missing entries 404.
+
+**Queue numbering on removal:**
+- Cancelling or rescheduling away from a date closes the gap: higher numbers shift down by one in ascending order and each affected patient receives a `QUEUE_UPDATED` notification.
+- The shift is performed inside the same transaction while holding the doctor/date advisory lock, so the UNIQUE `(queue_date, doctor_id, queue_number)` constraint is never violated.
+
+---
+
+## Appointment Cancellation and Rescheduling
+
+**Reschedule (`PATCH /api/v1/appointments/:id/reschedule`, patient-only):**
+- Patients may reschedule only their own appointments (403 otherwise) that are `SCHEDULED`, on or after today, and not started (queue status `WAITING`, no `started_at`).
+- The target date must differ from the current date, must be in the future relative to the clinic date, and must resolve to `AVAILABLE` from the availability service (working hours, breaks, exceptions, capacity). `FULL` returns `CAPACITY_FULL`, unavailable/non-working returns `APPOINTMENT_SLOT_UNAVAILABLE`, and an existing appointment with the same doctor that day returns `CONFLICT`.
+- The transaction locks both dates in sorted order, re-reads both `daily_capacities` rows with `FOR UPDATE`, moves the queue entry to the end of the new date (`MAX(queue_number)+1`), renumbers the old date, updates the appointment date, and adjusts `registered_count` (−1 old, +1 new).
+- The patient receives an `APPOINTMENT_RESCHEDULED` notification containing both schedules (old date/queue number and new date/queue number). Availability changes to the old date then trigger the waitlist promotion service.
+
+**Cancellation (`PATCH /api/v1/appointments/:id/cancel`, patient-only):**
+- Patients may cancel only their own appointments (403 otherwise). `CANCELLED`/`COMPLETED` appointments are rejected.
+- CASH payments are deleted; GCASH payments are marked `CANCELLED`. The queue entry is deleted, the queue is renumbered, capacity is released, and the patient receives an `APPOINTMENT_CANCELLED` notification.
+- After commit, the freed slot is offered to the first `WAITING` patient for that doctor/date through `promoteNextPatient` (`WAITLIST_UPDATE`).
+
 ---
 
 ## Waitlist Booking and Notifications
@@ -231,6 +256,7 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 See `docs/VERSION_HISTORY.md` for complete version history.
 
 **Recent Versions:**
+- 01.35: Patient appointment rescheduling, cancellation with waitlist promotion, and live queue tracking
 - 01.34: Consolidated idempotent schema migration and tracked, rerunnable migration runner
 - 01.33: Notification dropdown navigation and full message display
 - 01.32: Waitlist slot notification opens doctor schedule with date preselected; FULL dates show only the bottom Join Waitlist action

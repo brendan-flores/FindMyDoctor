@@ -659,6 +659,23 @@ class ApiService {
     );
   }
 
+  Future<Map<String, dynamic>> rescheduleAppointment({
+    required String id,
+    required String newAppointmentDate,
+  }) async {
+    return await patch(
+      '${ApiConstants.appointments}/$id${ApiConstants.appointmentReschedule}',
+      body: {'newAppointmentDate': newAppointmentDate},
+      requireAuth: true,
+    );
+  }
+
+  /// Live queue for the authenticated patient on the clinic's current date.
+  /// The backend resolves the patient from the token.
+  Future<Map<String, dynamic>> getMyQueueToday() async {
+    return await get(ApiConstants.queueTodayMe, requireAuth: true);
+  }
+
   // ===========================
   // CONVERSATIONS METHODS
   // ===========================

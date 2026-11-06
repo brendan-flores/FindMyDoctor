@@ -48,6 +48,19 @@ jest.mock('../modules/availability/availabilityService', () => ({
 const { query, getClient } = require('../database/connection');
 const { calculateAvailability, invalidateAvailabilityCache } = require('../modules/availability/availabilityService');
 
+/**
+ * Booking requests must target a future date because the API rejects past
+ * dates. A hardcoded date would start failing as the calendar advances.
+ */
+function futureBookingDate(offsetDays = 3): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 describe('Appointment Booking with Completion Status', () => {
   let app: express.Application;
 
@@ -84,7 +97,7 @@ describe('Appointment Booking with Completion Status', () => {
         .post('/api/v1/appointments')
         .send({
           doctorId: 'test-doctor-id',
-          appointmentDate: '2026-10-20',
+          appointmentDate: futureBookingDate(),
           reasonForVisit: 'Checkup',
         });
 
@@ -151,7 +164,7 @@ describe('Appointment Booking with Completion Status', () => {
         .post('/api/v1/appointments')
         .send({
           doctorId: 'test-doctor-id',
-          appointmentDate: '2026-10-20',
+          appointmentDate: futureBookingDate(),
           reasonForVisit: 'Checkup',
         });
 
@@ -185,7 +198,7 @@ describe('Appointment Booking with Completion Status', () => {
         .post('/api/v1/appointments')
         .send({
           doctorId: 'test-doctor-id',
-          appointmentDate: '2026-10-20',
+          appointmentDate: futureBookingDate(),
           reasonForVisit: 'Checkup',
         });
 
@@ -269,7 +282,7 @@ describe('Appointment Booking with Completion Status', () => {
         .post('/api/v1/appointments')
         .send({
           doctorId: 'test-doctor-id',
-          appointmentDate: '2026-10-20',
+          appointmentDate: futureBookingDate(),
           reasonForVisit: 'Checkup',
         });
 
@@ -306,7 +319,7 @@ describe('Appointment Booking with Completion Status', () => {
         .post('/api/v1/appointments')
         .send({
           doctorId: 'test-doctor-id',
-          appointmentDate: '2026-10-20',
+          appointmentDate: futureBookingDate(),
           reasonForVisit: 'Checkup',
         });
 
@@ -356,7 +369,7 @@ describe('Appointment Booking with Completion Status', () => {
         .post('/api/v1/appointments')
         .send({
           doctorId: 'test-doctor-id',
-          appointmentDate: '2026-10-20',
+          appointmentDate: futureBookingDate(),
           reasonForVisit: 'Checkup',
         });
 
@@ -440,7 +453,7 @@ describe('Appointment Booking with Completion Status', () => {
         .post('/api/v1/appointments')
         .send({
           doctorId: 'test-doctor-id',
-          appointmentDate: '2026-10-20',
+          appointmentDate: futureBookingDate(),
           reasonForVisit: 'Checkup',
         });
 
@@ -618,7 +631,7 @@ describe('Password Change Enforcement on Appointments', () => {
         .post('/api/v1/appointments')
         .send({
           doctorId: 'doctor-123',
-          appointmentDate: '2026-10-20'
+          appointmentDate: futureBookingDate()
         });
 
       expect(response.status).toBe(403);
@@ -633,7 +646,7 @@ describe('Password Change Enforcement on Appointments', () => {
         .post('/api/v1/appointments')
         .send({
           doctorId: 'doctor-123',
-          appointmentDate: '2026-10-20'
+          appointmentDate: futureBookingDate()
         });
 
       // Verify it's NOT blocked by password change guard (would be 403 if blocked)
@@ -747,6 +760,9 @@ describe('Appointment Cancellation with Queue Renumbering', () => {
       if (sql.includes('BEGIN')) {
         return Promise.resolve();
       }
+      if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'patient-123' }] });
+      }
       if (sql.includes('SELECT') && sql.includes('appointments a')) {
         // Get appointment with queue info
         return Promise.resolve({
@@ -835,6 +851,9 @@ describe('Appointment Cancellation with Queue Renumbering', () => {
       if (sql.includes('BEGIN')) {
         return Promise.resolve();
       }
+      if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'patient-123' }] });
+      }
       if (sql.includes('SELECT') && sql.includes('appointments a')) {
         return Promise.resolve({
           rows: [{
@@ -888,6 +907,9 @@ describe('Appointment Cancellation with Queue Renumbering', () => {
       if (sql.includes('BEGIN')) {
         return Promise.resolve();
       }
+      if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'patient-123' }] });
+      }
       if (sql.includes('SELECT') && sql.includes('appointments a')) {
         return Promise.resolve({
           rows: [{
@@ -909,5 +931,315 @@ describe('Appointment Cancellation with Queue Renumbering', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('INVALID_APPOINTMENT_STATUS');
+  });
+});
+
+describe('Patient appointment reschedule and cancellation authorization', () => {
+  let app: express.Application;
+  let mockClient: any;
+
+  // Reschedule rejects past dates, so tests build dates relative to today.
+  const futureDate = (offsetDays: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const oldDate = futureDate(7);
+  const newDate = futureDate(10);
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/appointments', appointmentsRouter);
+    mockUser = { id: 'test-patient-user-id', role: 'PATIENT', mustChangePassword: false };
+    mockClient = {
+      query: jest.fn(),
+      release: jest.fn(),
+    };
+    getClient.mockResolvedValue(mockClient);
+    jest.clearAllMocks();
+  });
+
+  it('should return 403 when a patient cancels another patient\'s appointment', async () => {
+    mockClient.query.mockImplementation((sql: string) => {
+      if (sql.includes('BEGIN')) return Promise.resolve();
+      if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'patient-123' }] });
+      }
+      if (sql.includes('SELECT') && sql.includes('appointments a')) {
+        return Promise.resolve({
+          rows: [{
+            id: 'apt-1',
+            patient_id: 'patient-999',
+            doctor_id: 'doctor-456',
+            appointment_date: '2026-10-20',
+            status: 'SCHEDULED',
+            queue_number: 1,
+            queue_date: '2026-10-20'
+          }]
+        });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app).patch('/api/v1/appointments/apt-1/cancel');
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe('FORBIDDEN');
+
+    const statusUpdates = mockClient.query.mock.calls.filter(
+      (call: any[]) => call[0].includes("UPDATE appointments SET status = 'CANCELLED'")
+    );
+    expect(statusUpdates.length).toBe(0);
+  });
+
+  it('should notify the patient with APPOINTMENT_CANCELLED on cancellation', async () => {
+    mockClient.query.mockImplementation((sql: string) => {
+      if (sql.includes('BEGIN')) return Promise.resolve();
+      if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'patient-123' }] });
+      }
+      if (sql.includes('SELECT') && sql.includes('appointments a')) {
+        return Promise.resolve({
+          rows: [{
+            id: 'apt-1',
+            patient_id: 'patient-123',
+            doctor_id: 'doctor-456',
+            appointment_date: '2026-10-20',
+            status: 'SCHEDULED',
+            queue_number: 3,
+            queue_date: '2026-10-20'
+          }]
+        });
+      }
+      if (sql.includes('pg_try_advisory_xact_lock')) {
+        return Promise.resolve({ rows: [{ lock_acquired: true }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app).patch('/api/v1/appointments/apt-1/cancel');
+
+    expect(response.status).toBe(200);
+
+    const cancelledNotifications = mockClient.query.mock.calls.filter(
+      (call: any[]) => call[0].includes('INSERT INTO notifications') && call[0].includes('APPOINTMENT_CANCELLED')
+    );
+    expect(cancelledNotifications.length).toBe(1);
+    expect(cancelledNotifications[0][1][0]).toBe('test-patient-user-id');
+    expect(cancelledNotifications[0][1][1]).toContain('2026-10-20');
+    expect(cancelledNotifications[0][1][2]).toBe('apt-1');
+  });
+
+  // Builds a mock that serves a successful reschedule for the given appointment.
+  const mockSuccessfulReschedule = (appointmentOverrides: Record<string, any> = {}) => {
+    mockClient.query.mockImplementation((sql: string, params: any[]) => {
+      if (sql.includes('BEGIN')) return Promise.resolve();
+      if (sql.includes('ROLLBACK')) return Promise.resolve();
+      if (sql.includes('COMMIT')) return Promise.resolve();
+      if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'patient-123' }] });
+      }
+      if (sql.includes('date, final_capacity, registered_count')) {
+        return Promise.resolve({
+          rows: [
+            { date: oldDate, final_capacity: 10, registered_count: 6 },
+            { date: newDate, final_capacity: 10, registered_count: 4 }
+          ]
+        });
+      }
+      if (sql.includes('COALESCE(MAX(queue_number)')) {
+        return Promise.resolve({ rows: [{ next_queue: 5 }] });
+      }
+      if (sql.includes('pg_try_advisory_xact_lock')) {
+        return Promise.resolve({ rows: [{ lock_acquired: true }] });
+      }
+      if (sql.includes('queue_number >')) {
+        return Promise.resolve({
+          rows: [{ id: 'queue-9', patient_id: 'patient-9', old_queue_number: 3 }]
+        });
+      }
+      if (sql.includes('SELECT id FROM appointments') && sql.includes('patient_id')) {
+        return Promise.resolve({ rows: [] });
+      }
+      if (sql.includes('SELECT') && sql.includes('appointments a')) {
+        return Promise.resolve({
+          rows: [{
+            id: 'apt-1',
+            patient_id: 'patient-123',
+            doctor_id: 'doctor-456',
+            appointment_date: oldDate,
+            status: 'SCHEDULED',
+            queue_entry_id: 'queue-1',
+            queue_number: 2,
+            queue_date: oldDate,
+            queue_status: 'WAITING',
+            started_at: null,
+            doctor_first_name: 'Maria',
+            doctor_last_name: 'Santos',
+            ...appointmentOverrides
+          }]
+        });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+  };
+
+  it('should move the queue entry, swap capacity and notify on reschedule', async () => {
+    calculateAvailability.mockResolvedValue({ status: 'AVAILABLE' });
+    mockSuccessfulReschedule();
+
+    const response = await request(app)
+      .patch('/api/v1/appointments/apt-1/reschedule')
+      .send({ newAppointmentDate: newDate });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.previousDate).toBe(oldDate);
+    expect(response.body.data.previousQueueNumber).toBe(2);
+    expect(response.body.data.appointmentDate).toBe(newDate);
+    expect(response.body.data.queueNumber).toBe(5);
+
+    // Both dates must be locked (sorted, one advisory lock each).
+    const lockCalls = mockClient.query.mock.calls.filter(
+      (call: any[]) => call[0].includes('pg_try_advisory_xact_lock')
+    );
+    expect(lockCalls.length).toBe(2);
+
+    // Old date decremented, new date incremented.
+    const capacityCalls = mockClient.query.mock.calls.filter(
+      (call: any[]) => call[0].includes('UPDATE daily_capacities')
+    );
+    expect(capacityCalls.length).toBe(2);
+    expect(capacityCalls[0][1]).toEqual(['doctor-456', oldDate]);
+    expect(capacityCalls[1][1]).toEqual(['doctor-456', newDate]);
+
+    // The gap left on the old date is closed (queue #3 -> #2).
+    const renumberCalls = mockClient.query.mock.calls.filter(
+      (call: any[]) => call[0].includes('UPDATE queue_entries') && call[0].includes('SET queue_number')
+    );
+    expect(renumberCalls.length).toBe(1);
+    expect(renumberCalls[0][1]).toEqual([2, 'queue-9']);
+
+    // Patient is notified with the old AND new schedule.
+    const rescheduleNotifications = mockClient.query.mock.calls.filter(
+      (call: any[]) => call[0].includes('APPOINTMENT_RESCHEDULED')
+    );
+    expect(rescheduleNotifications.length).toBe(1);
+    const message = rescheduleNotifications[0][1][1];
+    expect(message).toContain(oldDate);
+    expect(message).toContain(newDate);
+    expect(message).toContain('#2');
+    expect(message).toContain('#5');
+    expect(rescheduleNotifications[0][1][2]).toBe('apt-1');
+  });
+
+  it('should return 403 when a patient reschedules another patient\'s appointment', async () => {
+    calculateAvailability.mockResolvedValue({ status: 'AVAILABLE' });
+    mockSuccessfulReschedule({ patient_id: 'patient-999' });
+
+    const response = await request(app)
+      .patch('/api/v1/appointments/apt-1/reschedule')
+      .send({ newAppointmentDate: newDate });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe('FORBIDDEN');
+  });
+
+  it('should reject rescheduling an appointment that has already started', async () => {
+    calculateAvailability.mockResolvedValue({ status: 'AVAILABLE' });
+    mockSuccessfulReschedule({ queue_status: 'IN_CHECKUP' });
+
+    const response = await request(app)
+      .patch('/api/v1/appointments/apt-1/reschedule')
+      .send({ newAppointmentDate: newDate });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('INVALID_APPOINTMENT_STATUS');
+  });
+
+  it('should reject rescheduling to the same date', async () => {
+    calculateAvailability.mockResolvedValue({ status: 'AVAILABLE' });
+    mockSuccessfulReschedule();
+
+    const response = await request(app)
+      .patch('/api/v1/appointments/apt-1/reschedule')
+      .send({ newAppointmentDate: oldDate });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('should reject rescheduling to a fully booked date', async () => {
+    calculateAvailability.mockResolvedValue({ status: 'FULL' });
+    mockSuccessfulReschedule();
+
+    const response = await request(app)
+      .patch('/api/v1/appointments/apt-1/reschedule')
+      .send({ newAppointmentDate: newDate });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('CAPACITY_FULL');
+
+    const moves = mockClient.query.mock.calls.filter(
+      (call: any[]) => call[0].includes('UPDATE queue_entries')
+    );
+    expect(moves.length).toBe(0);
+  });
+
+  it('should reject rescheduling to a date the doctor is unavailable', async () => {
+    calculateAvailability.mockResolvedValue({ status: 'NON_WORKING' });
+    mockSuccessfulReschedule();
+
+    const response = await request(app)
+      .patch('/api/v1/appointments/apt-1/reschedule')
+      .send({ newAppointmentDate: newDate });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('APPOINTMENT_SLOT_UNAVAILABLE');
+  });
+
+  it('should return 429 when the queue is locked by another transaction', async () => {
+    calculateAvailability.mockResolvedValue({ status: 'AVAILABLE' });
+    mockSuccessfulReschedule();
+
+    mockClient.query.mockImplementation((sql: string) => {
+      if (sql.includes('BEGIN')) return Promise.resolve();
+      if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'patient-123' }] });
+      }
+      if (sql.includes('SELECT') && sql.includes('appointments a')) {
+        return Promise.resolve({
+          rows: [{
+            id: 'apt-1',
+            patient_id: 'patient-123',
+            doctor_id: 'doctor-456',
+            appointment_date: oldDate,
+            status: 'SCHEDULED',
+            queue_entry_id: 'queue-1',
+            queue_number: 2,
+            queue_date: oldDate,
+            queue_status: 'WAITING',
+            started_at: null,
+            doctor_first_name: 'Maria',
+            doctor_last_name: 'Santos',
+          }]
+        });
+      }
+      if (sql.includes('pg_try_advisory_xact_lock')) {
+        return Promise.resolve({ rows: [{ lock_acquired: false }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .patch('/api/v1/appointments/apt-1/reschedule')
+      .send({ newAppointmentDate: newDate });
+
+    expect(response.status).toBe(429);
   });
 });

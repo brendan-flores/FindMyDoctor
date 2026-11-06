@@ -382,6 +382,36 @@ Example:
 
 > **"You are number 1 in the queue for that day. Please come early. Thank you."**
 
+### Rescheduling Rules
+
+Patients may reschedule their own scheduled appointments only.
+
+The system must:
+
+1. Reject rescheduling for appointments that are cancelled, completed, in the past, or already started.
+2. Reject rescheduling another patient's appointment with HTTP 403.
+3. Validate the new date against the doctor's working hours, breaks, date-specific exceptions, and daily capacity — the same rules used for booking.
+4. Reject a fully booked date (`CAPACITY_FULL`), an unavailable or non-working date, and a second appointment with the same doctor on the same date.
+5. Release the original slot, reserve the new slot, and update both dates' daily capacity counts.
+6. Assign a new queue number at the end of the new date's queue and renumber the remaining entries on the original date.
+7. Send an `APPOINTMENT_RESCHEDULED` notification containing both the old and new schedules (date and queue number).
+8. Offer the freed original date to the next waitlisted patient through the waitlist promotion service.
+
+The operation must be transactional and use row/advisory locking so that concurrent bookings, walk-ins, cancellations, and reschedules cannot overflow capacity or duplicate a queue number.
+
+### Cancellation Rules
+
+Patients may cancel their own appointments that are neither cancelled nor completed.
+
+The system must:
+
+1. Return HTTP 403 when a patient attempts to cancel another patient's appointment.
+2. Release the daily capacity for that date.
+3. Remove the queue entry and renumber the remaining entries so queue numbers stay sequential.
+4. Delete a CASH payment record (no refund needed) or mark a GCASH payment as `CANCELLED`.
+5. Send an `APPOINTMENT_CANCELLED` notification to the patient.
+6. Offer the freed slot to the first eligible patient on that date's waitlist through the existing waitlist promotion service.
+
 ---
 
 # 10. Unified Daily Patient Queue
@@ -415,6 +445,20 @@ Each queue record must store:
 - `WALK_IN`
 
 The source is used for monitoring and reporting only.
+
+### Patient Queue Visibility
+
+A patient can see their live queue position for today's appointment:
+
+- Queue number and queue status.
+- The number currently being served.
+- How many patients are ahead.
+- Estimated waiting time.
+- Doctor information (name, specialty, practice, room).
+
+The patient is identified by the authenticated token, never by a client-supplied patient id. Patients must never access another patient's appointment or queue information; unauthorized requests return HTTP 403.
+
+When a queue entry is removed (cancellation or reschedule), higher queue numbers shift down by one so the remaining queue stays sequential, and affected patients are notified.
 
 ---
 
@@ -771,6 +815,8 @@ Notifications may be generated for:
 - Prescription availability.
 - Payment verification.
 - Waitlist updates.
+
+Cancellation and rescheduling create `APPOINTMENT_CANCELLED` and `APPOINTMENT_RESCHEDULED` notifications. Both use `related_entity_type = 'appointment'` with the appointment id as `related_entity_id`; the reschedule message contains both the old and new schedules (date and queue number). Tapping either notification opens the related appointment detail screen. Queue renumbering after a cancellation or reschedule notifies affected patients with `QUEUE_UPDATED`.
 
 When a waitlist slot becomes available, the promoted patient receives a WAITLIST_UPDATE notification. Tapping it from either the notifications page or the header notification dropdown opens the doctor's schedule with the offered waitlist date preselected so the patient can book immediately. Payment-related notifications similarly open the related payment screen from either surface, and dropdown messages are shown in full without truncation.
 

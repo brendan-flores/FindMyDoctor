@@ -9,6 +9,7 @@ import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/utils/json_parsers.dart';
 import '../../payments/presentation/invoice_bottom_sheet.dart';
+import 'live_queue_card.dart';
 
 class AppointmentDetailPage extends StatefulWidget {
   final String appointmentId;
@@ -187,8 +188,30 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     }
   }
 
-  String _formatQueueStatus(String? queueStatus) {
-    if (queueStatus == null) return 'Not Available';
+  /// Whether the appointment falls on the clinic's current date, in which case
+  /// the live queue card replaces the static queue summary.
+  bool _isToday(DateTime? date) {
+    if (date == null) return false;
+    final local = date.toLocal();
+    final now = DateTime.now();
+    return local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+  }
+
+  Future<void> _rescheduleAppointment() async {
+    final result = await Navigator.pushNamed(
+      context,
+      '/reschedule',
+      arguments: {'appointmentId': widget.appointmentId},
+    );
+
+    if (result == true) {
+      _fetchAppointmentDetails();
+    }
+  }
+
+  String _formatQueueStatus(String? queueStatus) {    if (queueStatus == null) return 'Not Available';
     switch (queueStatus) {
       case 'WAITING':
         return 'Waiting';
@@ -293,7 +316,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             const SizedBox(height: spacing.AppSpacing.gutterLg),
             _buildAppointmentDetails(appointmentDate, endTime, queueNumber, registrationSource, notes),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
-            if (queueNumber != null)
+            if (_isToday(appointmentDate))
+              LiveQueueCard(
+                appointmentId: widget.appointmentId,
+                apiService: _apiService,
+              )
+            else if (queueNumber != null)
               _buildQueueStatus(queueNumber, queueStatus),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
             _buildPaymentInfo(),
@@ -823,6 +851,22 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             icon: const Icon(Icons.upload, size: 20),
           ),
         if (shouldShowUploadButton) const SizedBox(height: spacing.AppSpacing.gutterMd),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _rescheduleAppointment,
+            icon: const Icon(Icons.event_repeat, size: 18),
+            label: const Text('Reschedule Appointment'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+              padding: EdgeInsets.symmetric(
+                vertical: spacing.AppSpacing.gutterMd,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: spacing.AppSpacing.gutterMd),
         PrimaryButton(
           text: 'Cancel Appointment',
           onPressed: _isCancelling ? null : _cancelAppointment,
