@@ -666,9 +666,11 @@ The architecture should support:
 
 ```text
 users (including SUPERADMIN role)
-patients
+patients (with middle_name; sex default 'NOT_SPECIFIED')
 doctors (with approval_status: PENDING, ACTIVE, REJECTED, two_factor_enabled: boolean)
 secretaries (with two_factor_enabled: boolean)
+
+patient_doctor_associations (persistent patient-doctor link; details_completion_status: PENDING, COMPLETE)
 
 doctor_schedules
 doctor_unavailability
@@ -718,6 +720,14 @@ login_otp_challenges (for login OTP challenge state)
 - `022_add_trusted_browsers.sql` - Creates the `trusted_browsers` table for trusted-device sessions (hashed tokens, device info, 30-day expiry, revocation timestamps)
 - `032_add_session_version.sql` - Adds `users.session_version` for account-wide refresh-token revocation on password change/reset, deactivation, and "Sign out of all devices"
 - `040_add_invoice_status.sql` - Adds `invoices.status` field to support invoice voiding and reissue workflow (status: ACTIVE, VOID). Applied via `npm run migrate:invoice-status`.
+- `consolidated_schema.sql` - Complete, idempotent representation of the schema the application expects (tables, columns, indexes, constraints, triggers). Safe to run repeatedly; creates missing objects and never drops tables, columns, or data.
+
+**Migration Runner:**
+- `npm run migrate` runs `backend/src/database/migrate.ts`, which is the single schema entry point.
+- Applied files are tracked in `schema_migrations` (primary key `filename`; also `version`, `checksum`, `applied_at`, `execution_time_ms`, `note`). Already-recorded files are skipped, so reruns are safe.
+- Each pending migration runs in its own transaction; a failure rolls it back and stops the run. The runner verifies required columns and tables on success.
+- Migrations `001`–`041` are baselined (recorded, never executed) because several are destructive or non-idempotent. `consolidated_schema.sql` is the only migration actually applied; historical files remain for audit.
+- `--dry-run` previews without writing; `--force` is refused; checksum changes on recorded files only warn and are not re-applied.
 
 ---
 
@@ -784,8 +794,7 @@ The doctor sign-up page at `/doctor-signup` creates a doctor account:
 - Basic information (first_name, middle_name, last_name, contact_number) is stored in the doctors table.
 - Professional information fields (specialty, credentials, PRC license number, hospital/clinic, etc.) are NOT collected at this stage.
 - Registered doctors are created with `approval_status = 'PENDING'` and `profile_completion_status = 'INCOMPLETE'`, so they must complete their professional profile and wait for administrator approval before accessing the system.
-- After successful OTP verification, the backend returns an access token which is stored in localStorage using the existing authentication mechanism.
-- The doctor is automatically redirected to `/doctor-profile` to complete their professional profile.
+- After successful OTP verification, the backend returns an access token, a refresh token, and session metadata, and sets the role-scoped `doctor_accessToken`/`doctor_refreshToken` cookies. Writing these cookies replaces any stale token from a previous account. The web client clears leftover auth before installing the new session and redirects to `/doctor-profile` to complete the professional profile.
 - Duplicate email returns `409`. A successful verification returns an access token and redirects to profile completion.
 - PostgreSQL is the single source of truth for doctor accounts, credentials and profile data. Supabase never stores the doctor's application account - it only sends and verifies the email OTP.
 
@@ -794,13 +803,14 @@ The doctor sign-up page at `/doctor-signup` creates a doctor account:
 After successful OTP verification, doctors must complete their professional profile:
 
 - **Profile Update Endpoint:** `PUT /api/v1/doctors/me/profile` (requires Doctor authentication)
-  - Accepts professional profile fields: professional_photo_url, specialty, credentials, prc_license_number, practice_name, years_of_experience, areas_of_expertise, biography, consultation_fee, consultation_type, languages_spoken
+  - Accepts professional profile fields: professional_photo_url, specialty, credentials, prc_license_number, practice_name, room_number, years_of_experience, areas_of_expertise, biography, consultation_fee, consultation_type, languages_spoken
   - Validates PRC license number format (7 digits) and uniqueness
   - Automatically updates `profile_completion_status` to 'COMPLETE' when all required fields are present
   - Allows partial updates (field-by-field or multiple fields at once)
 
 - **Profile Submission Endpoint:** `POST /api/v1/doctors/me/profile/submit` (requires Doctor authentication)
-  - Validates required fields before submission: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic
+  - Validates the professional fields required for submission: verified email, specialty, credentials, PRC license number, hospital/clinic
+  - Does not re-validate personal details (first/middle/last name, contact number); those are captured at sign-up and are not edited or displayed on `/doctor-profile`
   - Sets `profile_completion_status = 'SUBMITTED'` and `profile_submitted_at` to current timestamp
   - Keeps `approval_status = 'PENDING'` (does not approve the doctor)
   - Returns message directing doctor to wait for admin approval
@@ -812,7 +822,7 @@ After a doctor completes self-registration, email OTP verification, and profile 
 - The doctor account is created with `approval_status = 'PENDING'` and `profile_completion_status = 'INCOMPLETE'`.
 - The doctor must complete their professional profile and submit it for review.
 - After profile submission, `profile_completion_status` becomes 'SUBMITTED' but `approval_status` remains 'PENDING'.
-- The doctor cannot log in or access the Doctor Dashboard while in PENDING status.
+- The doctor cannot log in or access the Doctor Dashboard after submitting the profile (PENDING + SUBMITTED). PENDING doctors with an unsubmitted profile may log in and are routed to `/doctor-profile` to finish onboarding.
 - Administrators can view pending doctors through the Admin Doctors page at `/admin/doctors`.
 - Administrators can review complete doctor information and either:
   - Approve the doctor: Sets `approval_status = 'ACTIVE'` and `is_approved = true`, allowing the doctor to log in and access the Doctor Dashboard.
@@ -849,7 +859,8 @@ When a doctor is rejected:
 - The web Doctor login page routes authenticated Doctors based on approval_status:
   - ACTIVE → `/doctor/dashboard`
   - REJECTED → `/doctor-profile`
-  - PENDING → blocked by backend (should not reach frontend login routing)
+  - PENDING with an unsubmitted profile → `/doctor-profile` to finish onboarding
+  - PENDING with a submitted profile → blocked by the backend login endpoint
 
 `POST /api/v1/auth/register/doctor` remains available for Administrator-provisioned doctor accounts, but the self-registration page no longer uses it.
 

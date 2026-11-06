@@ -58,11 +58,9 @@ export default function DoctorDashboard() {
           } else if (approvalStatus === 'REJECTED') {
             router.push('/doctor-profile');
           } else if (approvalStatus === 'PENDING') {
-            localStorage.removeItem('token');
-            localStorage.removeItem('refreshToken');
-            localStorage.removeItem('user');
-            apiClient.clearToken();
-            router.push('/doctor-login');
+            // PENDING doctors who have not submitted their professional profile
+            // must complete it instead of being signed out.
+            router.push('/doctor-profile');
           } else {
             localStorage.removeItem('token');
             localStorage.removeItem('refreshToken');

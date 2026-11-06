@@ -148,7 +148,7 @@ export interface Visit {
 
 export const doctorApi = {
   // Get current doctor's profile
-  getProfile: async (options?: GetOptions): Promise<{ success: boolean; data?: DoctorProfile; error?: string }> => {
+  getProfile: async (options?: GetOptions): Promise<{ success: boolean; data?: DoctorProfile; error?: string; errorCode?: string; httpStatus?: number }> => {
     return apiClient.get<DoctorProfile>('/doctors/me', options);
   },
 

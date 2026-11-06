@@ -207,6 +207,8 @@ export interface VerifyOtpData {
     is_approved: boolean;
   };
   accessToken: string;
+  refreshToken?: string;
+  session?: SessionMetadata;
 }
 
 export interface VerifyOtpResponse {

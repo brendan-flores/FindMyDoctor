@@ -81,8 +81,8 @@ describe('Auth API - Patient Login Validation', () => {
             }]
           });
         }
-        if (sql.includes('SELECT approval_status FROM doctors')) {
-          return Promise.resolve({ rows: [{ approval_status: 'ACTIVE' }] });
+        if (sql.includes('profile_completion_status FROM doctors')) {
+          return Promise.resolve({ rows: [{ approval_status: 'ACTIVE', profile_completion_status: 'SUBMITTED' }] });
         }
         if (sql.includes('SELECT two_factor_enabled FROM doctors')) {
           return Promise.resolve({ rows: [{ two_factor_enabled: false }] });
@@ -249,8 +249,8 @@ describe('Auth API - Patient Login Validation', () => {
             }]
           });
         }
-        if (sql.includes('SELECT approval_status FROM doctors')) {
-          return Promise.resolve({ rows: [{ approval_status: 'ACTIVE' }] });
+        if (sql.includes('profile_completion_status FROM doctors')) {
+          return Promise.resolve({ rows: [{ approval_status: 'ACTIVE', profile_completion_status: 'SUBMITTED' }] });
         }
         if (sql.includes('SELECT two_factor_enabled FROM doctors')) {
           return Promise.resolve({ rows: [{ two_factor_enabled: false }] });
@@ -517,7 +517,7 @@ describe('Auth API - Patient Login Validation', () => {
   });
 
   describe('Persistent Regression Coverage - DOCTOR Special Requirements', () => {
-    it('should reject DOCTOR login with PENDING approval status', async () => {
+    it('should reject DOCTOR login with PENDING approval status after profile submission', async () => {
       query.mockImplementation((sql: string, params: any[]) => {
         if (sql.includes('SELECT * FROM users')) {
           return Promise.resolve({
@@ -531,8 +531,8 @@ describe('Auth API - Patient Login Validation', () => {
             }]
           });
         }
-        if (sql.includes('SELECT approval_status FROM doctors')) {
-          return Promise.resolve({ rows: [{ approval_status: 'PENDING' }] });
+        if (sql.includes('profile_completion_status FROM doctors')) {
+          return Promise.resolve({ rows: [{ approval_status: 'PENDING', profile_completion_status: 'SUBMITTED' }] });
         }
         if (sql.includes('SELECT two_factor_enabled FROM doctors')) {
           return Promise.resolve({ rows: [{ two_factor_enabled: false }] });
@@ -551,10 +551,50 @@ describe('Auth API - Patient Login Validation', () => {
           expectedRole: 'DOCTOR'
         });
 
-      // The implementation rejects PENDING doctors at the service layer
-      // The test verifies this behavior is preserved
+      // The implementation rejects PENDING doctors who already submitted their
+      // profile at the service layer; the test verifies this behavior is preserved
       expect(response.status).toBe(401);
       expect(response.body.error.message).toContain('awaiting administrator approval');
+    });
+
+    it('should allow DOCTOR login with PENDING approval status before profile submission', async () => {
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT * FROM users')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'doctor-id',
+              email: 'doctor@example.com',
+              password_hash: '$2a$10$hashedpassword',
+              role: 'DOCTOR',
+              is_active: true,
+              must_change_password: false
+            }]
+          });
+        }
+        if (sql.includes('profile_completion_status FROM doctors')) {
+          return Promise.resolve({
+            rows: [{ approval_status: 'PENDING', profile_completion_status: 'INCOMPLETE' }]
+          });
+        }
+        if (sql.includes('SELECT two_factor_enabled FROM doctors')) {
+          return Promise.resolve({ rows: [{ two_factor_enabled: false }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const bcrypt = require('bcryptjs');
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
+
+      const response = await request(app)
+        .post('/api/v1/auth/login')
+        .send({
+          email: 'doctor@example.com',
+          password: 'password123',
+          expectedRole: 'DOCTOR'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
     });
 
     it('should allow DOCTOR login with REJECTED approval status (to allow profile correction)', async () => {
@@ -571,8 +611,8 @@ describe('Auth API - Patient Login Validation', () => {
             }]
           });
         }
-        if (sql.includes('SELECT approval_status FROM doctors')) {
-          return Promise.resolve({ rows: [{ approval_status: 'REJECTED' }] });
+        if (sql.includes('profile_completion_status FROM doctors')) {
+          return Promise.resolve({ rows: [{ approval_status: 'REJECTED', profile_completion_status: 'INCOMPLETE' }] });
         }
         if (sql.includes('SELECT two_factor_enabled FROM doctors')) {
           return Promise.resolve({ rows: [{ two_factor_enabled: false }] });

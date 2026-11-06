@@ -912,7 +912,7 @@ The system shall support a doctor rejection and resubmission workflow:
 10. The doctor profile page shall display a rejection banner with the reason when in REJECTED status.
 11. The doctor profile page shall allow editing and resubmission when in REJECTED status, even if `profile_completion_status === 'SUBMITTED'`.
 12. The doctor login page shall route authenticated doctors based on approval_status: ACTIVE → dashboard, REJECTED → profile page.
-13. PENDING doctors shall not be able to log in while awaiting administrator approval.
+13. PENDING doctors may log in only while their profile is not yet submitted so they can complete and submit it; PENDING doctors who have submitted their profile shall not be able to log in while awaiting administrator approval.
 
 ## FR-006 — Availability
 
@@ -1070,7 +1070,7 @@ The mobile patient Profile tab is grouped into Account, Security, Notifications,
 
 Administrators shall be able to approve/reject doctors.
 
-Doctors who complete self-registration, email OTP verification, and profile submission are created with `approval_status = 'PENDING'`, `is_approved = false`, and `profile_completion_status = 'SUBMITTED'`, and must wait for administrator approval before accessing the system. Administrators can view pending doctors through the Admin Doctors page, review complete doctor information, and either approve (setting `approval_status = 'ACTIVE'` and `is_approved = true`) or reject (setting `approval_status = 'REJECTED'` and `is_approved = false`) the registration. Only ACTIVE doctors can log in and access the Doctor Dashboard.
+Doctors who complete self-registration, email OTP verification, and profile submission are created with `approval_status = 'PENDING'`, `is_approved = false`, and `profile_completion_status = 'SUBMITTED'`, and must wait for administrator approval before accessing the system. A PENDING doctor whose profile is not yet submitted may log in and is routed to `/doctor-profile` to finish onboarding; once submitted, PENDING doctors cannot log in. Administrators can view pending doctors through the Admin Doctors page, review complete doctor information, and either approve (setting `approval_status = 'ACTIVE'` and `is_approved = true`) or reject (setting `approval_status = 'REJECTED'` and `is_approved = false`) the registration. Only ACTIVE doctors can access the Doctor Dashboard.
 
 ## FR-041 — Secretary Management
 
@@ -1504,19 +1504,22 @@ The doctor sign-up page at `/doctor-signup` allows a doctor to create an account
 After successful OTP verification, doctors must complete their professional profile:
 
 - **Profile Update Endpoint:** `PUT /api/v1/doctors/me/profile` (requires Doctor authentication)
-  - Accepts professional profile fields: professional_photo_url, specialty, credentials, prc_license_number, practice_name, years_of_experience, areas_of_expertise, biography, consultation_fee, consultation_type, languages_spoken
+  - Accepts professional profile fields: professional_photo_url, specialty, credentials, prc_license_number, practice_name, room_number, years_of_experience, areas_of_expertise, biography, consultation_fee, consultation_type, languages_spoken
   - Validates PRC license number format (7 digits) and uniqueness
   - Automatically updates `profile_completion_status` to 'COMPLETE' when all required fields are present
   - Allows partial updates (field-by-field or multiple fields at once)
 
 - **Profile Submission Endpoint:** `POST /api/v1/doctors/me/profile/submit` (requires Doctor authentication)
-  - Validates required fields before submission: first name, last name, verified email, contact number, specialty, credentials, PRC license number, hospital/clinic
+  - Validates the professional fields required for submission: verified email, specialty, credentials, PRC license number, hospital/clinic
+  - Does not re-validate personal details (first name, middle name, last name, contact number); those are collected at sign-up and are not edited or displayed on `/doctor-profile`
   - Sets `profile_completion_status = 'SUBMITTED'` and `profile_submitted_at` to current timestamp
   - Keeps `approval_status = 'PENDING'` (does not approve the doctor)
   - Returns message directing doctor to wait for admin approval
+  - The profile page does not display or edit sign-up personal details and keeps its single Submit for Approval button disabled until the required professional fields are complete
 
 - The PRC license number is stored on the doctor profile and may only be registered once.
 - PRC license numbers are recorded but are not verified against a PRC registry; PRC verification remains out of scope.
+- The room number field is displayed on the profile completion page only when the selected hospital/clinic is a facility that assigns consultation room numbers.
 
 ### Doctor Available Schedule Management
 
