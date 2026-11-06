@@ -22,9 +22,9 @@ export default function AdminManagement() {
   const [userRole, setUserRole] = useState<string>('');
 
   useEffect(() => {
-    // Check authentication and role
-    const token = localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
+    // Check authentication and role - use admin-scoped keys
+    const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
+    const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
 
     if (!token || !userStr) {
       router.push('/admin/login');
@@ -168,6 +168,15 @@ export default function AdminManagement() {
 
       {/* Admin Table */}
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-slate-900">Admin Accounts</h2>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 text-sm font-semibold text-white bg-[#1b5eb8] hover:bg-[#0d3b75] rounded-lg transition-colors"
+          >
+            Create Admin
+          </button>
+        </div>
         <table className="w-full">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
