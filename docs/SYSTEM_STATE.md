@@ -148,7 +148,7 @@ Current System State (October 2026):
 - Role-based login OTP/2FA is implemented with server-side challenge state in PostgreSQL
 - Doctor, Secretary, and Admin web login pages submit their expected role; the backend rejects cross-role login attempts before OTP challenge creation or delivery with `Invalid credentials or account role.` Admin login continues to accept SUPERADMIN accounts
 - The shared mobile patient/secretary application logs in through the same `/api/v1/auth/login` endpoint and credentials; the mobile login verifies the account as a patient and then as a secretary, and the backend-returned `User.role` determines routing (patients → `/home`, secretaries → `/secretary-home`); the persisted role guides restored sessions and mobile route guards; secretary mobile login with 2FA enabled requires completing the OTP step on the web dashboard
-- Admin/SuperAdmin login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
+- Admin login requires mandatory OTP (no setting, no bypass) - enforced by backend role check
 - Doctor login requires OTP only if `two_factor_enabled = true` - enforced by backend role check
 - Secretary login requires OTP only if `two_factor_enabled = true` - enforced by backend role check
 - Login OTP flow: user submits credentials → backend checks role-specific OTP requirement → if required, creates challenge → sends OTP via Supabase → returns opaque challenge token → user submits OTP → backend verifies with Supabase → consumes challenge → issues application JWT
@@ -247,6 +247,24 @@ Current System State (October 2026):
 - `calculateCapacityRange` uses four batched queries instead of per-date queries. Doctor and Secretary dashboards read concurrently and reuse loaded rows; the payments list loads charges in one query.
 - Web `apiClient` caches successful `GET` responses for 15 seconds per role, shares concurrent identical non-abortable reads, retries only `GET` on `429` (3 attempts, exponential backoff with jitter, 5-second cap, `Retry-After` precedence), and clears its cache on token/role change, logout/session expiry, and any successful mutation.
 - Dashboard pages abort in-flight reads on unmount. Sidebar refresh after a save uses `skipCache: true`.
+
+## GCash Account Details
+
+- Secretaries can configure GCash account details (account name and number) for their assigned doctor through the secretary settings page at `/secretary/settings`
+- Database migration `042_add_gcash_account_details.sql` adds nullable columns `gcash_account_name` (VARCHAR(100)) and `gcash_account_number` (VARCHAR(20)) to the `doctors` table
+- Backend API endpoint `GET /api/v1/gcash-qr/doctor/:doctorId` (SECRETARY-only) returns GCash QR URL, last-updated timestamp, account name, and account number
+- Backend API endpoint `POST /api/v1/gcash-qr/doctor/:doctorId` (SECRETARY-only) accepts and validates GCash account details with the following rules:
+  - Account name must be at least 2 characters and at most 100 characters
+  - Account number must match Philippine mobile format: `09XXXXXXXXX` or `+639XXXXXXXXX`
+  - Account number is normalized to `09XXXXXXXXX` format before storage
+  - If a QR code is configured, both account name and number must be provided (incomplete info rejected)
+  - Secretaries can only manage account details for their assigned doctor
+- Public endpoint `GET /api/v1/payments/gcash-qr?doctorId=` (unauthenticated) returns only `qrUrl`, `accountName`, and `accountNumber` for patient display, with no private doctor or patient data exposed
+- Secretary settings page at `/secretary/settings` includes an editable GCash account details form with validation, unsaved changes tracking, and success/error feedback
+- Secretary GCash QR management page at `/secretary/settings/gcash-qr` displays the saved account name and number as a read-only summary beside the QR code upload/delete controls
+- Mobile app displays GCash account name and number beside the QR code in the booking payment section (`/doctor-schedule`) and payment screen (`/payment`)
+- Mobile app provides copy-to-clipboard functionality for the account number with visual feedback
+- Mobile app shows appropriate fallback messaging when QR code or account details are not configured
 - Web tests: `cd web && npm test` (Node built-in test runner). Backend tests include `rateLimit.test.ts`, `ttlCache.test.ts`, `availabilityCache.test.ts`, and `capacityService.test.ts`.
 - No database schema change or migration was required for this work.
 

@@ -42,9 +42,9 @@ publicPaymentsRouter.get('/gcash-qr', async (req: AuthRequest, res: Response) =>
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'doctorId is required'));
     }
 
-    // Get the doctor's GCash QR URL from database
+    // Get the doctor's GCash QR URL and account details from database
     const doctorResult = await query(
-      'SELECT gcash_qr_url FROM doctors WHERE id = $1',
+      'SELECT gcash_qr_url, gcash_account_name, gcash_account_number FROM doctors WHERE id = $1',
       [doctorId]
     );
 
@@ -53,12 +53,14 @@ publicPaymentsRouter.get('/gcash-qr', async (req: AuthRequest, res: Response) =>
     }
 
     const gcashQrUrl = doctorResult.rows[0].gcash_qr_url;
+    const gcashAccountName = doctorResult.rows[0].gcash_account_name;
+    const gcashAccountNumber = doctorResult.rows[0].gcash_account_number;
 
     if (!gcashQrUrl) {
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'GCash QR code not configured for this doctor'));
     }
 
-    res.json(success({ qrUrl: gcashQrUrl }, 'GCash QR code URL retrieved'));
+    res.json(success({ qrUrl: gcashQrUrl, accountName: gcashAccountName, accountNumber: gcashAccountNumber }, 'GCash QR code URL retrieved'));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to retrieve GCash QR code'));
   }

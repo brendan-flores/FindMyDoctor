@@ -51,9 +51,9 @@ router.get('/doctor/:doctorId', authenticate, requireSecretaryPasswordChange, re
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only manage QR codes for your assigned doctor'));
     }
 
-    // Get the doctor's GCash QR URL and its last-updated timestamp
+    // Get the doctor's GCash QR URL, account details, and last-updated timestamp
     const doctorResult = await query(
-      'SELECT gcash_qr_url, gcash_qr_updated_at FROM doctors WHERE id = $1',
+      'SELECT gcash_qr_url, gcash_qr_updated_at, gcash_account_name, gcash_account_number FROM doctors WHERE id = $1',
       [doctorId]
     );
 
@@ -63,8 +63,10 @@ router.get('/doctor/:doctorId', authenticate, requireSecretaryPasswordChange, re
 
     const gcashQrUrl = doctorResult.rows[0].gcash_qr_url;
     const gcashQrUpdatedAt = doctorResult.rows[0].gcash_qr_updated_at;
+    const gcashAccountName = doctorResult.rows[0].gcash_account_name;
+    const gcashAccountNumber = doctorResult.rows[0].gcash_account_number;
 
-    res.json(success({ gcashQrUrl, gcashQrUpdatedAt }, 'GCash QR code retrieved'));
+    res.json(success({ gcashQrUrl, gcashQrUpdatedAt, gcashAccountName, gcashAccountNumber }, 'GCash QR code retrieved'));
   } catch (err: any) {
     console.error('Error fetching GCash QR code:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch GCash QR code'));
@@ -148,6 +150,97 @@ router.post('/doctor/:doctorId/upload', authenticate, requireSecretaryPasswordCh
   } catch (err: any) {
     console.error('Error uploading GCash QR code:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to upload GCash QR code'));
+  }
+});
+
+// Update GCash account details for a doctor (secretary only)
+router.post('/doctor/:doctorId', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { doctorId } = req.params;
+    const secretaryId = req.user!.id;
+    const { gcashAccountName, gcashAccountNumber } = req.body;
+
+    // Verify secretary is assigned to this doctor
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [secretaryId]
+    );
+
+    if (secretaryResult.rows.length === 0) {
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Secretary profile not found'));
+    }
+
+    const secretaryDoctorId = secretaryResult.rows[0].doctor_id;
+
+    if (secretaryDoctorId !== doctorId) {
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only manage QR codes for your assigned doctor'));
+    }
+
+    // Validate account name (minimum 2 characters, maximum 100)
+    if (gcashAccountName !== null && gcashAccountName !== undefined) {
+      if (typeof gcashAccountName !== 'string' || gcashAccountName.trim().length < 2) {
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Account name must be at least 2 characters'));
+      }
+      if (gcashAccountName.trim().length > 100) {
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Account name must not exceed 100 characters'));
+      }
+    }
+
+    // Validate and normalize account number
+    let normalizedNumber = null;
+    if (gcashAccountNumber !== null && gcashAccountNumber !== undefined) {
+      if (typeof gcashAccountNumber !== 'string') {
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Account number must be a string'));
+      }
+
+      // Remove spaces and dashes
+      const cleanedNumber = gcashAccountNumber.replace(/[\s-]/g, '');
+
+      // Validate format: 09XXXXXXXXX or +639XXXXXXXXX
+      const philippineMobileRegex = /^(\+639\d{9}|09\d{9})$/;
+      if (!philippineMobileRegex.test(cleanedNumber)) {
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid account number format. Use 09XXXXXXXXX or +639XXXXXXXXX'));
+      }
+
+      // Normalize to 09XXXXXXXXX format
+      normalizedNumber = cleanedNumber.startsWith('+63') ? '0' + cleanedNumber.substring(3) : cleanedNumber;
+    }
+
+    // Get current QR URL to check if QR is configured
+    const doctorResult = await query(
+      'SELECT gcash_qr_url FROM doctors WHERE id = $1',
+      [doctorId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor not found'));
+    }
+
+    const currentQrUrl = doctorResult.rows[0].gcash_qr_url;
+
+    // If QR is configured, both account name and number must be provided
+    if (currentQrUrl) {
+      if (!gcashAccountName || !gcashAccountNumber) {
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Both account name and number are required when QR code is configured'));
+      }
+    }
+
+    // Update database with account details
+    const result = await query(
+      `UPDATE doctors
+       SET gcash_account_name = $1, gcash_account_number = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3
+       RETURNING gcash_account_name, gcash_account_number`,
+      [gcashAccountName?.trim() || null, normalizedNumber, doctorId]
+    );
+
+    res.json(success({
+      gcashAccountName: result.rows[0].gcash_account_name,
+      gcashAccountNumber: result.rows[0].gcash_account_number
+    }, 'GCash account details updated successfully'));
+  } catch (err: any) {
+    console.error('Error updating GCash account details:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to update GCash account details'));
   }
 });
 

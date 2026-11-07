@@ -199,7 +199,9 @@ CREATE TABLE IF NOT EXISTS doctors (
     room_number character varying(50),
     middle_name character varying(100),
     two_factor_enabled boolean DEFAULT false,
-    gcash_qr_updated_at timestamp with time zone
+    gcash_qr_updated_at timestamp with time zone,
+    gcash_account_name character varying(100),
+    gcash_account_number character varying(20)
 );
 
 CREATE TABLE IF NOT EXISTS invoice_settings (
@@ -646,6 +648,11 @@ ALTER TABLE doctors ADD COLUMN IF NOT EXISTS room_number character varying(50);
 ALTER TABLE doctors ADD COLUMN IF NOT EXISTS middle_name character varying(100);
 ALTER TABLE doctors ADD COLUMN IF NOT EXISTS two_factor_enabled boolean DEFAULT false;
 ALTER TABLE doctors ADD COLUMN IF NOT EXISTS gcash_qr_updated_at timestamp with time zone;
+-- Migration: 042_add_gcash_account_details.sql
+ALTER TABLE doctors ADD COLUMN IF NOT EXISTS gcash_account_name character varying(100);
+ALTER TABLE doctors ADD COLUMN IF NOT EXISTS gcash_account_number character varying(20);
+COMMENT ON COLUMN doctors.gcash_account_name IS 'GCash account name (e.g., "Maria Santos") displayed to patients for payment';
+COMMENT ON COLUMN doctors.gcash_account_number IS 'GCash account number (Philippian mobile format: 09XXXXXXXXX) displayed to patients for payment';
 ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS doctor_id uuid NOT NULL;
 ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS clinic_name text DEFAULT ''::text NOT NULL;
 ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS address text DEFAULT ''::text NOT NULL;
@@ -1643,3 +1650,9 @@ DROP TRIGGER IF EXISTS update_patient_doctor_associations_updated_at ON patient_
 CREATE TRIGGER update_patient_doctor_associations_updated_at
     BEFORE UPDATE ON patient_doctor_associations
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ---------------------------------------------------------------------------
+-- Migration: 042_add_gcash_account_details.sql
+-- Added gcash_account_name and gcash_account_number columns to doctors table
+-- for displaying GCash account details to patients alongside QR code
+-- ---------------------------------------------------------------------------

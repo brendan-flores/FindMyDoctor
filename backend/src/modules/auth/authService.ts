@@ -185,10 +185,13 @@ export async function login(data: LoginData) {
   const requiresTrustPrompt = staff && !isTrustedBrowser;
 
   // Server-side OTP requirement:
-  // - Admin/SuperAdmin: always mandatory.
+  // - SuperAdmin: no OTP (log in directly).
+  // - Admin: always mandatory.
   // - Doctor/Secretary: only when 2FA is enabled and this is not a trusted device.
   let requiresOtp = false;
-  if (isAdminRole(user.role)) {
+  if (user.role === 'SUPERADMIN') {
+    requiresOtp = false;
+  } else if (isAdminRole(user.role)) {
     requiresOtp = true;
   } else if (staff) {
     const twoFactorEnabled = await isTwoFactorEnabled(user);

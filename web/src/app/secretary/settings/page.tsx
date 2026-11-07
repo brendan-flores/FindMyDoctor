@@ -20,6 +20,8 @@ interface TwoFactorUpdateResponse {
 interface GcashQrData {
   gcashQrUrl: string | null;
   gcashQrUpdatedAt: string | null;
+  gcashAccountName: string | null;
+  gcashAccountNumber: string | null;
 }
 
 function formatQrDate(value: string | null): string | null {
@@ -58,6 +60,15 @@ export default function SecretarySettings() {
     footerLine: '',
   });
   const [isSavingInvoice, setIsSavingInvoice] = useState(false);
+
+  // GCash account details
+  const [gcashAccountForm, setGcashAccountForm] = useState({
+    accountName: '',
+    accountNumber: '',
+  });
+  const [isSavingGcashAccount, setIsSavingGcashAccount] = useState(false);
+  const [gcashAccountError, setGcashAccountError] = useState('');
+  const [hasUnsavedGcashAccountChanges, setHasUnsavedGcashAccountChanges] = useState(false);
 
   const router = useRouter();
 
@@ -122,6 +133,11 @@ export default function SecretarySettings() {
       const response = await apiClient.get(`/gcash-qr/doctor/${assignedDoctorId}`);
       if (response.success && response.data) {
         setGcashQr(response.data as GcashQrData);
+        // Pre-populate account form with existing values
+        setGcashAccountForm({
+          accountName: response.data.gcashAccountName || '',
+          accountNumber: response.data.gcashAccountNumber || '',
+        });
       } else {
         setQrError(response.error || 'Failed to load the GCash QR status');
       }
@@ -178,6 +194,42 @@ export default function SecretarySettings() {
       setError('An error occurred. Please try again.');
     } finally {
       setIsSavingInvoice(false);
+    }
+  };
+
+  const handleSaveGcashAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!doctorId) {
+      setGcashAccountError('No doctor assigned');
+      return;
+    }
+
+    setIsSavingGcashAccount(true);
+    setGcashAccountError('');
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await apiClient.post(`/gcash-qr/doctor/${doctorId}`, {
+        gcashAccountName: gcashAccountForm.accountName || null,
+        gcashAccountNumber: gcashAccountForm.accountNumber || null,
+      });
+
+      if (response.success && response.data) {
+        setGcashQr({
+          ...gcashQr,
+          gcashAccountName: response.data.gcashAccountName,
+          gcashAccountNumber: response.data.gcashAccountNumber,
+        });
+        setSuccess('GCash account details updated successfully');
+        setHasUnsavedGcashAccountChanges(false);
+      } else {
+        setGcashAccountError(response.error || 'Failed to update GCash account details');
+      }
+    } catch (err) {
+      setGcashAccountError('An error occurred. Please try again.');
+    } finally {
+      setIsSavingGcashAccount(false);
     }
   };
 
@@ -455,22 +507,87 @@ export default function SecretarySettings() {
               )}
             </div>
 
-            {/* Placeholder: waiting for the patient payments view (account details displayed beside the QR code). Do not build until patient payments ship. */}
+            {/* GCash Account Details */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="font-semibold text-slate-900">GCash account details</h3>
-                  <p className="text-sm text-slate-600 mt-1">
-                    Account name and GCash number shown to patients beside the QR code.
+              <div>
+                <h3 className="font-semibold text-slate-900">GCash account details</h3>
+                <p className="text-sm text-slate-600 mt-1">
+                  Account name and GCash number shown to patients beside the QR code.
+                </p>
+              </div>
+
+              {isQrLoading ? (
+                <div className="mt-5 text-sm text-slate-500" aria-busy="true">
+                  Loading account details…
+                </div>
+              ) : qrError ? (
+                <div className="mt-5">
+                  <p className="text-sm text-rose-600" role="alert">
+                    {qrError}
                   </p>
                 </div>
-                <span className="flex-shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 border border-slate-200">
-                  Coming soon
-                </span>
-              </div>
-              <p className="mt-3 text-sm text-slate-500">
-                Available later with the patient payments view.
-              </p>
+              ) : (
+                <form onSubmit={handleSaveGcashAccount} className="mt-5 space-y-4">
+                  <div>
+                    <label htmlFor="accountName" className="block text-sm font-medium text-slate-700 mb-1">
+                      Account Name
+                    </label>
+                    <input
+                      type="text"
+                      id="accountName"
+                      value={gcashAccountForm.accountName}
+                      onChange={(e) => {
+                        setGcashAccountForm({ ...gcashAccountForm, accountName: e.target.value });
+                        setHasUnsavedGcashAccountChanges(true);
+                      }}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]"
+                      placeholder="e.g., Maria Santos"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="accountNumber" className="block text-sm font-medium text-slate-700 mb-1">
+                      Account Number
+                    </label>
+                    <input
+                      type="text"
+                      id="accountNumber"
+                      value={gcashAccountForm.accountNumber}
+                      onChange={(e) => {
+                        setGcashAccountForm({ ...gcashAccountForm, accountNumber: e.target.value });
+                        setHasUnsavedGcashAccountChanges(true);
+                      }}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]"
+                      placeholder="e.g., 09171234567 or +639171234567"
+                    />
+                    <p className="mt-1 text-xs text-slate-500">
+                      Philippine mobile format: 09XXXXXXXXX or +639XXXXXXXXX
+                    </p>
+                  </div>
+
+                  {gcashAccountError && (
+                    <p className="text-sm text-rose-600" role="alert">
+                      {gcashAccountError}
+                    </p>
+                  )}
+
+                  {hasUnsavedGcashAccountChanges && (
+                    <p className="text-sm text-amber-600">
+                      You have unsaved changes.
+                    </p>
+                  )}
+
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSavingGcashAccount || !hasUnsavedGcashAccountChanges}
+                      className="px-4 py-2 bg-[#1A62CD] text-white rounded-lg hover:bg-[#1550A8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSavingGcashAccount ? 'Saving…' : 'Save Changes'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         </section>

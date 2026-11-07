@@ -14,6 +14,8 @@ interface Doctor {
 export default function GcashQrManagement() {
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [gcashQrUrl, setGcashQrUrl] = useState<string | null>(null);
+  const [gcashAccountName, setGcashAccountName] = useState<string | null>(null);
+  const [gcashAccountNumber, setGcashAccountNumber] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,8 +86,14 @@ export default function GcashQrManagement() {
     try {
       const response = await apiClient.get(`/gcash-qr/doctor/${doctorId}`);
       if (response.success && response.data) {
-        const data = response.data as { gcashQrUrl: string | null };
+        const data = response.data as {
+          gcashQrUrl: string | null;
+          gcashAccountName: string | null;
+          gcashAccountNumber: string | null;
+        };
         setGcashQrUrl(data.gcashQrUrl);
+        setGcashAccountName(data.gcashAccountName);
+        setGcashAccountNumber(data.gcashAccountNumber);
       }
     } catch (err) {
       console.error('Error fetching GCash QR:', err);
@@ -226,12 +234,40 @@ export default function GcashQrManagement() {
 
           {gcashQrUrl ? (
             <div className="space-y-4">
-              <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-                <img
-                  src={gcashQrUrl}
-                  alt="GCash QR Code"
-                  className="max-w-xs mx-auto"
-                />
+              <div className="flex flex-col sm:flex-row gap-6">
+                <div className="flex-shrink-0">
+                  <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                    <img
+                      src={gcashQrUrl}
+                      alt="GCash QR Code"
+                      className="max-w-xs mx-auto"
+                    />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-slate-900 mb-3">Account Details</h3>
+                  {gcashAccountName || gcashAccountNumber ? (
+                    <div className="space-y-2">
+                      {gcashAccountName && (
+                        <div>
+                          <p className="text-sm text-slate-600">Account Name:</p>
+                          <p className="font-medium text-slate-900">{gcashAccountName}</p>
+                        </div>
+                      )}
+                      {gcashAccountNumber && (
+                        <div>
+                          <p className="text-sm text-slate-600">Account Number:</p>
+                          <p className="font-medium text-slate-900">{gcashAccountNumber}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500 italic">No account details configured</p>
+                  )}
+                  <p className="text-xs text-slate-500 mt-3">
+                    Edit account details in Settings
+                  </p>
+                </div>
               </div>
               <div className="flex justify-end">
                 <button

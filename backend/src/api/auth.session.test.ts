@@ -207,6 +207,16 @@ describe('Auth routes - session behavior', () => {
     expect(findCookie(setCookieHeader(response), 'admin_trustedBrowser')).toBeUndefined();
   });
 
+  it('allows SuperAdmin to log in without OTP', async () => {
+    const response = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'superadmin@example.com', password: 'password123', expectedRole: 'ADMIN' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.requiresOtp).toBeUndefined();
+    expect(response.body.data.session).toBeDefined();
+  });
+
   it('sets a short, non-persistent session and requires the trust prompt for a new staff browser', async () => {
     mockDoctorUser(false);
     const bcrypt = require('bcryptjs');
