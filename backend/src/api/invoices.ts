@@ -3,6 +3,7 @@ import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, requireSecretaryProfileCompletion } from '../middleware/auth';
 import { generateInvoicePdf } from '../services/invoicePdfService';
+import { logBillingAction } from '../services/billingService';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
@@ -502,6 +503,101 @@ router.post('/:id/void', authenticate, requireSecretaryPasswordChange, requireSe
   }
 });
 
+// Correct invoice: void the ACTIVE invoice so charges/payments can be fixed
+// and a replacement invoice issued (billing redesign). Reason required.
+router.post('/:id/correct', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    const { id } = req.params;
+    const { reason, note } = req.body;
+
+    if (!reason || typeof reason !== 'string' || reason.trim() === '') {
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Correction reason is required'));
+    }
+
+    await client.query('BEGIN');
+
+    // Verify the secretary is assigned to this invoice's doctor.
+    const secretaryResult = await client.query(
+      'SELECT id, doctor_id FROM secretaries WHERE user_id = $1',
+      [req.user!.id]
+    );
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    const invoiceResult = await client.query('SELECT * FROM invoices WHERE id = $1 FOR UPDATE', [id]);
+    if (invoiceResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Invoice not found'));
+    }
+    const invoice = invoiceResult.rows[0];
+    if (invoice.doctor_id !== assignedDoctorId) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only edit invoices for your assigned doctor'));
+    }
+    if (invoice.status !== 'ACTIVE') {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invoice is not active'));
+    }
+
+    const fullReason = note && String(note).trim() !== ''
+      ? `${reason.trim()} — ${String(note).trim()}`
+      : reason.trim();
+
+    const updated = await client.query(
+      `UPDATE invoices SET status = 'VOID', voided_by = $1, voided_at = CURRENT_TIMESTAMP,
+        void_reason = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *`,
+      [req.user!.id, fullReason, id]);
+
+    // Void + unlock are recorded together so the audit trail explains why the
+    // bill became editable again.
+    await logBillingAction(
+      invoice.payment_id,
+      req.user!.id,
+      'INVOICE_VOIDED',
+      'invoice',
+      invoice.id,
+      { status: 'ACTIVE', invoice_number: invoice.invoice_number },
+      { status: 'VOID', invoice_number: invoice.invoice_number },
+      fullReason,
+      client
+    );
+    await logBillingAction(
+      invoice.payment_id,
+      req.user!.id,
+      'INVOICE_UNLOCKED',
+      'invoice',
+      invoice.id,
+      { charges_locked: true },
+      { charges_locked: false },
+      fullReason,
+      client
+    );
+
+    await client.query('COMMIT');
+    client.release();
+
+    res.json(success(updated.rows[0], 'Invoice voided - a replacement can now be issued'));
+  } catch (err: any) {
+    try {
+      await client.query('ROLLBACK');
+      client.release();
+    } catch (rollbackErr) {
+      console.error('Rollback failed:', rollbackErr);
+    }
+    console.error('Invoice correction error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, `Failed to correct invoice: ${err.message}`));
+  }
+});
+
 // Download invoice as PDF
 router.get('/:id/pdf', authenticate, async (req: AuthRequest, res: Response) => {
   const client = await getClient();
@@ -566,27 +662,41 @@ router.get('/:id/pdf', authenticate, async (req: AuthRequest, res: Response) => 
 
     const invoiceData = typeof invoice.invoice_data === 'string' ? JSON.parse(invoice.invoice_data) : invoice.invoice_data;
 
-    // Update invoice data with current payment data to ensure PDF matches preview
-    const advancePayment = parseFloat(invoice.gcash_advance_amount || '0');
-    const cashTendered = parseFloat(invoice.cash_tendered_amount || '0');
-    const totalAmount = parseFloat(invoice.total_amount || '0');
-    const amountPaid = parseFloat(invoice.amount_paid || '0');
+    // Update invoice data with current payment data to ensure PDF matches preview.
+    // Replacement invoices carry a transaction snapshot, which is authoritative;
+    // don't overwrite it with legacy payment columns.
+    if (!(Array.isArray(invoiceData.payment?.transactions) && invoiceData.payment.transactions.length > 0)) {
+      const advancePayment = parseFloat(invoice.gcash_advance_amount || '0');
+      const cashTendered = parseFloat(invoice.cash_tendered_amount || '0');
+      const totalAmount = parseFloat(invoice.total_amount || '0');
+      const amountPaid = parseFloat(invoice.amount_paid || '0');
 
-    const remainingBalanceBeforePayment = Math.max(0, totalAmount - advancePayment);
-    const amountApplied = Math.min(cashTendered, remainingBalanceBeforePayment);
-    const changeAmount = Math.max(0, cashTendered - amountApplied);
-    const finalBalance = Math.max(0, totalAmount - amountPaid);
+      const remainingBalanceBeforePayment = Math.max(0, totalAmount - advancePayment);
+      const amountApplied = Math.min(cashTendered, remainingBalanceBeforePayment);
+      const changeAmount = Math.max(0, cashTendered - amountApplied);
+      const finalBalance = Math.max(0, totalAmount - amountPaid);
 
-    invoiceData.payment.advance_payment = advancePayment;
-    invoiceData.payment.cash_tendered = cashTendered;
-    invoiceData.payment.amount_applied = amountApplied;
-    invoiceData.payment.change_amount = changeAmount;
-    invoiceData.payment.final_balance = finalBalance;
-    invoiceData.payment.remaining_balance_before_payment = remainingBalanceBeforePayment;
+      invoiceData.payment.advance_payment = advancePayment;
+      invoiceData.payment.cash_tendered = cashTendered;
+      invoiceData.payment.amount_applied = amountApplied;
+      invoiceData.payment.change_amount = changeAmount;
+      invoiceData.payment.final_balance = finalBalance;
+      invoiceData.payment.remaining_balance_before_payment = remainingBalanceBeforePayment;
+    }
 
     // Add invoice number and date to the data
     invoiceData.invoice_number = invoice.invoice_number;
     invoiceData.invoice_date = invoice.invoice_date;
+
+    // Replacement invoices show the invoice number they supersede.
+    if (invoice.replaces_invoice_id) {
+      const priorResult = await client.query(
+        'SELECT invoice_number FROM invoices WHERE id = $1',
+        [invoice.replaces_invoice_id]
+      );
+      invoiceData.replaces_invoice_number =
+        priorResult.rows[0]?.invoice_number || invoiceData.replaces_invoice_number || null;
+    }
 
     client.release();
 
@@ -770,29 +880,50 @@ router.get('/:id/download', async (req: AuthRequest, res: Response) => {
     }
 
     const invoice = invoiceResult.rows[0];
+
+    // Voided invoices stay in the audit trail and are not downloadable.
+    if (invoice.status === 'VOID') {
+      client.release();
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Cannot download PDF for voided invoice'));
+    }
+
     const invoiceData = typeof invoice.invoice_data === 'string' ? JSON.parse(invoice.invoice_data) : invoice.invoice_data;
 
-    // Update invoice data with current payment data to ensure PDF matches preview
-    const advancePayment = parseFloat(invoice.gcash_advance_amount || '0');
-    const cashTendered = parseFloat(invoice.cash_tendered_amount || '0');
-    const totalAmount = parseFloat(invoice.total_amount || '0');
-    const amountPaid = parseFloat(invoice.amount_paid || '0');
+    // Update invoice data with current payment data to ensure PDF matches preview.
+    // Replacement invoices carry a transaction snapshot, which is authoritative;
+    // don't overwrite it with legacy payment columns.
+    if (!(Array.isArray(invoiceData.payment?.transactions) && invoiceData.payment.transactions.length > 0)) {
+      const advancePayment = parseFloat(invoice.gcash_advance_amount || '0');
+      const cashTendered = parseFloat(invoice.cash_tendered_amount || '0');
+      const totalAmount = parseFloat(invoice.total_amount || '0');
+      const amountPaid = parseFloat(invoice.amount_paid || '0');
 
-    const remainingBalanceBeforePayment = Math.max(0, totalAmount - advancePayment);
-    const amountApplied = Math.min(cashTendered, remainingBalanceBeforePayment);
-    const changeAmount = Math.max(0, cashTendered - amountApplied);
-    const finalBalance = Math.max(0, totalAmount - amountPaid);
+      const remainingBalanceBeforePayment = Math.max(0, totalAmount - advancePayment);
+      const amountApplied = Math.min(cashTendered, remainingBalanceBeforePayment);
+      const changeAmount = Math.max(0, cashTendered - amountApplied);
+      const finalBalance = Math.max(0, totalAmount - amountPaid);
 
-    invoiceData.payment.advance_payment = advancePayment;
-    invoiceData.payment.cash_tendered = cashTendered;
-    invoiceData.payment.amount_applied = amountApplied;
-    invoiceData.payment.change_amount = changeAmount;
-    invoiceData.payment.final_balance = finalBalance;
-    invoiceData.payment.remaining_balance_before_payment = remainingBalanceBeforePayment;
+      invoiceData.payment.advance_payment = advancePayment;
+      invoiceData.payment.cash_tendered = cashTendered;
+      invoiceData.payment.amount_applied = amountApplied;
+      invoiceData.payment.change_amount = changeAmount;
+      invoiceData.payment.final_balance = finalBalance;
+      invoiceData.payment.remaining_balance_before_payment = remainingBalanceBeforePayment;
+    }
 
     // Add invoice number and date to the data
     invoiceData.invoice_number = invoice.invoice_number;
     invoiceData.invoice_date = invoice.invoice_date;
+
+    // Replacement invoices show the invoice number they supersede.
+    if (invoice.replaces_invoice_id) {
+      const priorResult = await client.query(
+        'SELECT invoice_number FROM invoices WHERE id = $1',
+        [invoice.replaces_invoice_id]
+      );
+      invoiceData.replaces_invoice_number =
+        priorResult.rows[0]?.invoice_number || invoiceData.replaces_invoice_number || null;
+    }
 
     client.release();
 
