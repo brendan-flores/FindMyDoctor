@@ -23,7 +23,7 @@ import queueRouter from './api/queue.js';
 import walkInsRouter from './api/walk-ins.js';
 import conversationsRouter from './api/conversations.js';
 import aiChatRouter from './api/ai-chat.js';
-import paymentsRouter, { publicPaymentsRouter } from './api/payments.js';
+import paymentsRouter, { publicPaymentsRouter, secretaryPaymentsRouter } from './api/payments.js';
 import visitsRouter from './api/visits.js';
 import prescriptionsRouter from './api/prescriptions.js';
 import notificationsRouter from './api/notifications.js';
@@ -126,6 +126,7 @@ app.use(`/api/${apiVersion}/ai`, authenticate, aiChatRouter);
 app.use(`/api/${apiVersion}/payments`, publicPaymentsRouter);
 // Authenticated payment routes
 app.use(`/api/${apiVersion}/payments`, authenticate, paymentsRouter);
+app.use(`/api/${apiVersion}/secretary`, authenticate, secretaryPaymentsRouter);
 app.use(`/api/${apiVersion}/visits`, authenticate, visitsRouter);
 app.use(`/api/${apiVersion}/prescriptions`, authenticate, prescriptionsRouter);
 app.use(`/api/${apiVersion}/notifications`, authenticate, notificationsRouter);

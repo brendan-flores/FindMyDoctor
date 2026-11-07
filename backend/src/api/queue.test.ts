@@ -183,6 +183,44 @@ describe('Queue API Security', () => {
       expect(response.body.data[1].registration_source).toBe('WALK_IN');
     });
 
+    it('should normalize DECIMAL money fields to numbers', async () => {
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM queue_entries q')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'queue-1',
+              patient_id: 'patient-1',
+              doctor_id: 'assigned-doctor-id',
+              queue_date: '2024-12-01',
+              queue_number: 1,
+              status: 'COMPLETED',
+              registration_source: 'WALK_IN',
+              consultation_fee: '500.00',
+              payment_status: 'PARTIAL',
+              payment_bill_total: '650.00',
+              payment_net_paid: '300.00',
+              payment_balance: '350.00',
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/queue/2024-12-01');
+
+      expect(response.status).toBe(200);
+      const entry = response.body.data[0];
+      expect(entry.consultation_fee).toBe(500);
+      expect(entry.payment_bill_total).toBe(650);
+      expect(entry.payment_net_paid).toBe(300);
+      expect(entry.payment_balance).toBe(350);
+      expect(typeof entry.payment_balance).toBe('number');
+    });
+
     it('should return 500 on database error', async () => {
       query.mockImplementation(() => {
         return Promise.reject(new Error('Database connection failed'));

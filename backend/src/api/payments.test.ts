@@ -829,7 +829,13 @@ describe('Secretary Payment Verification UI', () => {
           });
         }
         if (sql.includes('INSERT INTO payments')) {
-          return Promise.resolve();
+          return Promise.resolve({ rows: [{ id: 'payment-new-1' }] });
+        }
+        if (sql.includes('bill_total')) {
+          return Promise.resolve({ rows: [{ bill_total: '500.00' }] });
+        }
+        if (sql.includes('FROM payment_transactions')) {
+          return Promise.resolve({ rows: [{ accepted_payments: '0', accepted_refunds: '0', pending_count: '0' }] });
         }
         if (sql.includes('COMMIT')) {
           return Promise.resolve();
@@ -886,6 +892,12 @@ describe('Secretary Payment Verification UI', () => {
         }
         if (sql.includes('UPDATE payments') && sql.includes('SET receipt_url')) {
           return Promise.resolve();
+        }
+        if (sql.includes('bill_total')) {
+          return Promise.resolve({ rows: [{ bill_total: '500.00' }] });
+        }
+        if (sql.includes('FROM payment_transactions')) {
+          return Promise.resolve({ rows: [{ accepted_payments: '0', accepted_refunds: '0', pending_count: '0' }] });
         }
         if (sql.includes('COMMIT')) {
           return Promise.resolve();
@@ -1339,6 +1351,76 @@ describe('Secretary Payment Verification UI', () => {
           chargeType: 'MEDICINE',
           name: 'Paracetamol',
           quantity: 7,
+          unitPrice: 50.00
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should add a service charge with quantity and unit price', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('FROM secretaries') && sql.includes('user_id')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id', id: 'secretary-1' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'payment-1',
+              patient_id: 'patient-1',
+              appointment_id: 'appointment-1',
+              payment_method: 'CASH',
+              consultation_amount: 500.00,
+              total_additional_charges: 0.00,
+              total_amount: 500.00,
+              amount_paid: 0.00,
+              status: 'UNPAID',
+              receipt_url: null,
+              verified_by: null,
+              verified_at: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              doctor_id: 'assigned-doctor-id',
+              patient_user_id: 'patient-user-id'
+            }]
+          });
+        }
+        if (sql.includes('INSERT INTO payment_charges') && sql.includes('SERVICE')) {
+          expect(sql).toContain('SERVICE');
+          expect(params[3]).toBe(100.00); // 2 * 50.00
+          expect(params[4]).toBe(2);
+          expect(params[5]).toBe(50.00);
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT COALESCE(SUM(amount)')) {
+          return Promise.resolve({ rows: [{ total_charges: '100.00' }] });
+        }
+        if (sql.includes('UPDATE payments')) {
+          return Promise.resolve({ rowCount: 1, rows: [] });
+        }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      query.mockImplementation(() => Promise.resolve({ rows: [] }));
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({
+          chargeType: 'SERVICE',
+          name: 'Wound dressing',
+          quantity: 2,
           unitPrice: 50.00
         });
 
@@ -1928,10 +2010,10 @@ describe('Secretary Payment Verification UI', () => {
           // Simulate existing charges + new medicine charge
           return Promise.resolve({ rows: [{ total_charges: '450.00' }] });
         }
-        if (sql.includes('UPDATE payments')) {
+        if (sql.includes('UPDATE payments') && sql.includes('total_additional_charges')) {
           // Verify total is consultation + charges
           expect(params[1]).toBe(950.00); // 500 + 450
-          return Promise.resolve();
+          return Promise.resolve({ rowCount: 1, rows: [] });
         }
         if (sql.includes('COMMIT')) {
           return Promise.resolve();
@@ -2616,11 +2698,11 @@ describe('Secretary Payment Verification UI', () => {
         if (sql.includes('SELECT COALESCE(SUM(amount)')) {
           return Promise.resolve({ rows: [{ total_charges: '100.00' }] });
         }
-        if (sql.includes('UPDATE payments')) {
+        if (sql.includes('UPDATE payments') && sql.includes('total_additional_charges')) {
           // Verify amount_paid is not updated (remains 200.00)
           expect(sql).not.toContain('amount_paid');
           expect(params[1]).toBe(600.00); // 500 + 100 new total
-          return Promise.resolve();
+          return Promise.resolve({ rowCount: 1, rows: [] });
         }
         if (sql.includes('COMMIT')) {
           return Promise.resolve();
@@ -3351,6 +3433,258 @@ describe('Secretary Payment Verification UI', () => {
       expect(response.status).toBe(200);
       expect(response.body.data.amountPaid).toBe('400.00');
       expect(response.body.data.balance).toBe('100.00');
+    });
+  });
+
+  describe('POST /api/v1/payments/:id/transactions', () => {
+    it('should reject an identical payment recorded within 30 seconds', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string) => {
+        if (sql.includes('BEGIN') || sql.includes('ROLLBACK') || sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
+        if (sql.includes('SELECT * FROM payments') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({ rows: [{ id: 'payment-1', status: 'UNPAID' }] });
+        }
+        if (sql.includes('FROM invoices')) {
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.includes('FROM payment_transactions') && sql.includes('created_at > CURRENT_TIMESTAMP')) {
+          return Promise.resolve({ rows: [{ id: 'existing-transaction' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/transactions')
+        .send({ kind: 'PAYMENT', method: 'CASH', amount: 500.00 });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe('CONFLICT');
+      expect(mockClient.query).not.toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO payment_transactions'),
+        expect.anything()
+      );
+    });
+  });
+
+  describe('Charge locking and invoice replacement', () => {
+    const paymentRow = {
+      id: 'payment-1',
+      patient_id: 'patient-1',
+      appointment_id: 'appointment-1',
+      payment_method: 'CASH',
+      consultation_amount: 500.00,
+      total_additional_charges: 100.00,
+      total_amount: 600.00,
+      amount_paid: 600.00,
+      status: 'PAID',
+      patient_user_id: 'patient-user-id',
+      doctor_id: 'assigned-doctor-id',
+      patient_first_name: 'John',
+      patient_last_name: 'Doe',
+      doctor_first_name: 'Jane',
+      doctor_last_name: 'Smith',
+    };
+
+    it('should reject adding a charge while an ACTIVE invoice exists', async () => {
+      const mockClient = { query: jest.fn(), release: jest.fn() };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string) => {
+        if (sql.includes('BEGIN') || sql.includes('ROLLBACK')) return Promise.resolve();
+        if (sql.includes('FROM secretaries')) {
+          return Promise.resolve({ rows: [{ id: 'secretary-1', doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({ rows: [paymentRow] });
+        }
+        if (sql.includes('FROM invoices')) {
+          return Promise.resolve({ rows: [{ id: 'invoice-1', invoice_number: 'INV-0001' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/charges')
+        .send({ chargeType: 'SERVICE', name: 'Dressing', quantity: 1, unitPrice: 100 });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toContain('INVOICE_LOCKED');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+    });
+
+    it('should block removing a charge when it would overpay the bill', async () => {
+      const mockClient = { query: jest.fn(), release: jest.fn() };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string) => {
+        if (sql.includes('BEGIN') || sql.includes('ROLLBACK')) return Promise.resolve();
+        if (sql.includes('FROM secretaries')) {
+          return Promise.resolve({ rows: [{ id: 'secretary-1', doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({ rows: [{ ...paymentRow, total_additional_charges: 100, total_amount: 600 }] });
+        }
+        if (sql.includes('FROM invoices')) return Promise.resolve({ rows: [] });
+        if (sql.includes('FROM payment_charges WHERE id = $1')) {
+          return Promise.resolve({ rows: [{ id: 'charge-1', payment_id: 'payment-1', amount: '100.00' }] });
+        }
+        if (sql.includes('SELECT COALESCE(SUM(amount)')) {
+          return Promise.resolve({ rows: [{ total_charges: '100.00' }] });
+        }
+        if (sql.includes('FROM payment_transactions')) {
+          return Promise.resolve({ rows: [{ accepted_payments: '600.00', accepted_refunds: '0.00' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .delete('/api/v1/payments/payment-1/charges/charge-1');
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toContain('Removing this would overpay the bill by ₱100.00. Void a payment first.');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClient.query).not.toHaveBeenCalledWith(
+        expect.stringContaining('SET deleted_at'),
+        expect.anything()
+      );
+    });
+
+    it('should allow removing a charge when the bill stays covered', async () => {
+      const mockClient = { query: jest.fn(), release: jest.fn() };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string) => {
+        if (sql.includes('BEGIN') || sql.includes('COMMIT')) return Promise.resolve();
+        if (sql.includes('FROM secretaries')) {
+          return Promise.resolve({ rows: [{ id: 'secretary-1', doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('FOR UPDATE')) {
+          return Promise.resolve({ rows: [{ ...paymentRow, status: 'PARTIAL', amount_paid: 400 }] });
+        }
+        if (sql.includes('FROM invoices')) return Promise.resolve({ rows: [] });
+        if (sql.includes('FROM payment_charges WHERE id = $1')) {
+          return Promise.resolve({ rows: [{ id: 'charge-1', payment_id: 'payment-1', amount: '100.00' }] });
+        }
+        if (sql.includes('SELECT COALESCE(SUM(amount)')) {
+          return Promise.resolve({ rows: [{ total_charges: '100.00' }] });
+        }
+        if (sql.includes('FROM payment_transactions')) {
+          return Promise.resolve({ rows: [{ accepted_payments: '400.00', accepted_refunds: '0.00' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .delete('/api/v1/payments/payment-1/charges/charge-1');
+
+      expect(response.status).toBe(200);
+      expect(mockClient.query).toHaveBeenCalledWith(
+        expect.stringContaining('SET deleted_at'),
+        ['charge-1']
+      );
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+
+      const auditCalls = mockClient.query.mock.calls.filter(([sql]: [string]) =>
+        sql.includes('INSERT INTO billing_audit_log')
+      );
+      const actions = auditCalls.map(([, params]: [string, any[]]) => params[2]);
+      expect(actions).toContain('CHARGE_REMOVED');
+    });
+
+    it('should lock the payment row and link a replacement invoice to the voided one', async () => {
+      const mockClient = { query: jest.fn(), release: jest.fn() };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string) => {
+        if (sql.includes('BEGIN') || sql.includes('COMMIT')) return Promise.resolve();
+        if (sql.includes('FROM secretaries')) {
+          return Promise.resolve({ rows: [{ id: 'secretary-1', doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('FOR UPDATE OF p')) {
+          return Promise.resolve({ rows: [paymentRow] });
+        }
+        if (sql.includes('FROM invoices') && sql.includes("status = 'ACTIVE'")) {
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.includes('SELECT id, kind, method, amount, status, reference_no, created_at')) {
+          return Promise.resolve({ rows: [
+            { id: 'tx-1', kind: 'PAYMENT', method: 'CASH', amount: '300.00', status: 'ACCEPTED', reference_no: null, created_at: new Date() },
+            { id: 'tx-2', kind: 'PAYMENT', method: 'GCASH', amount: '300.00', status: 'ACCEPTED', reference_no: 'GC-123', created_at: new Date() },
+          ] });
+        }
+        if (sql.includes('FROM payment_charges')) {
+          return Promise.resolve({ rows: [{ charge_type: 'SERVICE', description: 'Dressing', amount: '100.00', quantity: '1', unit_price: '100.00' }] });
+        }
+        if (sql.includes('FROM invoice_settings')) {
+          return Promise.resolve({ rows: [{ clinic_name: 'Clinic', address: '', contact_number: '', footer_line: 'Thanks' }] });
+        }
+        if (sql.includes("status = 'VOID'")) {
+          return Promise.resolve({ rows: [{ id: 'old-invoice', invoice_number: 'INV-0001', status: 'VOID' }] });
+        }
+        if (sql.includes('MAX(CAST')) {
+          return Promise.resolve({ rows: [{ next_num: 2 }] });
+        }
+        if (sql.includes('INSERT INTO invoices')) {
+          return Promise.resolve({ rows: [{ id: 'new-invoice', invoice_number: 'INV-0002' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/invoice')
+        .send({});
+
+      expect(response.status).toBe(201);
+      expect(response.body.data.invoice_data.replaces_invoice_number).toBe('INV-0001');
+      expect(response.body.data.invoice_data.payment.transactions).toHaveLength(2);
+      expect(mockClient.query).toHaveBeenCalledWith(
+        expect.stringContaining('FOR UPDATE OF p'),
+        ['payment-1']
+      );
+      expect(mockClient.query).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE invoices SET replaced_by_invoice_id'),
+        ['new-invoice', 'old-invoice']
+      );
+
+      const auditCalls = mockClient.query.mock.calls.filter(([sql]: [string]) =>
+        sql.includes('INSERT INTO billing_audit_log')
+      );
+      const actions = auditCalls.map(([, params]: [string, any[]]) => params[2]);
+      expect(actions).toContain('INVOICE_REISSUED');
+    });
+
+    it('should refuse a second ACTIVE invoice for the same bill', async () => {
+      const mockClient = { query: jest.fn(), release: jest.fn() };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string) => {
+        if (sql.includes('BEGIN') || sql.includes('ROLLBACK')) return Promise.resolve();
+        if (sql.includes('FROM secretaries')) {
+          return Promise.resolve({ rows: [{ id: 'secretary-1', doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM payments p') && sql.includes('FOR UPDATE OF p')) {
+          return Promise.resolve({ rows: [paymentRow] });
+        }
+        if (sql.includes('FROM invoices')) {
+          return Promise.resolve({ rows: [{ id: 'invoice-1', invoice_number: 'INV-0001' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/payments/payment-1/invoice')
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toContain('INVOICE_ALREADY_ACTIVE');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
     });
   });
 });

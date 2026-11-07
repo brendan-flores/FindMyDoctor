@@ -5,6 +5,12 @@ import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, r
 
 const router = Router();
 
+const toNumberOrNull = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 // Get queue for a specific date
 router.get('/:date', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('DOCTOR', 'SECRETARY', 'ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
@@ -19,11 +25,33 @@ router.get('/:date', authenticate, requireSecretaryPasswordChange, requireSecret
              u.email as patient_email,
              d.first_name as doctor_first_name, d.last_name as doctor_last_name,
              d.consultation_fee,
-             COALESCE(q.registration_source, 'ONLINE') as registration_source
+             COALESCE(q.registration_source, 'ONLINE') as registration_source,
+             pay.status as payment_status,
+             (SELECT i.invoice_number
+                FROM invoices i
+               WHERE i.payment_id = pay.id AND i.status = 'ACTIVE'
+               ORDER BY i.created_at DESC
+               LIMIT 1) as payment_invoice_number,
+             (COALESCE(pay.consultation_amount, 0) + COALESCE(pay.total_additional_charges, 0)) as payment_bill_total,
+             COALESCE((
+               SELECT SUM(CASE WHEN pt.kind = 'PAYMENT' THEN pt.amount ELSE -pt.amount END)
+               FROM payment_transactions pt
+               WHERE pt.payment_id = pay.id AND pt.status = 'ACCEPTED'
+             ), pay.amount_paid, 0) as payment_net_paid,
+             GREATEST(
+               (COALESCE(pay.consultation_amount, 0) + COALESCE(pay.total_additional_charges, 0)) -
+               COALESCE((
+                 SELECT SUM(CASE WHEN pt.kind = 'PAYMENT' THEN pt.amount ELSE -pt.amount END)
+                 FROM payment_transactions pt
+                 WHERE pt.payment_id = pay.id AND pt.status = 'ACCEPTED'
+               ), pay.amount_paid, 0),
+               0
+             ) as payment_balance
       FROM queue_entries q
       JOIN patients p ON q.patient_id = p.id
       JOIN users u ON u.id = p.user_id
       JOIN doctors d ON q.doctor_id = d.id
+      LEFT JOIN payments pay ON pay.appointment_id = q.appointment_id
       WHERE q.queue_date = $1
     `;
     const params = [date];
@@ -52,7 +80,17 @@ router.get('/:date', authenticate, requireSecretaryPasswordChange, requireSecret
 
     const result = await query(queryText, params);
 
-    res.json(success(result.rows));
+    // PostgreSQL returns DECIMAL/NUMERIC columns as strings. Normalize the
+    // money fields so API clients receive the numeric types they expect.
+    const queueEntries = result.rows.map((row) => ({
+      ...row,
+      consultation_fee: toNumberOrNull(row.consultation_fee),
+      payment_bill_total: toNumberOrNull(row.payment_bill_total),
+      payment_net_paid: toNumberOrNull(row.payment_net_paid),
+      payment_balance: toNumberOrNull(row.payment_balance),
+    }));
+
+    res.json(success(queueEntries));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch queue'));
   }

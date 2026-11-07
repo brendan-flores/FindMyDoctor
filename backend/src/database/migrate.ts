@@ -42,7 +42,7 @@ type AppliedMigration = {
 
 function discoverMigrations(): Migration[] {
   const entries = fs.readdirSync(MIGRATIONS_DIR);
-  return entries
+  const numberedMigrations = entries
     .filter((filename) => /^\d{3}_.+\.sql$/i.test(filename))
     .sort((a, b) => a.localeCompare(b))
     .map((filename) => ({
@@ -50,6 +50,19 @@ function discoverMigrations(): Migration[] {
       filename,
       filepath: path.join(MIGRATIONS_DIR, filename),
     }));
+
+  // Add consolidated_schema.sql as a special migration (no numeric prefix)
+  const consolidatedFilename = 'consolidated_schema.sql';
+  const consolidatedPath = path.join(MIGRATIONS_DIR, consolidatedFilename);
+  if (fs.existsSync(consolidatedPath)) {
+    numberedMigrations.push({
+      version: CONSOLIDATED_VERSION, // Use '042' as the version for tracking
+      filename: consolidatedFilename,
+      filepath: consolidatedPath,
+    });
+  }
+
+  return numberedMigrations;
 }
 
 function checksum(content: string): string {
