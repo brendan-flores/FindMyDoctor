@@ -516,6 +516,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           // Show GCash account details if available
           if (!_isLoadingQr && (_accountName != null || _accountNumber != null))
             Container(
+              width: double.infinity,
               padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
               decoration: BoxDecoration(
                 color: AppColors.surfaceLow,
@@ -525,25 +526,34 @@ class _PaymentScreenState extends State<PaymentScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'GCash Account Details',
-                    style: AppTextStyles.labelSm.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.account_balance_wallet_outlined,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: spacing.AppSpacing.gutterXs),
+                      Text(
+                        'GCash Account Details',
+                        style: AppTextStyles.labelSm.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: spacing.AppSpacing.gutterSm),
                   if (_accountName != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        _accountName!,
-                        style: AppTextStyles.bodyMd.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                    Text(
+                      _accountName!,
+                      style: AppTextStyles.bodyMd.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  if (_accountNumber != null)
+                  if (_accountNumber != null) ...[
+                    const SizedBox(height: spacing.AppSpacing.gutterXs),
                     InkWell(
                       onTap: () {
                         Clipboard.setData(ClipboardData(text: _accountNumber!));
@@ -554,27 +564,66 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           ),
                         );
                       },
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _accountNumber!,
-                            style: AppTextStyles.bodyMd,
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.copy,
-                            size: 16,
-                            color: AppColors.primary,
-                          ),
-                        ],
+                      borderRadius: BorderRadius.circular(
+                        spacing.AppSpacing.radiusSm,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: spacing.AppSpacing.gutterXs,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _accountNumber!,
+                                style: AppTextStyles.bodyMdMedium.copyWith(
+                                  fontSize: 18,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: spacing.AppSpacing.gutterSm,
+                                vertical: spacing.AppSpacing.gutterXs,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(
+                                  spacing.AppSpacing.radiusFull,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.copy,
+                                    size: 14,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Copy',
+                                    style: AppTextStyles.labelSm.copyWith(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
           if (!_isLoadingQr && _accountName == null && _accountNumber == null)
             Container(
+              width: double.infinity,
               padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
               decoration: BoxDecoration(
                 color: AppColors.surfaceLow,
