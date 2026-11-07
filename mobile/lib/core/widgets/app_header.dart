@@ -42,7 +42,12 @@ class AppHeader extends StatefulWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(60);
+  Size get preferredSize {
+    final double topPadding =
+        WidgetsBinding.instance.platformDispatcher.views.first.padding.top /
+        WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
+    return Size.fromHeight(topPadding + 56.0); // 56 = gutterMd(12) + content(32) + gutterMd(12)
+  }
 
   @override
   State<AppHeader> createState() => _AppHeaderState();
@@ -722,13 +727,16 @@ class _AppHeaderState extends State<AppHeader> {
 
   @override
   Widget build(BuildContext context) {
+    final double topPadding = MediaQuery.of(context).padding.top;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: spacing.AppSpacing.screenPadding,
-            vertical: spacing.AppSpacing.gutterMd,
+          padding: EdgeInsets.only(
+            left: spacing.AppSpacing.screenPadding,
+            right: spacing.AppSpacing.screenPadding,
+            top: topPadding + spacing.AppSpacing.gutterMd,
+            bottom: spacing.AppSpacing.gutterMd,
           ),
           decoration: BoxDecoration(
             color: AppColors.surface,
@@ -740,9 +748,7 @@ class _AppHeaderState extends State<AppHeader> {
               ),
             ],
           ),
-          child: SafeArea(
-            bottom: false,
-            child: Row(
+          child: Row(
               children: [
                 if (widget.showBackButton)
                   IconButton(
@@ -843,7 +849,6 @@ class _AppHeaderState extends State<AppHeader> {
                 ],
               ],
             ),
-          ),
         ),
       ],
     );
