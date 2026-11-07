@@ -299,6 +299,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         final isWaitlistNotification = type == 'WAITLIST_UPDATE';
                         final isAppointmentNotification = type == 'APPOINTMENT_CANCELLED' ||
                             type == 'APPOINTMENT_RESCHEDULED';
+                        final isPrescriptionNotification = type == 'PRESCRIPTION_AVAILABLE';
 
                         return Card(
                           margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
@@ -325,6 +326,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     context,
                                     '/appointment-detail',
                                     arguments: {'appointmentId': appointmentId},
+                                  );
+                                }
+                                return;
+                              }
+
+                              // Handle prescription notifications - deep-link to prescription detail
+                              if (isPrescriptionNotification) {
+                                final prescriptionId = notification['related_entity_id']?.toString();
+                                if (prescriptionId != null && prescriptionId.isNotEmpty) {
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/prescription-detail',
+                                    arguments: {'prescriptionId': prescriptionId},
                                   );
                                 }
                                 return;

@@ -28,6 +28,8 @@ import '../features/payments/presentation/payment_screen.dart';
 import '../features/notifications/presentation/notifications_page.dart';
 import '../features/secretary/presentation/secretary_home_page.dart';
 import '../features/waitlist/presentation/waitlist_page.dart';
+import '../features/medical-records/presentation/medical_records_page.dart';
+import '../features/medical-records/presentation/prescription_detail_page.dart';
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -190,6 +192,8 @@ class MyAppState extends State<MyApp> {
           case '/waitlist':
           case '/reschedule':
           case '/appointment-detail':
+          case '/medical-records':
+          case '/prescription-detail':
             // Protect all authenticated routes - enforce password change requirement
             if (!_isAuthenticated) {              return MaterialPageRoute(builder: (context) => const LoginPage());
             }
@@ -340,6 +344,17 @@ class MyAppState extends State<MyApp> {
                 return MaterialPageRoute(
                   builder: (context) => AppointmentDetailPage(
                     appointmentId: args?['appointmentId']?.toString() ?? '',
+                  ),
+                );
+              case '/medical-records':
+                return MaterialPageRoute(
+                  builder: (context) => const MedicalRecordsPage(),
+                );
+              case '/prescription-detail':
+                final args = settings.arguments as Map<String, dynamic>?;
+                return MaterialPageRoute(
+                  builder: (context) => PrescriptionDetailPage(
+                    prescriptionId: args?['prescriptionId']?.toString() ?? '',
                   ),
                 );
               case '/payment':
