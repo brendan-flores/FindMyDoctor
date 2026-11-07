@@ -478,6 +478,12 @@ Charges may include:
 - Additional services.
 - Other applicable fees.
 
+Each charge is recorded as one of `MEDICINE`, `SERVICE`, or `OTHER` with a quantity and unit price; the backend calculates `amount = quantity × unit_price`. The legacy `ADDITIONAL` type remains a flat amount.
+
+Charges stay editable until an ACTIVE invoice exists. Once an invoice is issued, the API rejects charge additions/removals and the secretary must use **Edit bill…**, which requires a reason and voids the invoice in one transaction (status VOID, voided_by/at/reason, audit rows) so the bill unlocks. The replacement invoice links to the voided one, shows `Replaces INV-xxxx`, lists every accepted payment (old and new), and the database allows only one ACTIVE invoice per bill.
+
+Removing a charge is blocked if it would make the bill overpaid; the error states the exact overpayment and asks the secretary to void a payment first. Status and balance are always recalculated by the server, never inferred in the UI.
+
 ---
 
 # 22. Walk-in Registration Rules
@@ -685,7 +691,9 @@ prescription_items
 
 payments
 payment_charges
-invoices (with status: ACTIVE, VOID)
+payment_transactions
+invoices (status: ACTIVE, VOID; replacement links, void reason)
+billing_audit_log
 
 conversations
 messages
