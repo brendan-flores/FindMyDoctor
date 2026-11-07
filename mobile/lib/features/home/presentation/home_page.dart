@@ -17,7 +17,6 @@ import '../../../features/auth/presentation/change_password_page.dart';
 import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
 import '../../conversations/models/conversation.dart';
-import '../../notifications/models/notification.dart' as notif_model;
 import '../../../core/constants/ai_constants.dart';
 
 class HomePage extends StatefulWidget {
@@ -252,24 +251,6 @@ class _HomePageState extends State<HomePage> {
     Navigator.of(context).pushReplacementNamed('/login');
   }
 
-  void _handleNotificationItemTap(notif_model.Notification notification) {
-    // Reload notification unread count to update badge
-    _loadNotificationUnreadCount();
-
-    // Navigate based on notification type
-    if (notification.isPaymentRelated) {
-      // Navigate to appointments tab (payments are accessed via appointments)
-      setState(() {
-        _currentIndex = 2;
-      });
-    } else if (notification.isMessageRelated) {
-      // Navigate to chat tab
-      setState(() {
-        _currentIndex = 3;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -319,14 +300,8 @@ class _HomePageState extends State<HomePage> {
           showNotifications: true,
           showProfile: true,
           unreadCount: _notificationUnreadCount,
-          onNotificationItemTap: (notif_model.Notification notification) {
-            _handleNotificationItemTap(notification);
-          },
           onUnreadCountUpdate: () {
             _loadNotificationUnreadCount();
-          },
-          onViewAll: () {
-            Navigator.of(context).pushNamed('/notifications');
           },
         ),
         Expanded(
@@ -403,14 +378,8 @@ class _HomePageState extends State<HomePage> {
           showNotifications: true,
           showProfile: true,
           unreadCount: _notificationUnreadCount,
-          onNotificationItemTap: (notif_model.Notification notification) {
-            _handleNotificationItemTap(notification);
-          },
           onUnreadCountUpdate: () {
             _loadNotificationUnreadCount();
-          },
-          onViewAll: () {
-            Navigator.of(context).pushNamed('/notifications');
           },
         ),
         // M1: Segmented control for Clinic | AI Assistant
@@ -702,14 +671,8 @@ class _HomePageState extends State<HomePage> {
           showNotifications: true,
           showProfile: true,
           unreadCount: _notificationUnreadCount,
-          onNotificationItemTap: (notif_model.Notification notification) {
-            _handleNotificationItemTap(notification);
-          },
           onUnreadCountUpdate: () {
             _loadNotificationUnreadCount();
-          },
-          onViewAll: () {
-            Navigator.of(context).pushNamed('/notifications');
           },
         ),
         Expanded(
