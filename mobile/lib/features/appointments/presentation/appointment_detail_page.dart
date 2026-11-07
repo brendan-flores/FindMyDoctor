@@ -670,6 +670,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
     // Show invoice button only for completed appointments with PAID status (case-insensitive)
     final showInvoiceButton = status == 'COMPLETED' && paymentStatus?.toUpperCase() == 'PAID' && paymentId != null;
+    // Receipts are only uploaded for GCash payments
+    final showReceiptButton = paymentMethod.toUpperCase() == 'GCASH' && paymentId != null;
 
     // Debug logging for invoice button visibility
     print('=== Invoice Button Debug ===');
@@ -740,6 +742,24 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               ),
             ],
           ),
+          if (showReceiptButton) ...[
+            const SizedBox(height: spacing.AppSpacing.gutterMd),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _viewReceipt,
+                icon: const Icon(Icons.image_outlined, size: 18),
+                label: const Text('View Receipt'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                  padding: EdgeInsets.symmetric(
+                    vertical: spacing.AppSpacing.gutterMd,
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (showInvoiceButton) ...[
             const SizedBox(height: spacing.AppSpacing.gutterMd),
             SizedBox(
@@ -767,6 +787,40 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           ],
         ],
       ),
+    );
+  }
+
+  Future<void> _viewReceipt() async {
+    try {
+      print('=== View Receipt ===');
+      print('Appointment ID: ${widget.appointmentId}');
+
+      final response = await _apiService.getMyReceiptUrl(widget.appointmentId);
+      print('API Response: $response');
+
+      final signedUrl = response['data']?['signedUrl']?.toString();
+      print('Signed URL: $signedUrl');
+
+      if (signedUrl == null || signedUrl.isEmpty) {
+        _showSnackBar('No receipt found for this payment.');
+        return;
+      }
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (_) => _ReceiptViewerDialog(imageUrl: signedUrl),
+      );
+    } catch (e) {
+      print('Error viewing receipt: $e');
+      _showSnackBar('Unable to load the receipt. Please try again.');
+    }
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -831,6 +885,74 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           textColor: AppColors.onError,
         ),
       ],
+    );
+  }
+}
+
+class _ReceiptViewerDialog extends StatelessWidget {
+  final String imageUrl;
+
+  const _ReceiptViewerDialog({required this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.black,
+      insetPadding: const EdgeInsets.all(16),
+      child: Stack(
+        children: [
+          InteractiveViewer(
+            maxScale: 5,
+            child: Center(
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const Padding(
+                    padding: EdgeInsets.all(48),
+                    child: CircularProgressIndicator(color: Colors.white),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print('=== Image.network Error ===');
+                  print('Error: $error');
+                  print('StackTrace: $stackTrace');
+                  print('Image URL: $imageUrl');
+                  return Padding(
+                    padding: const EdgeInsets.all(48),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.broken_image, color: Colors.white54, size: 48),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Could not load receipt',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          error.toString(),
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

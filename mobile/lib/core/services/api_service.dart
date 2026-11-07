@@ -830,11 +830,25 @@ class ApiService {
   Future<Map<String, dynamic>> uploadPaymentReceipt({
     required String appointmentId,
     required File receiptFile,
+    double? patientDeclaredAmount,
   }) async {
+    Map<String, String>? fields;
+    if (patientDeclaredAmount != null) {
+      fields = {'patient_declared_amount': patientDeclaredAmount.toString()};
+    }
     return await postMultipart(
       '${ApiConstants.payments}/$appointmentId${ApiConstants.paymentReceipt}',
       file: receiptFile,
       fileField: 'receipt',
+      fields: fields,
+      requireAuth: true,
+    );
+  }
+
+  /// Get a signed URL to view the patient's uploaded payment receipt.
+  Future<Map<String, dynamic>> getMyReceiptUrl(String appointmentId) async {
+    return await get(
+      '${ApiConstants.payments}/my-receipt/$appointmentId',
       requireAuth: true,
     );
   }
