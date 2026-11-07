@@ -1,7 +1,7 @@
 -- ============================================================================
 -- FindMyDoctor consolidated schema
 -- Run on a fresh, empty database for a full deployment.
--- Includes all migrations through: 041_add_payment_transactions_and_audit_log.sql
+-- Includes all migrations through: 046_add_service_other_charge_types.sql
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -213,6 +213,11 @@ CREATE TABLE IF NOT EXISTS invoice_settings (
 );
 
 CREATE TABLE IF NOT EXISTS invoices (
+    replaces_invoice_id uuid,
+    replaced_by_invoice_id uuid,
+    voided_by uuid,
+    voided_at timestamp with time zone,
+    void_reason text,
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     invoice_number text NOT NULL,
     payment_id uuid NOT NULL,
@@ -232,6 +237,42 @@ CREATE TABLE IF NOT EXISTS invoices (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     status text NOT NULL DEFAULT 'ACTIVE'::text
+);
+
+CREATE TABLE IF NOT EXISTS billing_audit_log (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    payment_id uuid,
+    actor_user_id uuid,
+    action character varying(50) NOT NULL,
+    entity_type character varying(30),
+    entity_id uuid,
+    state_before jsonb DEFAULT '{}'::jsonb,
+    state_after jsonb DEFAULT '{}'::jsonb,
+    reason text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS payment_transactions (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    payment_id uuid NOT NULL,
+    kind character varying(10) NOT NULL DEFAULT 'PAYMENT'::character varying,
+    method character varying(10) NOT NULL,
+    amount numeric(10,2) NOT NULL,
+    status character varying(20) NOT NULL DEFAULT 'PENDING'::character varying,
+    receipt_url text,
+    reference_no character varying(100),
+    patient_declared_amount numeric(10,2),
+    source character varying(20) NOT NULL DEFAULT 'SECRETARY'::character varying,
+    reviewed_by uuid,
+    reviewed_at timestamp with time zone,
+    reject_reason text,
+    reject_note text,
+    voided_by uuid,
+    voided_at timestamp with time zone,
+    void_reason text,
+    void_note text,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS login_otp_challenges (
@@ -852,6 +893,12 @@ DO $$ BEGIN
     ALTER TABLE appointments ADD CONSTRAINT appointments_pkey PRIMARY KEY (id);
   END IF;
 END $$;
+-- Source migration: 043_add_billing_redesign.sql
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='billing_audit_log'::regclass AND contype='p') THEN
+    ALTER TABLE billing_audit_log ADD CONSTRAINT billing_audit_log_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='conversations'::regclass AND contype='p') THEN
     ALTER TABLE conversations ADD CONSTRAINT conversations_pkey PRIMARY KEY (id);
@@ -930,6 +977,12 @@ END $$;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='payments'::regclass AND contype='p') THEN
     ALTER TABLE payments ADD CONSTRAINT payments_pkey PRIMARY KEY (id);
+  END IF;
+END $$;
+-- Source migration: 043_add_billing_redesign.sql
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='payment_transactions'::regclass AND contype='p') THEN
+    ALTER TABLE payment_transactions ADD CONSTRAINT payment_transactions_pkey PRIMARY KEY (id);
   END IF;
 END $$;
 DO $$ BEGIN
@@ -1115,12 +1168,20 @@ ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_message_type_check;
 ALTER TABLE messages ADD CONSTRAINT messages_message_type_check CHECK (((message_type)::text = ANY (ARRAY[('TEXT'::character varying)::text, ('INVOICE'::character varying)::text])));
 ALTER TABLE patients DROP CONSTRAINT IF EXISTS patients_sex_check;
 ALTER TABLE patients ADD CONSTRAINT patients_sex_check CHECK (((sex)::text = ANY ((ARRAY['MALE'::character varying, 'FEMALE'::character varying, 'OTHER'::character varying, 'NOT_SPECIFIED'::character varying])::text[])));
+-- Source migration: 046_add_service_other_charge_types.sql
 ALTER TABLE payment_charges DROP CONSTRAINT IF EXISTS payment_charges_charge_type_check;
-ALTER TABLE payment_charges ADD CONSTRAINT payment_charges_charge_type_check CHECK (((charge_type)::text = ANY (ARRAY[('ADDITIONAL'::character varying)::text, ('MEDICINE'::character varying)::text])));
+ALTER TABLE payment_charges ADD CONSTRAINT payment_charges_charge_type_check CHECK (((charge_type)::text = ANY (ARRAY[('ADDITIONAL'::character varying)::text, ('MEDICINE'::character varying)::text, ('SERVICE'::character varying)::text, ('OTHER'::character varying)::text])));
 ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_payment_method_check;
 ALTER TABLE payments ADD CONSTRAINT payments_payment_method_check CHECK (((payment_method)::text = ANY (ARRAY[('CASH'::character varying)::text, ('GCASH'::character varying)::text])));
 ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_status_check;
-ALTER TABLE payments ADD CONSTRAINT payments_status_check CHECK (((status)::text = ANY (ARRAY['UNPAID'::text, 'PENDING_VERIFICATION'::text, 'PAID'::text, 'REJECTED'::text, 'CANCELLED'::text])));
+ALTER TABLE payments ADD CONSTRAINT payments_status_check CHECK (((status)::text = ANY (ARRAY['UNPAID'::text, 'PENDING_VERIFICATION'::text, 'PARTIAL'::text, 'PAID'::text, 'OVERPAID'::text, 'REJECTED'::text, 'CANCELLED'::text])));
+
+-- Source migration: 043_add_billing_redesign.sql
+ALTER TABLE payment_transactions ADD CONSTRAINT payment_transactions_kind_check CHECK (((kind)::text = ANY (ARRAY[('PAYMENT'::character varying)::text, ('REFUND'::character varying)::text])));
+ALTER TABLE payment_transactions ADD CONSTRAINT payment_transactions_method_check CHECK (((method)::text = ANY (ARRAY[('CASH'::character varying)::text, ('GCASH'::character varying)::text])));
+ALTER TABLE payment_transactions ADD CONSTRAINT payment_transactions_status_check CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('ACCEPTED'::character varying)::text, ('REJECTED'::character varying)::text, ('VOIDED'::character varying)::text])));
+ALTER TABLE payment_transactions ADD CONSTRAINT payment_transactions_source_check CHECK (((source)::text = ANY (ARRAY[('PATIENT_UPLOAD'::character varying)::text, ('SECRETARY'::character varying)::text])));
+ALTER TABLE payment_transactions ADD CONSTRAINT payment_transactions_amount_check CHECK ((amount > (0)::numeric));
 ALTER TABLE pending_patient_signups DROP CONSTRAINT IF EXISTS pending_patient_signups_sex_check;
 ALTER TABLE pending_patient_signups ADD CONSTRAINT pending_patient_signups_sex_check CHECK (((sex)::text = ANY (ARRAY[('MALE'::character varying)::text, ('FEMALE'::character varying)::text, ('OTHER'::character varying)::text, ('NOT_SPECIFIED'::character varying)::text])));
 ALTER TABLE queue_entries DROP CONSTRAINT IF EXISTS queue_entries_registration_source_check;
@@ -1164,6 +1225,17 @@ END $$;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='appointments'::regclass AND conname='appointments_patient_id_fkey') THEN
     ALTER TABLE appointments ADD CONSTRAINT appointments_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+-- Source migration: 043_add_billing_redesign.sql
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='billing_audit_log'::regclass AND conname='billing_audit_log_payment_id_fkey') THEN
+    ALTER TABLE billing_audit_log ADD CONSTRAINT billing_audit_log_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='billing_audit_log'::regclass AND conname='billing_audit_log_actor_user_id_fkey') THEN
+    ALTER TABLE billing_audit_log ADD CONSTRAINT billing_audit_log_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL;
   END IF;
 END $$;
 DO $$ BEGIN
@@ -1236,6 +1308,22 @@ DO $$ BEGIN
     ALTER TABLE invoices ADD CONSTRAINT invoices_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE;
   END IF;
 END $$;
+-- Source migration: 043_add_billing_redesign.sql
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='invoices'::regclass AND conname='invoices_replaces_invoice_id_fkey') THEN
+    ALTER TABLE invoices ADD CONSTRAINT invoices_replaces_invoice_id_fkey FOREIGN KEY (replaces_invoice_id) REFERENCES invoices(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='invoices'::regclass AND conname='invoices_replaced_by_invoice_id_fkey') THEN
+    ALTER TABLE invoices ADD CONSTRAINT invoices_replaced_by_invoice_id_fkey FOREIGN KEY (replaced_by_invoice_id) REFERENCES invoices(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='invoices'::regclass AND conname='invoices_voided_by_fkey') THEN
+    ALTER TABLE invoices ADD CONSTRAINT invoices_voided_by_fkey FOREIGN KEY (voided_by) REFERENCES users(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='login_otp_challenges'::regclass AND conname='login_otp_challenges_user_id_fkey') THEN
     ALTER TABLE login_otp_challenges ADD CONSTRAINT login_otp_challenges_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
@@ -1289,6 +1377,27 @@ END $$;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='payment_charges'::regclass AND conname='payment_charges_prescription_item_id_fkey') THEN
     ALTER TABLE payment_charges ADD CONSTRAINT payment_charges_prescription_item_id_fkey FOREIGN KEY (prescription_item_id) REFERENCES prescription_items(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+-- Source migration: 043_add_billing_redesign.sql
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='payment_transactions'::regclass AND conname='payment_transactions_payment_id_fkey') THEN
+    ALTER TABLE payment_transactions ADD CONSTRAINT payment_transactions_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='payment_transactions'::regclass AND conname='payment_transactions_reviewed_by_fkey') THEN
+    ALTER TABLE payment_transactions ADD CONSTRAINT payment_transactions_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='payment_transactions'::regclass AND conname='payment_transactions_voided_by_fkey') THEN
+    ALTER TABLE payment_transactions ADD CONSTRAINT payment_transactions_voided_by_fkey FOREIGN KEY (voided_by) REFERENCES users(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='payment_transactions'::regclass AND conname='payment_transactions_created_by_fkey') THEN
+    ALTER TABLE payment_transactions ADD CONSTRAINT payment_transactions_created_by_fkey FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
   END IF;
 END $$;
 DO $$ BEGIN
@@ -1392,6 +1501,9 @@ CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments USING btree (ap
 CREATE INDEX IF NOT EXISTS idx_appointments_doctor_id ON appointments USING btree (doctor_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_patient_id ON appointments USING btree (patient_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments USING btree (status);
+-- Source migration: 043_add_billing_redesign.sql
+CREATE INDEX IF NOT EXISTS idx_billing_audit_log_payment_id ON billing_audit_log USING btree (payment_id);
+CREATE INDEX IF NOT EXISTS idx_billing_audit_log_created_at ON billing_audit_log USING btree (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_conversations_doctor_id ON conversations USING btree (doctor_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_patient_id ON conversations USING btree (patient_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_secretary_id ON conversations USING btree (secretary_id);
@@ -1414,6 +1526,8 @@ CREATE INDEX IF NOT EXISTS idx_invoices_invoice_date ON invoices USING btree (in
 CREATE INDEX IF NOT EXISTS idx_invoices_patient_id ON invoices USING btree (patient_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_payment_id ON invoices USING btree (payment_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices USING btree (status);
+-- Source migration: 043_add_billing_redesign.sql
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_one_active_per_payment ON invoices USING btree (payment_id) WHERE (status = 'ACTIVE'::text);
 CREATE INDEX IF NOT EXISTS idx_login_otp_challenges_expires_at ON login_otp_challenges USING btree (expires_at);
 CREATE INDEX IF NOT EXISTS idx_login_otp_challenges_hash ON login_otp_challenges USING btree (challenge_token_hash);
 CREATE INDEX IF NOT EXISTS idx_login_otp_challenges_user_id ON login_otp_challenges USING btree (user_id);
@@ -1430,6 +1544,10 @@ CREATE INDEX IF NOT EXISTS idx_patients_user_id ON patients USING btree (user_id
 CREATE INDEX IF NOT EXISTS idx_payment_charges_charge_type ON payment_charges USING btree (charge_type);
 CREATE INDEX IF NOT EXISTS idx_payment_charges_deleted_at ON payment_charges USING btree (deleted_at) WHERE (deleted_at IS NULL);
 CREATE INDEX IF NOT EXISTS idx_payment_charges_prescription_item_id ON payment_charges USING btree (prescription_item_id) WHERE (prescription_item_id IS NOT NULL);
+-- Source migration: 043_add_billing_redesign.sql
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_payment_id ON payment_transactions USING btree (payment_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_payment_status ON payment_transactions USING btree (payment_id, status);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_status ON payment_transactions USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_payments_appointment_id ON payments USING btree (appointment_id);
 CREATE INDEX IF NOT EXISTS idx_payments_patient_id ON payments USING btree (patient_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments USING btree (status);

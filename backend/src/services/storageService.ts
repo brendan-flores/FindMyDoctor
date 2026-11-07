@@ -589,7 +589,10 @@ export async function generateSignedReceiptUrl(
       };
     }
 
-    console.log(`Generating signed URL for receipt: ${filePath}`);
+    console.log(`=== generateSignedReceiptUrl ===`);
+    console.log(`Bucket: ${RECEIPT_STORAGE_BUCKET}`);
+    console.log(`File path: ${filePath}`);
+    console.log(`Expires in: ${expiresIn} seconds`);
 
     // Generate signed URL with expiration
     const { data, error } = await supabaseAdmin.storage
@@ -604,6 +607,7 @@ export async function generateSignedReceiptUrl(
       };
     }
 
+    console.log(`Signed URL result data:`, data);
     console.log(`Signed URL generated successfully for: ${filePath}`);
     return {
       success: true,

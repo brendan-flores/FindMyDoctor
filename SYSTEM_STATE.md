@@ -176,23 +176,61 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 
 ---
 
-## Payment Workflow
+## Payment Workflow (Billing Redesign)
 
-**Payment Status Flow:**
-- UNPAID → PENDING_VERIFICATION → PAID (or REJECTED)
-- CASH payments: UNPAID → PAID (immediate, no verification needed)
-- GCASH payments: UNPAID → PENDING_VERIFICATION → PAID (after receipt verification)
+**Billing Model:**
+- Each `payments` row is a bill. `payment_transactions` rows record individual payments (PAYMENT) and refunds (REFUND) with method (CASH/GCASH), status (PENDING/ACCEPTED/REJECTED/VOIDED), receipt URL, reference number, patient-declared amount, and source (PATIENT_UPLOAD/SECRETARY).
+- `payments.status` caches the derived billing status, recomputed by `recalculateBill()` after every charge/transaction change: UNPAID, FOR_REVIEW (stored as PENDING_VERIFICATION), PARTIAL, PAID, OVERPAID.
+- Bill total = `consultation_amount + total_additional_charges`. Balance = bill total − accepted payments + accepted refunds.
+- `payment_charges.charge_type` is one of `ADDITIONAL`, `MEDICINE`, `SERVICE`, or `OTHER` (migration `046_add_service_other_charge_types.sql`). `MEDICINE`, `SERVICE`, and `OTHER` charges carry `quantity` and `unit_price`; the server computes `amount = quantity × unit_price` and ignores any client-supplied line total. `ADDITIONAL` remains a flat amount for legacy callers.
+- `billing_audit_log` records every billing mutation (charge add/remove, transaction create/accept/reject/void, refund, invoice create/void/unlock/reissue) with actor, entity, before/after state, and reason.
 
-**Additional Charges:**
-- Secretaries can add charges for medicine, additional services, or other fees
-- Charges linked to payment record
-- Can be deleted before invoice generation
+**Patient Receipt Upload:**
+- `POST /api/v1/payments/:appointmentId/receipt` (PATIENT) accepts an optional `patient_declared_amount` multipart field.
+- Creates/updates the payment and inserts a PENDING `payment_transactions` row (GCASH, source=PATIENT_UPLOAD) for secretary review.
+- `GET /api/v1/payments/my-receipt/:appointmentId` (PATIENT) returns a short-lived signed Supabase URL for the patient's own uploaded receipt (falls back to the latest transaction receipt); 404 when none exists.
 
-**Invoice Generation:**
-- Only for PAID payments
-- Secretary-only action
-- Uses secretary's assigned doctor's invoice settings
-- PDF stored in Supabase private bucket with signed URLs
+**Secretary Billing Endpoints:**
+- `GET /api/v1/payments/by-appointment/:appointmentId` and `GET /api/v1/payments/:id/billing` — bill + charges + transactions + derived summary + active invoice.
+- `POST /api/v1/payments/:id/transactions` — record payment/refund (GCASH requires reference_no; blocked while an ACTIVE invoice exists; the payment row is locked and an identical payment created in the last 30 seconds is rejected with 409 to prevent double-submits).
+- `PATCH /api/v1/payments/:id/transactions/:txId/accept|reject|void` — review pending receipts / void accepted ones (reason required; voiding also voids the ACTIVE invoice).
+- `POST /api/v1/payments/:id/charges` — add a charge. Blocked while an ACTIVE invoice exists (`INVOICE_LOCKED`); status/balance are recomputed server-side so adding a charge to a paid bill returns it to PARTIAL/UNPAID.
+- `DELETE /api/v1/payments/:id/charges/:chargeId` — soft-delete a charge. Blocked while an ACTIVE invoice exists and blocked if the removal would leave the bill overpaid (`Removing this would overpay the bill by ₱X. Void a payment first.`).
+- `POST /api/v1/payments/:id/refunds` — refund entry, only when OVERPAID.
+- `POST /api/v1/payments/:id/invoice` — issue invoice only when balance = 0 and no ACTIVE invoice exists. Locks the payment row, verifies the secretary's assigned doctor, snapshots every accepted payment into `invoice_data`, and links a replacement to the voided invoice it supersedes.
+- `POST /api/v1/invoices/:id/correct` — "Edit bill": requires a reason, verifies doctor assignment, and voids the ACTIVE invoice in one transaction (`status=VOID`, `voided_by/at/reason`) so charges unlock; writes `INVOICE_VOIDED` and `INVOICE_UNLOCKED` audit rows.
+- `GET /api/v1/secretary/payments/review|collect|history?date=` — pending receipts, bills with balance, and invoiced history + cash/GCASH/grand totals (mounted via `secretaryPaymentsRouter` at `/api/v1/secretary`).
+
+**Invoice Lifecycle:**
+- `invoices` gained `replaces_invoice_id`, `replaced_by_invoice_id`, `voided_by`, `voided_at`, `void_reason`.
+- States: ACTIVE (downloadable) / VOID (audit only; PDF download refused). One ACTIVE invoice per payment enforced by `idx_invoices_one_active_per_payment`.
+- Edit-bill flow: `POST /invoices/:id/correct` voids + unlocks in one transaction → secretary changes charges and collects any new balance → `POST /payments/:id/invoice` issues a replacement linked through `replaces_invoice_id` / `replaced_by_invoice_id`.
+- Replacement invoices display `Replaces INV-xxxx` and list every accepted payment (old and new GCash references included). Voided invoices remain in the audit trail only.
+- The invoice "Payment Breakdown" (both the PDF and the in-app preview) is computed from the accepted-transaction snapshot in `invoice_data.payment.transactions`, never from the legacy `advance_payment`/`cash_tendered` columns when a snapshot exists (those were zero for payments recorded via the transaction flow, which made the preview show ₱0.00). Format: Cash line first, then GCash line (`GCash · Ref: <sorted refs>`), then Cash/GCash refund lines as separate negative lines when refunds exist. TOTAL PAID = accepted payments minus refunds and equals the sum of every line above it. The PDF generator divides refunds into separate negative lines and no longer double-counts GCash refunds.
+
+**Secretary UI:**
+- `/secretary/queue` and `/secretary/payments` open the shared `BillingPanel` modal instead of the old stacked PaymentModal/InvoiceModal (files removed).
+- `BillingPanel` is a single scrolling view — Bill, then Payments, then Collect payment, then the invoice card — with a status strip (Total, Paid, Balance, status chip) pinned at the top. The four-tab layout was removed.
+- Header reads `Billing · Q-03 · Patient Name`; the queue number comes from the `queueNumber` prop when opened from the queue and otherwise from `queue_number` in the billing response, so no appointment UUID is shown.
+- Bill always lists the **Consultation fee** as the first, locked line so the displayed lines reconcile with the bill total. Additional charges follow, each showing its type and `qty × unit price` when present.
+- Add charge is one inline row regardless of type: Type (Service / Medicine / Other), Name, Qty (default 1), Unit price, and a live line total. After adding, the row stays open for another item.
+- Charges are editable until an ACTIVE invoice exists. Once it does, `+ Add charge` and Remove are hidden and an **Edit bill…** button appears with the hint `Invoice issued. Edit bill to change charges.`; the API also rejects charge changes server-side.
+- Edit bill asks for a required reason (Forgot item / Wrong amount / Wrong price / Other + optional note) and shows `This will void INV-xxxx and unlock the bill.` Voiding and unlocking happen in one DB transaction with audit rows.
+- Removing a charge opens a confirmation dialog. If the removal would leave the bill overpaid, the dialog shows `Removing this would overpay the bill by ₱X. Void a payment first.` and the server rejects it; otherwise removal is allowed after confirmation.
+- Collect payment prefills Amount with the current balance. The action label follows the edited amount (`Record ₱500 · ₱544 left`, or `Record ₱1,044` once it clears the balance) and does not claim to issue the invoice. Cash tendered (Cash only) shows the live Change amount and blocks recording when it is below the amount; GCash shows the reference-number field.
+- The primary action is a sticky footer outside the scrolling content: Record payment while a balance remains, Issue invoice once the bill is paid, so it cannot scroll out of view. It is disabled while a request is in flight to prevent double submission.
+- Recording a payment never auto-issues the invoice. A paid bill shows an explicit **Issue invoice** button in the sticky footer with the wording `Issue the invoice to give the patient their receipt.`; the invoice then appears as a card (number, issued date, totals, View/Print, Edit bill…). Paid bills without an invoice also show `No active invoice, issue one when paid.`
+- Billing status uses colored chips (Unpaid red, For review/Partial amber, Paid green, Overpaid purple) and lists methods as `Cash`/`GCash` rather than the raw enum values.
+- The Payments list shows each transaction's date and time in Asia/Manila (e.g. `Nov 7, 2026 · 2:48 PM`) and keeps GCash reference numbers.
+- Queue rows show billing chips (Unpaid/For review/Partial/Paid/Overpaid), a "To collect" filter, and Bill/View invoice actions after Complete Checkup. A PAID row with no ACTIVE invoice shows **Issue Invoice** plus a `No active invoice` badge instead of pretending an invoice exists.
+- `/secretary/payments` uses action tabs (To Review, To Collect, Paid, Needs Attention) with search/date filters and a cash/GCASH day summary on Paid.
+
+**Mobile:**
+- Receipt upload screen has an optional "Amount you paid" field sent as `patient_declared_amount`.
+- Appointment detail → Payment Information shows a "View Receipt" button for GCash payments; it fetches a signed URL via `GET /payments/my-receipt/:appointmentId` and displays the image in an in-app zoomable dialog (`InteractiveViewer`). Shown alongside "View Invoice" (PAID + COMPLETED).
+
+**Legacy Compatibility:**
+- Other pre-existing payment endpoints (verify, reject, mark-paid, record-payment, record, walk-in, payment-method, revert-unpaid) remain unchanged. Charge add/delete now follow the billing-redesign locking rules above.
 
 ---
 
@@ -219,7 +257,7 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 - doctor_schedules, doctor_unavailability, daily_capacities
 - appointments, queue_entries
 - visits, prescriptions, prescription_items
-- payments, payment_charges, invoices
+- payments, payment_charges, payment_transactions, billing_audit_log, invoices
 - conversations, messages
 - ai_conversations, ai_messages
 - waitlists, notifications, device_tokens

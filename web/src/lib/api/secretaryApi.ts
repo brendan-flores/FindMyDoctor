@@ -146,7 +146,7 @@ export interface QueueEntry {
   id: string;
   patient_id: string;
   doctor_id: string;
-  appointment_id?: string;
+  appointment_id?: string | null;
   queue_date: string;
   queue_number: number;
   registration_source: 'ONLINE' | 'WALK_IN';
@@ -162,6 +162,11 @@ export interface QueueEntry {
   doctor_first_name: string;
   doctor_last_name: string;
   consultation_fee?: number;
+  payment_status?: 'UNPAID' | 'FOR_REVIEW' | 'PARTIAL' | 'PAID' | 'OVERPAID' | 'PENDING_VERIFICATION';
+  payment_invoice_number?: string | null;
+  payment_bill_total?: number;
+  payment_net_paid?: number;
+  payment_balance?: number;
 }
 
 export const secretaryApi = {
@@ -303,7 +308,7 @@ export const secretaryApi = {
 
   // Payments: add charge to payment (by payment ID)
   addCharge: async (paymentId: string, payload: {
-    chargeType?: 'ADDITIONAL' | 'MEDICINE';
+    chargeType?: 'ADDITIONAL' | 'MEDICINE' | 'SERVICE' | 'OTHER';
     description?: string;
     amount?: number;
     name?: string;
@@ -324,7 +329,7 @@ export const secretaryApi = {
     appointmentId: string;
     paymentMethod: 'CASH' | 'GCASH';
     consultationFee: number;
-    additionalCharges: Array<{ description: string; amount: number; chargeType?: 'ADDITIONAL' | 'MEDICINE'; name?: string; quantity?: number; unitPrice?: number }>;
+    additionalCharges: Array<{ description: string; amount: number; chargeType?: 'ADDITIONAL' | 'MEDICINE' | 'SERVICE' | 'OTHER'; name?: string; quantity?: number; unitPrice?: number }>;
   }): Promise<{ success: boolean; data?: { paymentId: string }; error?: string }> => {
     return apiClient.post<{ paymentId: string }>('/payments/record', payload);
   },
@@ -347,6 +352,77 @@ export const secretaryApi = {
     additionalCharges: Array<{ description: string; amount: number }>;
   }): Promise<{ success: boolean; data?: { paymentId: string }; error?: string }> => {
     return apiClient.post<{ paymentId: string }>('/payments/walk-in', payload);
+  },
+
+  // === BILLING REDESIGN ENDPOINTS ===
+
+  // Get payment with full billing details by appointment ID
+  getPaymentBillingByAppointment: async (appointmentId: string): Promise<{ success: boolean; data?: PaymentBillingData; error?: string }> => {
+    return apiClient.get<PaymentBillingData>(`/payments/by-appointment/${appointmentId}`);
+  },
+
+  // Get payment with full billing details by payment ID
+  getPaymentBillingById: async (paymentId: string): Promise<{ success: boolean; data?: PaymentBillingData; error?: string }> => {
+    return apiClient.get<PaymentBillingData>(`/payments/${paymentId}/billing`);
+  },
+
+  // Record a payment transaction (CASH/GCASH, amount, reference_no for GCash)
+  recordTransaction: async (paymentId: string, payload: {
+    kind: 'PAYMENT' | 'REFUND';
+    method: 'CASH' | 'GCASH';
+    amount: number;
+    receipt_url?: string | null;
+    reference_no?: string | null;
+    patient_declared_amount?: number | null;
+    source?: string;
+  }): Promise<{ success: boolean; data?: PaymentTransaction; error?: string }> => {
+    return apiClient.post<PaymentTransaction>(`/payments/${paymentId}/transactions`, payload);
+  },
+
+  // Accept a pending receipt transaction
+  acceptTransaction: async (paymentId: string, txId: string, payload?: { amount?: number; reference_no?: string }): Promise<{ success: boolean; data?: PaymentTransaction; error?: string }> => {
+    return apiClient.patch<PaymentTransaction>(`/payments/${paymentId}/transactions/${txId}/accept`, payload || {});
+  },
+
+  // Reject a pending receipt transaction (reason required)
+  rejectTransaction: async (paymentId: string, txId: string, payload: { reason: string; note?: string }): Promise<{ success: boolean; data?: PaymentTransaction; error?: string }> => {
+    return apiClient.patch<PaymentTransaction>(`/payments/${paymentId}/transactions/${txId}/reject`, payload);
+  },
+
+  // Void an accepted transaction (reason required)
+  voidTransaction: async (paymentId: string, txId: string, payload: { reason: string; note?: string }): Promise<{ success: boolean; data?: PaymentTransaction; error?: string }> => {
+    return apiClient.patch<PaymentTransaction>(`/payments/${paymentId}/transactions/${txId}/void`, payload);
+  },
+
+  // Create a refund (only when OVERPAID)
+  createRefund: async (paymentId: string, payload: { method: 'CASH' | 'GCASH'; amount: number; reason: string; reference_no?: string }): Promise<{ success: boolean; data?: PaymentTransaction; error?: string }> => {
+    return apiClient.post<PaymentTransaction>(`/payments/${paymentId}/refunds`, payload);
+  },
+
+  // Issue invoice (only when balance == 0)
+  issueInvoice: async (paymentId: string): Promise<{ success: boolean; data?: Invoice; error?: string }> => {
+    return apiClient.post<Invoice>(`/payments/${paymentId}/invoice`, {});
+  },
+
+  // Correct invoice (void + allow reissue)
+  correctInvoice: async (invoiceId: string, payload: { reason: string; note?: string }): Promise<{ success: boolean; data?: Invoice; error?: string }> => {
+    return apiClient.post<Invoice>(`/invoices/${invoiceId}/correct`, payload);
+  },
+
+  // Get pending receipts for review
+  getPendingReceipts: async (): Promise<{ success: boolean; data?: PaymentTransaction[]; error?: string }> => {
+    return apiClient.get<PaymentTransaction[]>('/secretary/payments/review');
+  },
+
+  // Get payments to collect (balance > 0)
+  getPaymentsToCollect: async (): Promise<{ success: boolean; data?: Payment[]; error?: string }> => {
+    return apiClient.get<Payment[]>('/secretary/payments/collect');
+  },
+
+  // Get payment history with day summary
+  getPaymentHistory: async (date?: string): Promise<{ success: boolean; data?: { invoices: Invoice[]; summary: { cashTotal: number; gcashTotal: number; grandTotal: number } }; error?: string }> => {
+    const queryParams = date ? `?date=${date}` : '';
+    return apiClient.get<{ invoices: Invoice[]; summary: { cashTotal: number; gcashTotal: number; grandTotal: number } }>(`/secretary/payments/history${queryParams}`);
   },
 
   // Prescriptions: get patient's prescriptions (with items for medicine charge linking)
@@ -479,7 +555,7 @@ export const secretaryApi = {
 export interface PaymentCharge {
   id: string;
   payment_id: string;
-  charge_type?: 'ADDITIONAL' | 'MEDICINE';
+  charge_type?: 'ADDITIONAL' | 'MEDICINE' | 'SERVICE' | 'OTHER';
   description: string;
   amount: number;
   quantity?: number | null;
@@ -492,11 +568,13 @@ export interface PaymentCharge {
 }
 
 // Payment (from payments table with joined patient/appointment/verifier data)
+// status holds the derived billing status: UNPAID | FOR_REVIEW (stored as
+// PENDING_VERIFICATION) | PARTIAL | PAID | OVERPAID, plus legacy values.
 export interface Payment {
   id: string;
   appointment_id: string;
   patient_id: string;
-  status: 'UNPAID' | 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED' | 'CANCELLED';
+  status: 'UNPAID' | 'PENDING_VERIFICATION' | 'FOR_REVIEW' | 'PARTIAL' | 'PAID' | 'OVERPAID' | 'REJECTED' | 'CANCELLED';
   payment_method: string;
   receipt_url?: string | null;
   consultation_amount: number;
@@ -512,14 +590,61 @@ export interface Payment {
   patient_first_name?: string;
   patient_last_name?: string;
   patient_phone?: string;
+  patient_date_of_birth?: string;
+  patient_age?: number | null;
   // Verifier details (joined)
   verified_by_first_name?: string | null;
   verified_by_last_name?: string | null;
   // Appointment details (joined)
   appointment_date?: string;
   reason_for_visit?: string;
+  queue_number?: number | null;
   // Nested charges
   charges?: PaymentCharge[];
+}
+
+// Billing redesign types
+export type BillingStatus = 'UNPAID' | 'FOR_REVIEW' | 'PARTIAL' | 'PAID' | 'OVERPAID';
+
+export interface PaymentTransaction {
+  id: string;
+  payment_id: string;
+  kind: 'PAYMENT' | 'REFUND';
+  method: 'CASH' | 'GCASH';
+  amount: number;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'VOIDED';
+  receipt_url: string | null;
+  reference_no: string | null;
+  patient_declared_amount: number | null;
+  source: 'PATIENT_UPLOAD' | 'SECRETARY';
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reject_reason: string | null;
+  reject_note: string | null;
+  voided_by: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
+  void_note: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface BillingSummary {
+  billTotal: number;
+  acceptedPayments: number;
+  acceptedRefunds: number;
+  netPaid: number;
+  balance: number;
+  billingStatus: BillingStatus;
+  pendingCount: number;
+}
+
+export interface PaymentBillingData {
+  payment: Payment;
+  charges: PaymentCharge[];
+  transactions: PaymentTransaction[];
+  billingSummary: BillingSummary;
+  activeInvoice: Invoice | null;
 }
 
 // Invoice (from invoices table)
@@ -552,6 +677,7 @@ export interface Invoice {
 export interface InvoiceData {
   invoice_number: string;
   invoice_date: string;
+  replaces_invoice_number?: string | null;
   clinic: {
     name: string;
     address: string;

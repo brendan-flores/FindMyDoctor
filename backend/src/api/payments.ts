@@ -6,6 +6,7 @@ import { sendPushToUser } from '../services/pushService';
 import multer from 'multer';
 import { uploadPaymentReceipt, validatePaymentReceiptFile, generateSignedReceiptUrl } from '../services/storageService';
 import { createNotification, NotificationTypes } from './notifications';
+import { recalculateBill, logBillingAction, getBillingSummary, getPaymentWithBilling } from '../services/billingService';
 
 const router = Router();
 
@@ -104,6 +105,7 @@ router.get('/', authenticate, requireSecretaryPasswordChange, requireSecretaryPr
         pat.first_name as patient_first_name,
         pat.last_name as patient_last_name,
         pat.phone as patient_phone,
+        pat.date_of_birth as patient_date_of_birth,
         s.first_name as verified_by_first_name,
         s.last_name as verified_by_last_name,
         a.appointment_date,
@@ -160,8 +162,22 @@ router.get('/', authenticate, requireSecretaryPasswordChange, requireSecretaryPr
 
     const payments = result.rows.map(payment => {
       const balance = Math.max(0, parseFloat(payment.total_amount) - parseFloat(payment.amount_paid));
+
+      // Calculate patient age from date of birth
+      let patientAge: number | null = null;
+      if (payment.patient_date_of_birth) {
+        const dob = new Date(payment.patient_date_of_birth);
+        const today = new Date();
+        patientAge = today.getFullYear() - dob.getFullYear();
+        const monthDiff = today.getMonth() - dob.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+          patientAge--;
+        }
+      }
+
       return {
         ...payment,
+        patient_age: patientAge,
         charges: chargesByPayment.get(payment.id) || [],
         balance: balance.toFixed(2),
       };
@@ -323,6 +339,7 @@ router.post('/:appointmentId/receipt', authenticate, authorize('PATIENT'), uploa
   const client = await getClient();
   try {
     const { appointmentId } = req.params;
+    const patientDeclaredAmount = req.body.patient_declared_amount ? parseFloat(req.body.patient_declared_amount) : null;
 
     if (!req.file) {
       client.release();
@@ -359,7 +376,10 @@ router.post('/:appointmentId/receipt', authenticate, authorize('PATIENT'), uploa
       [appointmentId]
     );
 
+    let paymentId: string;
+
     if (existingResult.rows.length > 0) {
+      paymentId = existingResult.rows[0].id;
       // Update existing payment (add receipt URL, don't change status if already PENDING_VERIFICATION)
       await client.query(
         `UPDATE payments
@@ -390,12 +410,33 @@ router.post('/:appointmentId/receipt', authenticate, authorize('PATIENT'), uploa
 
       const consultationFee = doctorResult.rows[0].consultation_fee;
 
-      await client.query(
+      const insertResult = await client.query(
         `INSERT INTO payments (patient_id, appointment_id, payment_method, consultation_amount, total_amount, gcash_advance_amount, cash_tendered_amount, status, receipt_url)
-         VALUES ($1, $2, 'GCASH', $3, $3, 0.00, 0.00, 'PENDING_VERIFICATION', $4)`,
+         VALUES ($1, $2, 'GCASH', $3, $3, 0.00, 0.00, 'PENDING_VERIFICATION', $4)
+         RETURNING id`,
         [appointment.patient_id, appointmentId, consultationFee, receiptPath]
       );
+      paymentId = insertResult.rows[0].id;
     }
+
+    // Create a pending payment_transaction for the uploaded receipt
+    // Amount defaults to the bill total; secretary can adjust on accept
+    const billTotalResult = await client.query(
+      `SELECT COALESCE(consultation_amount, 0) + COALESCE(total_additional_charges, 0) as bill_total
+       FROM payments WHERE id = $1`,
+      [paymentId]
+    );
+    const declaredOrBillTotal = patientDeclaredAmount ?? parseFloat(billTotalResult.rows[0]?.bill_total || 0);
+
+    await client.query(
+      `INSERT INTO payment_transactions (
+        payment_id, kind, method, amount, receipt_url, patient_declared_amount,
+        source, created_by, status, created_at
+      ) VALUES ($1, 'PAYMENT', 'GCASH', $2, $3, $4, 'PATIENT_UPLOAD', $5, 'PENDING', CURRENT_TIMESTAMP)`,
+      [paymentId, declaredOrBillTotal, receiptPath, patientDeclaredAmount, req.user!.id]
+    );
+
+    await recalculateBill(paymentId, client);
 
     await client.query('COMMIT');
     client.release();
@@ -410,6 +451,63 @@ router.post('/:appointmentId/receipt', authenticate, authorize('PATIENT'), uploa
       console.error('Rollback failed:', rollbackErr);
     }
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to upload receipt'));
+  }
+});
+
+// Get signed receipt URL for the authenticated patient (patient only)
+// GET /payments/my-receipt/:appointmentId
+router.get('/my-receipt/:appointmentId', authenticate, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { appointmentId } = req.params;
+    const patientUserId = req.user!.id;
+
+    console.log('=== My Receipt URL Request ===');
+    console.log('Appointment ID:', appointmentId);
+    console.log('Patient User ID:', patientUserId);
+
+    // Verify the appointment belongs to this patient
+    const result = await query(
+      `SELECT p.receipt_url, pt.receipt_url as tx_receipt_url
+       FROM payments p
+       JOIN appointments a ON p.appointment_id = a.id
+       JOIN patients pat ON a.patient_id = pat.id
+       LEFT JOIN LATERAL (
+         SELECT receipt_url FROM payment_transactions
+         WHERE payment_id = p.id AND receipt_url IS NOT NULL
+         ORDER BY created_at DESC LIMIT 1
+       ) pt ON true
+       WHERE p.appointment_id = $1 AND pat.user_id = $2`,
+      [appointmentId, patientUserId]
+    );
+
+    if (result.rows.length === 0) {
+      console.log('Payment not found for this appointment/patient');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Payment not found'));
+    }
+
+    const receiptPath = result.rows[0].receipt_url || result.rows[0].tx_receipt_url;
+    console.log('Receipt path from DB:', receiptPath);
+    console.log('Payments.receipt_url:', result.rows[0].receipt_url);
+    console.log('Transaction receipt_url:', result.rows[0].tx_receipt_url);
+
+    if (!receiptPath) {
+      console.log('No receipt URL found in either payments or payment_transactions');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'No receipt uploaded for this payment'));
+    }
+
+    console.log('Generating signed URL for path:', receiptPath);
+    const signedUrlResult = await generateSignedReceiptUrl(receiptPath, 300);
+
+    if (!signedUrlResult.success) {
+      console.error('Failed to generate signed URL:', signedUrlResult.error);
+      return res.status(500).json(error(ErrorCodes.SERVER_ERROR, signedUrlResult.error || 'Failed to generate signed URL'));
+    }
+
+    console.log('Signed URL generated:', signedUrlResult.signedUrl);
+    res.json(success({ signedUrl: signedUrlResult.signedUrl }, 'Signed URL generated successfully'));
+  } catch (err: any) {
+    console.error('Error in my-receipt endpoint:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to generate signed URL'));
   }
 });
 
@@ -816,6 +914,13 @@ router.patch('/:id/mark-paid', authenticate, requireSecretaryPasswordChange, req
 
       const invoiceNumber = `INV-${String(nextInvoiceNumber).padStart(4, '0')}`;
 
+      // Fetch payment transactions for snapshot in invoice
+      const transactionsResult = await client.query(
+        `SELECT id, kind, method, amount, status, reference_no FROM payment_transactions WHERE payment_id = $1 AND status = 'ACCEPTED' ORDER BY created_at`,
+        [id]
+      );
+      const acceptedTransactions = transactionsResult.rows;
+
       // Prepare invoice data JSONB
       const invoiceData = {
         clinic: {
@@ -861,7 +966,15 @@ router.patch('/:id/mark-paid', authenticate, requireSecretaryPasswordChange, req
           cash_tendered: cashTendered,
           amount_applied: amountApplied,
           change_amount: changeAmount,
-          final_balance: finalBalance
+          final_balance: finalBalance,
+          transactions: acceptedTransactions.map(tx => ({
+            id: tx.id,
+            kind: tx.kind,
+            method: tx.method,
+            amount: parseFloat(tx.amount),
+            status: tx.status,
+            reference_no: tx.reference_no
+          }))
         }
       };
 
@@ -934,19 +1047,25 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
     const finalChargeType = chargeType || 'ADDITIONAL';
 
     // Validate charge type
-    if (!['ADDITIONAL', 'MEDICINE'].includes(finalChargeType)) {
+    if (!['ADDITIONAL', 'MEDICINE', 'SERVICE', 'OTHER'].includes(finalChargeType)) {
       client.release();
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid charge type. Must be ADDITIONAL or MEDICINE'));
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid charge type. Must be ADDITIONAL, MEDICINE, SERVICE, or OTHER'));
     }
+
+    // Unit-based charges (medicine, service, other) are priced as qty × unit price.
+    const unitBased = ['MEDICINE', 'SERVICE', 'OTHER'].includes(finalChargeType);
 
     let chargeAmount: number;
     let chargeDescription: string;
 
-    if (finalChargeType === 'MEDICINE') {
-      // Medicine charge validation
-      if (!name || typeof name !== 'string' || name.trim() === '') {
+    if (unitBased) {
+      const chargeName = typeof name === 'string' && name.trim() !== ''
+        ? name
+        : (typeof description === 'string' ? description : '');
+
+      if (!chargeName || chargeName.trim() === '') {
         client.release();
-        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Medicine name is required for medicine charges'));
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Name is required for this charge'));
       }
 
       const numericQuantity = Number(quantity);
@@ -961,9 +1080,9 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
         return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Unit price must be a valid positive number'));
       }
 
-      // Calculate amount on server (never trust client-supplied medicine total)
+      // Calculate amount on server (never trust a client-supplied line total)
       chargeAmount = numericQuantity * numericUnitPrice;
-      chargeDescription = name.trim();
+      chargeDescription = chargeName.trim();
 
       // Round to 2 decimal places for monetary precision
       chargeAmount = Math.round(chargeAmount * 100) / 100;
@@ -1037,11 +1156,21 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only add charges to payments for your assigned doctor'));
     }
 
-    // Only allow charge addition for UNPAID and PENDING_VERIFICATION payments
-    if (payment.status === 'PAID') {
+    // Charges stay editable until an ACTIVE invoice exists. After that the bill
+    // is locked and the secretary must use "Edit bill…" (void + replace).
+    const activeInvoiceResult = await client.query(
+      `SELECT id, invoice_number FROM invoices
+        WHERE payment_id = $1 AND status = 'ACTIVE'
+        LIMIT 1`,
+      [id]
+    );
+    if (activeInvoiceResult.rows.length > 0) {
       await client.query('ROLLBACK');
       client.release();
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot add charges to a paid payment'));
+      return res.status(400).json(error(
+        ErrorCodes.VALIDATION_ERROR,
+        `INVOICE_LOCKED: Invoice ${activeInvoiceResult.rows[0].invoice_number} is active. Edit the bill to change charges.`
+      ));
     }
 
     if (payment.status === 'REJECTED') {
@@ -1092,19 +1221,23 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
     }
 
     // Insert charge with appropriate fields based on type
-    if (finalChargeType === 'MEDICINE') {
-      await client.query(
+    let chargeInsertResult;
+    if (unitBased) {
+      chargeInsertResult = await client.query(
         `INSERT INTO payment_charges (payment_id, charge_type, description, amount, quantity, unit_price, prescription_item_id, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [id, 'MEDICINE', chargeDescription, chargeAmount, Number(quantity), Number(unitPrice), prescriptionItemId || null, secretaryRecordId]
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id`,
+        [id, finalChargeType, chargeDescription, chargeAmount, Number(quantity), Number(unitPrice), prescriptionItemId || null, secretaryRecordId]
       );
     } else {
-      await client.query(
+      chargeInsertResult = await client.query(
         `INSERT INTO payment_charges (payment_id, charge_type, description, amount, created_by)
-         VALUES ($1, $2, $3, $4, $5)`,
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id`,
         [id, 'ADDITIONAL', chargeDescription, chargeAmount, secretaryRecordId]
       );
     }
+    const chargeId = chargeInsertResult?.rows?.[0]?.id;
 
     // Recalculate total from authoritative charge records (excluding deleted charges)
     const chargesResult = await client.query(
@@ -1115,30 +1248,29 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
     const totalCharges = parseFloat(chargesResult.rows[0].total_charges);
     const newTotal = parseFloat(payment.consultation_amount) + totalCharges;
 
-    console.log('[Add Charge] Current consultation_amount:', payment.consultation_amount);
-    console.log('[Add Charge] Total charges from DB:', totalCharges);
-    console.log('[Add Charge] New total:', newTotal);
-    console.log('[Add Charge] Payment ID:', id);
+    await client.query(
+      `UPDATE payments
+          SET total_additional_charges = $1, total_amount = $2, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $3`,
+      [totalCharges, newTotal, id]
+    );
 
-    // Update payment totals and revert status to UNPAID if there's now a remaining balance
-    const currentAmountPaid = parseFloat(payment.amount_paid || '0');
-    const hasRemainingBalance = newTotal > currentAmountPaid;
+    // Status/balance are always derived by the server, never by the client or
+    // by manual status flips. Adding a charge to a paid bill moves it back to
+    // PARTIAL (or UNPAID when nothing has been paid).
+    const billingStatus = await recalculateBill(id, client, newTotal);
 
-    let updateQuery = 'UPDATE payments SET total_additional_charges = $1, total_amount = $2, updated_at = CURRENT_TIMESTAMP';
-    const updateParams = [totalCharges, newTotal];
-
-    // If payment was PAID and now has a remaining balance, revert to UNPAID
-    if (payment.status === 'PAID' && hasRemainingBalance) {
-      updateQuery += ', status = $3';
-      updateParams.push('UNPAID');
-    }
-
-    updateQuery += ' WHERE id = $' + (updateParams.length + 1);
-    updateParams.push(id);
-
-    const updateResult = await client.query(updateQuery, updateParams);
-
-    console.log('[Add Charge] Update result rowCount:', updateResult.rowCount);
+    await logBillingAction(
+      id,
+      userId,
+      'CHARGE_ADDED',
+      'payment_charge',
+      chargeId,
+      { total_amount: payment.total_amount, status: payment.status },
+      { total_amount: newTotal, status: billingStatus, charge_amount: chargeAmount, charge_type: finalChargeType },
+      undefined,
+      client
+    );
 
     // Insert notification for patient with charge amount
     const notificationMessage = `An additional charge of ₱${chargeAmount.toFixed(2)} has been added to your payment.`;
@@ -1166,7 +1298,12 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
       console.error('Push delivery failed:', pushErr);
     }
 
-    res.json(success(null, 'Additional charge added'));
+    res.json(success({
+      totalAmount: newTotal,
+      status: billingStatus,
+      chargeAmount,
+      chargeType: finalChargeType,
+    }, 'Additional charge added'));
   } catch (err: any) {
     try {
       await client.query('ROLLBACK');
@@ -1226,11 +1363,20 @@ router.delete('/:id/charges/:chargeId', authenticate, requireSecretaryPasswordCh
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only delete charges from payments for your assigned doctor'));
     }
 
-    // Only allow charge deletion for UNPAID and PENDING_VERIFICATION payments
-    if (payment.status === 'PAID') {
+    // Charges are locked once an ACTIVE invoice exists.
+    const activeInvoiceResult = await client.query(
+      `SELECT id, invoice_number FROM invoices
+        WHERE payment_id = $1 AND status = 'ACTIVE'
+        LIMIT 1`,
+      [id]
+    );
+    if (activeInvoiceResult.rows.length > 0) {
       await client.query('ROLLBACK');
       client.release();
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot delete charges from a paid payment'));
+      return res.status(400).json(error(
+        ErrorCodes.VALIDATION_ERROR,
+        `INVOICE_LOCKED: Invoice ${activeInvoiceResult.rows[0].invoice_number} is active. Edit the bill to change charges.`
+      ));
     }
 
     if (payment.status === 'REJECTED') {
@@ -1251,44 +1397,74 @@ router.delete('/:id/charges/:chargeId', authenticate, requireSecretaryPasswordCh
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Charge not found or already deleted'));
     }
 
+    // Removing a charge must never leave the bill overpaid. Compare the total
+    // after removal with accepted payments minus refunds before soft-deleting.
+    const chargesSumResult = await client.query(
+      'SELECT COALESCE(SUM(amount)::numeric, 0) as total_charges FROM payment_charges WHERE payment_id = $1 AND deleted_at IS NULL',
+      [id]
+    );
+    const totalChargesBefore = parseFloat(chargesSumResult.rows[0].total_charges);
+    const totalChargesAfter = Math.max(0, totalChargesBefore - parseFloat(chargeResult.rows[0].amount));
+    const newTotal = parseFloat(payment.consultation_amount) + totalChargesAfter;
+
+    const paidResult = await client.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN kind = 'PAYMENT' AND status = 'ACCEPTED' THEN amount ELSE 0 END), 0) as accepted_payments,
+         COALESCE(SUM(CASE WHEN kind = 'REFUND' AND status = 'ACCEPTED' THEN amount ELSE 0 END), 0) as accepted_refunds
+       FROM payment_transactions
+       WHERE payment_id = $1`,
+      [id]
+    );
+    const acceptedPayments = parseFloat(paidResult.rows[0].accepted_payments || 0);
+    const acceptedRefunds = parseFloat(paidResult.rows[0].accepted_refunds || 0);
+    const netPaid = acceptedPayments - acceptedRefunds;
+
+    if (netPaid > newTotal + 0.005) {
+      const overpayAmount = (netPaid - newTotal).toFixed(2);
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json(error(
+        ErrorCodes.VALIDATION_ERROR,
+        `Removing this would overpay the bill by ₱${overpayAmount}. Void a payment first.`
+      ));
+    }
+
     // Soft-delete the charge by setting deleted_at
     await client.query(
       'UPDATE payment_charges SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1',
       [chargeId]
     );
 
-    // Recalculate total from authoritative charge records (excluding deleted charges)
-    const chargesResult = await client.query(
-      'SELECT COALESCE(SUM(amount), 0) as total_charges FROM payment_charges WHERE payment_id = $1 AND deleted_at IS NULL',
-      [id]
+    await client.query(
+      `UPDATE payments
+          SET total_additional_charges = $1, total_amount = $2, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $3`,
+      [totalChargesAfter, newTotal, id]
     );
 
-    const totalCharges = parseFloat(chargesResult.rows[0].total_charges);
-    const newTotal = payment.consultation_amount + totalCharges;
+    // Recalculate status server-side. Removing a charge on a paid bill can make
+    // it OVERPAID, which is exactly what the guard above prevents.
+    const billingStatus = await recalculateBill(id, client, newTotal);
 
-    // Update payment totals
-    // If payment was UNPAID and is now fully paid, update to PAID
-    const currentAmountPaid = parseFloat(payment.amount_paid || '0');
-    const isNowFullyPaid = newTotal <= currentAmountPaid && currentAmountPaid > 0;
-
-    let updateQuery = 'UPDATE payments SET total_additional_charges = $1, total_amount = $2, updated_at = CURRENT_TIMESTAMP';
-    const updateParams = [totalCharges, newTotal];
-
-    // If payment was UNPAID and is now fully paid, update to PAID
-    if (payment.status === 'UNPAID' && isNowFullyPaid) {
-      updateQuery += ', status = $3';
-      updateParams.push('PAID');
-    }
-
-    updateQuery += ' WHERE id = $' + (updateParams.length + 1);
-    updateParams.push(id);
-
-    await client.query(updateQuery, updateParams);
+    await logBillingAction(
+      id,
+      userId,
+      'CHARGE_REMOVED',
+      'payment_charge',
+      chargeId,
+      { total_amount: payment.total_amount, status: payment.status, charge_amount: parseFloat(chargeResult.rows[0].amount) },
+      { total_amount: newTotal, status: billingStatus },
+      undefined,
+      client
+    );
 
     await client.query('COMMIT');
     client.release();
 
-    res.json(success(null, 'Charge deleted'));
+    res.json(success({
+      totalAmount: newTotal,
+      status: billingStatus,
+    }, 'Charge deleted'));
   } catch (err: any) {
     try {
       await client.query('ROLLBACK');
@@ -1640,31 +1816,31 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
       for (const charge of additionalCharges) {
         const chargeType = charge.chargeType || 'ADDITIONAL';
 
-        if (!['ADDITIONAL', 'MEDICINE'].includes(chargeType)) {
+        if (!['ADDITIONAL', 'MEDICINE', 'SERVICE', 'OTHER'].includes(chargeType)) {
           client.release();
-          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid charge type. Must be ADDITIONAL or MEDICINE'));
+          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid charge type. Must be ADDITIONAL, MEDICINE, SERVICE, or OTHER'));
         }
 
-        if (chargeType === 'MEDICINE') {
-          // Medicine charge validation
+        if (chargeType !== 'ADDITIONAL') {
+          // Unit-based charge validation (medicine, service, other)
           if (!charge.name || typeof charge.name !== 'string' || charge.name.trim() === '') {
             client.release();
-            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Medicine name is required for medicine charges'));
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'A name is required for this charge'));
           }
 
           const quantity = Number(charge.quantity);
           if (isNaN(quantity) || !isFinite(quantity) || quantity <= 0) {
             client.release();
-            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Quantity must be a valid positive number for medicine charges'));
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Quantity must be a valid positive number for this charge'));
           }
 
           const unitPrice = Number(charge.unitPrice);
           if (isNaN(unitPrice) || !isFinite(unitPrice) || unitPrice <= 0) {
             client.release();
-            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Unit price must be a valid positive number for medicine charges'));
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Unit price must be a valid positive number for this charge'));
           }
 
-          // Calculate amount on server (never trust client-supplied medicine total)
+          // Calculate amount on server (never trust client-supplied totals)
           charge.amount = quantity * unitPrice;
           charge.amount = Math.round(charge.amount * 100) / 100;
           charge.description = charge.name.trim();
@@ -1780,11 +1956,11 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
         for (const charge of additionalCharges) {
           const chargeType = charge.chargeType || 'ADDITIONAL';
 
-          if (chargeType === 'MEDICINE') {
+          if (chargeType !== 'ADDITIONAL') {
             await client.query(
               `INSERT INTO payment_charges (payment_id, charge_type, description, amount, quantity, unit_price, created_by)
                VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-              [paymentId, 'MEDICINE', charge.description.trim(), parseFloat(charge.amount), Number(charge.quantity), Number(charge.unitPrice), secretaryRecordId]
+              [paymentId, chargeType, charge.description.trim(), parseFloat(charge.amount), Number(charge.quantity), Number(charge.unitPrice), secretaryRecordId]
             );
           } else {
             await client.query(
@@ -1825,11 +2001,11 @@ router.post('/record', authenticate, requireSecretaryPasswordChange, requireSecr
         for (const charge of additionalCharges) {
           const chargeType = charge.chargeType || 'ADDITIONAL';
 
-          if (chargeType === 'MEDICINE') {
+          if (chargeType !== 'ADDITIONAL') {
             await client.query(
               `INSERT INTO payment_charges (payment_id, charge_type, description, amount, quantity, unit_price, created_by)
                VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-              [paymentId, 'MEDICINE', charge.description.trim(), parseFloat(charge.amount), Number(charge.quantity), Number(charge.unitPrice), secretaryRecordId]
+              [paymentId, chargeType, charge.description.trim(), parseFloat(charge.amount), Number(charge.quantity), Number(charge.unitPrice), secretaryRecordId]
             );
           } else {
             await client.query(
@@ -2026,31 +2202,31 @@ router.post('/walk-in', authenticate, requireSecretaryPasswordChange, requireSec
       for (const charge of additionalCharges) {
         const chargeType = charge.chargeType || 'ADDITIONAL';
 
-        if (!['ADDITIONAL', 'MEDICINE'].includes(chargeType)) {
+        if (!['ADDITIONAL', 'MEDICINE', 'SERVICE', 'OTHER'].includes(chargeType)) {
           client.release();
-          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid charge type. Must be ADDITIONAL or MEDICINE'));
+          return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Invalid charge type. Must be ADDITIONAL, MEDICINE, SERVICE, or OTHER'));
         }
 
-        if (chargeType === 'MEDICINE') {
-          // Medicine charge validation
+        if (chargeType !== 'ADDITIONAL') {
+          // Unit-based charge validation (medicine, service, other)
           if (!charge.name || typeof charge.name !== 'string' || charge.name.trim() === '') {
             client.release();
-            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Medicine name is required for medicine charges'));
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'A name is required for this charge'));
           }
 
           const quantity = Number(charge.quantity);
           if (isNaN(quantity) || !isFinite(quantity) || quantity <= 0) {
             client.release();
-            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Quantity must be a valid positive number for medicine charges'));
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Quantity must be a valid positive number for this charge'));
           }
 
           const unitPrice = Number(charge.unitPrice);
           if (isNaN(unitPrice) || !isFinite(unitPrice) || unitPrice <= 0) {
             client.release();
-            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Unit price must be a valid positive number for medicine charges'));
+            return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Unit price must be a valid positive number for this charge'));
           }
 
-          // Calculate amount on server (never trust client-supplied medicine total)
+          // Calculate amount on server (never trust client-supplied totals)
           charge.amount = quantity * unitPrice;
           charge.amount = Math.round(charge.amount * 100) / 100;
           charge.description = charge.name.trim();
@@ -2173,6 +2349,662 @@ router.post('/walk-in', authenticate, requireSecretaryPasswordChange, requireSec
       console.error('Rollback failed:', rollbackErr);
     }
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to record payment'));
+  }
+});
+
+// ============================================================================
+// BILLING REDESIGN ENDPOINTS (payment_transactions based)
+// ============================================================================
+
+const secAuth = [authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY')];
+
+// GET /payments/:id/billing - bill + charges + transactions + derived status by payment ID
+router.get('/:id/billing', ...secAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id: paymentId } = req.params;
+    const billingData = await getPaymentWithBilling(paymentId);
+    res.json(success({
+      payment: billingData.payment,
+      charges: billingData.charges,
+      transactions: billingData.transactions,
+      billingSummary: billingData.billingSummary,
+      activeInvoice: billingData.activeInvoice,
+    }));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch payment details'));
+  }
+});
+
+// GET /payments/by-appointment/:appointmentId - bill + charges + transactions + derived status
+router.get('/by-appointment/:appointmentId', ...secAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { appointmentId } = req.params;
+    const paymentResult = await query('SELECT id FROM payments WHERE appointment_id = $1', [appointmentId]);
+    if (paymentResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Payment not found for this appointment'));
+    }
+    const billingData = await getPaymentWithBilling(paymentResult.rows[0].id);
+    res.json(success({
+      payment: billingData.payment,
+      charges: billingData.charges,
+      transactions: billingData.transactions,
+      billingSummary: billingData.billingSummary,
+      activeInvoice: billingData.activeInvoice,
+    }));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch payment details'));
+  }
+});
+
+// POST /payments/:id/transactions - record payment/refund transaction
+router.post('/:id/transactions', ...secAuth, async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const { id: paymentId } = req.params;
+    const { kind, method, amount, receipt_url, reference_no, patient_declared_amount, source } = req.body;
+
+    if (!kind || !method || !amount || amount <= 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'kind, method, and a positive amount are required'));
+    }
+    if (method === 'GCASH' && !reference_no) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'REFERENCE_NO_REQUIRED: Reference number is required for GCash payments'));
+    }
+
+    const paymentResult = await client.query('SELECT * FROM payments WHERE id = $1 FOR UPDATE', [paymentId]);
+    if (paymentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Payment not found'));
+    }
+
+    const invoiceResult = await client.query(
+      `SELECT id FROM invoices WHERE payment_id = $1 AND status = 'ACTIVE' LIMIT 1`, [paymentId]);
+    if (invoiceResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Cannot add payments - ACTIVE invoice exists'));
+    }
+
+    // Guard against double-submits: the payment row lock above serialises
+    // concurrent requests, so a second identical request sees the first one.
+    const duplicateResult = await client.query(
+      `SELECT id FROM payment_transactions
+        WHERE payment_id = $1
+          AND kind = $2
+          AND method = $3
+          AND amount = $4
+          AND COALESCE(reference_no, '') = COALESCE($5, '')
+          AND status IN ('ACCEPTED', 'PENDING')
+          AND created_at > CURRENT_TIMESTAMP - INTERVAL '30 seconds'
+        LIMIT 1`,
+      [paymentId, kind, method, Number(amount), reference_no || null]
+    );
+    if (duplicateResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json(error(ErrorCodes.CONFLICT, 'An identical payment was just recorded for this bill. Refresh and try again.'));
+    }
+
+    const txResult = await client.query(
+      `INSERT INTO payment_transactions (
+        payment_id, kind, method, amount, receipt_url, reference_no,
+        patient_declared_amount, source, created_by, status, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ACCEPTED', CURRENT_TIMESTAMP)
+      RETURNING *`,
+      [paymentId, kind, method, amount, receipt_url || null, reference_no || null,
+       patient_declared_amount || null, source || 'SECRETARY', req.user!.id]
+    );
+
+    await recalculateBill(paymentId, client);
+    await logBillingAction(paymentId, req.user!.id, 'TRANSACTION_CREATED', 'payment_transaction',
+      txResult.rows[0].id, {}, txResult.rows[0], undefined, client);
+
+    await client.query('COMMIT');
+    res.status(201).json(success(txResult.rows[0], 'Payment recorded successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to record payment'));
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /payments/:id/transactions/:txId/accept - accept pending receipt
+router.patch('/:id/transactions/:txId/accept', ...secAuth, async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const { id: paymentId, txId } = req.params;
+    const { amount, reference_no } = req.body;
+
+    const txResult = await client.query(
+      'SELECT * FROM payment_transactions WHERE id = $1 AND payment_id = $2', [txId, paymentId]);
+    if (txResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Transaction not found'));
+    }
+    if (txResult.rows[0].status !== 'PENDING') {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Transaction is not pending'));
+    }
+
+    const updated = await client.query(
+      `UPDATE payment_transactions SET status = 'ACCEPTED',
+        amount = COALESCE($1, amount), reference_no = COALESCE($2, reference_no),
+        reviewed_by = $3, reviewed_at = CURRENT_TIMESTAMP
+       WHERE id = $4 RETURNING *`,
+      [amount || null, reference_no || null, req.user!.id, txId]);
+
+    await recalculateBill(paymentId, client);
+    await logBillingAction(paymentId, req.user!.id, 'TRANSACTION_ACCEPTED', 'payment_transaction',
+      txId, txResult.rows[0], updated.rows[0], undefined, client);
+
+    await client.query('COMMIT');
+    res.json(success(updated.rows[0], 'Receipt accepted successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to accept receipt'));
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /payments/:id/transactions/:txId/reject - reject pending receipt (reason required)
+router.patch('/:id/transactions/:txId/reject', ...secAuth, async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const { id: paymentId, txId } = req.params;
+    const { reason, note } = req.body;
+
+    if (!reason) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Rejection reason is required'));
+    }
+
+    const txResult = await client.query(
+      'SELECT * FROM payment_transactions WHERE id = $1 AND payment_id = $2', [txId, paymentId]);
+    if (txResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Transaction not found'));
+    }
+    if (txResult.rows[0].status !== 'PENDING') {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Transaction is not pending'));
+    }
+
+    const updated = await client.query(
+      `UPDATE payment_transactions SET status = 'REJECTED',
+        reject_reason = $1, reject_note = $2, reviewed_by = $3, reviewed_at = CURRENT_TIMESTAMP
+       WHERE id = $4 RETURNING *`,
+      [reason, note || null, req.user!.id, txId]);
+
+    await recalculateBill(paymentId, client);
+    await logBillingAction(paymentId, req.user!.id, 'TRANSACTION_REJECTED', 'payment_transaction',
+      txId, txResult.rows[0], updated.rows[0], reason, client);
+
+    await client.query('COMMIT');
+    res.json(success(updated.rows[0], 'Receipt rejected'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to reject receipt'));
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /payments/:id/transactions/:txId/void - void accepted transaction (reason required)
+router.patch('/:id/transactions/:txId/void', ...secAuth, async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const { id: paymentId, txId } = req.params;
+    const { reason, note } = req.body;
+
+    if (!reason) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'VOID_REASON_REQUIRED: Void reason is required'));
+    }
+
+    const txResult = await client.query(
+      'SELECT * FROM payment_transactions WHERE id = $1 AND payment_id = $2', [txId, paymentId]);
+    if (txResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Transaction not found'));
+    }
+    if (txResult.rows[0].status === 'VOIDED') {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Transaction is already voided'));
+    }
+
+    // If ACTIVE invoice exists, void it too
+    const invoiceResult = await client.query(
+      `SELECT * FROM invoices WHERE payment_id = $1 AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1`,
+      [paymentId]);
+
+    const updated = await client.query(
+      `UPDATE payment_transactions SET status = 'VOIDED',
+        void_reason = $1, void_note = $2, voided_by = $3, voided_at = CURRENT_TIMESTAMP
+       WHERE id = $4 RETURNING *`,
+      [reason, note || null, req.user!.id, txId]);
+
+    if (invoiceResult.rows.length > 0) {
+      await client.query(
+        `UPDATE invoices SET status = 'VOID', voided_by = $1, voided_at = CURRENT_TIMESTAMP,
+          void_reason = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+        [req.user!.id, reason, invoiceResult.rows[0].id]);
+    }
+
+    await recalculateBill(paymentId, client);
+    await logBillingAction(paymentId, req.user!.id, 'TRANSACTION_VOIDED', 'payment_transaction',
+      txId, txResult.rows[0], updated.rows[0], reason, client);
+
+    await client.query('COMMIT');
+    res.json(success(updated.rows[0], 'Payment voided successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to void payment'));
+  } finally {
+    client.release();
+  }
+});
+
+// POST /payments/:id/refunds - refund entry (only when OVERPAID)
+router.post('/:id/refunds', ...secAuth, async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const { id: paymentId } = req.params;
+    const { method, amount, reason, reference_no } = req.body;
+
+    if (!method || !amount || amount <= 0 || !reason) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'method, a positive amount, and reason are required'));
+    }
+
+    const summary = await getBillingSummary(paymentId);
+    if (summary.billingStatus !== 'OVERPAID') {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'PAYMENT_NOT_OVERPAID: Refunds are only allowed when bill is overpaid'));
+    }
+    const overpaid = summary.netPaid - summary.billTotal;
+    if (amount > overpaid) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Refund amount exceeds overpaid amount'));
+    }
+
+    const txResult = await client.query(
+      `INSERT INTO payment_transactions (
+        payment_id, kind, method, amount, reference_no, source, created_by, status, created_at
+      ) VALUES ($1, 'REFUND', $2, $3, $4, 'SECRETARY', $5, 'ACCEPTED', CURRENT_TIMESTAMP)
+      RETURNING *`,
+      [paymentId, method, amount, reference_no || null, req.user!.id]);
+
+    await recalculateBill(paymentId, client);
+    await logBillingAction(paymentId, req.user!.id, 'REFUND_CREATED', 'payment_transaction',
+      txResult.rows[0].id, {}, txResult.rows[0], reason, client);
+
+    await client.query('COMMIT');
+    res.status(201).json(success(txResult.rows[0], 'Refund recorded successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to create refund'));
+  } finally {
+    client.release();
+  }
+});
+
+// POST /payments/:id/invoice - issue invoice (only when balance == 0)
+// Locks the payment row so two secretaries cannot both issue an invoice, and
+// links a replacement to the voided invoice it supersedes.
+router.post('/:id/invoice', ...secAuth, async (req: AuthRequest, res: Response) => {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const { id: paymentId } = req.params;
+
+    const secretaryResult = await client.query(
+      'SELECT id, doctor_id FROM secretaries WHERE user_id = $1',
+      [req.user!.id]
+    );
+    if (secretaryResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+    const assignedDoctorId = secretaryResult.rows[0].doctor_id;
+
+    // Lock the payment row for the whole invoice transaction. `FOR UPDATE OF p`
+    // avoids trying to lock the nullable side of the LEFT JOINs.
+    const paymentResult = await client.query(
+      `SELECT p.*, a.doctor_id, a.appointment_date, a.reason_for_visit,
+              d.first_name as doctor_first_name, d.last_name as doctor_last_name,
+              d.specialty, d.practice_name,
+              pat.first_name as patient_first_name, pat.last_name as patient_last_name,
+              u.email as patient_email, pat.phone as patient_phone,
+              pat.address as patient_address, pat.date_of_birth as patient_date_of_birth,
+              pat.sex as patient_sex
+       FROM payments p
+       LEFT JOIN appointments a ON p.appointment_id = a.id
+       LEFT JOIN doctors d ON a.doctor_id = d.id
+       JOIN patients pat ON p.patient_id = pat.id
+       JOIN users u ON u.id = pat.user_id
+       WHERE p.id = $1
+       FOR UPDATE OF p`,
+      [paymentId]
+    );
+    if (paymentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Payment not found'));
+    }
+    const payment = paymentResult.rows[0];
+
+    // Doctor assignment: walk-in payments may not have an appointment, so fall
+    // back to the secretary's assigned doctor.
+    if (payment.doctor_id && payment.doctor_id !== assignedDoctorId) {
+      await client.query('ROLLBACK');
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You can only issue invoices for your assigned doctor'));
+    }
+    const doctorId = payment.doctor_id || assignedDoctorId;
+    const patientId = payment.patient_id;
+
+    const existingInvoice = await client.query(
+      `SELECT id, invoice_number FROM invoices WHERE payment_id = $1 AND status = 'ACTIVE' LIMIT 1`,
+      [paymentId]
+    );
+    if (existingInvoice.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'INVOICE_ALREADY_ACTIVE: An active invoice already exists'));
+    }
+
+    // Derive the bill + balance from the same locked client, never from a
+    // separate connection (that would not see this transaction's rows).
+    const billTotal =
+      parseFloat(payment.consultation_amount || '0') + parseFloat(payment.total_additional_charges || '0');
+
+    const transactionsResult = await client.query(
+      `SELECT id, kind, method, amount, status, reference_no, created_at
+         FROM payment_transactions
+        WHERE payment_id = $1
+        ORDER BY created_at ASC`,
+      [paymentId]
+    );
+    const acceptedTransactions = transactionsResult.rows.filter((tx: any) => tx.status === 'ACCEPTED');
+    const acceptedPayments = acceptedTransactions
+      .filter((tx: any) => tx.kind === 'PAYMENT')
+      .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount || 0), 0);
+    const acceptedRefunds = acceptedTransactions
+      .filter((tx: any) => tx.kind === 'REFUND')
+      .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount || 0), 0);
+    const netPaid = acceptedPayments - acceptedRefunds;
+    const balance = Math.max(0, billTotal - netPaid);
+
+    if (balance > 0.005) {
+      await client.query('ROLLBACK');
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'BILL_BALANCE_NOT_ZERO: Cannot issue invoice - balance is not zero'));
+    }
+
+    const chargesResult = await client.query(
+      `SELECT charge_type, description, amount, quantity, unit_price
+         FROM payment_charges
+        WHERE payment_id = $1 AND deleted_at IS NULL
+        ORDER BY created_at ASC`,
+      [paymentId]
+    );
+
+    const invoiceSettingsResult = await client.query(
+      'SELECT clinic_name, address, contact_number, footer_line FROM invoice_settings WHERE doctor_id = $1',
+      [doctorId]
+    );
+    const invoiceSettings = invoiceSettingsResult.rows[0] || {
+      clinic_name: payment.practice_name || 'Find My Doctor',
+      address: '',
+      contact_number: '',
+      footer_line: 'Thank you for your visit!',
+    };
+
+    // Find the voided invoice this one replaces (if any).
+    const priorInvoiceResult = await client.query(
+      `SELECT * FROM invoices
+        WHERE payment_id = $1 AND status = 'VOID' AND replaced_by_invoice_id IS NULL
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [paymentId]
+    );
+    const priorInvoice = priorInvoiceResult.rows[0] || null;
+
+    const nextNum = await client.query(
+      `SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 5) AS INTEGER)), 0) + 1 as next_num
+       FROM invoices WHERE doctor_id = $1 AND invoice_number LIKE 'INV-%'`,
+      [doctorId]
+    );
+    const invoiceNumber = `INV-${String(nextNum.rows[0].next_num).padStart(4, '0')}`;
+
+    const invoiceData = {
+      invoice_number: invoiceNumber,
+      invoice_date: new Date(),
+      replaces_invoice_number: priorInvoice?.invoice_number || null,
+      clinic: {
+        name: invoiceSettings.clinic_name,
+        address: invoiceSettings.address,
+        contact_number: invoiceSettings.contact_number,
+        footer_line: invoiceSettings.footer_line,
+      },
+      doctor: {
+        first_name: payment.doctor_first_name,
+        last_name: payment.doctor_last_name,
+        specialty: payment.specialty,
+        practice_name: payment.practice_name,
+      },
+      patient: {
+        first_name: payment.patient_first_name,
+        last_name: payment.patient_last_name,
+        email: payment.patient_email,
+        phone: payment.patient_phone,
+        address: payment.patient_address,
+        date_of_birth: payment.patient_date_of_birth,
+        sex: payment.patient_sex,
+      },
+      appointment: {
+        date: payment.appointment_date,
+        reason_for_visit: payment.reason_for_visit,
+      },
+      charges: chargesResult.rows.map((charge: any) => ({
+        charge_type: charge.charge_type,
+        description: charge.description,
+        name: charge.description,
+        amount: parseFloat(charge.amount || '0'),
+        quantity: charge.quantity ? parseFloat(charge.quantity) : null,
+        unit_price: charge.unit_price ? parseFloat(charge.unit_price) : null,
+      })),
+      payment: {
+        consultation_amount: parseFloat(payment.consultation_amount || '0'),
+        charges_total: parseFloat(payment.total_additional_charges || '0'),
+        subtotal: billTotal,
+        total_amount: billTotal,
+        advance_payment: acceptedPayments,
+        remaining_balance_before_payment: 0,
+        payment_method: payment.payment_method || 'CASH',
+        cash_tendered: acceptedPayments,
+        amount_applied: acceptedPayments,
+        change_amount: 0,
+        final_balance: balance,
+        transactions: acceptedTransactions.map((tx: any) => ({
+          id: tx.id,
+          kind: tx.kind,
+          method: tx.method,
+          amount: parseFloat(tx.amount || '0'),
+          status: tx.status,
+          reference_no: tx.reference_no,
+          created_at: tx.created_at,
+        })),
+      },
+    };
+
+    const invoiceResult = await client.query(
+      `INSERT INTO invoices (
+        invoice_number, payment_id, doctor_id, patient_id, invoice_date,
+        subtotal, total_amount, advance_payment, remaining_balance_before_payment,
+        payment_method, cash_tendered, amount_applied, change_amount, final_balance,
+        invoice_data, status, replaces_invoice_id, created_at
+      ) VALUES ($1,$2,$3,$4,CURRENT_TIMESTAMP,$5,$6,$7,$8,$9,$10,$11,0,$12,$13,'ACTIVE',$14,CURRENT_TIMESTAMP)
+      RETURNING *`,
+      [
+        invoiceNumber,
+        paymentId,
+        doctorId,
+        patientId,
+        billTotal,
+        billTotal,
+        acceptedPayments,
+        balance,
+        payment.payment_method || 'CASH',
+        acceptedPayments,
+        acceptedPayments,
+        balance,
+        JSON.stringify(invoiceData),
+        priorInvoice?.id || null,
+      ]
+    );
+
+    if (priorInvoice) {
+      await client.query(
+        `UPDATE invoices SET replaced_by_invoice_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [invoiceResult.rows[0].id, priorInvoice.id]
+      );
+    }
+
+    await logBillingAction(
+      paymentId,
+      req.user!.id,
+      priorInvoice ? 'INVOICE_REISSUED' : 'INVOICE_CREATED',
+      'invoice',
+      invoiceResult.rows[0].id,
+      priorInvoice ? { invoice_id: priorInvoice.id, invoice_number: priorInvoice.invoice_number, status: 'VOID' } : {},
+      {
+        invoice_id: invoiceResult.rows[0].id,
+        invoice_number: invoiceNumber,
+        replaces_invoice_number: priorInvoice?.invoice_number || null,
+      },
+      priorInvoice ? `Replaces ${priorInvoice.invoice_number}` : undefined,
+      client
+    );
+
+    await client.query('COMMIT');
+    res.status(201).json(success({ ...invoiceResult.rows[0], invoice_data: invoiceData }, 'Invoice issued successfully'));
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Issue invoice error:', err);
+    if (err?.code === '23505') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'INVOICE_ALREADY_ACTIVE: An active invoice already exists'));
+    }
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to issue invoice'));
+  } finally {
+    client.release();
+  }
+});
+
+// Secretary billing list endpoints live on a dedicated router mounted at
+// /api/v1/secretary so paths match /secretary/payments/{review,collect,history}.
+export const secretaryPaymentsRouter = Router();
+const secListAuth = [requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY')];
+
+// GET /secretary/payments/review - pending receipts across assigned doctor
+secretaryPaymentsRouter.get('/payments/review', ...secListAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1', [req.user!.id]);
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+    const doctorId = secretaryResult.rows[0].doctor_id;
+    const result = await query(
+      `SELECT pt.*, p.appointment_id, p.consultation_amount, p.total_additional_charges,
+              pat.first_name as patient_first_name, pat.last_name as patient_last_name,
+              d.first_name as doctor_first_name, d.last_name as doctor_last_name
+       FROM payment_transactions pt
+       JOIN payments p ON pt.payment_id = p.id
+       JOIN appointments a ON p.appointment_id = a.id
+       JOIN patients pat ON p.patient_id = pat.id
+       JOIN doctors d ON a.doctor_id = d.id
+       WHERE pt.status = 'PENDING' AND a.doctor_id = $1
+       ORDER BY pt.created_at DESC`, [doctorId]);
+    res.json(success(result.rows));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch pending receipts'));
+  }
+});
+
+// GET /secretary/payments/collect - completed visits with balance > 0
+secretaryPaymentsRouter.get('/payments/collect', ...secListAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1', [req.user!.id]);
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+    const doctorId = secretaryResult.rows[0].doctor_id;
+    const result = await query(
+      `SELECT p.*, pat.first_name as patient_first_name, pat.last_name as patient_last_name,
+              d.first_name as doctor_first_name, d.last_name as doctor_last_name
+       FROM payments p
+       JOIN appointments a ON p.appointment_id = a.id
+       JOIN patients pat ON p.patient_id = pat.id
+       JOIN doctors d ON a.doctor_id = d.id
+       WHERE a.doctor_id = $1
+         AND p.status IN ('UNPAID','PARTIAL','FOR_REVIEW','PENDING_VERIFICATION')
+       ORDER BY p.created_at ASC`, [doctorId]);
+    res.json(success(result.rows));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch payments to collect'));
+  }
+});
+
+// GET /secretary/payments/history?date= - issued invoices + day summary
+secretaryPaymentsRouter.get('/payments/history', ...secListAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1', [req.user!.id]);
+    if (secretaryResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
+    }
+    const doctorId = secretaryResult.rows[0].doctor_id;
+    const { date } = req.query;
+    const dateFilter = date ? 'AND DATE(i.created_at) = $2' : '';
+    const params: any[] = [doctorId];
+    if (date) params.push(date);
+
+    const result = await query(
+      `SELECT i.*, p.appointment_id, pat.first_name as patient_first_name, pat.last_name as patient_last_name
+       FROM invoices i
+       JOIN payments p ON i.payment_id = p.id
+       JOIN patients pat ON i.patient_id = pat.id
+       WHERE i.doctor_id = $1 AND i.status = 'ACTIVE' ${dateFilter}
+       ORDER BY i.created_at DESC`, params);
+
+    const summaryResult = await query(
+      `SELECT
+         SUM(CASE WHEN pt.kind = 'PAYMENT' AND pt.method = 'CASH' AND pt.status = 'ACCEPTED' THEN pt.amount ELSE 0 END) as cash_total,
+         SUM(CASE WHEN pt.kind = 'PAYMENT' AND pt.method = 'GCASH' AND pt.status = 'ACCEPTED' THEN pt.amount ELSE 0 END) as gcash_total,
+         SUM(CASE WHEN pt.kind = 'PAYMENT' AND pt.status = 'ACCEPTED' THEN pt.amount ELSE 0 END)
+           - SUM(CASE WHEN pt.kind = 'REFUND' AND pt.status = 'ACCEPTED' THEN pt.amount ELSE 0 END) as grand_total
+       FROM payment_transactions pt
+       JOIN payments p ON pt.payment_id = p.id
+       JOIN invoices i ON p.id = i.payment_id
+       WHERE i.doctor_id = $1 AND i.status = 'ACTIVE' AND pt.status = 'ACCEPTED'
+         ${date ? 'AND DATE(i.created_at) = $2' : ''}`,
+      params);
+    const s = summaryResult.rows[0] || {};
+
+    res.json(success({
+      invoices: result.rows,
+      summary: {
+        cashTotal: parseFloat(s.cash_total || 0),
+        gcashTotal: parseFloat(s.gcash_total || 0),
+        grandTotal: parseFloat(s.grand_total || 0),
+      }
+    }));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch payment history'));
   }
 });
 

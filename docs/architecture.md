@@ -1523,11 +1523,18 @@ payment_charges
 ---------------
 id
 payment_id
+charge_type        (ADDITIONAL | MEDICINE | SERVICE | OTHER)
 description
 amount
+quantity           (MEDICINE / SERVICE / OTHER)
+unit_price         (MEDICINE / SERVICE / OTHER)
+prescription_item_id (optional, medicine)
 created_by
 created_at
+deleted_at         (soft delete)
 ```
+
+For `MEDICINE`, `SERVICE`, and `OTHER` charges, `amount = quantity × unit_price` and is calculated by the backend. `ADDITIONAL` is the legacy flat-amount type.
 
 Calculation:
 

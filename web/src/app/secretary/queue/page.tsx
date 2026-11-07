@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { secretaryApi, QueueEntry, SecretaryProfile } from '@/lib/api/secretaryApi';
 import Toast from '@/components/ui/Toast';
-import PaymentModal from '@/components/PaymentModal';
+import BillingPanel from '@/components/BillingPanel';
 
 
 
-type TabType = 'all' | 'waiting' | 'in-consultation' | 'completed' | 'skipped';
+type TabType = 'all' | 'waiting' | 'in-consultation' | 'completed' | 'skipped' | 'to-collect';
 
 const QUEUE_STATUS_COLORS: Record<string, string> = {
   WAITING: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -29,6 +29,14 @@ const QUEUE_STATUS_LABELS: Record<string, string> = {
   SKIPPED: 'Skipped',
   CANCELLED: 'Cancelled',
   NO_SHOW: 'No Show',
+};
+
+// Money values may arrive as strings from the API (PostgreSQL DECIMAL), so
+// coerce defensively before formatting with toFixed().
+const toAmount = (value: number | string | null | undefined): number => {
+  if (value === null || value === undefined || value === '') return 0;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 };
 
 export default function SecretaryQueue() {
@@ -53,13 +61,11 @@ export default function SecretaryQueue() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentModalData, setPaymentModalData] = useState<{
-    appointmentId: string;
-    consultationFee: number;
-    patientName: string;
-    initialPaymentMethod?: 'CASH' | 'GCASH';
-    isWalkIn: boolean;
+  const [showBillingPanel, setShowBillingPanel] = useState(false);
+  const [billingPanelData, setBillingPanelData] = useState<{
+    paymentId: string;
+    appointmentId?: string;
+    queueNumber?: number;
   } | null>(null);
 
   useEffect(() => {
@@ -141,45 +147,64 @@ export default function SecretaryQueue() {
       // Find the queue entry to check if it's a walk-in or booked patient
       const queueEntry = queueEntries.find(entry => entry.id === queueId);
 
-      if (queueEntry && queueEntry.appointment_id) {
-        // Show payment modal for both walk-in and booked patients
-        const consultationFee = queueEntry.consultation_fee !== null && queueEntry.consultation_fee !== undefined
-          ? queueEntry.consultation_fee
-          : 0;
+      console.log('=== Complete Checkup Debug ===');
+      console.log('Queue Entry:', queueEntry);
+      console.log('Has appointment_id:', !!queueEntry?.appointment_id);
+      console.log('Appointment ID:', queueEntry?.appointment_id);
 
-        if (consultationFee > 0) {
-          const isWalkIn = queueEntry.registration_source === 'WALK_IN';
-          let initialPaymentMethod: 'CASH' | 'GCASH' | undefined;
-
-          // For booked patients, fetch their initial payment method and balance
-          if (!isWalkIn) {
-            try {
-              const paymentResponse = await secretaryApi.getPayment(queueEntry.appointment_id);
-              if (paymentResponse.success && paymentResponse.data) {
-                initialPaymentMethod = paymentResponse.data.payment_method as 'CASH' | 'GCASH';
+      if (queueEntry) {
+        // Both walk-in and booked patients should have appointment_id
+        if (queueEntry.appointment_id) {
+          // Try to fetch payment ID for this appointment
+          try {
+            const paymentResponse = await secretaryApi.getPayment(queueEntry.appointment_id);
+            console.log('Payment Response:', paymentResponse);
+            if (paymentResponse.success && paymentResponse.data) {
+              // Payment exists, open Billing Panel
+              setBillingPanelData({
+                paymentId: paymentResponse.data.id,
+                appointmentId: queueEntry.appointment_id,
+                queueNumber: queueEntry.queue_number,
+              });
+              setShowBillingPanel(true);
+            } else {
+              // Payment doesn't exist, create one first
+              const consultationFee = toAmount(queueEntry.consultation_fee) || 500; // Default fee if not set
+              console.log('Creating payment with consultation fee:', consultationFee);
+              const createPaymentResponse = await secretaryApi.recordPayment({
+                appointmentId: queueEntry.appointment_id,
+                paymentMethod: 'CASH', // Default to CASH, can be changed in Billing Panel
+                consultationFee,
+                additionalCharges: [],
+              });
+              console.log('Create Payment Response:', createPaymentResponse);
+              if (createPaymentResponse.success && createPaymentResponse.data?.paymentId) {
+                // Payment created, open Billing Panel
+                setBillingPanelData({
+                  paymentId: createPaymentResponse.data.paymentId,
+                  appointmentId: queueEntry.appointment_id,
+                  queueNumber: queueEntry.queue_number,
+                });
+                setShowBillingPanel(true);
+              } else {
+                setError(createPaymentResponse.error || 'Failed to create payment record');
+                fetchQueue();
               }
-            } catch (e) {
-              // If payment fetch fails, default to no initial payment method
-              console.error('Failed to fetch payment for booked patient:', e);
             }
+          } catch (e) {
+            console.error('Failed to handle payment for queue entry:', e);
+            setError('Failed to load billing information');
+            fetchQueue();
           }
-
-          setPaymentModalData({
-            appointmentId: queueEntry.appointment_id,
-            consultationFee: consultationFee,
-            patientName: `${queueEntry.patient_first_name} ${queueEntry.patient_last_name}`,
-            initialPaymentMethod,
-            isWalkIn,
-          });
-          setShowPaymentModal(true);
         } else {
-          // Consultation fee not configured - show error
-          setError('Cannot record payment: Doctor consultation fee is not configured. Please contact administrator.');
+          // appointment_id is null - this shouldn't happen for walk-ins, but handle gracefully
+          console.error('Queue entry missing appointment_id:', queueEntry);
+          setError('Appointment information not found for this queue entry');
           fetchQueue();
         }
       } else {
-        // If data is missing, show success message
-        setSuccess('Checkup completed successfully');
+        // Queue entry not found
+        setError('Queue entry not found');
         fetchQueue();
       }
     } else {
@@ -188,8 +213,14 @@ export default function SecretaryQueue() {
     setActionLoading(false);
   };
 
-  const handlePaymentSuccess = () => {
-    setSuccess('Payment recorded successfully');
+  const handleBillingPanelClose = () => {
+    setShowBillingPanel(false);
+    setBillingPanelData(null);
+    // Refresh queue to show updated payment status
+    fetchQueue();
+  };
+
+  const handleBillingPaymentComplete = () => {
     // Refresh queue to show updated payment status
     fetchQueue();
   };
@@ -347,6 +378,7 @@ export default function SecretaryQueue() {
   const inConsultation = queueEntries.filter(e => e.status === 'IN_CHECKUP').length;
   const completed = queueEntries.filter(e => e.status === 'COMPLETED').length;
   const skippedNoShow = queueEntries.filter(e => e.status === 'SKIPPED' || e.status === 'NO_SHOW' || e.status === 'NOT_PRESENT').length;
+  const toCollect = queueEntries.filter(e => e.status === 'COMPLETED' && e.payment_status && e.payment_status !== 'PAID').length;
 
   // Filter queue entries based on tab and search
   const filteredEntries = queueEntries.filter(entry => {
@@ -365,6 +397,9 @@ export default function SecretaryQueue() {
       case 'skipped':
         statusMatch = entry.status === 'SKIPPED' || entry.status === 'NO_SHOW' || entry.status === 'NOT_PRESENT';
         break;
+      case 'to-collect':
+        statusMatch = entry.status === 'COMPLETED' && !!entry.payment_status && entry.payment_status !== 'PAID';
+        break;
       case 'all':
       default:
         statusMatch = true;
@@ -382,6 +417,15 @@ export default function SecretaryQueue() {
 
     return statusMatch && sourceMatch && searchMatch;
   });
+
+  const getTimeAgo = (timestamp: string | null | undefined) => {
+    if (!timestamp) return '';
+    const now = new Date();
+    const past = new Date(timestamp);
+    const diffMs = now.getTime() - past.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    return diffMins > 0 ? `(${diffMins}m)` : '';
+  };
 
   if (loading && !secretary) {
     return (
@@ -545,6 +589,16 @@ export default function SecretaryQueue() {
           >
             Skipped / No-Show ({skippedNoShow})
           </button>
+          <button
+            onClick={() => setActiveTab('to-collect')}
+            className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors ${
+              activeTab === 'to-collect'
+                ? 'bg-[#1b5eb8] text-white'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            To Collect ({toCollect})
+          </button>
         </nav>
 
         {/* Search and Filters */}
@@ -610,30 +664,21 @@ export default function SecretaryQueue() {
                   <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Queue #</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Patient</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Source</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Queue Status</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Status</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {filteredEntries.map((entry) => {
-                  const getTimeAgo = (timestamp: string | null | undefined) => {
-                    if (!timestamp) return '';
-                    const now = new Date();
-                    const past = new Date(timestamp);
-                    const diffMs = now.getTime() - past.getTime();
-                    const diffMins = Math.floor(diffMs / 60000);
-                    return diffMins > 0 ? `(${diffMins}m)` : '';
-                  };
-
                   return (
                     <tr key={entry.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 text-center">
                         <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-[#1b5eb8] text-white font-bold text-sm">
                           Q-{String(entry.queue_number).padStart(2, '0')}
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="flex items-start gap-3">
+                        <div className="flex items-start gap-3 justify-center">
                           <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm">
                             {entry.patient_first_name[0]}{entry.patient_last_name[0]}
                           </div>
@@ -647,7 +692,7 @@ export default function SecretaryQueue() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 text-center">
                         <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
                           entry.registration_source === 'ONLINE'
                             ? 'bg-blue-50 text-blue-700'
@@ -657,18 +702,42 @@ export default function SecretaryQueue() {
                         </span>
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
-                          entry.status === 'IN_CHECKUP' ? 'bg-emerald-50 text-emerald-700' :
-                          entry.status === 'CALLED' ? 'bg-amber-50 text-amber-700' :
-                          entry.status === 'WAITING' ? 'bg-blue-50 text-blue-700' :
-                          entry.status === 'COMPLETED' ? 'bg-slate-100 text-slate-600' :
-                          'bg-slate-100 text-slate-600'
-                        }`}>
-                          {QUEUE_STATUS_LABELS[entry.status] || entry.status} {getTimeAgo(entry.called_at)}
-                        </span>
+                        <div className="flex flex-col gap-2 items-center">
+                          {/* Queue Status */}
+                          <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
+                            entry.status === 'IN_CHECKUP' ? 'bg-emerald-50 text-emerald-700' :
+                            entry.status === 'CALLED' ? 'bg-amber-50 text-amber-700' :
+                            entry.status === 'WAITING' ? 'bg-blue-50 text-blue-700' :
+                            entry.status === 'COMPLETED' ? 'bg-slate-100 text-slate-600' :
+                            'bg-slate-100 text-slate-600'
+                          }`}>
+                            {QUEUE_STATUS_LABELS[entry.status] || entry.status}
+                            {entry.status !== 'COMPLETED' && getTimeAgo(entry.called_at)}
+                          </span>
+                          {/* Payment Status (only for completed and not PAID) */}
+                          {entry.status === 'COMPLETED' && entry.payment_status && entry.payment_status !== 'PAID' && (() => {
+                            const ps = entry.payment_status === 'PENDING_VERIFICATION' ? 'FOR_REVIEW' : entry.payment_status;
+                            const chipClass =
+                              ps === 'PARTIAL' ? 'bg-blue-100 text-blue-800' :
+                              ps === 'FOR_REVIEW' ? 'bg-yellow-100 text-yellow-800' :
+                              ps === 'OVERPAID' ? 'bg-purple-100 text-purple-800' :
+                              ps === 'UNPAID' ? 'bg-gray-100 text-gray-800' :
+                              'bg-gray-100 text-gray-800';
+                            const chipText =
+                              ps === 'UNPAID' ? `Unpaid ₱${toAmount(entry.payment_balance ?? entry.consultation_fee).toFixed(2)}` :
+                              ps === 'PARTIAL' ? `Partial ₱${toAmount(entry.payment_balance).toFixed(2)} left` :
+                              ps === 'FOR_REVIEW' ? 'For review' :
+                              ps === 'OVERPAID' ? 'Overpaid' : ps;
+                            return (
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${chipClass}`}>
+                                {chipText}
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap justify-center">
                           {entry.status === 'IN_CHECKUP' && (
                             <button
                               onClick={() => handleCompleteCheckup(entry.id)}
@@ -735,6 +804,59 @@ export default function SecretaryQueue() {
                           >
                             View Patient
                           </button>
+                          {entry.status === 'COMPLETED' && entry.appointment_id && entry.payment_status && entry.payment_status !== 'PAID' && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const paymentResponse = await secretaryApi.getPayment(entry.appointment_id || '');
+                                  if (paymentResponse.success && paymentResponse.data) {
+                                    setBillingPanelData({
+                                      paymentId: paymentResponse.data.id,
+                                      appointmentId: entry.appointment_id || undefined,
+                                      queueNumber: entry.queue_number,
+                                    });
+                                    setShowBillingPanel(true);
+                                  }
+                                } catch (e) {
+                                  console.error('Failed to fetch payment:', e);
+                                  setError('Failed to load billing information');
+                                }
+                              }}
+                              disabled={actionLoading}
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                            >
+                              Bill
+                            </button>
+                          )}
+                          {entry.status === 'COMPLETED' && entry.payment_status === 'PAID' && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const paymentResponse = await secretaryApi.getPayment(entry.appointment_id || '');
+                                  if (paymentResponse.success && paymentResponse.data) {
+                                    setBillingPanelData({
+                                      paymentId: paymentResponse.data.id,
+                                      appointmentId: entry.appointment_id || undefined,
+                                      queueNumber: entry.queue_number,
+                                    });
+                                    setShowBillingPanel(true);
+                                  }
+                                } catch (e) {
+                                  console.error('Failed to fetch payment:', e);
+                                  setError('Failed to load billing information');
+                                }
+                              }}
+                              disabled={actionLoading}
+                              className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                            >
+                              {entry.payment_invoice_number ? 'View Invoice' : 'Issue Invoice'}
+                            </button>
+                          )}
+                          {entry.status === 'COMPLETED' && entry.payment_status === 'PAID' && !entry.payment_invoice_number && (
+                            <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                              No active invoice
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -781,17 +903,15 @@ export default function SecretaryQueue() {
         />
       )}
 
-      {/* Payment Modal */}
-      {showPaymentModal && paymentModalData && (
-        <PaymentModal
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          appointmentId={paymentModalData.appointmentId}
-          consultationFee={paymentModalData.consultationFee}
-          patientName={paymentModalData.patientName}
-          initialPaymentMethod={paymentModalData.initialPaymentMethod}
-          isWalkIn={paymentModalData.isWalkIn}
-          onSuccess={handlePaymentSuccess}
+      {/* Billing Panel */}
+      {showBillingPanel && billingPanelData && (
+        <BillingPanel
+          isOpen={showBillingPanel}
+          onClose={handleBillingPanelClose}
+          paymentId={billingPanelData.paymentId}
+          appointmentId={billingPanelData.appointmentId}
+          queueNumber={billingPanelData.queueNumber}
+          onPaymentComplete={handleBillingPaymentComplete}
         />
       )}
     </div>

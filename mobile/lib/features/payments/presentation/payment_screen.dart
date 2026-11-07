@@ -40,6 +40,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Map<String, dynamic>? _paymentData;
   String? _errorMessage;
   bool _hasUploadedReceipt = false;
+  final TextEditingController _amountController = TextEditingController();
 
   @override
   void initState() {
@@ -168,9 +169,29 @@ class _PaymentScreenState extends State<PaymentScreen> {
     });
 
     try {
+      // Get the declared amount if provided
+      final declaredAmountText = _amountController.text.trim();
+      double? declaredAmount;
+      if (declaredAmountText.isNotEmpty) {
+        declaredAmount = double.tryParse(declaredAmountText);
+        if (declaredAmount == null || declaredAmount <= 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please enter a valid amount'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+          setState(() {
+            _isUploading = false;
+          });
+          return;
+        }
+      }
+
       final response = await _apiService.uploadPaymentReceipt(
         appointmentId: widget.appointmentId,
         receiptFile: _receiptImage!,
+        patientDeclaredAmount: declaredAmount,
       );
 
       if (response['success'] == true) {
@@ -476,6 +497,30 @@ class _PaymentScreenState extends State<PaymentScreen> {
             text: 'Select Receipt Image',
             onPressed: _pickReceiptImage,
             icon: const Icon(Icons.upload, size: 20),
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterLg),
+          // Amount you paid field
+          Text(
+            'Amount you paid (optional)',
+            style: AppTextStyles.labelSm.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          TextField(
+            controller: _amountController,
+            keyboardType: TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              hintText: 'Enter amount paid',
+              prefixText: '₱ ',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+              ),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: spacing.AppSpacing.gutterMd,
+                vertical: spacing.AppSpacing.gutterMd,
+              ),
+            ),
           ),
           const SizedBox(height: spacing.AppSpacing.gutterLg),
           if (_receiptImage != null) ...[
