@@ -260,6 +260,23 @@ Current System State (October 2026):
   - If a QR code is configured, both account name and number must be provided (incomplete info rejected)
   - Secretaries can only manage account details for their assigned doctor
 - Public endpoint `GET /api/v1/payments/gcash-qr?doctorId=` (unauthenticated) returns only `qrUrl`, `accountName`, and `accountNumber` for patient display, with no private doctor or patient data exposed
+
+## Patient Medical Records and Prescription Access
+- Patients can view their completed consultations (visits) and prescriptions through the mobile app at `/medical-records`
+- The medical records page has two tabs: History (completed consultations) and Prescriptions
+- History tab displays completed visits with visit date, doctor name, diagnosis, notes, and linked appointment information
+- Prescriptions tab displays prescriptions with prescription date, doctor name, medication count, and status
+- Both tabs support date filters (Last 7 days, Last 30 days, All time), pull-to-refresh, loading states, empty states, and retryable error states
+- Patient-scoped backend endpoints: `GET /api/v1/visits/me` (list all patient visits), `GET /api/v1/visits/me/:id` (single visit), `GET /api/v1/prescriptions/me` (list all patient prescriptions)
+- All patient-scoped endpoints enforce ownership verification and return only the authenticated patient's data; cross-patient access returns HTTP 403
+- Prescription detail page at `/prescription-detail` shows full prescription information including each medication's name, dosage, frequency, duration, and instructions
+- PDF access uses the existing patient-authorized endpoint `GET /api/v1/prescriptions/:id/pdf-url` which generates a signed URL for download/viewing
+- Expired PDF links show a retry button to generate a fresh signed URL
+- Entry points to medical records are available from Home quick actions and the Profile tab on `/home`
+- The existing `PRESCRIPTION_AVAILABLE` notification type deep-links to `/prescription-detail` with the prescription ID when tapped
+- Medical records and prescription pages are patient-only; secretaries attempting to access these routes are redirected to `/secretary-home`
+- No database schema changes required; existing `visits`, `prescriptions`, and `prescription_items` tables are sufficient
+- Multi-device isolation is enforced by backend authentication; each patient sees only their own records regardless of device
 - Secretary settings page at `/secretary/settings` includes an editable GCash account details form with validation, unsaved changes tracking, and success/error feedback
 - Secretary GCash QR management page at `/secretary/settings/gcash-qr` displays the saved account name and number as a read-only summary beside the QR code upload/delete controls
 - Mobile app displays GCash account name and number beside the QR code in the booking payment section (`/doctor-schedule`) and payment screen (`/payment`)

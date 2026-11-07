@@ -4,6 +4,49 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.37 (November 7, 2026)
+
+**Purpose:** Enable patients to view their medical history and prescriptions through the mobile app, with access to prescription PDFs.
+
+**Significant Features:**
+- Backend patient-scoped endpoints:
+  - Added `GET /api/v1/visits/me` (PATIENT-only) to return authenticated patient's completed consultations (visit date, doctor, diagnosis, notes, linked appointment).
+  - Added `GET /api/v1/visits/me/:id` (PATIENT-only) to return a specific visit for the authenticated patient.
+  - Added `GET /api/v1/prescriptions/me` (PATIENT-only) to return authenticated patient's prescriptions (prescription date, doctor, medication count, status).
+  - All patient-scoped endpoints enforce ownership verification and return HTTP 403 for cross-patient access.
+- Mobile medical records page (`/medical-records`):
+  - Two tabs: History (completed consultations) and Prescriptions.
+  - History tab displays medical history cards with visit date, doctor name, diagnosis, and notes.
+  - Prescriptions tab displays prescription cards with prescription date, doctor name, medication count, and status.
+  - Date filters: All time, Last 7 days, Last 30 days.
+  - Pull-to-refresh, loading states, empty states, and retryable error states.
+- Mobile prescription detail page (`/prescription-detail`):
+  - Displays full prescription information including each medication's name, dosage, frequency, duration, and instructions.
+  - PDF viewing and downloading functionality using signed URL from `GET /api/v1/prescriptions/:id/pdf-url`.
+  - Retry mechanism for expired PDF links.
+- Mobile navigation:
+  - Added `/medical-records` and `/prescription-detail` routes with patient-only guards (secretaries redirected to secretary home).
+  - Entry points from Home quick actions ("Medical Records") and Profile tab ("Medical Records").
+- Notification deep-linking:
+  - Updated notifications page to handle `PRESCRIPTION_AVAILABLE` notification type.
+  - Tapping PRESCRIPTION_AVAILABLE notification navigates to `/prescription-detail` with the prescription ID.
+
+**Improvements:**
+- Patients can now view their complete medical history and prescriptions in one centralized location.
+- Date filtering allows patients to quickly find recent records.
+- PDF access with retry mechanism ensures patients can always download their prescriptions.
+- Security enforcement ensures patients can only access their own records.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature only; non-breaking API additions).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.37, added version entry to `VERSION_HISTORY.md`, and updated `SYSTEM_STATE.md` and `architecture.md` with patient medical records and prescription access documentation.
+
+---
+
 ### 01.36 (November 7, 2026)
 
 **Purpose:** Enable secretaries to configure GCash account details for their assigned doctor, which patients will see alongside the GCash QR code when making payments.
