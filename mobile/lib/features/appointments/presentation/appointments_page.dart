@@ -204,6 +204,95 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     ]);
   }
 
+  Widget _buildTodayQueueSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.confirmation_number_outlined,
+              color: AppColors.primary,
+              size: spacing.AppSpacing.iconMd,
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterSm),
+            Text(
+              'Today\'s Queue',
+              style: AppTextStyles.headlineSm,
+            ),
+          ],
+        ),
+        const SizedBox(height: spacing.AppSpacing.gutterMd),
+        ..._todayQueues.map((entry) => _buildTodayQueueCard(entry)),
+      ],
+    );
+  }
+
+  Widget _buildTodayQueueCard(Map<String, dynamic> entry) {
+    final queueNumber = parseInt(entry['queueNumber']);
+    final nowServing = parseInt(entry['nowServing']);
+    final patientsAhead = parseInt(entry['patientsAhead']) ?? 0;
+    final estimatedWait = parseInt(entry['estimatedWaitMinutes']) ?? 0;
+    final doctorName = parseString(entry['doctorName']) ?? 'Your doctor';
+    final appointmentId = parseString(entry['appointmentId']);
+    final queueStatus = parseString(entry['queueStatus']);
+    final isCalled = queueStatus == 'CALLED' || queueStatus == 'IN_CHECKUP';
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
+      child: AppCard(
+        padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+        onTap: appointmentId != null
+            ? () => _navigateToDetail(appointmentId)
+            : null,
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+              ),
+              child: Center(
+                child: Text(
+                  queueNumber != null ? '#$queueNumber' : '#--',
+                  style: AppTextStyles.queueNum.copyWith(
+                    fontSize: 20,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(doctorName, style: AppTextStyles.bodyMdMedium),
+                  const SizedBox(height: 2),
+                  Text(
+                    isCalled
+                        ? 'It\'s your turn'
+                        : 'Now serving ${nowServing != null ? '#$nowServing' : '—'} • '
+                            '$patientsAhead ${patientsAhead == 1 ? 'patient' : 'patients'} ahead'
+                            '${estimatedWait > 0 ? ' • ~$estimatedWait min' : ''}',
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: isCalled ? AppColors.primary : AppColors.secondary,
+                      fontWeight:
+                          isCalled ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppColors.outline),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredAppointments = _appointments.where((a) {
@@ -243,10 +332,22 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
             ),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: _fetchAppointments,
+                onRefresh: _refreshAll,
                 child: CustomScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   slivers: [
+                    if (_todayQueues.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            spacing.AppSpacing.screenPadding,
+                            0,
+                            spacing.AppSpacing.screenPadding,
+                            spacing.AppSpacing.gutterSm,
+                          ),
+                          child: _buildTodayQueueSection(),
+                        ),
+                      ),
                     if (showWaitlistRow)
                       SliverToBoxAdapter(
                         child: Padding(
