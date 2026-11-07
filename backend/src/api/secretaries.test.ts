@@ -302,7 +302,16 @@ describe('Secretary Schedule API Security', () => {
 
   describe('DELETE /api/v1/secretaries/managed-doctors/unavailability/:id', () => {
     it('should delete exception for secretary\'s assigned doctor', async () => {
-      query.mockImplementation((sql: string, params: any[]) => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
         if (sql.includes('SELECT doctor_id FROM secretaries')) {
           return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
         }
@@ -323,6 +332,9 @@ describe('Secretary Schedule API Security', () => {
             }]
           });
         }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
         return Promise.resolve({ rows: [] });
       });
 
@@ -333,12 +345,24 @@ describe('Secretary Schedule API Security', () => {
     });
 
     it('should return 404 for exception not belonging to assigned doctor', async () => {
-      query.mockImplementation((sql: string, params: any[]) => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
         if (sql.includes('SELECT doctor_id FROM secretaries')) {
           return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
         }
         if (sql.includes('SELECT * FROM doctor_unavailability WHERE id = $1 AND doctor_id = $2')) {
           return Promise.resolve({ rows: [] });
+        }
+        if (sql.includes('ROLLBACK')) {
+          return Promise.resolve();
         }
         return Promise.resolve({ rows: [] });
       });
@@ -529,7 +553,16 @@ describe('Secretary Schedule API Security', () => {
 
   describe('DELETE /api/v1/secretaries/managed-doctors/break-periods/:id', () => {
     it('should delete break period for secretary\'s assigned doctor', async () => {
-      query.mockImplementation((sql: string, params: any[]) => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
         if (sql.includes('SELECT doctor_id FROM secretaries')) {
           return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
         }
@@ -550,6 +583,9 @@ describe('Secretary Schedule API Security', () => {
             }]
           });
         }
+        if (sql.includes('COMMIT')) {
+          return Promise.resolve();
+        }
         return Promise.resolve({ rows: [] });
       });
 
@@ -560,12 +596,24 @@ describe('Secretary Schedule API Security', () => {
     });
 
     it('should return 404 for break period not belonging to assigned doctor', async () => {
-      query.mockImplementation((sql: string, params: any[]) => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      mockClient.query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('BEGIN')) {
+          return Promise.resolve();
+        }
         if (sql.includes('SELECT doctor_id FROM secretaries')) {
           return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
         }
         if (sql.includes('SELECT * FROM doctor_break_periods WHERE id = $1 AND doctor_id = $2')) {
           return Promise.resolve({ rows: [] });
+        }
+        if (sql.includes('ROLLBACK')) {
+          return Promise.resolve();
         }
         return Promise.resolve({ rows: [] });
       });
