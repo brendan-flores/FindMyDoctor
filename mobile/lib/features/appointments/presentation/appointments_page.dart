@@ -32,7 +32,6 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
 
   // Waitlist state
   List<dynamic> _waitlists = [];
-  bool _isLoadingWaitlists = true;
 
   @override
   void initState() {
@@ -99,29 +98,28 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
   }
 
   Future<void> _fetchWaitlists() async {
-    setState(() {
-      _isLoadingWaitlists = true;
-    });
-
     try {
       final response = await _apiService.getMyWaitlists();
       if (response['success'] == true && response['data'] != null) {
         final waitlists = response['data'] as List;
-        setState(() {
-          _waitlists = waitlists;
-          _isLoadingWaitlists = false;
-        });
+        if (mounted) {
+          setState(() {
+            _waitlists = waitlists;
+          });
+        }
       } else {
-        setState(() {
-          _waitlists = [];
-          _isLoadingWaitlists = false;
-        });
+        if (mounted) {
+          setState(() {
+            _waitlists = [];
+          });
+        }
       }
     } catch (e) {
-      setState(() {
-        _waitlists = [];
-        _isLoadingWaitlists = false;
-      });
+      if (mounted) {
+        setState(() {
+          _waitlists = [];
+        });
+      }
     }
   }
 
@@ -144,158 +142,173 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredAppointments = _appointments.where((a) {
+      switch (_selectedFilter) {
+        case 'upcoming':
+          return a['status'] == 'SCHEDULED';
+        case 'completed':
+          return a['status'] == 'COMPLETED';
+        case 'cancelled':
+          return a['status'] == 'CANCELLED';
+        default:
+          return false;
+      }
+    }).toList();
+
+    final showWaitlistRow = _selectedFilter == 'upcoming' &&
+        _waitlists.isNotEmpty &&
+        widget.onNavigateToWaitlist != null;
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          const AppHeader(showNotifications: true, showProfile: true),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _fetchAppointments,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Padding(
-                  padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: spacing.AppSpacing.gutterLg),
-                      _buildHeader(),
-                      const SizedBox(height: spacing.AppSpacing.gutterMd),
-                      _buildSearchBar(),
-                      const SizedBox(height: spacing.AppSpacing.gutterLg),
-                      _buildFilterTabs(),
-                      const SizedBox(height: spacing.AppSpacing.gutterLg),
-                      _buildWaitlistSection(),
-                      const SizedBox(height: spacing.AppSpacing.gutterLg),
-                      _buildAppointmentsList(),
-                      const SizedBox(height: spacing.AppSpacing.gutter3xl),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    final upcomingCount = _allAppointments.where((a) => a['status'] == 'SCHEDULED').length;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: Semantics(
+        container: true,
+        label: 'My Appointments',
+        child: Column(
           children: [
-            Row(
-              children: [
-                Text(
-                  'My Appointments',
-                  style: AppTextStyles.headlineMd,
-                ),
-                const SizedBox(width: spacing.AppSpacing.gutterSm),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: spacing.AppSpacing.gutterSm,
-                    vertical: spacing.AppSpacing.gutterXs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryContainer,
-                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
-                  ),
-                  child: Text(
-                    '$upcomingCount Active',
-                    style: AppTextStyles.labelSm.copyWith(
-                      color: AppColors.onPrimary,
-                    ),
-                  ),
-                ),
-              ],
+            const AppHeader(showNotifications: true, showProfile: true),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                spacing.AppSpacing.screenPadding,
+                spacing.AppSpacing.gutterSm,
+                spacing.AppSpacing.screenPadding,
+                spacing.AppSpacing.gutterSm,
+              ),
+              child: _buildFilterTabs(),
             ),
-            if (widget.onNavigateToWaitlist != null)
-              TextButton.icon(
-                onPressed: widget.onNavigateToWaitlist,
-                icon: Icon(
-                  Icons.hourglass_empty,
-                  size: spacing.AppSpacing.iconSm,
-                  color: AppColors.primary,
-                ),
-                label: Text(
-                  'My Waitlists',
-                  style: AppTextStyles.labelSm.copyWith(
-                    color: AppColors.primary,
-                  ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _fetchAppointments,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    if (showWaitlistRow)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            spacing.AppSpacing.screenPadding,
+                            0,
+                            spacing.AppSpacing.screenPadding,
+                            spacing.AppSpacing.gutterSm,
+                          ),
+                          child: _buildWaitlistRow(),
+                        ),
+                      ),
+                    if (_isLoading)
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (_errorMessage != null)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.error_outline,
+                                  size: 64,
+                                  color: AppColors.error,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _errorMessage!,
+                                  style: AppTextStyles.bodyMd.copyWith(
+                                    color: AppColors.error,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: _fetchAppointments,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    else if (filteredAppointments.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32.0),
+                            child: _appointments.isEmpty
+                                ? Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.event_busy,
+                                        size: 64,
+                                        color: AppColors.outline,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'No appointments yet',
+                                        style: AppTextStyles.headlineSm.copyWith(
+                                          color: AppColors.onSurface,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Your appointments will appear here',
+                                        style: AppTextStyles.bodyMd.copyWith(
+                                          color: AppColors.onSurfaceVariant,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.event_busy,
+                                        size: 64,
+                                        color: AppColors.outline,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'No $_selectedFilter appointments',
+                                        style: AppTextStyles.headlineSm.copyWith(
+                                          color: AppColors.onSurface,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      )
+                    else ...[
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: spacing.AppSpacing.screenPadding,
+                            ).copyWith(
+                              bottom: spacing.AppSpacing.gutterLg,
+                            ),
+                            child: _buildAppointmentCard(filteredAppointments[index]),
+                          ),
+                          childCount: filteredAppointments.length,
+                        ),
+                      ),
+                      // Keep the last card clear of the floating "Ask MediGuide" button
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: 112),
+                      ),
+                    ],
+                  ],
                 ),
               ),
+            ),
           ],
         ),
-        const SizedBox(height: spacing.AppSpacing.gutterXs),
-        Text(
-          'Manage your clinic visits, queue passes & medical records',
-          style: AppTextStyles.bodyMd.copyWith(
-            color: AppColors.secondary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: spacing.AppSpacing.gutterSm,
-        vertical: spacing.AppSpacing.gutterXs,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLowest,
-        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.slate800.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.search,
-            color: AppColors.outline,
-            size: spacing.AppSpacing.iconLg,
-          ),
-          const SizedBox(width: spacing.AppSpacing.gutterSm),
-          Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search doctor, hospital, or specialty...',
-                hintStyle: AppTextStyles.bodyMd.copyWith(
-                  color: AppColors.outline,
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  vertical: spacing.AppSpacing.gutterXs,
-                ),
-              ),
-            ),
-          ),
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLow,
-              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-            ),
-            child: Icon(
-              Icons.tune,
-              color: AppColors.primary,
-              size: spacing.AppSpacing.iconSm,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -402,273 +415,50 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     );
   }
 
-  Widget _buildWaitlistSection() {
-    if (_isLoadingWaitlists) {
-      return const SizedBox.shrink();
-    }
+  Widget _buildWaitlistRow() {
+    final count = _waitlists.length;
 
-    if (_waitlists.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              Icons.hourglass_empty,
-              color: AppColors.primary,
-              size: spacing.AppSpacing.iconMd,
+    return Semantics(
+      label: 'My waitlists, $count ${count == 1 ? 'entry' : 'entries'}',
+      button: true,
+      child: Material(
+        color: AppColors.surfaceLow,
+        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+        child: InkWell(
+          onTap: widget.onNavigateToWaitlist,
+          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(
+              horizontal: spacing.AppSpacing.gutterMd,
             ),
-            const SizedBox(width: spacing.AppSpacing.gutterSm),
-            Text(
-              'Active Waitlists',
-              style: AppTextStyles.headlineSm,
-            ),
-          ],
-        ),
-        const SizedBox(height: spacing.AppSpacing.gutterMd),
-        ..._waitlists.map((waitlist) => _buildWaitlistCard(waitlist)).toList(),
-      ],
-    );
-  }
-
-  Widget _buildWaitlistCard(dynamic waitlist) {
-    final status = waitlist['status'] as String;
-    final position = waitlist['position'] as int;
-    final doctorName = '${waitlist['doctor_first_name']} ${waitlist['doctor_last_name']}';
-    final doctorSpecialty = waitlist['specialty'] as String?;
-    final waitlistDate = waitlist['waitlist_date'] as String;
-    final isOffered = status == 'OFFERED';
-
-    return AppCard(
-      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-      margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      doctorName,
-                      style: AppTextStyles.bodyMdMedium,
-                    ),
-                    if (doctorSpecialty != null)
-                      Text(
-                        doctorSpecialty,
-                        style: AppTextStyles.labelSm.copyWith(
-                          color: AppColors.secondary,
-                        ),
-                      ),
-                  ],
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.hourglass_empty,
+                  color: AppColors.primary,
+                  size: spacing.AppSpacing.iconMd,
                 ),
-              ),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: spacing.AppSpacing.gutterSm,
-                  vertical: spacing.AppSpacing.gutterXs,
-                ),
-                decoration: BoxDecoration(
-                  color: isOffered
-                      ? AppColors.primary.withValues(alpha: 0.1)
-                      : AppColors.tertiary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
-                ),
-                child: Text(
-                  isOffered ? 'Offered' : 'Position #$position',
-                  style: AppTextStyles.labelSm.copyWith(
-                    color: isOffered ? AppColors.primary : AppColors.tertiary,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(width: spacing.AppSpacing.gutterSm),
+                Expanded(
+                  child: Text(
+                    count == 1
+                        ? "You're on 1 waitlist"
+                        : "You're on $count waitlists",
+                    style: AppTextStyles.bodyMdMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: spacing.AppSpacing.gutterSm),
-          Row(
-            children: [
-              Icon(
-                Icons.calendar_today,
-                size: spacing.AppSpacing.iconSm,
-                color: AppColors.secondary,
-              ),
-              const SizedBox(width: spacing.AppSpacing.gutterXs),
-              Text(
-                DateFormat('MMM dd, yyyy').format(DateTime.parse(waitlistDate)),
-                style: AppTextStyles.labelSm.copyWith(
+                const Icon(
+                  Icons.chevron_right,
                   color: AppColors.secondary,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: spacing.AppSpacing.gutterMd),
-          if (isOffered)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => _bookFromWaitlist(waitlist),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.onPrimary,
-                ),
-                child: const Text('Book Now'),
-              ),
-            )
-          else
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: widget.onNavigateToWaitlist,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                ),
-                child: const Text('View Details'),
-              ),
+              ],
             ),
-        ],
+          ),
+        ),
       ),
-    );
-  }
-
-  Future<void> _bookFromWaitlist(dynamic waitlist) async {
-    final doctorId = waitlist['doctor_id'] as String;
-    final doctorName = '${waitlist['doctor_first_name']} ${waitlist['doctor_last_name']}';
-    final waitlistDate = waitlist['waitlist_date'] as String;
-
-    Navigator.of(context).pushNamed(
-      '/doctor-schedule',
-      arguments: {
-        'doctorId': doctorId,
-        'doctorName': doctorName,
-        'specialty': waitlist['specialty'],
-        'clinic': waitlist['practice_name'],
-        'consultationFee': null,
-        'defaultDate': waitlistDate,
-      },
-    );
-  }
-
-  Widget _buildAppointmentsList() {
-    if (_isLoading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    if (_errorMessage != null) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: Column(
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: AppColors.error,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _errorMessage!,
-                style: AppTextStyles.bodyMd.copyWith(
-                  color: AppColors.error,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _fetchAppointments,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (_appointments.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: Column(
-            children: [
-              Icon(
-                Icons.event_busy,
-                size: 64,
-                color: AppColors.outline,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No appointments yet',
-                style: AppTextStyles.headlineSm.copyWith(
-                  color: AppColors.onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Your appointments will appear here',
-                style: AppTextStyles.bodyMd.copyWith(
-                  color: AppColors.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final filteredAppointments = _appointments.where((a) {
-      switch (_selectedFilter) {
-        case 'upcoming':
-          return a['status'] == 'SCHEDULED';
-        case 'completed':
-          return a['status'] == 'COMPLETED';
-        case 'cancelled':
-          return a['status'] == 'CANCELLED';
-        default:
-          return false;
-      }
-    }).toList();
-
-    if (filteredAppointments.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: Column(
-            children: [
-              Icon(
-                Icons.event_busy,
-                size: 64,
-                color: AppColors.outline,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No $_selectedFilter appointments',
-                style: AppTextStyles.headlineSm.copyWith(
-                  color: AppColors.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: filteredAppointments.map((appointment) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterLg),
-          child: _buildAppointmentCard(appointment),
-        );
-      }).toList(),
     );
   }
 
@@ -730,6 +520,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                   borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       status == 'SCHEDULED'
@@ -745,20 +536,24 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                               : AppColors.onErrorContainer,
                     ),
                     const SizedBox(width: spacing.AppSpacing.gutterXs),
-                    Text(
-                      status == 'SCHEDULED'
-                          ? queueNumber != null
-                              ? 'Confirmed • Queue #$queueNumber'
-                              : 'Confirmed'
-                          : status == 'COMPLETED'
-                              ? 'Completed'
-                              : 'Cancelled',
-                      style: AppTextStyles.labelMd.copyWith(
-                        color: status == 'SCHEDULED'
-                            ? AppColors.onTertiaryContainer
+                    Flexible(
+                      child: Text(
+                        status == 'SCHEDULED'
+                            ? queueNumber != null
+                                ? 'Confirmed • Queue #$queueNumber'
+                                : 'Confirmed'
                             : status == 'COMPLETED'
-                                ? AppColors.secondary
-                                : AppColors.onErrorContainer,
+                                ? 'Completed'
+                                : 'Cancelled',
+                        style: AppTextStyles.labelMd.copyWith(
+                          color: status == 'SCHEDULED'
+                              ? AppColors.onTertiaryContainer
+                              : status == 'COMPLETED'
+                                  ? AppColors.secondary
+                                  : AppColors.onErrorContainer,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -867,43 +662,52 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLowest,
-                        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-                      ),
-                      child: Icon(
-                        Icons.event,
-                        color: AppColors.primary,
-                        size: spacing.AppSpacing.iconMd,
-                      ),
-                    ),
-                    const SizedBox(width: spacing.AppSpacing.gutterSm),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          appointmentDate != null
-                              ? DateFormat('EEEE, MMM d, yyyy').format(appointmentDate)
-                              : 'Date not available',
-                          style: AppTextStyles.bodyMdMedium,
+                Flexible(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLowest,
+                          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
                         ),
-                        Text(
-                          appointmentDate != null
-                              ? DateFormat('hh:mm a').format(appointmentDate)
-                              : 'Time not available',
-                          style: AppTextStyles.labelSm.copyWith(
-                            color: AppColors.secondary,
-                          ),
+                        child: Icon(
+                          Icons.event,
+                          color: AppColors.primary,
+                          size: spacing.AppSpacing.iconMd,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(width: spacing.AppSpacing.gutterSm),
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              appointmentDate != null
+                                  ? DateFormat('EEEE, MMM d, yyyy').format(appointmentDate)
+                                  : 'Date not available',
+                              style: AppTextStyles.bodyMdMedium,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              appointmentDate != null
+                                  ? DateFormat('hh:mm a').format(appointmentDate)
+                                  : 'Time not available',
+                              style: AppTextStyles.labelSm.copyWith(
+                                color: AppColors.secondary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: spacing.AppSpacing.gutterSm),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
