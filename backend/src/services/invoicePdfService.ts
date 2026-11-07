@@ -31,6 +31,13 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
         return `PHP ${amount.toFixed(2)}`;
       };
 
+      const formatMethodLabel = (method?: string | null): string => {
+        if (!method) return '';
+        if (method === 'CASH') return 'Cash';
+        if (method === 'GCASH') return 'GCash';
+        return method;
+      };
+
       // Helper function to format date
       const formatDate = (date: string | Date): string => {
         const d = new Date(date);
@@ -152,6 +159,10 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
       doc.fontSize(13).font('Helvetica').fillColor('#64748b');
       doc.text(`Invoice #: ${invoiceData.invoice_number}`, rightBlockX, y + 52, { align: 'right', width: rightBlockWidth });
       doc.text(`Date: ${formatDate(invoiceData.invoice_date)}`, rightBlockX, y + 72, { align: 'right', width: rightBlockWidth });
+      if (invoiceData.replaces_invoice_number) {
+        doc.fontSize(11).font('Helvetica-Oblique').fillColor('#64748b');
+        doc.text(`Replaces ${invoiceData.replaces_invoice_number}`, rightBlockX, y + 90, { align: 'right', width: rightBlockWidth });
+      }
 
       // ===== BILL TO =====
       y = Math.max(cy + 26, y + 104);
@@ -222,7 +233,7 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
       if (invoiceData.charges?.length) {
         invoiceData.charges.forEach((charge) => {
           const desc = charge.description || 'Additional Charge';
-          if (charge.charge_type === 'MEDICINE') {
+          if (charge.quantity != null && charge.unit_price != null) {
             const qty = charge.quantity || 1;
             const price = charge.unit_price || charge.amount;
             drawRow(desc, qty.toString(), formatCurrency(price), formatCurrency(charge.amount));
@@ -250,45 +261,82 @@ export async function generateInvoicePdf(invoiceData: InvoiceData, options: Invo
       doc.fontSize(12).font('Helvetica-Bold').fillColor('#64748b').text('Payment Breakdown', x, y);
       y += 20;
 
-      if (invoiceData.payment.advance_payment > 0) {
-        drawBox(x, y, w, 35, '#f8fafc', '#e2e8f0');
-        doc.fontSize(13).font('Helvetica-Bold').fillColor('#1e293b');
-        doc.text('GCash Advance Payment', x + 13, y + 12);
-        doc.text(formatCurrency(invoiceData.payment.advance_payment), x + labelWidth, y + 12, { width: valueWidth, align: 'right' });
-        y += 35;
+      const acceptedTransactions = (invoiceData.payment.transactions || [])
+        .filter(tx => tx.status === 'ACCEPTED');
 
-        if (invoiceData.payment.amount_applied > 0) {
-          doc.fontSize(12).font('Helvetica').fillColor('#64748b');
-          doc.text('Amount applied to balance', x + 13, y + 10);
-          doc.text(formatCurrency(invoiceData.payment.amount_applied), x + labelWidth, y + 10, { width: valueWidth, align: 'right' });
-          y += 20;
+      // Group Cash and GCash payments by method, sum amounts, list GCash refs.
+      // Refunds are separate negative lines by method; TOTAL PAID is the sum
+      // of every line (i.e. payments minus refunds).
+      let cashTotal = 0.0;
+      let gcashTotal = 0.0;
+      let cashRefund = 0.0;
+      let gcashRefund = 0.0;
+      const finalGcashRefs: string[] = [];
+      let totalPaid = 0.0;
+
+      for (const tx of acceptedTransactions) {
+        const amount = Number(tx.amount) || 0;
+        const kind = tx.kind || '';
+        const method = tx.method || '';
+
+        if (kind === 'REFUND') {
+          totalPaid -= amount;
+          if (method === 'CASH') cashRefund += amount;
+          else if (method === 'GCASH') gcashRefund += amount;
+          continue;
+        }
+
+        // Kind === 'PAYMENT'
+        totalPaid += amount;
+        if (method === 'CASH') {
+          cashTotal += amount;
+        } else if (method === 'GCASH') {
+          gcashTotal += amount;
+          if (tx.reference_no) finalGcashRefs.push(tx.reference_no);
         }
       }
 
-      if (invoiceData.payment.cash_tendered > 0) {
+      // Cash line
+      drawBox(x, y, w, 35, '#f8fafc', '#e2e8f0');
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('#1e293b');
+      doc.text('Cash', x + 13, y + 12, { width: w - 140, ellipsis: true });
+      doc.text(formatCurrency(cashTotal), x + labelWidth, y + 12, { width: valueWidth, align: 'right' });
+      y += 35;
+
+      // GCash line
+      if (gcashTotal > 0 || finalGcashRefs.length > 0) {
         drawBox(x, y, w, 35, '#f8fafc', '#e2e8f0');
-        doc.fontSize(13).font('Helvetica-Bold').fillColor('#1e293b');
-        doc.text('Cash Payment at Clinic', x + 13, y + 12);
-        doc.text(formatCurrency(invoiceData.payment.cash_tendered), x + labelWidth, y + 12, { width: valueWidth, align: 'right' });
+        doc.fontSize(12).font('Helvetica-Bold').fillColor('#1e293b');
+        finalGcashRefs.sort();
+        const refsText = finalGcashRefs.length > 0 ? finalGcashRefs.join(', ') : '';
+        doc.text('GCash · Ref: ' + refsText, x + 13, y + 12, { width: w - 140, ellipsis: true });
+        doc.text(formatCurrency(gcashTotal), x + labelWidth, y + 12, { width: valueWidth, align: 'right' });
         y += 35;
       }
 
-      if (invoiceData.payment.change_amount > 0) {
-        doc.strokeColor('#a7f3d0').lineWidth(0.65).moveTo(x, y + 10).lineTo(x + w, y + 10).stroke();
-        y += 13;
-        drawBox(x, y, w, 35, '#ecfdf5', '#a7f3d0');
-        doc.fontSize(15).font('Helvetica-Bold').fillColor('#059669');
-        doc.text('Change Returned', x + 13, y + 12);
-        doc.text(formatCurrency(invoiceData.payment.change_amount), x + labelWidth, y + 12, { width: valueWidth, align: 'right' });
+      // Refund lines (negative amounts by method)
+      if (cashRefund > 0) {
+        drawBox(x, y, w, 35, '#fef2f2', '#fecaca');
+        doc.fontSize(12).font('Helvetica-Bold').fillColor('#b91c1c');
+        doc.text('Cash Refund', x + 13, y + 12, { width: w - 140, ellipsis: true });
+        doc.text('-' + formatCurrency(cashRefund), x + labelWidth, y + 12, { width: valueWidth, align: 'right' });
+        y += 35;
+      }
+      if (gcashRefund > 0) {
+        drawBox(x, y, w, 35, '#fef2f2', '#fecaca');
+        doc.fontSize(12).font('Helvetica-Bold').fillColor('#b91c1c');
+        doc.text('GCash Refund', x + 13, y + 12, { width: w - 140, ellipsis: true });
+        doc.text('-' + formatCurrency(gcashRefund), x + labelWidth, y + 12, { width: valueWidth, align: 'right' });
         y += 35;
       }
 
+      // Total Paid
       doc.strokeColor('#cbd5e1').lineWidth(0.65).moveTo(x, y + 10).lineTo(x + w, y + 10).stroke();
       y += 13;
 
       doc.fontSize(15).font('Helvetica-Bold').fillColor('#0f172a');
       doc.text('TOTAL PAID:', x, y);
-      doc.text(formatCurrency(invoiceData.payment.advance_payment + invoiceData.payment.cash_tendered), x + labelWidth, y, { width: valueWidth, align: 'right' });
+      doc.text(formatCurrency(totalPaid), x + labelWidth, y, { width: valueWidth, align: 'right' });
       y += 20;
 
       if (invoiceData.payment.final_balance > 0) {

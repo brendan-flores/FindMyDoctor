@@ -714,6 +714,40 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
     );
   }
 
+  Widget _buildRefundLine(String label, double amount) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFFECACA)),
+        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFFFEF2F2),
+      ),
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFFB91C1C),
+            ),
+          ),
+          Text(
+            '-₱${amount.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFB91C1C),
+            ),
+            textAlign: TextAlign.right,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTotalsSection(Map<String, dynamic> data) {
     final payment = (data['payment'] is Map<String, dynamic>)
         ? data['payment'] as Map<String, dynamic>
@@ -725,6 +759,48 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
     final cashTendered = _parseDouble(payment['cash_tendered']);
     final changeAmount = _parseDouble(payment['change_amount']);
     final finalBalance = _parseDouble(payment['final_balance']);
+
+    // Compute the breakdown from the accepted transaction snapshot — the same
+    // source the PDF uses. Falls back to the legacy advance/cash columns for
+    // invoices issued before the snapshot existed.
+    final rawTxns = payment['transactions'];
+    final txns = (rawTxns is List) ? rawTxns : const <dynamic>[];
+    double cashPaid = 0;
+    double gcashPaid = 0;
+    double cashRefund = 0;
+    double gcashRefund = 0;
+    final gcashRefs = <String>[];
+    for (final t in txns) {
+      if (t is! Map) continue;
+      final tx = Map<String, dynamic>.from(t);
+      if ((tx['status'] ?? '').toString().toUpperCase() != 'ACCEPTED') continue;
+      final kind = (tx['kind'] ?? 'PAYMENT').toString().toUpperCase();
+      final method = (tx['method'] ?? '').toString().toUpperCase();
+      final amount = _parseDouble(tx['amount']);
+      final ref = tx['reference_no']?.toString();
+      if (kind == 'REFUND') {
+        if (method == 'CASH') {
+          cashRefund += amount;
+        } else if (method == 'GCASH') {
+          gcashRefund += amount;
+        }
+        continue;
+      }
+      if (method == 'CASH') {
+        cashPaid += amount;
+      } else if (method == 'GCASH') {
+        gcashPaid += amount;
+        if (ref != null && ref.isNotEmpty) gcashRefs.add(ref);
+      }
+    }
+    final hasTxnSnapshot = txns.isNotEmpty;
+    gcashRefs.sort();
+    final gcashRefsText = gcashRefs.join(', ');
+    final cashLineAmount = hasTxnSnapshot ? cashPaid : cashTendered;
+    final gcashLineAmount = hasTxnSnapshot ? gcashPaid : advancePayment;
+    final totalPaidAmount = hasTxnSnapshot
+        ? cashPaid + gcashPaid - cashRefund - gcashRefund
+        : advancePayment + cashTendered;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -776,8 +852,96 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         ),
         const SizedBox(height: 8),
 
+        // Cash line
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            borderRadius: BorderRadius.circular(8),
+            color: const Color(0xFFF8FAFC),
+          ),
+          margin: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Flexible(
+                child: Text(
+                  'Cash',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ),
+              Flexible(
+                child: Text(
+                  '₱${cashLineAmount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // GCash line
+        if (gcashLineAmount != 0 || gcashRefsText.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(8),
+              color: const Color(0xFFF8FAFC),
+            ),
+            margin: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    gcashRefsText.isNotEmpty
+                        ? 'GCash · Ref: $gcashRefsText'
+                        : 'GCash',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: gcashRefsText.isNotEmpty
+                          ? FontWeight.w400
+                          : FontWeight.w600,
+                      color: gcashRefsText.isNotEmpty
+                          ? const Color(0xFF475569)
+                          : const Color(0xFF1E293B),
+                    ),
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '₱${gcashLineAmount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ],
+            ),
+          ),
+
+        // Refund lines (separate negative lines by method)
+        if (cashRefund > 0)
+          _buildRefundLine('Cash Refund', cashRefund),
+        if (gcashRefund > 0)
+          _buildRefundLine('GCash Refund', gcashRefund),
+
         // GCash Advance Payment
-        if (advancePayment > 0)
+        if (!hasTxnSnapshot && advancePayment > 0)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -848,7 +1012,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
           ),
 
         // Cash Payment at Clinic
-        if (cashTendered > 0)
+        if (!hasTxnSnapshot && cashTendered > 0)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -954,7 +1118,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                _formatCurrency(advancePayment + cashTendered),
+                _formatCurrency(totalPaidAmount),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
