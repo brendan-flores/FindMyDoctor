@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api/apiClient';
 import Toast from '@/components/ui/Toast';
+import { scheduleChangesApi, isPendingResponse, pendingRequestDateLabel, pendingSummaryText, type ScheduleChangeRequest } from '@/lib/api/scheduleChangesApi';
 
 const DAYS_OF_WEEK = [
   { value: 0, label: 'Sunday' },
@@ -144,10 +145,14 @@ export default function DoctorSchedule() {
   const [showExceptionStartDatePicker, setShowExceptionStartDatePicker] = useState(false);
   const [showExceptionEditStartDatePicker, setShowExceptionEditStartDatePicker] = useState(false);
 
+  // Pending schedule-change requests (awaiting secretary confirmation)
+  const [pendingRequests, setPendingRequests] = useState<ScheduleChangeRequest[]>([]);
+
   useEffect(() => {
     fetchSchedules();
     fetchUnavailability();
     fetchBreakPeriods();
+    fetchPendingRequests();
   }, []);
 
   useEffect(() => {
@@ -174,6 +179,19 @@ export default function DoctorSchedule() {
     setShowExceptionEditStartDatePicker(false);
     setShowCapacityDatePicker(false);
   };
+
+  const fetchPendingRequests = async () => {
+    const response = await scheduleChangesApi.listMinePending();
+    if (response.success && response.data) {
+      setPendingRequests(response.data);
+    }
+    // Pending list is advisory; the server still enforces the duplicate check.
+  };
+
+  const pendingExceptionCreates = pendingRequests.filter(r => r.changeType === 'EXCEPTION' && r.operation === 'CREATE');
+  const pendingBreakCreates = pendingRequests.filter(r => r.changeType === 'BREAK' && r.operation === 'CREATE');
+  const pendingTargetFor = (targetId: string) =>
+    pendingRequests.find(r => r.targetId === targetId && (r.operation === 'UPDATE' || r.operation === 'DELETE')) ?? null;
 
   const fetchSchedules = async () => {
     setLoading(true);
@@ -317,6 +335,13 @@ export default function DoctorSchedule() {
 
     const response = await apiClient.post<DoctorUnavailability>('/doctors/me/unavailability', payload);
     if (response.success && response.data) {
+      if (isPendingResponse(response.data)) {
+        setSuccess(`Awaiting secretary confirmation (${response.data.affectedCount} affected appointment(s)). It is not in effect yet.`);
+        setShowExceptionAddModal(false);
+        setExceptionFormData({ date: '', reason: '' });
+        fetchPendingRequests();
+        return;
+      }
       setSuccess('Exception created successfully');
       setShowExceptionAddModal(false);
       setExceptionFormData({ date: '', reason: '' });
@@ -342,6 +367,13 @@ export default function DoctorSchedule() {
 
     const response = await apiClient.put<DoctorUnavailability>(`/doctors/me/unavailability/${editingException.id}`, payload);
     if (response.success && response.data) {
+      if (isPendingResponse(response.data)) {
+        setSuccess(`Awaiting secretary confirmation (${response.data.affectedCount} affected appointment(s)). It is not in effect yet.`);
+        setShowExceptionEditModal(false);
+        setEditingException(null);
+        fetchPendingRequests();
+        return;
+      }
       setSuccess('Exception updated successfully');
       setShowExceptionEditModal(false);
       setEditingException(null);
@@ -359,6 +391,13 @@ export default function DoctorSchedule() {
 
     const response = await apiClient.delete<DoctorUnavailability>(`/doctors/me/unavailability/${deletingException.id}`);
     if (response.success && response.data) {
+      if (isPendingResponse(response.data)) {
+        setSuccess(`Awaiting secretary confirmation (${response.data.affectedCount} affected appointment(s)). It is not in effect yet.`);
+        setShowExceptionDeleteModal(false);
+        setDeletingException(null);
+        fetchPendingRequests();
+        return;
+      }
       setSuccess('Exception deleted successfully');
       setShowExceptionDeleteModal(false);
       setDeletingException(null);
@@ -406,6 +445,13 @@ export default function DoctorSchedule() {
 
     const response = await apiClient.post<DoctorBreakPeriod>('/doctors/me/break-periods', payload);
     if (response.success && response.data) {
+      if (isPendingResponse(response.data)) {
+        setSuccess(`Awaiting secretary confirmation (${response.data.affectedCount} affected appointment(s)). It is not in effect yet.`);
+        setShowBreakAddModal(false);
+        setBreakFormData({ breakDate: '', dayOfWeek: 1, startTime: '12:00', endTime: '13:00', reason: '' });
+        fetchPendingRequests();
+        return;
+      }
       setSuccess('Break period created successfully');
       setShowBreakAddModal(false);
       setBreakFormData({ breakDate: '', dayOfWeek: 1, startTime: '12:00', endTime: '13:00', reason: '' });
@@ -440,6 +486,13 @@ export default function DoctorSchedule() {
 
     const response = await apiClient.put<DoctorBreakPeriod>(`/doctors/me/break-periods/${editingBreak.id}`, payload);
     if (response.success && response.data) {
+      if (isPendingResponse(response.data)) {
+        setSuccess(`Awaiting secretary confirmation (${response.data.affectedCount} affected appointment(s)). It is not in effect yet.`);
+        setShowBreakEditModal(false);
+        setEditingBreak(null);
+        fetchPendingRequests();
+        return;
+      }
       setSuccess('Break period updated successfully');
       setShowBreakEditModal(false);
       setEditingBreak(null);
@@ -457,6 +510,13 @@ export default function DoctorSchedule() {
 
     const response = await apiClient.delete<DoctorBreakPeriod>(`/doctors/me/break-periods/${deletingBreak.id}`);
     if (response.success && response.data) {
+      if (isPendingResponse(response.data)) {
+        setSuccess(`Awaiting secretary confirmation (${response.data.affectedCount} affected appointment(s)). It is not in effect yet.`);
+        setShowBreakDeleteModal(false);
+        setDeletingBreak(null);
+        fetchPendingRequests();
+        return;
+      }
       setSuccess('Break period deleted successfully');
       setShowBreakDeleteModal(false);
       setDeletingBreak(null);
@@ -964,13 +1024,34 @@ export default function DoctorSchedule() {
             <h2 className="text-xl font-bold text-slate-800">Date-Specific Exceptions</h2>
             <button
               onClick={() => setShowExceptionAddModal(true)}
-              className="h-10 px-4 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105"
+              disabled={pendingExceptionCreates.length > 0}
+              className="h-10 px-4 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:from-red-500 disabled:hover:to-red-600"
+              title={pendingExceptionCreates.length > 0 ? 'Awaiting secretary confirmation for an exception change' : 'Add Exception'}
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
               <span>Add Exception</span>
             </button>
           </div>
         </div>
+
+        {pendingExceptionCreates.length > 0 && (
+          <div className="px-6 pt-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Awaiting secretary confirmation</p>
+              {pendingExceptionCreates.map((req) => (
+                <div key={req.id} className="flex items-start gap-2">
+                  <span className="material-symbols-outlined text-amber-600 text-[18px] mt-0.5">pending_actions</span>
+                  <div className="text-sm">
+                    <p className="font-semibold text-amber-900">{pendingSummaryText(req)}</p>
+                    <p className="text-xs text-amber-800">
+                      {pendingRequestDateLabel(req)} · {req.affectedCount} affected appointment{req.affectedCount === 1 ? '' : 's'} · waiting for secretary confirmation (not in effect)
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="divide-y divide-slate-200">
           {unavailability.length === 0 ? (
@@ -988,6 +1069,7 @@ export default function DoctorSchedule() {
               const [year, month, day] = exception.start_date.split('T')[0].split('-').map(Number);
               const date = new Date(year, month - 1, day);
               const formattedDate = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+              const pendingTarget = pendingTargetFor(exception.id);
               return (
                 <div
                   key={exception.id}
@@ -1018,8 +1100,14 @@ export default function DoctorSchedule() {
                           <span className={`w-2 h-2 rounded-full ${exception.is_active ? 'bg-white' : 'bg-slate-400'}`}></span>
                           {exception.is_active ? 'Active' : 'Inactive'}
                         </span>
-                      </div>
-                      {exception.reason && (
+                        {pendingTarget && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 border border-amber-300 text-amber-800">
+                            <span className="material-symbols-outlined text-[14px]">pending_actions</span>
+                            Awaiting secretary confirmation
+                          </span>
+                        )}
+                       </div>
+                       {exception.reason && (
                         <span className="text-sm text-slate-500 mt-1">{exception.reason}</span>
                       )}
                     </div>
@@ -1028,16 +1116,18 @@ export default function DoctorSchedule() {
                   <div className="flex items-center gap-2 mt-3 sm:mt-0">
                     <button
                       onClick={() => openExceptionEditModal(exception)}
-                      className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold flex items-center gap-2 transition-all transform hover:scale-105"
-                      title="Edit"
+                      disabled={!!pendingTarget}
+                      className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold flex items-center gap-2 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:bg-slate-100"
+                      title={pendingTarget ? 'This exception is awaiting secretary confirmation' : 'Edit'}
                     >
                       <span className="material-symbols-outlined text-[18px]">edit</span>
                       <span>Edit</span>
                     </button>
                     <button
                       onClick={() => openExceptionDeleteModal(exception)}
-                      className="h-10 px-4 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105"
-                      title="Delete"
+                      disabled={!!pendingTarget}
+                      className="h-10 px-4 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:from-red-500 disabled:hover:to-red-600"
+                      title={pendingTarget ? 'This exception is awaiting secretary confirmation' : 'Delete'}
                     >
                       <span className="material-symbols-outlined text-[18px]">delete</span>
                       <span>Delete</span>
@@ -1059,13 +1149,34 @@ export default function DoctorSchedule() {
             <h2 className="text-xl font-bold text-slate-800">Break Periods</h2>
             <button
               onClick={() => setShowBreakAddModal(true)}
-              className="h-10 px-4 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105"
+              disabled={pendingBreakCreates.length > 0}
+              className="h-10 px-4 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:from-blue-500 disabled:hover:to-blue-600"
+              title={pendingBreakCreates.length > 0 ? 'Awaiting secretary confirmation for a break change' : 'Add Break'}
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
               <span>Add Break</span>
             </button>
           </div>
         </div>
+
+        {pendingBreakCreates.length > 0 && (
+          <div className="px-6 pt-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Awaiting secretary confirmation</p>
+              {pendingBreakCreates.map((req) => (
+                <div key={req.id} className="flex items-start gap-2">
+                  <span className="material-symbols-outlined text-amber-600 text-[18px] mt-0.5">pending_actions</span>
+                  <div className="text-sm">
+                    <p className="font-semibold text-amber-900">{pendingSummaryText(req)}</p>
+                    <p className="text-xs text-amber-800">
+                      {pendingRequestDateLabel(req)} · {req.affectedCount} affected appointment{req.affectedCount === 1 ? '' : 's'} · waiting for secretary confirmation (not in effect)
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="divide-y divide-slate-200">
           {breakPeriods.length === 0 ? (
@@ -1081,6 +1192,7 @@ export default function DoctorSchedule() {
               .map((breakPeriod) => {
               const breakDate = new Date(breakPeriod.break_date);
               const dayName = breakDate.toLocaleDateString('en-US', { weekday: 'long' });
+              const pendingTarget = pendingTargetFor(breakPeriod.id);
               return (
                 <div
                   key={breakPeriod.id}
@@ -1114,8 +1226,14 @@ export default function DoctorSchedule() {
                           <span className={`w-2 h-2 rounded-full ${breakPeriod.is_active ? 'bg-white' : 'bg-slate-400'}`}></span>
                           {breakPeriod.is_active ? 'Active' : 'Inactive'}
                         </span>
-                      </div>
-                      {breakPeriod.reason && (
+                        {pendingTarget && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 border border-amber-300 text-amber-800">
+                            <span className="material-symbols-outlined text-[14px]">pending_actions</span>
+                            Awaiting secretary confirmation
+                          </span>
+                        )}
+                       </div>
+                       {breakPeriod.reason && (
                         <span className="text-sm text-slate-500 mt-1">{breakPeriod.reason}</span>
                       )}
                     </div>
@@ -1124,16 +1242,18 @@ export default function DoctorSchedule() {
                   <div className="flex items-center gap-2 mt-3 sm:mt-0">
                     <button
                       onClick={() => openBreakEditModal(breakPeriod)}
-                      className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold flex items-center gap-2 transition-all transform hover:scale-105"
-                      title="Edit"
+                      disabled={!!pendingTarget}
+                      className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold flex items-center gap-2 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:bg-slate-100"
+                      title={pendingTarget ? 'This break is awaiting secretary confirmation' : 'Edit'}
                     >
                       <span className="material-symbols-outlined text-[18px]">edit</span>
                       <span>Edit</span>
                     </button>
                     <button
                       onClick={() => openBreakDeleteModal(breakPeriod)}
-                      className="h-10 px-4 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105"
-                      title="Delete"
+                      disabled={!!pendingTarget}
+                      className="h-10 px-4 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:from-red-500 disabled:hover:to-red-600"
+                      title={pendingTarget ? 'This break is awaiting secretary confirmation' : 'Delete'}
                     >
                       <span className="material-symbols-outlined text-[18px]">delete</span>
                       <span>Delete</span>

@@ -13,6 +13,7 @@ interface Appointment {
   queue_number?: number;
   queue_status?: string;
   practice_name?: string;
+  needs_attention?: boolean;
 }
 
 export default function SecretaryAppointments() {
@@ -232,6 +233,12 @@ export default function SecretaryAppointments() {
                       <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(appointment.status)}`}>
                         {appointment.status.replace('_', ' ')}
                       </span>
+                      {appointment.needs_attention && appointment.status !== 'CANCELLED' && appointment.status !== 'COMPLETED' && appointment.status !== 'NO_SHOW' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800 border border-amber-200" title="The clinic changed the doctor's schedule. The clinic will contact this patient.">
+                          <span className="material-symbols-outlined text-[16px]">warning</span>
+                          Needs attention
+                        </span>
+                      )}
                       {appointment.queue_number && (
                         <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
                           Queue #{appointment.queue_number}

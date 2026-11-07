@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { secretaryApi, type SecretaryDashboard } from '@/lib/api/secretaryApi';
+import { scheduleChangesApi, pendingRequestDateLabel, pendingSummaryText, type ScheduleChangeRequest } from '@/lib/api/scheduleChangesApi';
 import TwoFactorBanner from '@/components/settings/TwoFactorBanner';
 
 export default function SecretaryDashboard() {
@@ -11,9 +12,85 @@ export default function SecretaryDashboard() {
   const [dashboardData, setDashboardData] = useState<SecretaryDashboard | null>(null);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean | null>(null);
   const [error, setError] = useState('');
+  const [pendingChanges, setPendingChanges] = useState<ScheduleChangeRequest[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(true);
+  const [pendingError, setPendingError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ id: string; action: 'confirm' | 'dismiss' } | null>(null);
+  const [pendingNotice, setPendingNotice] = useState<string | null>(null);
+
+  const loadPendingChanges = async (signal?: AbortSignal) => {
+    setPendingLoading(true);
+    setPendingError(null);
+
+    try {
+      const response = await scheduleChangesApi.listPending({ signal });
+      if (signal?.aborted) return;
+      if (response.success && response.data) {
+        setPendingChanges(response.data);
+      } else {
+        setPendingError(response.error || 'Failed to load pending schedule changes');
+      }
+    } catch (err) {
+      if (signal?.aborted) return;
+      console.error('Error loading pending schedule changes:', err);
+      setPendingError('Failed to load pending schedule changes');
+    } finally {
+      if (!signal?.aborted) {
+        setPendingLoading(false);
+      }
+    }
+  };
+
+  const handleConfirmPending = async (request: ScheduleChangeRequest) => {
+    setPendingAction({ id: request.id, action: 'confirm' });
+    setPendingNotice(null);
+    setPendingError(null);
+
+    try {
+      const response = await scheduleChangesApi.confirm(request.id);
+      if (response.success) {
+        const notified = response.data?.notifiedCount ?? request.affectedCount;
+        setPendingNotice(
+          notified > 0
+            ? `Schedule change confirmed. ${notified} patient${notified === 1 ? '' : 's'} notified.`
+            : 'Schedule change confirmed.'
+        );
+      } else {
+        setPendingError(response.error || 'Failed to confirm the schedule change');
+      }
+      await loadPendingChanges();
+    } catch (err) {
+      console.error('Error confirming schedule change:', err);
+      setPendingError('Failed to confirm the schedule change');
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const handleDismissPending = async (request: ScheduleChangeRequest) => {
+    setPendingAction({ id: request.id, action: 'dismiss' });
+    setPendingNotice(null);
+    setPendingError(null);
+
+    try {
+      const response = await scheduleChangesApi.dismiss(request.id);
+      if (response.success) {
+        setPendingNotice('Change dismissed. The schedule was not modified.');
+      } else {
+        setPendingError(response.error || 'Failed to dismiss the schedule change');
+      }
+      await loadPendingChanges();
+    } catch (err) {
+      console.error('Error dismissing schedule change:', err);
+      setPendingError('Failed to dismiss the schedule change');
+    } finally {
+      setPendingAction(null);
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
+    loadPendingChanges(controller.signal);
     loadDashboardData(controller.signal);
     return () => controller.abort();
   }, []);
@@ -275,18 +352,94 @@ export default function SecretaryDashboard() {
         )}
       </div>
 
-      {/* Schedule Alerts - TODO State */}
+      {/* Schedule Alerts */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-900 mb-4">Schedule Alerts</h3>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined text-amber-600 text-2xl">info</span>
-            <div>
-              <p className="text-sm font-semibold text-amber-900 mb-1">Feature Not Yet Implemented</p>
-              <p className="text-xs text-amber-700">This section will show alerts for exception or break period changes affecting active appointments once the confirmation workflow is established.</p>
-            </div>
-          </div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-slate-900">Schedule Alerts</h3>
+          {!pendingLoading && pendingChanges.length > 0 && (
+            <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full">
+              {pendingChanges.length} awaiting confirmation
+            </span>
+          )}
         </div>
+
+        {pendingNotice && (
+          <div className="mb-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-lg px-3 py-2 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[16px]">check_circle</span>
+            <span>{pendingNotice}</span>
+          </div>
+        )}
+        {pendingError && (
+          <div className="mb-3 bg-red-50 border border-red-200 text-red-700 text-xs font-medium rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+            <span>{pendingError}</span>
+            <button
+              onClick={() => loadPendingChanges()}
+              className="text-red-700 font-semibold underline hover:text-red-800"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {pendingLoading ? (
+          <div className="space-y-3">
+            {[0, 1].map((i) => (
+              <div key={i} className="animate-pulse bg-slate-50 border border-slate-100 rounded-xl p-4 h-20" />
+            ))}
+          </div>
+        ) : pendingChanges.length === 0 ? (
+          <div className="text-center py-8">
+            <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">event_available</span>
+            <p className="text-slate-600 font-medium">No schedule changes awaiting confirmation</p>
+            <p className="text-xs text-slate-400 mt-1">Changes that affect active appointments will appear here.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {pendingChanges.map((request) => {
+              const isActing = pendingAction?.id === request.id;
+              const count = request.affectedCount;
+              return (
+                <div
+                  key={request.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl"
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <span className="material-symbols-outlined text-amber-600 text-2xl">event_busy</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-amber-900">{pendingSummaryText(request)}</p>
+                      <p className="text-xs text-amber-800 mt-0.5">
+                        Dr. {request.doctor.name} · {pendingRequestDateLabel(request)}
+                      </p>
+                      <p className="text-xs text-amber-800 mt-0.5">
+                        <span className="font-semibold">{count} affected appointment{count === 1 ? '' : 's'}</span>
+                        {' · '}Requested by {request.requestedBy.name ?? request.requestedBy.role ?? 'the clinic'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 ml-9 sm:ml-0 shrink-0">
+                    <button
+                      onClick={() => handleConfirmPending(request)}
+                      disabled={isActing}
+                      className="h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">check</span>
+                      {isActing && pendingAction?.action === 'confirm'
+                        ? 'Confirming…'
+                        : `Confirm · notify ${count} patient${count === 1 ? '' : 's'}`}
+                    </button>
+                    <button
+                      onClick={() => handleDismissPending(request)}
+                      disabled={isActing}
+                      className="h-9 px-3 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isActing && pendingAction?.action === 'dismiss' ? 'Dismissing…' : 'Dismiss'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Recent Conversations */}
