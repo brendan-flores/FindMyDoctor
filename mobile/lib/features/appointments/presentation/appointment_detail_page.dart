@@ -316,6 +316,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             const SizedBox(height: spacing.AppSpacing.gutterLg),
             _buildAppointmentDetails(appointmentDate, endTime, queueNumber, registrationSource, notes),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
+            if (appointment['needs_attention'] == true &&
+                (status == 'SCHEDULED' || status == 'CONFIRMED' || status == 'IN_PROGRESS')) ...[
+              _buildNeedsAttentionNotice(),
+              const SizedBox(height: spacing.AppSpacing.gutterLg),
+            ],
             if (_isToday(appointmentDate))
               LiveQueueCard(
                 appointmentId: widget.appointmentId,
@@ -389,6 +394,40 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildNeedsAttentionNotice() {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      decoration: BoxDecoration(
+        color: AppColors.urgentAmber.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+        border: Border.all(
+          color: AppColors.urgentAmber.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: AppColors.urgentAmber,
+            size: spacing.AppSpacing.iconMd,
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterSm),
+          Expanded(
+            child: Text(
+              "The clinic changed the doctor's schedule. They will contact you.",
+              style: AppTextStyles.bodyMd.copyWith(
+                color: AppColors.slate700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

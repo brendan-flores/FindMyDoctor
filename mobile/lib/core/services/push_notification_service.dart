@@ -15,7 +15,8 @@ import 'api_service.dart';
 /// exposes the token through the `findmydoctor/push` method channel and
 /// forwards notification taps through the `onNotificationTap` method call.
 /// The service registers that token with the authenticated user, removes it
-/// on logout, and opens only authorized conversation threads when a
+/// on logout, opens the related appointment when a SCHEDULE_CHANGE_NOTICE is
+/// tapped, and opens only authorized conversation threads when a
 /// NEW_PATIENT_MESSAGE or NEW_SECRETARY_MESSAGE notification is tapped.
 class PushNotificationService {
   PushNotificationService._() : _apiService = ApiService();
@@ -146,10 +147,56 @@ class PushNotificationService {
     await prefs.setBool(pushEnabledKey, value);
   }
 
-  /// Handles a notification tap and opens the conversation thread only when
-  /// the authenticated user is authorized to access that conversation.
+  /// Handles a notification tap and opens the related appointment only when
+  /// the authenticated user is authorized to view it (patients only). Unlike
+  /// conversation deep links this never exposes data from another patient's
+  /// appointment — the backend authorizes the appointment detail fetch.
   Future<void> handleNotificationTap(Map<String, dynamic> data) async {
     final type = (data['type'] ?? '').toString();
+
+    if (type == 'SCHEDULE_CHANGE_NOTICE') {
+      final appointmentId = (data['appointmentId'] ??
+              data['appointment_id'] ??
+              data['related_entity_id'] ??
+              '')
+          .toString();
+      if (appointmentId.isEmpty ||
+          appointmentId == 'null' ||
+          appointmentId == 'undefined') {
+        return;
+      }
+
+      try {
+        final userResponse = await _apiService.getCurrentUser();
+        if (userResponse['success'] != true || userResponse['data'] is! Map) {
+          return;
+        }
+
+        final user = Map<String, dynamic>.from(userResponse['data'] as Map);
+        final role = (user['role'] ?? '').toString();
+        if (role != 'PATIENT') return;
+
+        // The appointment detail endpoint authorizes access to the caller's
+        // own appointments; only open the deep link when it succeeds.
+        final appointmentResponse =
+            await _apiService.getAppointmentById(appointmentId);
+        if (appointmentResponse['success'] != true) {
+          return;
+        }
+
+        final navigator = AppNavigator.key.currentState;
+        if (navigator == null) return;
+
+        await navigator.pushNamed(
+          '/appointment-detail',
+          arguments: {'appointmentId': appointmentId},
+        );
+      } catch (_) {
+        // Never surface push-deep-link failures to the user.
+      }
+      return;
+    }
+
     if (type != 'NEW_PATIENT_MESSAGE' && type != 'NEW_SECRETARY_MESSAGE') {
       return;
     }

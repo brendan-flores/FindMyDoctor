@@ -6,20 +6,23 @@ import '../../../core/services/api_service.dart';
 import '../../payments/presentation/payment_screen.dart';
 
 class NotificationsPage extends StatefulWidget {
-  const NotificationsPage({super.key});
+  final ApiService? apiService;
+
+  const NotificationsPage({super.key, this.apiService});
 
   @override
   State<NotificationsPage> createState() => _NotificationsPageState();
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
     _loadNotifications();
   }
 
@@ -298,7 +301,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         final isPaymentNotification = type == 'ADDITIONAL_CHARGE_ADDED' || type == 'PAYMENT_VERIFIED' || type == 'PAYMENT_REJECTED';
                         final isWaitlistNotification = type == 'WAITLIST_UPDATE';
                         final isAppointmentNotification = type == 'APPOINTMENT_CANCELLED' ||
-                            type == 'APPOINTMENT_RESCHEDULED';
+                            type == 'APPOINTMENT_RESCHEDULED' ||
+                            type == 'SCHEDULE_CHANGE_NOTICE';
 
                         return Card(
                           margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),

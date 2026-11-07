@@ -771,6 +771,31 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                 ),
             ],
           ),
+          if (appointment['needs_attention'] == true &&
+              (status == 'SCHEDULED' || status == 'CONFIRMED' || status == 'IN_PROGRESS'))
+            Padding(
+              padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: AppColors.urgentAmber,
+                    size: spacing.AppSpacing.iconSm,
+                  ),
+                  const SizedBox(width: spacing.AppSpacing.gutterXs),
+                  Expanded(
+                    child: Text(
+                      "The clinic changed the doctor's schedule. They will contact you.",
+                      style: AppTextStyles.labelSm.copyWith(
+                        color: AppColors.slate700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
           // Doctor info
           Row(
