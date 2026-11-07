@@ -1,7 +1,7 @@
 -- ============================================================================
 -- FindMyDoctor consolidated schema
 -- Run on a fresh, empty database for a full deployment.
--- Includes all migrations through: 046_add_service_other_charge_types.sql
+-- Includes all migrations through: 047_add_schedule_change_requests.sql
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -89,7 +89,11 @@ CREATE TABLE IF NOT EXISTS appointments (
     reason_for_visit text,
     notes text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    -- Source migration: 047_add_schedule_change_requests.sql
+    needs_attention boolean NOT NULL DEFAULT false,
+    needs_attention_reason text,
+    needs_attention_flagged_at timestamp with time zone
 );
 
 CREATE TABLE IF NOT EXISTS conversations (
@@ -462,6 +466,28 @@ CREATE TABLE IF NOT EXISTS secretaries (
     middle_name character varying(100),
     contact_number character varying(20),
     two_factor_enabled boolean DEFAULT false
+);
+
+-- Source migration: 047_add_schedule_change_requests.sql
+CREATE TABLE IF NOT EXISTS schedule_change_requests (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    doctor_id uuid NOT NULL,
+    requested_by uuid NOT NULL,
+    change_type character varying(20) NOT NULL,
+    operation character varying(10) NOT NULL,
+    proposed_payload jsonb NOT NULL,
+    target_id uuid,
+    affected_count integer NOT NULL DEFAULT 0,
+    affected_appointment_ids uuid[] NOT NULL DEFAULT '{}'::uuid[],
+    status character varying(10) NOT NULL DEFAULT 'PENDING'::character varying,
+    created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved_at timestamp with time zone,
+    resolved_by uuid,
+    CONSTRAINT schedule_change_requests_pkey PRIMARY KEY (id),
+    CONSTRAINT schedule_change_requests_change_type_check CHECK (((change_type)::text = ANY ((ARRAY['EXCEPTION'::character varying, 'BREAK'::character varying])::text[]))),
+    CONSTRAINT schedule_change_requests_operation_check CHECK (((operation)::text = ANY ((ARRAY['CREATE'::character varying, 'UPDATE'::character varying, 'DELETE'::character varying])::text[]))),
+    CONSTRAINT schedule_change_requests_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'CONFIRMED'::character varying, 'DISMISSED'::character varying])::text[])))
 );
 
 CREATE TABLE IF NOT EXISTS trusted_browsers (
@@ -1467,6 +1493,22 @@ DO $$ BEGIN
     ALTER TABLE secretaries ADD CONSTRAINT secretaries_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
   END IF;
 END $$;
+-- Source migration: 047_add_schedule_change_requests.sql
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='schedule_change_requests'::regclass AND conname='schedule_change_requests_doctor_id_fkey') THEN
+    ALTER TABLE schedule_change_requests ADD CONSTRAINT schedule_change_requests_doctor_id_fkey FOREIGN KEY (doctor_id) REFERENCES doctors(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='schedule_change_requests'::regclass AND conname='schedule_change_requests_requested_by_fkey') THEN
+    ALTER TABLE schedule_change_requests ADD CONSTRAINT schedule_change_requests_requested_by_fkey FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='schedule_change_requests'::regclass AND conname='schedule_change_requests_resolved_by_fkey') THEN
+    ALTER TABLE schedule_change_requests ADD CONSTRAINT schedule_change_requests_resolved_by_fkey FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='visits'::regclass AND conname='visits_appointment_id_fkey') THEN
     ALTER TABLE visits ADD CONSTRAINT visits_appointment_id_fkey FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE;
@@ -1571,6 +1613,11 @@ CREATE INDEX IF NOT EXISTS idx_queue_entries_queue_date ON queue_entries USING b
 CREATE INDEX IF NOT EXISTS idx_queue_entries_status ON queue_entries USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_secretaries_doctor_id ON secretaries USING btree (doctor_id);
 CREATE INDEX IF NOT EXISTS idx_secretaries_user_id ON secretaries USING btree (user_id);
+-- Source migration: 047_add_schedule_change_requests.sql
+CREATE INDEX IF NOT EXISTS idx_schedule_change_requests_doctor_status ON schedule_change_requests USING btree (doctor_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_change_requests_pending_target_id ON schedule_change_requests USING btree (target_id) WHERE (status = 'PENDING'::text AND target_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_schedule_change_requests_status ON schedule_change_requests USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_schedule_change_requests_target_id ON schedule_change_requests USING btree (target_id) WHERE (target_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_trusted_browsers_expires_at ON trusted_browsers USING btree (expires_at);
 CREATE INDEX IF NOT EXISTS idx_trusted_browsers_token ON trusted_browsers USING btree (token_hash);
 CREATE INDEX IF NOT EXISTS idx_trusted_browsers_user_active ON trusted_browsers USING btree (user_id) WHERE (revoked_at IS NULL);
@@ -1610,6 +1657,9 @@ DROP TRIGGER IF EXISTS update_queue_entries_updated_at ON queue_entries;
 CREATE TRIGGER update_queue_entries_updated_at BEFORE UPDATE ON queue_entries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 DROP TRIGGER IF EXISTS update_secretaries_updated_at ON secretaries;
 CREATE TRIGGER update_secretaries_updated_at BEFORE UPDATE ON secretaries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Source migration: 047_add_schedule_change_requests.sql
+DROP TRIGGER IF EXISTS update_schedule_change_requests_updated_at ON schedule_change_requests;
+CREATE TRIGGER update_schedule_change_requests_updated_at BEFORE UPDATE ON schedule_change_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 DROP TRIGGER IF EXISTS update_visits_updated_at ON visits;

@@ -545,7 +545,7 @@ router.patch('/:id/cancel', authenticate, requirePasswordChange, authorize('PATI
 
     // Update appointment status
     await client.query(
-      "UPDATE appointments SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+      "UPDATE appointments SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP, needs_attention = false, needs_attention_reason = NULL, needs_attention_flagged_at = NULL WHERE id = $1",
       [id]
     );
 
@@ -814,7 +814,7 @@ router.patch('/:id/reschedule', authenticate, requirePasswordChange, authorize('
     }
 
     await client.query(
-      'UPDATE appointments SET appointment_date = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE appointments SET appointment_date = $1, updated_at = CURRENT_TIMESTAMP, needs_attention = false, needs_attention_reason = NULL, needs_attention_flagged_at = NULL WHERE id = $2',
       [newDateOnly, id]
     );
 
