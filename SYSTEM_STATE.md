@@ -2,9 +2,9 @@
 
 This document tracks the current state of the FindMyDoctor application, including key features, workflows, and system configurations.
 
-**Current Version:** 01.34
+**Current Version:** 01.37
 
-**Last Updated:** November 6, 2026
+**Last Updated:** November 7, 2026
 
 ---
 
@@ -134,6 +134,24 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 **Queue numbering on removal:**
 - Cancelling or rescheduling away from a date closes the gap: higher numbers shift down by one in ascending order and each affected patient receives a `QUEUE_UPDATED` notification.
 - The shift is performed inside the same transaction while holding the doctor/date advisory lock, so the UNIQUE `(queue_date, doctor_id, queue_number)` constraint is never violated.
+
+---
+
+## Schedule-Change Confirmation
+
+**What changed:** Exception and break-period changes (create/update/delete) that affect active future appointments no longer take effect silently. They are held as PENDING requests, confirmed or dismissed by the secretary, and affected appointments stay active but are flagged as needing attention. See `docs/SYSTEM_STATE.md` for the full detail.
+
+**Data:**
+- New `schedule_change_requests` table (migration `backend/database/047_add_schedule_change_requests.sql`, applied; consolidated schema updated).
+- New `needs_attention` / `needs_attention_reason` / `needs_attention_flagged_at` columns on `appointments`.
+
+**Flow:**
+- Affected = active (`SCHEDULED`, `CONFIRMED`, `IN_PROGRESS`) future appointments (clinic date, Asia/Manila) newly in conflict with the change ( UPDATE = new conflicts only; BREAK matches whole-day for date-only appointments and time overlap for timed ones).
+- Affected appointments exist → HTTP 202 with the request summary; otherwise the change applies exactly as before (DELETE always applies immediately when no pending duplicate exists).
+- Secretary sees the request in `/secretary/dashboard` Schedule Alerts (doctor, date range, affected count, Confirm/Dismiss; confirm says how many patients will be notified). Confirm applies the change in one transaction, flags the affected appointments `SCHEDULE_CHANGE`, and sends each affected patient a `SCHEDULE_CHANGE_NOTICE` that opens the appointment. Dismiss leaves the schedule unchanged and notifies no one.
+- `/secretary/schedule` and `/doctor/schedule` show "Pending confirmation" / "Awaiting secretary confirmation" states and disable the relevant actions while a request is pending; `/secretary/appointments` shows a "Needs attention" badge; `/home` appointment cards and the appointment detail screen show "The clinic changed the doctor's schedule. They will contact you." on affected appointments; the mobile notifications list opens the related appointment on tap (same deep link as appointment notifications).
+- `needs_attention` clears automatically when the appointment is cancelled or rescheduled (date changed).
+- `GET /api/v1/schedule-changes` (SECRETARY, own doctor's pending), `POST /:id/confirm`, `POST /:id/dismiss`; read-only `GET /api/v1/doctors/me/schedule-change-requests` for doctors.
 
 ---
 
@@ -294,6 +312,8 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 See `docs/VERSION_HISTORY.md` for complete version history.
 
 **Recent Versions:**
+- 01.37: Schedule-change confirmation workflow — pending secretary approval for exception/break-period changes affecting active appointments, affected appointments flagged needs attention, patients notified via SCHEDULE_CHANGE_NOTICE
+- 01.36: GCash account details for secretaries; patients see account name/number beside the GCash QR
 - 01.35: Patient appointment rescheduling, cancellation with waitlist promotion, and live queue tracking
 - 01.34: Consolidated idempotent schema migration and tracked, rerunnable migration runner
 - 01.33: Notification dropdown navigation and full message display

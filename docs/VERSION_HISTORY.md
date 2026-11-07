@@ -4,6 +4,51 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.37 (November 7, 2026)
+
+**Purpose:** Stop schedule changes that affect active future appointments from taking effect silently. The change now waits for secretary confirmation; affected appointments stay active but are flagged as needing attention, and affected patients receive a notification.
+
+**Significant Changes:**
+- Database schema (migration `backend/database/047_add_schedule_change_requests.sql`, mirrored into `consolidated_schema.sql`):
+  - New `schedule_change_requests` table storing the doctor, requesting user, change type (`EXCEPTION` | `BREAK`), operation (`CREATE` | `UPDATE` | `DELETE`), proposed payload (with target record id and a validity snapshot for UPDATE/DELETE), affected appointment count and identifiers, status (`PENDING` | `CONFIRMED` | `DISMISSED`), audit timestamps (`created_at`, `updated_at`, `resolved_at`, `resolved_by`).
+  - New `needs_attention` boolean (default `false`), `needs_attention_reason` (text), and `needs_attention_flagged_at` (timestamptz) columns on `appointments` (there was no existing flag; it was added in this migration).
+  - Indexes on `(doctor_id, status)` and `target_id`; partial unique index on `target_id WHERE status = 'PENDING'` as a backstop against duplicate pending requests for the same record.
+  - Migration applied to the development database; consolidated schema updated to match.
+- New pending-confirmation flow shared by the eight existing schedule-write endpoints (doctor and secretary versions of `POST/PUT/DELETE /unavailability` and `/break-periods`):
+  - Affected set = active (`SCHEDULED`, `CONFIRMED`, `IN_PROGRESS`) future appointments (clinic date, Asia/Manila) newly in conflict. UPDATE counts only newly-conflicting appointments (new minus old conflict set); reason-only edits apply immediately when nothing is newly affected. BREAK matches whole-day for date-only appointments (time component `00:00:00`) and 30-minute time overlap for timed appointments (walk-in account registrations store a real time in `appointment_date`). `DATE(appointment_date) = $n` extraction is used, consistent with the availability service and queue.
+  - When the affected set is empty, the change applies exactly as before. When it is not, the change is not applied; a PENDING request is created and the endpoint returns HTTP 202 with the request summary (`id`, `status: 'PENDING'`, `pending: true`, `changeType`, `operation`, `affectedCount`, `affectedAppointmentIds`, `reason`, `createdAt`) and a `success: true` envelope the clients can distinguish from an applied change.
+  - Duplicate/overlapping PENDING requests for the same doctor and target are rejected with 409, both for proposals and implicitly at confirm time.
+  - Proposals are serialized per doctor (row lock on the doctor record) so concurrent overlapping submissions cannot both create pending requests. DELETE operations apply immediately when there is no pending duplicate for the target (deletes free time and have no affected set).
+  - Confirmation runs in one transaction with `SELECT ... FOR UPDATE` on the request row: status is re-verified, the change is re-validated against the current schedule (target record must still exist and match the proposed snapshot, otherwise the request stays PENDING and a 409 conflict is returned), the change is applied, the affected set is recomputed against current data (appointments cancelled or booked since proposal are handled correctly), appointments are flagged `needs_attention = true`/`SCHEDULE_CHANGE`, one `SCHEDULE_CHANGE_NOTICE` is created per affected patient (`related_entity_type = 'appointment'`), and the request is marked CONFIRMED with `resolved_at`/`resolved_by`. Availability cache is invalidated after the commit; push notifications are sent after commit, best-effort, with generic text; appointment statuses are never changed and nothing is auto-cancelled.
+- New router `backend/src/api/scheduleChanges.ts` mounted at `/api/v1/schedule-changes` (SECRETARY only; requests scoped to the caller's assigned doctor):
+  - `GET /` lists PENDING requests for the secretary's assigned doctor (pending only, newest first, doctor name, requester name and role, `created_at`, reason, affected count and ids, previous/proposed values for UPDATE).
+  - `POST /:id/confirm` applies the change (see above). `POST /:id/dismiss` marks the request DISMISSED; the change stays unapplied, no appointments are flagged, no patient is notified. Confirm and dismiss are idempotent-safe and never run twice.
+  - `GET /api/v1/doctors/me/schedule-change-requests` (DOCTOR read-only) lets a doctor see their own pending requests on `/doctor/schedule`.
+  - Non-secretaries (and secretaries of other doctors) receive the standard 403 authorization error.
+- Web:
+  - `/secretary/dashboard` Schedule Alerts placeholder replaced with the live list of pending requests: change summary, doctor, date range, affected appointment count, confirm action labeled with the number of patients who will be notified, dismiss action, refresh after every action, loading/empty/error states, and in-flight button disabling.
+  - `/secretary/schedule` and `/doctor/schedule` exceptions and break-period sections show a "Pending confirmation"/"Awaiting secretary confirmation" indicator (pending CREATE entries appear as a banner; UPDATE/DELETE pending requests render as a chip on the target row), disable the relevant Add/Edit/Delete actions while a pending request exists, and show a "waiting for secretary confirmation" message instead of a success toast when a submission is held for confirmation.
+  - Secretary `/secretary/appointments` list shows a small "Needs attention" badge on affected appointments (secretary can see which patients to contact; appointment stays active).
+- Mobile:
+  - Patients receive `SCHEDULE_CHANGE_NOTICE` in the notifications list; tapping it deep-links to the related appointment (`/appointment-detail`), matching the existing appointment notification handling, and the push tap handler opens the appointment for patients.
+  - The appointment card on `/home` and the appointment detail screen show the banner "The clinic changed the doctor's schedule. They will contact you." on affected (active) appointments.
+  - No cancel or reschedule actions were added to the patient app.
+- `needs_attention` clears automatically when the appointment is cancelled or rescheduled (date changed). It is shown only on active appointments.
+- `SCHEDULE_CHANGE_NOTICE` added to the backend notification type constants.
+- Tests: new end-to-end-style suite `backend/src/api/scheduleChanges.test.ts` (41 tests) covering the acceptance scenario, dismiss, immediate-apply, inactive/past exclusion and the midnight boundary, all eight endpoint families (CREATE/UPDATE/DELETE), duplicate rejection, the authorization matrix, double-confirm and confirm-vs-dismiss races, recompute-at-confirm, stale-target conflicts, the direct-DELETE confirm path, availability-cache invalidation, and the cancel/reschedule flag-clearing paths.
+
+**Improvements:** None beyond the above.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None (no business behavior was removed; schedule changes that affect no appointments apply exactly as before, including DELETE operations).
+
+**Breaking Changes:** None (additive; no existing client behavior changed when a change affects no appointments).
+
+**Documentation Updates:** `CURRENT_VERSION.md` 01.37, this entry, `SYSTEM_STATE.md` (root and `docs/SYSTEM_STATE.md`) with the schedule-change confirmation section, and `docs/architecture.md` / `docs/architecture-essentials.md` endpoint and notification updates.
+
+---
+
 ### 01.36 (November 7, 2026)
 
 **Purpose:** Enable secretaries to configure GCash account details for their assigned doctor, which patients will see alongside the GCash QR code when making payments.

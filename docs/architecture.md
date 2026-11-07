@@ -1779,6 +1779,8 @@ Notifications may be generated when:
 
 Cancellation and rescheduling create `APPOINTMENT_CANCELLED` and `APPOINTMENT_RESCHEDULED` notifications with `related_entity_type = 'appointment'` and the appointment id as `related_entity_id`. The reschedule message contains both the old and new schedules (date and queue number). Tapping either notification from the notifications page opens the related appointment detail screen. Patients whose queue numbers shift after a cancellation or reschedule receive `QUEUE_UPDATED`.
 
+A confirmed exception or break-period change whose affected set contains active future appointments creates `SCHEDULE_CHANGE_NOTICE` for each affected patient, with `related_entity_type = 'appointment'` and the appointment id as `related_entity_id`. The message is generic and carries no sensitive details. Tapping the notification from the notifications page opens the related appointment detail screen, and the push payload carries `type: 'SCHEDULE_CHANGE_NOTICE'` and `appointmentId`. No notification is sent when a change is only proposed or dismissed, and no appointment status is changed.
+
 When a cancellation or reschedule frees a slot, the waitlist promotion service offers it to the next waiting patient, creates a `WAITLIST_UPDATE` notification whose `related_entity_id` is the waitlist entry id, and the mobile notification opens `/doctor-schedule` for that entry's doctor with `defaultDate` set to the offered `waitlist_date` (YYYY-MM-DD). The schedule route receives the doctor id, name, specialty, clinic, consultation fee, and professional photo so the correct doctor's availability is shown with that date preselected. This navigation is available from both the full notifications page and the header notification dropdown. Payment-related notifications open the payment screen for the related appointment from either surface, and the dropdown displays full notification messages without line truncation.
 
 Chat notifications are sent only to recipients (never the sender) with generic titles, bodies, and push payloads that never include message content, and are additionally delivered as FCM/APNs pushes to the recipient's registered device tokens when push credentials are configured.
@@ -1842,7 +1844,18 @@ PUT    /secretaries/managed-doctors/break-periods/:id
 DELETE /secretaries/managed-doctors/break-periods/:id
 ```
 
-Secretary schedule endpoints use the `secretaries.doctor_id` ownership check. Weekly schedules are read-only for secretaries. Exception and break-period writes that affect active appointments require the warning and explicit confirmation before saving.
+Secretary schedule endpoints use the `secretaries.doctor_id` ownership check. Weekly schedules are read-only for secretaries. Exception and break-period writes that affect active future appointments do not apply; they are saved as PENDING `schedule_change_requests` and returned with HTTP 202 (a clearly distinguishable pending response), and the change takes effect only after the secretary confirms via `POST /schedule-changes/:id/confirm`. Changes that affect no appointments apply immediately as before. Doctor-equivalent endpoints behave the same (`/doctors/me/unavailability`, `/doctors/me/break-periods`); the doctor-side versions validate break periods against working hours and same-date overlaps exactly as before, and the secretary-side versions keep their existing validation (no working-hours or same-date overlap enforcement) by design in this release.
+
+### Schedule-Change Confirmation
+
+```text
+GET  /schedule-changes
+POST /schedule-changes/:id/confirm
+POST /schedule-changes/:id/dismiss
+GET  /doctors/me/schedule-change-requests   (doctor read-only, own requests)
+```
+
+All three `/schedule-changes` endpoints are SECRETARY-only and scoped to the caller's assigned doctor; other roles, and secretaries of another doctor, receive the standard 403 authorization error. `GET /schedule-changes` returns the assigned doctor's PENDING requests (pending only, newest first, doctor name, requester name and role, affected appointment count and identifiers — no patient personal data beyond count and ids). `POST /:id/confirm` runs in a single transaction with the request row locked `FOR UPDATE`: it verifies the request is still PENDING, re-validates the change against the current schedule (target must exist and match the snapshot, otherwise a 409 conflict is returned and the request stays PENDING), applies the change, recomputes the affected set against current appointment data, flags affected appointments `needs_attention = true` with reason `SCHEDULE_CHANGE` (no appointment is cancelled or rescheduled), creates one `SCHEDULE_CHANGE_NOTICE` per affected patient linked to the appointment, marks the request CONFIRMED with `resolved_at`/`resolved_by`, and only afterwards invalidates the availability cache and sends best-effort pushes with generic text. `POST /:id/dismiss` marks the request DISMISSED; the change stays unapplied and no patient is notified. Confirm and dismiss never run twice; the second of the two is rejected with 409. The doctor read-only list endpoint allows `/doctor/schedule` to display the doctor's own pending changes.
 
 ### Queue
 
@@ -2027,7 +2040,7 @@ secretaries
 doctor_schedules
 doctor_unavailability
 daily_capacities
-
+schedule_change_requests
 appointments
 queue_entries
 

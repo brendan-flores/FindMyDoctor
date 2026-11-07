@@ -689,6 +689,7 @@ patient_doctor_associations (persistent patient-doctor link; details_completion_
 doctor_schedules
 doctor_unavailability
 daily_capacities
+schedule_change_requests
 
 appointments
 queue_entries
@@ -981,9 +982,11 @@ Use the `/api/v1/secretaries/managed-doctors/...` API convention:
 - `GET /schedules` for read-only weekly working hours.
 - `GET`, `POST`, `PUT`, and `DELETE` for `/unavailability` and `/break-periods`.
 
-Apply the doctor schedule validation rules: start <= end, breaks must fall within working hours, and breaks must not overlap.
+Exception and break-period writes that affect active future appointments return HTTP 202 with a schedule-change request summary instead of applying; such changes take effect only after the secretary confirms via `POST /api/v1/schedule-changes/:id/confirm` (SECRETARY-only, scoped to the caller's assigned doctor; confirm is transactional with the request row locked). Changes that affect no appointments apply immediately as before. Secretary break-period proposals intentionally keep the secretary validation profile (they are not required to fall within working hours and are not overlap-checked against other breaks, unlike doctor proposals) — only the doctor-side endpoints enforce those rules; both roles are subject to the new checks (duplicate/overlapping pending requests → 409, stale target at confirm → 409 and the request stays PENDING). Doctors can view their own pending requests read-only via `GET /api/v1/doctors/me/schedule-change-requests`.
 
-When an exception or break-period change affects dates with active appointments, warn the doctor or secretary with the number of affected appointments and require explicit confirmation before saving. After confirmation, save the change and notify affected patients through the notification module. Do not automatically cancel affected appointments; the secretary handles them through existing cancellation and rescheduling flows.
+Apply the doctor schedule validation rules: start <= end, breaks must fall within working hours, and breaks must not overlap (doctor-side enforcement; the secretary endpoints keep their existing validation behavior).
+
+When an exception or break-period change affects dates with active appointments, the change is saved as a PENDING request and the secretary confirms it on `/secretary/dashboard` (Schedule Alerts) before it takes effect. Affected appointments remain active but are flagged `needs_attention` and shown as "Needs attention"/"Awaiting secretary confirmation" in the UIs; each affected patient receives a `SCHEDULE_CHANGE_NOTICE` notification that opens the appointment. Do not automatically cancel affected appointments; the secretary handles them through existing cancellation and rescheduling flows.
 
 Do not:
 - Allow a Secretary to create, edit, or delete weekly working hours
