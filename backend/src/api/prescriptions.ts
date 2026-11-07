@@ -10,6 +10,43 @@ import { sendPushToUser } from '../services/pushService';
 
 const router = Router();
 
+// Get authenticated patient's prescriptions (PATIENT-only)
+router.get('/me', authenticate, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get patient ID from user
+    const patientResult = await query(
+      'SELECT id FROM patients WHERE user_id = $1',
+      [userId]
+    );
+
+    if (patientResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Patient not found'));
+    }
+
+    const patientId = patientResult.rows[0].id;
+
+    // Get all prescriptions for this patient
+    const result = await query(
+      `SELECT p.*,
+              d.first_name as doctor_first_name, d.last_name as doctor_last_name,
+              CASE WHEN p.pdf_url IS NOT NULL AND p.pdf_url != '' THEN true ELSE false END as has_pdf,
+              (SELECT COUNT(*) FROM prescription_items WHERE prescription_id = p.id) as medication_count
+       FROM prescriptions p
+       JOIN doctors d ON p.doctor_id = d.id
+       WHERE p.patient_id = $1
+       ORDER BY p.prescription_date DESC`,
+      [patientId]
+    );
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    console.error('Error fetching patient prescriptions:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch prescriptions'));
+  }
+});
+
 // Create prescription
 router.post('/', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
   try {

@@ -5,6 +5,86 @@ import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
+// Get authenticated patient's visits (PATIENT-only)
+router.get('/me', authenticate, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // Get patient ID from user
+    const patientResult = await query(
+      'SELECT id FROM patients WHERE user_id = $1',
+      [userId]
+    );
+
+    if (patientResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Patient not found'));
+    }
+
+    const patientId = patientResult.rows[0].id;
+
+    // Get all visits for this patient
+    const result = await query(
+      `SELECT v.*,
+              d.first_name as doctor_first_name, d.last_name as doctor_last_name,
+              a.appointment_date,
+              a.id as appointment_id
+       FROM visits v
+       JOIN doctors d ON v.doctor_id = d.id
+       LEFT JOIN appointments a ON v.appointment_id = a.id
+       WHERE v.patient_id = $1
+       ORDER BY v.visit_date DESC`,
+      [patientId]
+    );
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    console.error('Error fetching patient visits:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch visits'));
+  }
+});
+
+// Get specific visit for authenticated patient (PATIENT-only)
+router.get('/me/:id', authenticate, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+
+    // Get patient ID from user
+    const patientResult = await query(
+      'SELECT id FROM patients WHERE user_id = $1',
+      [userId]
+    );
+
+    if (patientResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Patient not found'));
+    }
+
+    const patientId = patientResult.rows[0].id;
+
+    // Get specific visit for this patient
+    const result = await query(
+      `SELECT v.*,
+              d.first_name as doctor_first_name, d.last_name as doctor_last_name,
+              a.appointment_date,
+              a.id as appointment_id
+       FROM visits v
+       JOIN doctors d ON v.doctor_id = d.id
+       LEFT JOIN appointments a ON v.appointment_id = a.id
+       WHERE v.id = $1 AND v.patient_id = $2`,
+      [id, patientId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Visit not found'));
+    }
+
+    res.json(success(result.rows[0]));
+  } catch (err: any) {
+    console.error('Error fetching patient visit:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch visit'));
+  }
+});
+
 // Create visit record (for recording during checkup)
 router.post('/', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
   try {
