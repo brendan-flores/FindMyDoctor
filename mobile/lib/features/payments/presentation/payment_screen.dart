@@ -317,11 +317,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
             showBackButton: true,
             onBackPressed: () {
               if (_hasUploadedReceipt) {
-                // If receipt was uploaded, navigate to appointments page
-                Navigator.of(context).pushNamedAndRemoveUntil('/appointments', (route) {
-                  // Keep the home page in the stack to maintain proper navigation
-                  return route.settings.name == '/home';
-                });
+                // If receipt was uploaded, return to the home page with the
+                // Appointments tab selected (there is no standalone
+                // /appointments route).
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  '/home',
+                  (route) => route.settings.name == '/home',
+                  arguments: {'initialTab': 2},
+                );
               } else {
                 // If no receipt uploaded, go back to previous page (booking confirmation)
                 Navigator.of(context).pop();
