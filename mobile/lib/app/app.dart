@@ -25,6 +25,7 @@ import '../features/conversations/presentation/conversation_thread_page.dart';
 import '../features/conversations/presentation/ai_conversation_page.dart';
 import '../features/conversations/presentation/ai_conversation_history_page.dart';
 import '../features/payments/presentation/payment_screen.dart';
+import '../features/payments/presentation/payments_hub_page.dart';
 import '../features/notifications/presentation/notifications_page.dart';
 import '../features/secretary/presentation/secretary_home_page.dart';
 import '../features/waitlist/presentation/waitlist_page.dart';
@@ -185,6 +186,7 @@ class MyAppState extends State<MyApp> {
           case '/patient-profile':
           case '/privacy-notice':
           case '/payment':
+          case '/payments':
           case '/notifications':
           case '/conversation-thread':
           case '/ai-conversation':
@@ -367,6 +369,10 @@ class MyAppState extends State<MyApp> {
                     appointmentDate: args?['appointmentDate'],
                     doctorId: args?['doctorId'],
                   ),
+                );
+              case '/payments':
+                return MaterialPageRoute(
+                  builder: (context) => const PaymentsHubPage(),
                 );
               default:
                 return MaterialPageRoute(

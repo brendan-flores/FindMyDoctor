@@ -724,6 +724,49 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                   ],
                 ),
               ),
+              if (status == 'COMPLETED')
+                Padding(
+                  padding: EdgeInsets.only(
+                    right: spacing.AppSpacing.gutterXs,
+                  ),
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).pushNamed('/payments');
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: spacing.AppSpacing.gutterSm,
+                        vertical: spacing.AppSpacing.gutterXs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondaryContainer.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(
+                          spacing.AppSpacing.radiusFull,
+                        ),
+                        border: Border.all(
+                          color: AppColors.secondary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.payments_outlined,
+                            size: spacing.AppSpacing.iconSm,
+                            color: AppColors.secondary,
+                          ),
+                          const SizedBox(width: spacing.AppSpacing.gutterXs),
+                          Text(
+                            'Payments',
+                            style: AppTextStyles.labelSm.copyWith(
+                              color: AppColors.secondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               if (showInvoiceButton)
                 GestureDetector(
                   onTap: () {

@@ -886,6 +886,11 @@ class ApiService {
     );
   }
 
+  /// List the authenticated patient's own payment records (newest first).
+  Future<Map<String, dynamic>> getMyPayments() async {
+    return await get('${ApiConstants.payments}/me', requireAuth: true);
+  }
+
   Future<Map<String, dynamic>> getGcashQr({required String doctorId}) async {
     return await get(
       '${ApiConstants.payments}/gcash-qr',
@@ -897,6 +902,19 @@ class ApiService {
   // ===========================
   // INVOICES METHODS
   // ===========================
+
+  /// List the authenticated patient's own invoices (newest first).
+  Future<Map<String, dynamic>> getMyInvoices() async {
+    return await get('${ApiConstants.invoices}/me', requireAuth: true);
+  }
+
+  /// Get a short-lived signed download URL for an invoice.
+  Future<Map<String, dynamic>> getInvoiceDownloadUrl(String invoiceId) async {
+    return await get(
+      '${ApiConstants.invoices}/$invoiceId/download-url',
+      requireAuth: true,
+    );
+  }
 
   Future<Map<String, dynamic>> getInvoiceByPayment(String paymentId) async {
     return await get(
