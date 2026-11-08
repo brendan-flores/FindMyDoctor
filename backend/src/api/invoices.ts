@@ -252,6 +252,42 @@ router.post('/generate/:paymentId', authenticate, requireSecretaryPasswordChange
   }
 });
 
+// List the authenticated patient's own invoices (patient only)
+// GET /invoices/me - must be registered before /:id so "me" is not captured
+// as an invoice id.
+router.get('/me', authenticate, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    const result = await query(
+      `SELECT
+         i.id,
+         i.invoice_number,
+         i.invoice_date,
+         i.total_amount,
+         i.payment_method,
+         i.status,
+         i.payment_id,
+         d.first_name as doctor_first_name,
+         d.last_name as doctor_last_name,
+         d.specialty,
+         d.practice_name,
+         a.appointment_date
+       FROM invoices i
+       JOIN doctors d ON i.doctor_id = d.id
+       LEFT JOIN payments p ON i.payment_id = p.id
+       LEFT JOIN appointments a ON p.appointment_id = a.id
+       WHERE i.patient_id = (SELECT id FROM patients WHERE user_id = $1)
+       ORDER BY i.invoice_date DESC`,
+      [userId]
+    );
+
+    res.json(success(result.rows));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch invoices'));
+  }
+});
+
 // Get invoice by ID
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
