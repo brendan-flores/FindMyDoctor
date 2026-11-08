@@ -26,6 +26,7 @@ router.get('/me', authenticate, authorize('PATIENT'), async (req: AuthRequest, r
     const result = await query(
       `SELECT v.*,
               d.first_name as doctor_first_name, d.last_name as doctor_last_name,
+              d.professional_photo_url as doctor_professional_photo_url,
               a.appointment_date,
               a.id as appointment_id
        FROM visits v

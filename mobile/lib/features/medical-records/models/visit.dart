@@ -1,3 +1,5 @@
+import '../../../core/utils/json_parsers.dart';
+
 class Visit {
   final String id;
   final DateTime? visitDate;
@@ -6,6 +8,7 @@ class Visit {
   final String doctorFirstName;
   final String doctorLastName;
   final String? appointmentId;
+  final String? doctorProfessionalPhotoUrl;
 
   Visit({
     required this.id,
@@ -15,6 +18,7 @@ class Visit {
     required this.doctorFirstName,
     required this.doctorLastName,
     this.appointmentId,
+    this.doctorProfessionalPhotoUrl,
   });
 
   factory Visit.fromJson(Map<String, dynamic> json) {
@@ -27,7 +31,9 @@ class Visit {
       notes: json['notes'] as String?,
       doctorFirstName: json['doctor_first_name'] as String? ?? '',
       doctorLastName: json['doctor_last_name'] as String? ?? '',
-      appointmentId: json['appointment_id'] as String?,
+      appointmentId: parseString(json['appointment_id']),
+      doctorProfessionalPhotoUrl:
+          parseString(json['doctor_professional_photo_url']),
     );
   }
 }

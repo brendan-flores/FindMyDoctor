@@ -1,3 +1,5 @@
+import '../../../core/utils/json_parsers.dart';
+
 class Prescription {
   final String id;
   final DateTime? prescriptionDate;
@@ -23,8 +25,14 @@ class Prescription {
           : null,
       doctorFirstName: json['doctor_first_name'] as String? ?? '',
       doctorLastName: json['doctor_last_name'] as String? ?? '',
-      medicationCount: json['medication_count'] as int? ?? 0,
-      hasPdf: json['has_pdf'] as bool? ?? false,
+      // medication_count is a COUNT(*) (PostgreSQL bigint), which the
+      // node-postgres driver delivers as a JSON string - parse it instead
+      // of casting (`as int?` throws and fails the whole list load).
+      medicationCount: parseInt(json['medication_count']) ?? 0,
+      // has_pdf comes from a CASE WHEN boolean expression, but tolerate
+      // 'true'/'false' strings as well.
+      hasPdf: json['has_pdf'] == true ||
+          json['has_pdf']?.toString().toLowerCase() == 'true',
     );
   }
 }

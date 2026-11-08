@@ -13,10 +13,17 @@ import '../../../core/services/api_service.dart';
 
 class PrescriptionDetailPage extends StatefulWidget {
   final String prescriptionId;
+  final ApiService? apiService;
+
+  /// Test seam: inject how a URL is opened. Defaults to opening in an
+  /// external application (e.g. the browser / PDF viewer).
+  final Future<bool> Function(Uri)? openUrl;
 
   const PrescriptionDetailPage({
     super.key,
     required this.prescriptionId,
+    this.apiService,
+    this.openUrl,
   });
 
   @override
@@ -25,18 +32,18 @@ class PrescriptionDetailPage extends StatefulWidget {
 }
 
 class _PrescriptionDetailPageState extends State<PrescriptionDetailPage> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   Map<String, dynamic>? _prescription;
   List<dynamic> _items = [];
   bool _isLoading = true;
   String? _errorMessage;
-  String? _pdfUrl;
   bool _isLoadingPdf = false;
   String? _pdfError;
 
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
     _loadPrescription();
   }
 
@@ -83,21 +90,38 @@ class _PrescriptionDetailPageState extends State<PrescriptionDetailPage> {
       if (!mounted) return;
 
       if (response['success'] == true) {
+        final signedUrl = response['data']?['signedUrl'] as String?;
+        if (!mounted) return;
         setState(() {
-          _pdfUrl = response['data']['signedUrl'] as String?;
           _isLoadingPdf = false;
         });
 
         // Open PDF if URL is available
-        if (_pdfUrl != null) {
-          final uri = Uri.parse(_pdfUrl!);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          } else {
-            setState(() {
-              _pdfError = 'Could not open PDF';
-            });
+        if (signedUrl != null && signedUrl.isNotEmpty) {
+          // Don't rely on canLaunchUrl: on Android 11+ it returns false for
+          // https links unless the manifest declares an intent query. Call
+          // launchUrl directly and handle its boolean result instead.
+          final openUrl = widget.openUrl ??
+              (Uri target) =>
+                  launchUrl(target, mode: LaunchMode.externalApplication);
+          try {
+            final opened = await openUrl(Uri.parse(signedUrl));
+            if (!opened && mounted) {
+              setState(() {
+                _pdfError = 'Could not open PDF';
+              });
+            }
+          } catch (_) {
+            if (mounted) {
+              setState(() {
+                _pdfError = 'Could not open PDF';
+              });
+            }
           }
+        } else if (mounted) {
+          setState(() {
+            _pdfError = 'Could not open PDF';
+          });
         }
       } else {
         setState(() {
@@ -119,6 +143,7 @@ class _PrescriptionDetailPageState extends State<PrescriptionDetailPage> {
     return Scaffold(
       appBar: AppHeader(
         title: 'Prescription',
+        showBackButton: true,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

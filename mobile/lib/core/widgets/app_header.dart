@@ -46,7 +46,11 @@ class AppHeader extends StatefulWidget implements PreferredSizeWidget {
     final double topPadding =
         WidgetsBinding.instance.platformDispatcher.views.first.padding.top /
         WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
-    return Size.fromHeight(topPadding + 56.0); // 56 = gutterMd(12) + content(32) + gutterMd(12)
+    // 72 = gutterMd(12) + content(48, the IconButton touch-target height;
+    // the 32px logo/profile avatar is vertically centered inside it) +
+    // gutterMd(12). Keeping 56 here let the header paint 16 px over the
+    // page body and triggered a RenderFlex overflow.
+    return Size.fromHeight(topPadding + 72.0);
   }
 
   @override

@@ -42,6 +42,72 @@ describe('Visit API Authorization', () => {
     mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
   });
 
+  describe('GET /api/v1/visits/me', () => {
+    it('should include the doctor profile photo url in the visits query', async () => {
+      mockUser = { id: 'patient-user-id', role: 'PATIENT' };
+      let capturedSql = '';
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('FROM patients WHERE user_id')) {
+          expect(params).toEqual(['patient-user-id']);
+          return Promise.resolve({ rows: [{ id: 'patient-id' }] });
+        }
+        if (sql.includes('FROM visits v')) {
+          capturedSql = sql;
+          expect(params).toEqual(['patient-id']);
+          return Promise.resolve({
+            rows: [{
+              id: 'visit-1',
+              patient_id: 'patient-id',
+              doctor_id: 'doctor-id',
+              visit_date: '2024-01-15T10:00:00Z',
+              doctor_first_name: 'John',
+              doctor_last_name: 'Smith',
+              doctor_professional_photo_url: 'https://example.com/photo.png',
+              reason_for_visit: 'Checkup'
+            }]
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/visits/me');
+
+      expect(response.status).toBe(200);
+      expect(capturedSql).toContain('professional_photo_url as doctor_professional_photo_url');
+      expect(response.body.data[0].doctor_professional_photo_url).toBe('https://example.com/photo.png');
+    });
+
+    it('should scope visits to the authenticated patient', async () => {
+      mockUser = { id: 'patient-user-id', role: 'PATIENT' };
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('FROM patients WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'patient-id' }] });
+        }
+        if (sql.includes('FROM visits v')) {
+          expect(sql).toContain('WHERE v.patient_id = $1');
+          return Promise.resolve({ rows: [] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .get('/api/v1/visits/me');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toEqual([]);
+    });
+
+    it('should reject non-patient roles with 403', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      const response = await request(app)
+        .get('/api/v1/visits/me');
+
+      expect(response.status).toBe(403);
+    });
+  });
+
   describe('GET /api/v1/visits/patient/:patientId', () => {
     it('should allow doctor to access visits for patient through association', async () => {
       query.mockImplementation((sql: string, params: any[]) => {

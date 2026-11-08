@@ -8,13 +8,14 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/services/api_service.dart';
-import '../../../core/utils/json_parsers.dart';
 import '../models/visit.dart';
 import '../models/prescription.dart';
 import 'prescription_detail_page.dart';
 
 class MedicalRecordsPage extends StatefulWidget {
-  const MedicalRecordsPage({super.key});
+  final ApiService? apiService;
+
+  const MedicalRecordsPage({super.key, this.apiService});
 
   @override
   State<MedicalRecordsPage> createState() => _MedicalRecordsPageState();
@@ -23,7 +24,7 @@ class MedicalRecordsPage extends StatefulWidget {
 class _MedicalRecordsPageState extends State<MedicalRecordsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
 
   // History tab state
   List<Visit> _visits = [];
@@ -42,6 +43,7 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _apiService = widget.apiService ?? ApiService();
     _loadData();
   }
 
@@ -164,6 +166,7 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
     return Scaffold(
       appBar: AppHeader(
         title: 'Medical Records',
+        showBackButton: true,
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list),
@@ -308,6 +311,7 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
           Row(
             children: [
               DoctorProfileImage(
+                photoUrl: visit.doctorProfessionalPhotoUrl,
                 size: 48,
               ),
               const SizedBox(width: spacing.AppSpacing.gutterLg),
@@ -316,7 +320,7 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      doctorName,
+                      'Dr. $doctorName',
                       style: AppTextStyles.bodyMdMedium,
                     ),
                     const SizedBox(height: spacing.AppSpacing.gutterSm),
@@ -378,6 +382,7 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
             MaterialPageRoute(
               builder: (context) => PrescriptionDetailPage(
                 prescriptionId: prescription.id,
+                apiService: _apiService,
               ),
             ),
           );
