@@ -4,6 +4,27 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.39 (November 9, 2026)
+
+**Purpose:** Give patients a centralized Payments Hub in the mobile app to review payment records, pay via GCash QR, upload receipts, track verification status, and access invoices.
+
+**Significant Features:**
+- Backend: new patient-scoped endpoints `GET /api/v1/payments/me` (registered before `/:appointmentId`) and `GET /api/v1/invoices/me` (registered before `/:id`). Both return only the authenticated patient's records, sorted newest first; payments include appointment date, doctor, consultation fee, charges, totals, payment method, derived status, linked ACTIVE invoice id/number, and the latest rejection reason/note.
+- Mobile: new `/payments` route (`PaymentsHubPage`) — status filter chips (All, Unpaid, Pending verification, Paid, Rejected), payment cards with appointment/doctor/amount breakdown/status, lazy expandable GCash QR + account details with retry fallbacks, "Pay with GCash"/"Upload New Receipt" actions reusing the existing `/payment` guided upload flow, rejection reason display, receipt viewing via signed URL, and invoice view/download via the shared `InvoiceBottomSheet`.
+- Mobile: entry points to `/payments` added on the Home quick-actions grid, the Profile tab ("Payments & Invoices"), and COMPLETED appointment cards ("Payments" chip).
+- Mobile: `INVOICE_AVAILABLE` notifications now deep-link — the notifications page opens the invoice preview (`InvoiceBottomSheet`) with a `/payments` fallback, and push-notification taps open `/payments` for PATIENT-role users.
+- Mobile API service: added `getMyPayments()`, `getMyInvoices()`, and `getInvoiceDownloadUrl()`.
+
+**Bug Fixes:**
+- Mobile: `payment_screen.dart` back navigation after receipt upload pushed the unregistered `/appointments` route; it now returns to `/home` with the Appointments tab (`initialTab: 2`) selected.
+- Resolved committed merge-conflict markers in `app_header.dart` (kept the newer top-padding fix), `notifications_page.dart` (union of appointment/prescription/invoice notification handling), `docs/CURRENT_VERSION.md`, and root `SYSTEM_STATE.md`.
+
+**Breaking Changes:** None (additive endpoints and routes; existing payment/invoice endpoints unchanged).
+
+**Documentation Updates:** `CURRENT_VERSION.md` 01.39, this entry, `SYSTEM_STATE.md` (root and `docs/SYSTEM_STATE.md`) with the Patient Payments Hub section, `docs/architecture.md` Payments/Invoices endpoint lists, and `docs/prd.md` FR-025A.
+
+---
+
 ### 01.37 (November 7, 2026)
 
 **Purpose:** Stop schedule changes that affect active future appointments from taking effect silently. The change now waits for secretary confirmation; affected appointments stay active but are flagged as needing attention, and affected patients receive a notification.
