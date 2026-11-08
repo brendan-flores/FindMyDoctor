@@ -1916,7 +1916,7 @@ GET  /prescriptions/:id
 GET  /prescriptions/:id/pdf-url
 ```
 
-`GET /visits/me` and `GET /visits/me/:id` are PATIENT-only endpoints that return the authenticated patient's completed consultations (visit date, doctor, diagnosis, notes, linked appointment). Cross-patient access returns HTTP 403.
+`GET /visits/me` is a PATIENT-only endpoint that returns the authenticated patient's completed consultations (visit date, doctor, doctor profile photo (`doctor_professional_photo_url`, from `doctors.professional_photo_url`), diagnosis, notes, linked appointment). `GET /visits/me/:id` returns a single completed consultation for the authenticated patient. Cross-patient access returns HTTP 403.
 
 `GET /prescriptions/me` is a PATIENT-only endpoint that returns the authenticated patient's prescriptions (prescription date, doctor, medication count, status). Cross-patient access returns HTTP 403.
 

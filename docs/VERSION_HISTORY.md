@@ -4,6 +4,30 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.38 (November 8, 2026)
+
+**Purpose:** Fix the patient mobile Medical Records screen: prescriptions failing to load, and the History tab missing the "Dr." name prefix and the visit doctor's real profile photo.
+
+**Bug Fixes:**
+- Mobile: Prescriptions tab on `/medical-records` no longer shows "Failed to load prescriptions." `Prescription.fromJson` cast `medication_count` (a PostgreSQL bigint from `COUNT(*)`, delivered as a JSON string by the node-postgres driver) with `as int?`, which threw and aborted the whole list load. It now parses via the shared `parseInt` helper (numbers and numeric strings accepted; missing/invalid values default to 0). `has_pdf` parsing also tolerates `'true'`/`'false'` strings.
+- Mobile: fixed a pre-existing 16px `RenderFlex` overflow in the shared `AppHeader` (`appBar: AppHeader(...)` on Medical Records and Prescription Detail): the preferred size assumed 32px content (56px total) but IconButton touch targets are 48px. The preferred size is now `padding.top + 72px`, eliminating the overflow and the header paint overlapping the page body.
+- Mobile: "Download PDF" on the patient prescription detail page no longer reports "Could not open PDF." It relied on `canLaunchUrl()`, which returns false for https links on Android 11+ (package-visibility filtering). It now calls `launchUrl` directly and handles its boolean result (the same pattern as the doctor profile directions link), shows "Could not open PDF" only when the URL genuinely cannot be opened, and handles a missing `signedUrl` gracefully. `PrescriptionDetailPage` also accepts an optional `apiService` and `openUrl` for test injection (defaults unchanged).
+- Mobile: Medical Records page and prescription detail view now show a back button in the shared `AppHeader` (same `arrow_back_ios_new` pattern as other back-enabled screens). Tapping it pops the navigator, returning to the immediately previous view; the underlying Medical Records page keeps its selected tab, date filter, loaded data, and list scroll position because navigation uses `Navigator.push`/`pop` (no replace).
+
+**Improvements:**
+- Mobile: History tab visit cards now display the doctor's name with a "Dr." prefix (e.g., "Dr. Juan Dela Cruz").
+- Backend: `GET /api/v1/visits/me` now returns `doctor_professional_photo_url` (from `doctors.professional_photo_url`) for each visit.
+- Mobile: History tab visit cards now show the visit doctor's actual profile photo via the existing `DoctorProfileImage` widget, falling back to the default avatar when no photo is set (existing behavior).
+- Mobile: `MedicalRecordsPage` accepts an optional `apiService` for test injection (defaults to the shared singleton, consistent with other pages).
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (non-breaking additive API response field).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.38, added version entry to `VERSION_HISTORY.md`, and updated `architecture.md` and `system state documentation` (Patient Medical Records section) for the new `doctor_professional_photo_url` field, the "Dr." prefix, photo display, and the `AppHeader` size fix. No database schema changes or migrations were required.
+
+---
+
 ### 01.37 (November 7, 2026)
 
 **Purpose:** Enable patients to view their medical history and prescriptions through the mobile app, with access to prescription PDFs.

@@ -294,6 +294,9 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 See `docs/VERSION_HISTORY.md` for complete version history.
 
 **Recent Versions:**
+- 01.38: Patient Medical Records bug fixes — prescriptions tab no longer fails to load (bigint `medication_count` parsing), History tab shows "Dr." prefix and the visit doctor's real profile photo, prescription detail can open PDFs again; shared AppHeader 16px overflow fixed; back buttons added to the Medical Records screens
+- 01.37: Patient mobile Medical Records and Prescription access (prescriptions, visit history, prescription PDFs)
+- 01.36: Secretary GCash account details configuration
 - 01.35: Patient appointment rescheduling, cancellation with waitlist promotion, and live queue tracking
 - 01.34: Consolidated idempotent schema migration and tracked, rerunnable migration runner
 - 01.33: Notification dropdown navigation and full message display
