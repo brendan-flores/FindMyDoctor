@@ -550,17 +550,33 @@ class ApiService {
         'sex': sex,
         'phone': phone,
         'address': address,
-        if (emergencyContactName != null)
-          'emergencyContactName': emergencyContactName,
-        if (emergencyContactPhone != null)
-          'emergencyContactPhone': emergencyContactPhone,
+        if (emergencyContactName != null) 'emergencyContactName': emergencyContactName,
+        if (emergencyContactPhone != null) 'emergencyContactPhone': emergencyContactPhone,
         if (medicalHistory != null) 'medicalHistory': medicalHistory,
         if (allergies != null) 'allergies': allergies,
-        if (currentMedications != null)
-          'currentMedications': currentMedications,
+        if (currentMedications != null) 'currentMedications': currentMedications,
       },
-      requireAuth: true,
     );
+  }
+
+  // Get authenticated patient's visits
+  Future<Map<String, dynamic>> getMyVisits() async {
+    return await get('/visits/me', requireAuth: true);
+  }
+
+  // Get authenticated patient's prescriptions
+  Future<Map<String, dynamic>> getMyPrescriptions() async {
+    return await get('/prescriptions/me', requireAuth: true);
+  }
+
+  // Get prescription by ID
+  Future<Map<String, dynamic>> getPrescription(String id) async {
+    return await get('/prescriptions/$id', requireAuth: true);
+  }
+
+  // Get prescription PDF URL
+  Future<Map<String, dynamic>> getPrescriptionPdfUrl(String id) async {
+    return await get('/prescriptions/$id/pdf-url', requireAuth: true);
   }
 
   // ===========================

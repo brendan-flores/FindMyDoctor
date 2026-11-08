@@ -766,6 +766,15 @@ class _HomePageState extends State<HomePage> {
             Navigator.of(context).pushNamed('/patient-profile');
           },
         ),
+        _buildActionRow(
+          key: const ValueKey('profile_medical_records'),
+          icon: Icons.folder_open,
+          title: 'Medical Records',
+          semanticLabel: 'Medical Records',
+          onTap: () {
+            Navigator.of(context).pushNamed('/medical-records');
+          },
+        ),
       ],
     );
   }
@@ -1399,9 +1408,9 @@ class _HomePageState extends State<HomePage> {
           AppColors.secondary,
         ),
         _buildQuickActionCard(
-          'Secretary Chat',
-          'Inquiries',
-          Icons.chat,
+          'Medical Records',
+          'History & Prescriptions',
+          Icons.folder_open,
           AppColors.tertiary.withValues(alpha: 0.1),
           AppColors.tertiary,
         ),
@@ -1434,11 +1443,8 @@ class _HomePageState extends State<HomePage> {
           setState(() {
             _currentIndex = 2;
           });
-        } else if (title == 'Secretary Chat') {
-          setState(() {
-            _currentIndex = 3;
-            _chatSegment = 'clinic';
-          });
+        } else if (title == 'Medical Records') {
+          Navigator.of(context).pushNamed('/medical-records');
         } else if (title == 'My Profile') {
           setState(() {
             _currentIndex = 4;

@@ -189,6 +189,7 @@ mobile/
 │   ├── capacity/
 │   ├── patients/
 │   ├── prescriptions/
+│   ├── medical-records/      # Patient medical history and prescription records
 │   ├── payments/
 │   ├── conversations/
 │   ├── secretary/
@@ -1917,6 +1918,22 @@ GET  /ai/conversations
 GET  /ai/conversations/:id
 GET  /ai/conversations/:id/messages
 ```
+
+### Patient Medical Records and Prescriptions
+
+```text
+GET  /visits/me
+GET  /visits/me/:id
+GET  /prescriptions/me
+GET  /prescriptions/:id
+GET  /prescriptions/:id/pdf-url
+```
+
+`GET /visits/me` is a PATIENT-only endpoint that returns the authenticated patient's completed consultations (visit date, doctor, doctor profile photo (`doctor_professional_photo_url`, from `doctors.professional_photo_url`), diagnosis, notes, linked appointment). `GET /visits/me/:id` returns a single completed consultation for the authenticated patient. Cross-patient access returns HTTP 403.
+
+`GET /prescriptions/me` is a PATIENT-only endpoint that returns the authenticated patient's prescriptions (prescription date, doctor, medication count, status). Cross-patient access returns HTTP 403.
+
+`GET /prescriptions/:id` and `GET /prescriptions/:id/pdf-url` are existing patient-authorized endpoints for viewing prescription details and accessing signed PDF URLs. The PDF URL endpoint generates a short-lived signed URL for download/viewing; expired links require a retry to generate a fresh URL.
 
 ### Payments
 

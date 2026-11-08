@@ -301,8 +301,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         final isPaymentNotification = type == 'ADDITIONAL_CHARGE_ADDED' || type == 'PAYMENT_VERIFIED' || type == 'PAYMENT_REJECTED';
                         final isWaitlistNotification = type == 'WAITLIST_UPDATE';
                         final isAppointmentNotification = type == 'APPOINTMENT_CANCELLED' ||
+<<<<<<< HEAD
                             type == 'APPOINTMENT_RESCHEDULED' ||
                             type == 'SCHEDULE_CHANGE_NOTICE';
+=======
+                            type == 'APPOINTMENT_RESCHEDULED';
+                        final isPrescriptionNotification = type == 'PRESCRIPTION_AVAILABLE';
+>>>>>>> feature/mobile-patient-medical-records-prescriptions
 
                         return Card(
                           margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
@@ -329,6 +334,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     context,
                                     '/appointment-detail',
                                     arguments: {'appointmentId': appointmentId},
+                                  );
+                                }
+                                return;
+                              }
+
+                              // Handle prescription notifications - deep-link to prescription detail
+                              if (isPrescriptionNotification) {
+                                final prescriptionId = notification['related_entity_id']?.toString();
+                                if (prescriptionId != null && prescriptionId.isNotEmpty) {
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/prescription-detail',
+                                    arguments: {'prescriptionId': prescriptionId},
                                   );
                                 }
                                 return;

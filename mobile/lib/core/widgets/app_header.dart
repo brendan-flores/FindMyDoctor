@@ -33,7 +33,16 @@ class AppHeader extends StatefulWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(60);
+  Size get preferredSize {
+    final double topPadding =
+        WidgetsBinding.instance.platformDispatcher.views.first.padding.top /
+        WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
+    // 72 = gutterMd(12) + content(48, the IconButton touch-target height;
+    // the 32px logo/profile avatar is vertically centered inside it) +
+    // gutterMd(12). Keeping 56 here let the header paint 16 px over the
+    // page body and triggered a RenderFlex overflow.
+    return Size.fromHeight(topPadding + 72.0);
+  }
 
   @override
   State<AppHeader> createState() => _AppHeaderState();
@@ -59,13 +68,22 @@ class _AppHeaderState extends State<AppHeader> {
 
   @override
   Widget build(BuildContext context) {
+    final double topPadding = MediaQuery.of(context).padding.top;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
+<<<<<<< HEAD
           padding: const EdgeInsets.symmetric(
             horizontal: spacing.AppSpacing.screenPadding,
             vertical: spacing.AppSpacing.gutterMd,
+=======
+          padding: EdgeInsets.only(
+            left: spacing.AppSpacing.screenPadding,
+            right: spacing.AppSpacing.screenPadding,
+            top: topPadding + spacing.AppSpacing.gutterMd,
+            bottom: spacing.AppSpacing.gutterMd,
+>>>>>>> feature/mobile-patient-medical-records-prescriptions
           ),
           decoration: BoxDecoration(
             color: AppColors.surface,
@@ -77,9 +95,7 @@ class _AppHeaderState extends State<AppHeader> {
               ),
             ],
           ),
-          child: SafeArea(
-            bottom: false,
-            child: Row(
+          child: Row(
               children: [
                 if (widget.showBackButton)
                   IconButton(
@@ -179,7 +195,6 @@ class _AppHeaderState extends State<AppHeader> {
                 ],
               ],
             ),
-          ),
         ),
       ],
     );

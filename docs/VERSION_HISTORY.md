@@ -4,6 +4,77 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.38 (November 8, 2026)
+
+**Purpose:** Fix the patient mobile Medical Records screen: prescriptions failing to load, and the History tab missing the "Dr." name prefix and the visit doctor's real profile photo.
+
+**Bug Fixes:**
+- Mobile: Prescriptions tab on `/medical-records` no longer shows "Failed to load prescriptions." `Prescription.fromJson` cast `medication_count` (a PostgreSQL bigint from `COUNT(*)`, delivered as a JSON string by the node-postgres driver) with `as int?`, which threw and aborted the whole list load. It now parses via the shared `parseInt` helper (numbers and numeric strings accepted; missing/invalid values default to 0). `has_pdf` parsing also tolerates `'true'`/`'false'` strings.
+- Mobile: fixed a pre-existing 16px `RenderFlex` overflow in the shared `AppHeader` (`appBar: AppHeader(...)` on Medical Records and Prescription Detail): the preferred size assumed 32px content (56px total) but IconButton touch targets are 48px. The preferred size is now `padding.top + 72px`, eliminating the overflow and the header paint overlapping the page body.
+- Mobile: "Download PDF" on the patient prescription detail page no longer reports "Could not open PDF." It relied on `canLaunchUrl()`, which returns false for https links on Android 11+ (package-visibility filtering). It now calls `launchUrl` directly and handles its boolean result (the same pattern as the doctor profile directions link), shows "Could not open PDF" only when the URL genuinely cannot be opened, and handles a missing `signedUrl` gracefully. `PrescriptionDetailPage` also accepts an optional `apiService` and `openUrl` for test injection (defaults unchanged).
+- Mobile: Medical Records page and prescription detail view now show a back button in the shared `AppHeader` (same `arrow_back_ios_new` pattern as other back-enabled screens). Tapping it pops the navigator, returning to the immediately previous view; the underlying Medical Records page keeps its selected tab, date filter, loaded data, and list scroll position because navigation uses `Navigator.push`/`pop` (no replace).
+
+**Improvements:**
+- Mobile: History tab visit cards now display the doctor's name with a "Dr." prefix (e.g., "Dr. Juan Dela Cruz").
+- Backend: `GET /api/v1/visits/me` now returns `doctor_professional_photo_url` (from `doctors.professional_photo_url`) for each visit.
+- Mobile: History tab visit cards now show the visit doctor's actual profile photo via the existing `DoctorProfileImage` widget, falling back to the default avatar when no photo is set (existing behavior).
+- Mobile: `MedicalRecordsPage` accepts an optional `apiService` for test injection (defaults to the shared singleton, consistent with other pages).
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (non-breaking additive API response field).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.38, added version entry to `VERSION_HISTORY.md`, and updated `architecture.md` and `system state documentation` (Patient Medical Records section) for the new `doctor_professional_photo_url` field, the "Dr." prefix, photo display, and the `AppHeader` size fix. No database schema changes or migrations were required.
+
+---
+
+### 01.37 (November 7, 2026)
+
+**Purpose:** Enable patients to view their medical history and prescriptions through the mobile app, with access to prescription PDFs.
+
+**Significant Features:**
+- Backend patient-scoped endpoints:
+  - Added `GET /api/v1/visits/me` (PATIENT-only) to return authenticated patient's completed consultations (visit date, doctor, diagnosis, notes, linked appointment).
+  - Added `GET /api/v1/visits/me/:id` (PATIENT-only) to return a specific visit for the authenticated patient.
+  - Added `GET /api/v1/prescriptions/me` (PATIENT-only) to return authenticated patient's prescriptions (prescription date, doctor, medication count, status).
+  - All patient-scoped endpoints enforce ownership verification and return HTTP 403 for cross-patient access.
+- Mobile medical records page (`/medical-records`):
+  - Two tabs: History (completed consultations) and Prescriptions.
+  - History tab displays medical history cards with visit date, doctor name, diagnosis, and notes.
+  - Prescriptions tab displays prescription cards with prescription date, doctor name, medication count, and status.
+  - Date filters: All time, Last 7 days, Last 30 days.
+  - Pull-to-refresh, loading states, empty states, and retryable error states.
+- Mobile prescription detail page (`/prescription-detail`):
+  - Displays full prescription information including each medication's name, dosage, frequency, duration, and instructions.
+  - PDF viewing and downloading functionality using signed URL from `GET /api/v1/prescriptions/:id/pdf-url`.
+  - Retry mechanism for expired PDF links.
+- Mobile navigation:
+  - Added `/medical-records` and `/prescription-detail` routes with patient-only guards (secretaries redirected to secretary home).
+  - Entry points from Home quick actions ("Medical Records") and Profile tab ("Medical Records").
+- Notification deep-linking:
+  - Updated notifications page to handle `PRESCRIPTION_AVAILABLE` notification type.
+  - Tapping PRESCRIPTION_AVAILABLE notification navigates to `/prescription-detail` with the prescription ID.
+
+**Improvements:**
+- Patients can now view their complete medical history and prescriptions in one centralized location.
+- Date filtering allows patients to quickly find recent records.
+- PDF access with retry mechanism ensures patients can always download their prescriptions.
+- Security enforcement ensures patients can only access their own records.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (new feature only; non-breaking API additions).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.37, added version entry to `VERSION_HISTORY.md`, and updated `SYSTEM_STATE.md` and `architecture.md` with patient medical records and prescription access documentation.
+
+---
+
+*Note: the dev branch independently shipped a different `01.37` on November 7
+(the schedule-change confirmation entry recorded below). Both 01.37 releases
+are included in `01.38` (see the first entry above).*
+
 ### 01.37 (November 7, 2026)
 
 **Purpose:** Stop schedule changes that affect active future appointments from taking effect silently. The change now waits for secretary confirmation; affected appointments stay active but are flagged as needing attention, and affected patients receive a notification.
@@ -137,7 +208,7 @@ This document contains the complete version history for the FindMyDoctor applica
   - ESM-safe path resolution (`fileURLToPath`) so `npm run migrate` works under `tsx`.
   - Tracks applied migrations in `schema_migrations`, keyed by `filename` because multiple historical files share numeric prefixes.
   - Skips files already recorded, supports partially migrated databases, runs each pending migration in its own transaction, rolls back and stops on failure, and verifies required columns/tables after applying.
-  - Records migrations `001`–`041` as baselined (never executed) because several are destructive, insert sample data, or are not idempotent; the files are preserved for history.
+  - Records migrations `001`ΓÇô`041` as baselined (never executed) because several are destructive, insert sample data, or are not idempotent; the files are preserved for history.
   - Refuses `--force`, supports `--dry-run`, logs the non-secret target database label, and warns (without re-applying) when a recorded file's checksum changes.
 - Schema corrections required by the application:
   - Added `patients.middle_name` (nullable).
@@ -320,7 +391,7 @@ This document contains the complete version history for the FindMyDoctor applica
   - Extended existing section to include PAID payments that have no ACTIVE invoice.
   - Backend query now includes PAID payments where invoice is NULL or status is VOID.
   - Results scoped to the secretary's assigned doctor.
-  - New entries display with green/emerald "Paid — invoice not sent" status badge.
+  - New entries display with green/emerald "Paid ΓÇö invoice not sent" status badge.
   - All entries (existing PENDING_VERIFICATION, UNPAID, and new PAID without invoice) link to `/secretary/payments`.
 - Backend API changes:
   - Extended `GET /api/v1/doctors/me/dashboard` to include `consultationsNeedingRecords` array with appointment details and missing record/prescription flags.
@@ -330,7 +401,7 @@ This document contains the complete version history for the FindMyDoctor applica
   - Updated `SecretaryDashboard` interface in `web/src/lib/api/secretaryApi.ts` to include `invoiceNotSent` field in payment entries.
 - Frontend UI changes:
   - Replaced amber placeholder banner in `/web/src/app/doctor/dashboard/page.tsx` with table showing consultations needing records.
-  - Updated `/web/src/app/secretary/dashboard/page.tsx` to display "Paid — invoice not sent" entries with appropriate styling.
+  - Updated `/web/src/app/secretary/dashboard/page.tsx` to display "Paid ΓÇö invoice not sent" entries with appropriate styling.
 
 **Improvements:**
 - Doctors can now quickly identify completed consultations that need visit records or prescriptions.
@@ -564,8 +635,8 @@ This document contains the complete version history for the FindMyDoctor applica
 **Purpose:** Extend the forgot password feature to the web Doctor and Secretary portals for consistent user experience across all platforms.
 
 **Significant Features:**
-- Web Doctor Portal forgot password flow: Doctor Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Doctor Login with success message
-- Web Secretary Portal forgot password flow: Secretary Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Secretary Login with success message
+- Web Doctor Portal forgot password flow: Doctor Login ΓåÆ Forgot Password ΓåÆ enter email ΓåÆ send OTP ΓåÆ Reset Password ΓåÆ enter OTP + new password ΓåÆ reset ΓåÆ back to Doctor Login with success message
+- Web Secretary Portal forgot password flow: Secretary Login ΓåÆ Forgot Password ΓåÆ enter email ΓåÆ send OTP ΓåÆ Reset Password ΓåÆ enter OTP + new password ΓåÆ reset ΓåÆ back to Secretary Login with success message
 - Web Doctor forgot password page (`/web/src/app/doctor/forgot-password/page.tsx`) with email input form, following the same design patterns as the login page (colors, spacing, card styling, buttons)
 - Web Doctor reset password page (`/web/src/app/doctor/reset-password/page.tsx`) with OTP field (6 digits), new password field, confirm password field, password requirements indicators (8+ chars, number, uppercase), resend code button with 60-second cooldown, error banner, and loading state
 - Web Secretary forgot password page (`/web/src/app/secretary/forgot-password/page.tsx`) with email input form, following the same design patterns as the secretary login page
@@ -596,7 +667,7 @@ This document contains the complete version history for the FindMyDoctor applica
 **Purpose:** Add a secure password reset feature allowing users to reset their password via email OTP verification without authentication.
 
 **Significant Features:**
-- Mobile password reset flow: Login → Forgot Password → enter email → send OTP → Reset Password → enter OTP + new password → reset → back to Login with success message
+- Mobile password reset flow: Login ΓåÆ Forgot Password ΓåÆ enter email ΓåÆ send OTP ΓåÆ Reset Password ΓåÆ enter OTP + new password ΓåÆ reset ΓåÆ back to Login with success message
 - Backend API endpoints for password reset: `POST /api/v1/auth/password-reset/request` (send OTP) and `POST /api/v1/auth/password-reset/reset` (verify OTP and update password)
 - Mobile forgot password page (`forgot_password_page.dart`) with email input form, following the same design patterns as login and signup pages (background with soft blobs, back button, logo, white form card, custom text fields, primary button, trust footer)
 - Mobile reset password page (`reset_password_page.dart`) with OTP field (6 digits), new password field, confirm password field, password requirements indicators (8+ chars, number, uppercase), resend code button with 60-second cooldown, error banner, and loading state
@@ -624,12 +695,12 @@ This document contains the complete version history for the FindMyDoctor applica
 **Purpose:** Fix the mobile Secretary Chat tab rendering a completely blank page (no list, no empty state, no spinner) whenever the patient actually had conversations.
 
 **Bug Fix:**
-- Root cause: the 01.20 zero-frame guard (`if (MediaQuery.of(context).size.height > 300)`) was nested inside the `_conversations.isEmpty` branch of the inline collection-if chain in `_buildChatContent()`. Dart binds a trailing `else` to the nearest unmatched `if`, so the final `else` (the conversation-card list) attached to the *inner height guard* instead of the outer `else if (_conversations.isEmpty)` chain. The effective logic became: loading → spinner, empty → empty state, **has conversations → render nothing at all**. Any patient with an existing conversation saw the blank tab; a patient with zero conversations still saw the "No conversations yet" state, which is why the bug surfaced only for accounts with real message history.
-- Fix: the tab body was extracted into a public `ChatTabContent` stateless widget (`mobile/lib/features/home/presentation/home_page.dart`) with explicit early-return branches — loading → spinner, empty → height-guarded "No conversations yet" filler (zero-first-frame safety preserved), otherwise → `Column` of conversation cards. `_buildChatContent()` now delegates via `isLoading` / `conversations` / `onRefresh`; `onRefresh` preserves the previous behavior of reloading conversations after a thread is closed (mounted-checked). `_buildConversationCard` and `_formatTimestamp` moved unchanged into the widget.
+- Root cause: the 01.20 zero-frame guard (`if (MediaQuery.of(context).size.height > 300)`) was nested inside the `_conversations.isEmpty` branch of the inline collection-if chain in `_buildChatContent()`. Dart binds a trailing `else` to the nearest unmatched `if`, so the final `else` (the conversation-card list) attached to the *inner height guard* instead of the outer `else if (_conversations.isEmpty)` chain. The effective logic became: loading ΓåÆ spinner, empty ΓåÆ empty state, **has conversations ΓåÆ render nothing at all**. Any patient with an existing conversation saw the blank tab; a patient with zero conversations still saw the "No conversations yet" state, which is why the bug surfaced only for accounts with real message history.
+- Fix: the tab body was extracted into a public `ChatTabContent` stateless widget (`mobile/lib/features/home/presentation/home_page.dart`) with explicit early-return branches ΓÇö loading ΓåÆ spinner, empty ΓåÆ height-guarded "No conversations yet" filler (zero-first-frame safety preserved), otherwise ΓåÆ `Column` of conversation cards. `_buildChatContent()` now delegates via `isLoading` / `conversations` / `onRefresh`; `onRefresh` preserves the previous behavior of reloading conversations after a thread is closed (mounted-checked). `_buildConversationCard` and `_formatTimestamp` moved unchanged into the widget.
 
 **Tests:**
 - Added `mobile/test/chat_tab_content_test.dart` (4 tests, all passing): conversation list renders cards when the list is not empty, empty state renders when no conversations exist, loading spinner renders while loading, unread badge shows the unread count.
-- Full mobile `flutter test` suite: 138 pass / 11 failing — the same 11 pre-existing failures (verified in 01.20); `flutter analyze` stays at the 42 pre-existing issues baseline.
+- Full mobile `flutter test` suite: 138 pass / 11 failing ΓÇö the same 11 pre-existing failures (verified in 01.20); `flutter analyze` stays at the 42 pre-existing issues baseline.
 - Verified on the Android emulator: the Chat tab now renders the conversation card (secretary name, practice, preview, timestamp) and the card opens the conversation thread with full message history.
 
 **Breaking Changes:** None. Backend, API, data, and login/session flow untouched.
@@ -644,19 +715,19 @@ This document contains the complete version history for the FindMyDoctor applica
 
 **Significant Features:**
 - Mobile Profile tab (`_buildProfileContent` in `home_page.dart`) rewritten into labeled sections:
-  - **Account:** summary card (name, email, role) with a "View patient profile" row that opens the new standalone `PatientProfilePage` (read-only, `GET /api/v1/patients/me` via the existing `getCurrentPatient()` call; loading/error+retry states; shows exactly the same fields as the patient-details flow — fixed a literal `'_userEmail'` rendering bug while wiring it up).
+  - **Account:** summary card (name, email, role) with a "View patient profile" row that opens the new standalone `PatientProfilePage` (read-only, `GET /api/v1/patients/me` via the existing `getCurrentPatient()` call; loading/error+retry states; shows exactly the same fields as the patient-details flow ΓÇö fixed a literal `'_userEmail'` rendering bug while wiring it up).
   - **Security:** "Change password" row opening `ChangePasswordPage` via `MaterialPageRoute` with `onSuccess` returning to the Profile tab (success flow now returns to Profile instead of pushing the change page inline).
   - **Notifications:** push-notifications switch labeled `profile_push_switch`, backed by a persisted `push_notifications_enabled` preference (default ON so first-time users match the existing auto-registration behavior). Toggling ON asks the native host / OS for the FCM token and registers it through the existing `POST /device-tokens` endpoint (returns `409`-tolerant idempotent registration); Toggling OFF removes the stored token through `DELETE /device-tokens/:id` and clears the preference. If the OS notification permission is denied, a hint plus `openAppSettings()` is shown. No per-category switches were added.
   - **About:** app version read at runtime via `package_info_plus` (pubspec version), and a "Privacy notice" row opening the new static `PrivacyNoticePage` ("Last updated: October 2026").
   - **Log Out:** unchanged behavior (no confirmation dialog, still removes the device token server-side before clearing the local session).
-- New public routes `/patient-profile` and `/privacy-notice` in `app.dart`, inside the authenticated guarded group (unauthenticated requests bounce to `/login`; logout-required state enforces `/change-password`; secretaries are kept on the chat-first home). Mobile patients can only ever view and change their own data through the same pre-existing patient-scoped endpoints — no new endpoints, no queue/payment/clinic-management features.
+- New public routes `/patient-profile` and `/privacy-notice` in `app.dart`, inside the authenticated guarded group (unauthenticated requests bounce to `/login`; logout-required state enforces `/change-password`; secretaries are kept on the chat-first home). Mobile patients can only ever view and change their own data through the same pre-existing patient-scoped endpoints ΓÇö no new endpoints, no queue/payment/clinic-management features.
 - `PushNotificationService` (`mobile/lib/core/services/push_notification_service.dart`): `registerForCurrentUser()` now returns `Future<bool>` (true when a token was actually registered); added idempotent `disableForCurrentUser()` (DELETE via the stored `device_token_id`, then clears prefs), the `push_notifications_enabled` preference key with `isPushPreferred()`/`setPushPreferred()`, a test-only `PushNotificationService.withApiService(apiService)` constructor, and the method channel is now exposed as the public `PushNotificationService.channel` constant.
 - `HomePage` accepts an optional test seam `pushNotificationService` (falls back to `PushNotificationService.instance`), so widget tests can inject a fake registration service.
 
 **Improvements:**
-- New mobile dependencies: `permission_handler` (^12.0.0, needed because the app had no native push host/permission plumbing — bare `MainActivity.kt`) and `package_info_plus` (^8.0.0, the only runtime source of the pubspec version for the About section). `pubspec.lock` regenerated (the previously committed lock was already corrupt and could not be parsed).
-- Accessibility/large-text: all new Profile rows use ≥44 px touch targets with `Semantics` labels (`profile_view_details`, `profile_change_password`, `profile_privacy_notice`, `profile_push_switch`), consistent spacing, and text scaling-safe layout.
-- Fixed the pre-existing first-frame crash in `_buildChatContent()`: the empty-conversations filler used an unguarded `MediaQuery.of(context).size.height - 300` that produced a negative `BoxConstraints` (`h=-299.0`) on the zero-sized first layout pass — the exact bug class `test/initial_frame_layout_test.dart` was added to prevent in commit `488dcee`. The filler is now guarded (`if > 300`), matching the pattern the old profile filler had. This also un-wedges `initial_frame_layout_test.dart`, which previously failed (and hung a 10-minute attempt) — verified to fail identically at the previous commit (`85b8532` guard regression).
+- New mobile dependencies: `permission_handler` (^12.0.0, needed because the app had no native push host/permission plumbing ΓÇö bare `MainActivity.kt`) and `package_info_plus` (^8.0.0, the only runtime source of the pubspec version for the About section). `pubspec.lock` regenerated (the previously committed lock was already corrupt and could not be parsed).
+- Accessibility/large-text: all new Profile rows use ΓëÑ44 px touch targets with `Semantics` labels (`profile_view_details`, `profile_change_password`, `profile_privacy_notice`, `profile_push_switch`), consistent spacing, and text scaling-safe layout.
+- Fixed the pre-existing first-frame crash in `_buildChatContent()`: the empty-conversations filler used an unguarded `MediaQuery.of(context).size.height - 300` that produced a negative `BoxConstraints` (`h=-299.0`) on the zero-sized first layout pass ΓÇö the exact bug class `test/initial_frame_layout_test.dart` was added to prevent in commit `488dcee`. The filler is now guarded (`if > 300`), matching the pattern the old profile filler had. This also un-wedges `initial_frame_layout_test.dart`, which previously failed (and hung a 10-minute attempt) ΓÇö verified to fail identically at the previous commit (`85b8532` guard regression).
 
 **Removed/Modified Functionality:**
 - The old lightweight Profile tab (single card of rows) is replaced by the grouped sections above; the mate "View patient profile" flow now goes through the standalone screen instead of the patient-details form.
@@ -667,7 +738,7 @@ This document contains the complete version history for the FindMyDoctor applica
 **Tests:**
 - Added `mobile/test/profile_section_test.dart` (8 tests, all passing): switch ON registers a token through an injected fake `ApiService`; switch OFF removes the stored token; permission-denied surfaces the settings hint (via a fake `PermissionHandlerPlatform`); Account row opens `/patient-profile`; Privacy row opens `/privacy-notice`; Change password row opens `ChangePasswordPage`; About shows the pubspec version (mocked `PackageInfo`); unauthenticated `MyApp` cannot reach `/patient-profile` (redirects to login).
 - Full mobile `flutter test` suite run; `flutter analyze` back at the 42 pre-existing issues baseline (no new analyzer issues). `initial_frame_layout_test.dart` now passes again after the chat-filler guard.
-- Pre-existing failures NOT touched: `booking_confirmation_page_test.dart` + `patient_details_test.dart` (reference a nonexistent `receiptImage` param), `change_password_page_test.dart` "Unauthenticated access..." + `otp_verification_page_test.dart` structure test (both verified to fail identically at the previous commit — MyApp's `_initializeApp` await on the push method channel never completes under the fake-async test binding without a channel mock, leaving the splash on screen), and the backend's 5 known jest failures.
+- Pre-existing failures NOT touched: `booking_confirmation_page_test.dart` + `patient_details_test.dart` (reference a nonexistent `receiptImage` param), `change_password_page_test.dart` "Unauthenticated access..." + `otp_verification_page_test.dart` structure test (both verified to fail identically at the previous commit ΓÇö MyApp's `_initializeApp` await on the push method channel never completes under the fake-async test binding without a channel mock, leaving the splash on screen), and the backend's 5 known jest failures.
 
 **Documentation Updates:** `SYSTEM_STATE.md` updated (profile sections, push preference, new routes/screens), version files synced.
 
@@ -680,7 +751,7 @@ This document contains the complete version history for the FindMyDoctor applica
 **Significant Features:** None (bug fixes).
 
 **Improvements:**
-- Mobile: the week-range header ("Oct 18 – Oct 24, 2026" + "Regular Clinic" badge) is wrapped in `Center(FittedBox(scaleDown))` so the once-overflowing row scales down on narrow screens instead of clipping; date-info rows (`_buildInfoRow`) give the value an `Expanded(Text(textAlign: end))` so long values wrap instead of overflowing.
+- Mobile: the week-range header ("Oct 18 ΓÇô Oct 24, 2026" + "Regular Clinic" badge) is wrapped in `Center(FittedBox(scaleDown))` so the once-overflowing row scales down on narrow screens instead of clipping; date-info rows (`_buildInfoRow`) give the value an `Expanded(Text(textAlign: end))` so long values wrap instead of overflowing.
 - Mobile: fixed a 14 px RenderFlex overflow on the Doctors page "Hospitals & Medical Centers" section header (`doctors_page.dart`) by wrapping the title/subtitle column in `Expanded` (same pattern as the "Top Verified Doctors" header) so the "See all" action never pushes the row past its bounds and the subtitle wraps instead of clipping.
 
 **Bug Fixes:**
@@ -689,7 +760,7 @@ This document contains the complete version history for the FindMyDoctor applica
 **Breaking Changes:** None.
 
 **Tests:**
-- `middleware/auth.test.ts`: +3 tests — PATIENT and DOCTOR tokens both pass `authenticate` on `/api/v1/doctors/:id/availability`; `/doctors/me` still rejects PATIENT (401). Backend jest: 342 passing, same 5 pre-existing unrelated failures (`date`, `appointments`, `conversations`, `payments`, `queue`).
+- `middleware/auth.test.ts`: +3 tests ΓÇö PATIENT and DOCTOR tokens both pass `authenticate` on `/api/v1/doctors/:id/availability`; `/doctors/me` still rejects PATIENT (401). Backend jest: 342 passing, same 5 pre-existing unrelated failures (`date`, `appointments`, `conversations`, `payments`, `queue`).
 - Mobile: `flutter analyze doctor_schedule_page.dart` clean (only a pre-existing unnecessary-import info).
 
 **Documentation Updates:** `SYSTEM_STATE.md`, `architecture.md`, and `architecture-essentials.md` updated with the shared sub-resource exemption.
@@ -708,7 +779,7 @@ This document contains the complete version history for the FindMyDoctor applica
 
 **Improvements:**
 - Backend: added `doctors.gcash_qr_updated_at` (migration `033_add_gcash_qr_updated_at.sql`, applied via `npm run migrate:gcash-qr-updated-at`); set on QR upload, cleared on QR deletion, and returned by `GET /api/v1/gcash-qr/doctor/:doctorId` as `gcashQrUpdatedAt`. `doctors.updated_at` could not be used because profile/photo edits also bump it.
-- Backend: fixed portal-role resolution in `middleware/auth.ts` `resolveRolePrefix` — role names are now anchored to the mount namespace, so secretary-only sub-resource paths like `/gcash-qr/doctor/:id` are no longer misread as the DOCTOR portal (a valid secretary token previously received 401 on that route).
+- Backend: fixed portal-role resolution in `middleware/auth.ts` `resolveRolePrefix` ΓÇö role names are now anchored to the mount namespace, so secretary-only sub-resource paths like `/gcash-qr/doctor/:id` are no longer misread as the DOCTOR portal (a valid secretary token previously received 401 on that route).
 - Shared `TrustedBrowsersCard` gained a `confirmDialogs` prop (default true for the doctor page); the secretary page passes false so Revoke and "Sign out of all devices" act immediately without confirmation dialogs, as required.
 - 2FA description reworded to "Require a verification code when you sign in from a new or untrusted browser." with the duplicated explainer removed; toggle uses `role="switch"` / `aria-checked`.
 
@@ -722,7 +793,7 @@ This document contains the complete version history for the FindMyDoctor applica
 
 **Tests:**
 - Added `gcashQr.test.ts`: assigned-doctor GET returns the URL and upload timestamp; a secretary assigned to another doctor is 403; missing doctor is 404. These tests also regress the `resolveRolePrefix` fix.
-- Backend jest: all auth/middleware/gcash suites pass (339 passing; the 5 remaining failures — `date.test.ts`, `appointments`, `conversations`, `payments`, `queue` — are pre-existing stale-date/mock-teardown failures unrelated to this work).
+- Backend jest: all auth/middleware/gcash suites pass (339 passing; the 5 remaining failures ΓÇö `date.test.ts`, `appointments`, `conversations`, `payments`, `queue` ΓÇö are pre-existing stale-date/mock-teardown failures unrelated to this work).
 - Web `tsc --noEmit` and `next build` pass.
 
 **Documentation Updates:**
@@ -804,7 +875,7 @@ This document contains the complete version history for the FindMyDoctor applica
 
 **Testing:**
 - Backend and web TypeScript checks pass.
-- Targeted Jest: `auth.session.test.ts`, `auth.test.ts`, and `authService.test.ts` — 65/65 pass.
+- Targeted Jest: `auth.session.test.ts`, `auth.test.ts`, and `authService.test.ts` ΓÇö 65/65 pass.
 - Full backend Jest run: 334 passed, 24 failed; the 24 failures are the same pre-existing suites (`date`, `conversations`, `payments`, `appointments`, `queue`), with no new failures.
 - Live browser verification still requires real Doctor/Secretary credentials, OTP delivery, and a running backend.
 
@@ -925,7 +996,7 @@ This document contains the complete version history for the FindMyDoctor applica
 **Removed/Modified Functionality:**
 - Secretary mobile chat is no longer planned follow-up work; it is implemented in the shared mobile application
 - Secretary mobile access deliberately excludes queue management, payment verification, walk-in registration, and schedule management screens; all appointment management remains on the secretary web dashboard
-- Direct patient–doctor chat remains prohibited; no patient↔doctor messaging was added
+- Direct patientΓÇôdoctor chat remains prohibited; no patientΓåödoctor messaging was added
 - Backend, web, and database behavior are unchanged; the mobile app reuses existing endpoints, the `Conversation` model, and the shared conversation thread
 
 **Architecture:**
@@ -950,7 +1021,7 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ### 01.12 (October 19, 2026)
 
-**Purpose:** Implement the secretary–patient chat feature across the backend and the secretary web application, with role-based conversation access, read-status unread counts, chat notifications with FCM/APNs push delivery, device-token management, and a read-only appointment-summary endpoint
+**Purpose:** Implement the secretaryΓÇôpatient chat feature across the backend and the secretary web application, with role-based conversation access, read-status unread counts, chat notifications with FCM/APNs push delivery, device-token management, and a read-only appointment-summary endpoint
 
 **Significant Features:**
 - Secretary Web Dashboard chat at `/secretary/conversations` replaces the placeholder with a functional three-column interface: conversation list (patient details, unread badges/counts, latest-message previews), message thread with distinct sender/recipient styling, and a composer; the sidebar adds an unread badge on the Conversations item without changing its layout
@@ -962,7 +1033,7 @@ This document contains the complete version history for the FindMyDoctor applica
 - Backend: `GET /conversations` returns unread counts computed from `messages.read_at` excluding the caller's own messages, plus a latest-message preview consistent with the newest saved message, for both patient and secretary listings
 - Backend: `POST /conversations` reuses the patient's single conversation per doctor (no per-secretary duplicate histories); secretaries assigned to the same doctor (`secretaries.doctor_id`) share the same message history
 - Backend: role-based access enforced consistently across listing, creation, retrieval, message retrieval, sending, and read-status updates (patient: own conversations for doctors with `patient_doctor_associations` records; secretary: patients associated with the assigned doctor)
-- Backend: after a message is saved, recipients receive generic notifications with titles and bodies that never contain message content: patient-sent → `NEW_PATIENT_MESSAGE` to the assigned secretaries; secretary-sent → `NEW_SECRETARY_MESSAGE` to the patient; recipients only, never the sender
+- Backend: after a message is saved, recipients receive generic notifications with titles and bodies that never contain message content: patient-sent ΓåÆ `NEW_PATIENT_MESSAGE` to the assigned secretaries; secretary-sent ΓåÆ `NEW_SECRETARY_MESSAGE` to the patient; recipients only, never the sender
 - Backend: added `conversationService` (`backend/src/modules/conversations/conversationService.ts`) centralizing authorized-conversation access checks and recipient notifications; added push backend configuration (`FCM_*`, `APNS_*`) in `backend/src/config/index.ts`
 - Web: `secretaryApi.ts` adds `conversationApi` (list, get, messages, send, mark-as-read, appointment summary) and `Conversation`/`ConversationMessage`/`AppointmentSummary` types using relative API paths against the existing base URL
 
@@ -972,7 +1043,7 @@ This document contains the complete version history for the FindMyDoctor applica
 **Removed/Modified Functionality:**
 - `POST /conversations` no longer requires both `secretaryId` and `doctorId`; it now requires `doctorId` (with optional `secretaryId`) and validates the patient's doctor association plus the secretary's doctor assignment; responses are enriched with secretary/doctor names
 - `PATCH /conversations/:id/read` and message retrieval now enforce conversation authorization (previously unauthenticated-body verification only); unauthorized attempts return `403 CONVERSATION_ACCESS_DENIED` or `404`
-- Direct patient–doctor chat remains prohibited; no patient↔doctor messaging endpoints were added
+- Direct patientΓÇôdoctor chat remains prohibited; no patientΓåödoctor messaging endpoints were added
 - Secretary mobile chat is planned follow-up work and is not implemented
 
 **Architecture:**
@@ -987,7 +1058,7 @@ This document contains the complete version history for the FindMyDoctor applica
 - Web: `next build` succeeded (40 routes including `/secretary/conversations`); `tsc --noEmit` clean; lint shows only pre-existing errors in unrelated pages
 
 **Documentation:**
-- Updated `docs/prd.md` (section 16 Secretary–Patient Chat, section 24 Notifications, FR-031, FR-039, Secretary Web Dashboard scope) and `docs/architecture.md` (communication module, chat architecture, secretary chat and device-token endpoints, notification module, database tables)
+- Updated `docs/prd.md` (section 16 SecretaryΓÇôPatient Chat, section 24 Notifications, FR-031, FR-039, Secretary Web Dashboard scope) and `docs/architecture.md` (communication module, chat architecture, secretary chat and device-token endpoints, notification module, database tables)
 - Updated `docs/architecture-essentials.md` (Secretary Chat Rules access/sharing/unread/patient-info sheet/push rules, database tables and migration list, chat implementation checklist)
 - Updated `docs/SYSTEM_STATE.md` (Database Schema, Patient-Secretary Messaging and Push Notifications, Secretary Web Chat)
 - Updated CURRENT_VERSION.md to 01.12 and added this VERSION_HISTORY.md entry
@@ -1051,7 +1122,7 @@ This document contains the complete version history for the FindMyDoctor applica
 - Patient sign-up now verifies username availability up-front: `POST /api/v1/auth/patient/otp/send` returns `409 Conflict` with `Username already taken` before the sign-up is staged or any OTP is emailed
 
 **Improvements:**
-- Backend: The patient OTP `/send` endpoint checks username uniqueness after the existing email existence check and before OTP staging and sending (validation order: email existence check → username uniqueness check → OTP staging and sending)
+- Backend: The patient OTP `/send` endpoint checks username uniqueness after the existing email existence check and before OTP staging and sending (validation order: email existence check ΓåÆ username uniqueness check ΓåÆ OTP staging and sending)
 - Mobile: The sign-up form surfaces the `/send` `409 Conflict` message verbatim (e.g. `Username already taken`, `Email is already registered`) in its inline error banner and snackbar and keeps the user on the form, so a taken username no longer forces the patient to restart registration
 - Mobile: `SignUpPage` accepts an optional injected `ApiService` (test seam), matching the existing `AppointmentsPage` pattern; the default behavior is unchanged
 
@@ -1067,9 +1138,9 @@ This document contains the complete version history for the FindMyDoctor applica
 - Database: No schema changes; the `users` username unique constraint is unchanged and remains the final backstop
 
 **Testing:**
-- Backend: Added `Patient OTP /send - up-front email and username checks` tests (taken username → `409 Username already taken` with no OTP sent and nothing staged; taken email → `409 Email is already registered` with no OTP sent; the email is checked before the username; available email + username → sign-up staged and OTP sent)
-- Backend: Live verification against the running API and PostgreSQL confirmed fresh email + taken username → `409 Username already taken`; taken email → `409 Email is already registered`; both taken → `409 Email is already registered`
-- Mobile: Added widget tests driving `SignUpPage` through the real `ApiService` with a mock HTTP client (taken username → backend message shown on the form, no navigation to OTP verification, exactly one request; available username → navigates to OTP verification, exactly one request)
+- Backend: Added `Patient OTP /send - up-front email and username checks` tests (taken username ΓåÆ `409 Username already taken` with no OTP sent and nothing staged; taken email ΓåÆ `409 Email is already registered` with no OTP sent; the email is checked before the username; available email + username ΓåÆ sign-up staged and OTP sent)
+- Backend: Live verification against the running API and PostgreSQL confirmed fresh email + taken username ΓåÆ `409 Username already taken`; taken email ΓåÆ `409 Email is already registered`; both taken ΓåÆ `409 Email is already registered`
+- Mobile: Added widget tests driving `SignUpPage` through the real `ApiService` with a mock HTTP client (taken username ΓåÆ backend message shown on the form, no navigation to OTP verification, exactly one request; available username ΓåÆ navigates to OTP verification, exactly one request)
 - Backend: Full suite 251 passed with 4 pre-existing failures (`src/utils/date.test.ts` timezone, `src/api/auth.test.ts` change-password); `tsc --noEmit` clean. Mobile: 109 passed with 2 pre-existing failures (`password_change_enforcement_test.dart` mock signature, `widget_test.dart` counter smoke test); `flutter analyze` unchanged from baseline
 - Not verified: live mobile-device submission of the sign-up form (covered by widget tests against the real `ApiService` and by live API calls instead)
 
@@ -1198,7 +1269,7 @@ This document contains the complete version history for the FindMyDoctor applica
 
 **UI/UX Changes:**
 - Mobile patient sign-up page visually aligned with the redesigned login page; responsive across 320x568 up to 768x1024 with keyboard-aware scrolling and no overflow
-- Mobile UI: Sex dropdown refined to match the design system — field now mirrors `CustomTextField` (rounded outline, filled surface, error/focus borders, focus shadow, animated chevron) and the expanded options menu uses a rounded elevated surface with comfortable item height, a highlighted selected row with a check mark, and tinted pressed/focus feedback
+- Mobile UI: Sex dropdown refined to match the design system ΓÇö field now mirrors `CustomTextField` (rounded outline, filled surface, error/focus borders, focus shadow, animated chevron) and the expanded options menu uses a rounded elevated surface with comfortable item height, a highlighted selected row with a check mark, and tinted pressed/focus feedback
 
 **Removed/Modified Functionality:**
 - The mobile sign-up form no longer collects a single "Full Name" field (replaced by separate name components)
@@ -1222,7 +1293,7 @@ This document contains the complete version history for the FindMyDoctor applica
 **Documentation:**
 - Updated CURRENT_VERSION.md to 01.06
 - Added VERSION_HISTORY.md entry for 01.06
-- Updated prd.md (FR-001-A), architecture.md (§6.1), architecture-essentials.md (Patient Registration with OTP), and SYSTEM_STATE.md (Patient Registration, Database Schema, Mobile Application)
+- Updated prd.md (FR-001-A), architecture.md (┬º6.1), architecture-essentials.md (Patient Registration with OTP), and SYSTEM_STATE.md (Patient Registration, Database Schema, Mobile Application)
 
 ---
 
