@@ -73,17 +73,11 @@ class _AppHeaderState extends State<AppHeader> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-<<<<<<< HEAD
-          padding: const EdgeInsets.symmetric(
-            horizontal: spacing.AppSpacing.screenPadding,
-            vertical: spacing.AppSpacing.gutterMd,
-=======
           padding: EdgeInsets.only(
             left: spacing.AppSpacing.screenPadding,
             right: spacing.AppSpacing.screenPadding,
             top: topPadding + spacing.AppSpacing.gutterMd,
             bottom: spacing.AppSpacing.gutterMd,
->>>>>>> feature/mobile-patient-medical-records-prescriptions
           ),
           decoration: BoxDecoration(
             color: AppColors.surface,
