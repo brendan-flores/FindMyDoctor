@@ -386,6 +386,19 @@ Current System State (October 2026):
 - All backend patient update operations use transactions and proper parameter mapping to ensure data consistency
 - Backend tests verify SQL structure, parameter mapping, validation logic, role rejection, and error responses for PUT /api/v1/patients/:id endpoint and direct walk-in registration
 
+## Patient Payments Hub
+- Mobile route `/payments` (`PaymentsHubPage`) is the patient's centralized payments hub: it lists every payment record for the authenticated patient via `GET /api/v1/payments/me` (newest first) with filters for All / Unpaid / Pending verification / Paid / Rejected, pull-to-refresh, and loading/error/empty states with retry
+- Each payment card shows the appointment date, doctor, amount breakdown (consultation fee, medicine & other charges, total, amount paid/balance when partial), payment method, receipt-uploaded indicator, and derived payment status (UNPAID, PARTIAL, PENDING_VERIFICATION/FOR_REVIEW, PAID, OVERPAID, REJECTED, CANCELLED)
+- Unpaid/partially-paid and rejected records show an expandable "GCash QR & account details" section that lazily calls the public `GET /api/v1/payments/gcash-qr?doctorId=` endpoint and renders the QR image plus copyable account name/number, with loading, not-configured, and network-error fallbacks each offering retry; "Pay with GCash" / "Upload New Receipt" navigate to the existing `/payment` guided upload screen
+- Rejected records display the rejection reason/note (latest REJECTED `payment_transactions` row, returned by `GET /payments/me` as `reject_reason`/`reject_note`) and a retry upload action
+- Paid records show "View Invoice" when an ACTIVE invoice exists, opening the shared `InvoiceBottomSheet` (invoice preview plus PDF download via `GET /api/v1/invoices/:id/pdf`); records without an invoice yet show an "invoice will be available" note
+- Pending-verification records show an explanatory note plus a "View receipt" action that opens the signed receipt image (`GET /payments/my-receipt/:appointmentId`)
+- New patient-scoped endpoints: `GET /api/v1/payments/me` (PATIENT-only, registered before `/:appointmentId` so `me` is not captured as an appointment id) and `GET /api/v1/invoices/me` (PATIENT-only, registered before `/:id`); both return only the authenticated patient's records
+- `INVOICE_AVAILABLE` notifications (created when a secretary sends an invoice through a conversation) deep-link from the mobile notifications page to the invoice preview (`InvoiceBottomSheet` by `related_entity_id`, falling back to `/payments`) and from push-notification taps to the `/payments` hub for PATIENT-role users
+- Entry points to `/payments`: Home quick-actions grid ("Payments — Bills & Invoices"), Profile tab "Payments & Invoices" row, and a "Payments" chip on COMPLETED appointment cards in the Appointments tab
+- Fixed `payment_screen.dart` back navigation: after a receipt upload it previously pushed the unregistered `/appointments` route; it now returns to `/home` with the Appointments tab (`initialTab: 2`) selected
+- Resolved committed merge-conflict markers in `app_header.dart`, `notifications_page.dart`, `docs/CURRENT_VERSION.md`, and root `SYSTEM_STATE.md` (kept the newer top-padding header fix and the union of notification type handling)
+
 ## Secretary Queue Management
 - Web Secretary queue management page at `/secretary/queue` displays the daily patient queue for the secretary's assigned doctor
 - Queue page shows queue entries with patient name, queue number, status, registration source (ONLINE/WALK_IN), and doctor information

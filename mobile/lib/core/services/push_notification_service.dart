@@ -197,6 +197,29 @@ class PushNotificationService {
       return;
     }
 
+    if (type == 'INVOICE_AVAILABLE') {
+      // Invoice notifications belong to patients; open the payments hub
+      // which lists the invoice and links to the invoice preview.
+      try {
+        final userResponse = await _apiService.getCurrentUser();
+        if (userResponse['success'] != true || userResponse['data'] is! Map) {
+          return;
+        }
+
+        final user = Map<String, dynamic>.from(userResponse['data'] as Map);
+        final role = (user['role'] ?? '').toString();
+        if (role != 'PATIENT') return;
+
+        final navigator = AppNavigator.key.currentState;
+        if (navigator == null) return;
+
+        await navigator.pushNamed('/payments');
+      } catch (_) {
+        // Never surface push-deep-link failures to the user.
+      }
+      return;
+    }
+
     if (type != 'NEW_PATIENT_MESSAGE' && type != 'NEW_SECRETARY_MESSAGE') {
       return;
     }

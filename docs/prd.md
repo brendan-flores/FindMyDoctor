@@ -1042,6 +1042,10 @@ Authorized secretaries shall verify uploaded receipts.
 
 The system shall maintain consultation payment status.
 
+## FR-025A — Patient Payments Hub
+
+Patients shall have a centralized payments hub in the mobile application where they can view all of their payment records (appointment date, doctor, consultation fee, medicine/additional charges, total, payment method, and payment status), filter records by status (Unpaid, Pending Verification, Paid, Rejected), view the doctor's GCash QR code and account details, upload or re-upload GCash receipts, and view/download invoices when available. Receipt upload shall always result in Pending Verification, never an automatic Paid status. Rejected receipts shall display the rejection reason and allow retry. `INVOICE_AVAILABLE` notifications shall open the relevant invoice or the payments hub.
+
 ## FR-026 — Additional Charges
 
 Secretaries shall be able to add additional charges.

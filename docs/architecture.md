@@ -1938,12 +1938,30 @@ GET  /prescriptions/:id/pdf-url
 ### Payments
 
 ```text
+GET   /payments/me                        (PATIENT-only; the caller's own payment records, newest first)
 GET   /payments/:appointmentId
 POST  /payments/:appointmentId/receipt
+GET   /payments/my-receipt/:appointmentId  (PATIENT-only; short-lived signed receipt URL)
+GET   /payments/gcash-qr                  (public; static GCash QR + account details for a doctor)
 PATCH /payments/:id/verify
 PATCH /payments/:id/reject
 POST  /payments/:id/charges
 ```
+
+`GET /payments/me` returns only the authenticated patient's payments (appointment date, doctor, consultation fee, charges, total, payment method, derived status, linked ACTIVE invoice id/number, and the latest rejection reason/note when present), sorted newest to oldest. Receipt upload always creates a PENDING GCash `payment_transactions` row and derives `PENDING_VERIFICATION`; it never marks a payment PAID — only secretary review does.
+
+### Invoices
+
+```text
+GET   /invoices/me                        (PATIENT-only; the caller's own invoices, newest first)
+GET   /invoices/:id
+GET   /invoices/by-payment/:paymentId
+GET   /invoices/:id/download-url          (short-lived signed download URL)
+GET   /invoices/:id/download              (token-verified PDF download)
+GET   /invoices/:id/pdf                   (authenticated PDF download)
+```
+
+`GET /invoices/me` returns only invoices belonging to the authenticated patient (invoice number, invoice date, amount, doctor, and ACTIVE/VOID availability status). Invoice detail, download-url, and download endpoints keep their ownership checks and short-lived signed URLs.
 
 ---
 

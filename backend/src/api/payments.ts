@@ -243,6 +243,104 @@ router.get('/counts', authenticate, requireSecretaryPasswordChange, requireSecre
 });
 
 // Get payment for appointment
+// List the authenticated patient's own payments (patient only)
+// GET /payments/me - must be registered before /:appointmentId so "me" is not
+// captured as an appointment id.
+router.get('/me', authenticate, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    const result = await query(
+      `SELECT
+         p.id,
+         p.appointment_id,
+         p.status,
+         p.payment_method,
+         p.receipt_url,
+         p.consultation_amount,
+         p.total_additional_charges,
+         p.total_amount,
+         p.amount_paid,
+         p.created_at,
+         p.updated_at,
+         a.appointment_date,
+         a.reason_for_visit,
+         a.status as appointment_status,
+         d.id as doctor_id,
+         d.first_name as doctor_first_name,
+         d.last_name as doctor_last_name,
+         d.specialty,
+         d.practice_name,
+         d.professional_photo_url as doctor_photo_url,
+         i.id as invoice_id,
+         i.invoice_number,
+         i.status as invoice_status,
+         rj.reject_reason,
+         rj.reject_note
+       FROM payments p
+       LEFT JOIN appointments a ON p.appointment_id = a.id
+       LEFT JOIN doctors d ON a.doctor_id = d.id
+       LEFT JOIN invoices i ON i.payment_id = p.id AND i.status = 'ACTIVE'
+       LEFT JOIN LATERAL (
+         SELECT pt.reject_reason, pt.reject_note
+         FROM payment_transactions pt
+         WHERE pt.payment_id = p.id AND pt.status = 'REJECTED'
+         ORDER BY pt.reviewed_at DESC NULLS LAST, pt.created_at DESC
+         LIMIT 1
+       ) rj ON true
+       WHERE p.patient_id = (SELECT id FROM patients WHERE user_id = $1)
+       ORDER BY COALESCE(a.appointment_date, p.created_at) DESC`,
+      [userId]
+    );
+
+    // Fetch charges for all returned payments in one query (avoids N+1).
+    const chargesByPayment = new Map<string, any[]>();
+    const paymentIds = result.rows.map(payment => payment.id);
+
+    if (paymentIds.length > 0) {
+      const chargesResult = await query(
+        `SELECT
+          pc.id,
+          pc.payment_id,
+          pc.charge_type,
+          pc.description,
+          pc.amount,
+          pc.quantity,
+          pc.unit_price,
+          pc.created_at
+         FROM payment_charges pc
+         WHERE pc.payment_id = ANY($1::uuid[]) AND pc.deleted_at IS NULL
+         ORDER BY pc.created_at ASC`,
+        [paymentIds]
+      );
+
+      for (const charge of chargesResult.rows) {
+        const list = chargesByPayment.get(charge.payment_id) || [];
+        list.push(charge);
+        chargesByPayment.set(charge.payment_id, list);
+      }
+    }
+
+    const payments = result.rows.map(payment => {
+      const balance = Math.max(
+        0,
+        parseFloat(payment.total_amount) - parseFloat(payment.amount_paid || '0')
+      );
+
+      return {
+        ...payment,
+        charges: chargesByPayment.get(payment.id) || [],
+        balance: balance.toFixed(2),
+        has_receipt: payment.receipt_url != null,
+      };
+    });
+
+    res.json(success(payments));
+  } catch (err: any) {
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch payments'));
+  }
+});
+
 router.get('/:appointmentId', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, async (req: AuthRequest, res: Response) => {
   try {
     const { appointmentId } = req.params;

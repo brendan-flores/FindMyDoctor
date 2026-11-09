@@ -2,9 +2,9 @@
 
 This document tracks the current state of the FindMyDoctor application, including key features, workflows, and system configurations.
 
-**Current Version:** 01.37
+**Current Version:** 01.39
 
-**Last Updated:** November 7, 2026
+**Last Updated:** November 9, 2026
 
 ---
 
@@ -246,6 +246,9 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 **Mobile:**
 - Receipt upload screen has an optional "Amount you paid" field sent as `patient_declared_amount`.
 - Appointment detail → Payment Information shows a "View Receipt" button for GCash payments; it fetches a signed URL via `GET /payments/my-receipt/:appointmentId` and displays the image in an in-app zoomable dialog (`InteractiveViewer`). Shown alongside "View Invoice" (PAID + COMPLETED).
+- New `/payments` route (`PaymentsHubPage`) is the patient's centralized payments hub: `GET /api/v1/payments/me` (PATIENT-only, newest first) feeds status filters (All/Unpaid/Pending/Paid/Rejected), and each card shows appointment, doctor, amount breakdown, payment method, GCash QR + account details (lazy `GET /payments/gcash-qr`), receipt upload/retry actions via the existing `/payment` screen, rejection reason, and invoice view/download via `InvoiceBottomSheet` when an ACTIVE invoice exists.
+- New patient-scoped endpoints: `GET /api/v1/payments/me` and `GET /api/v1/invoices/me` (both registered before the `/:param` routes so the literal `me` segment is not captured).
+- `INVOICE_AVAILABLE` notifications deep-link to the invoice preview in the notifications list and to `/payments` from push taps; entry points added on the Home quick-actions grid, Profile tab, and COMPLETED appointment cards. `payment_screen.dart` back navigation now returns to `/home` (Appointments tab) instead of the unregistered `/appointments` route.
 
 **Legacy Compatibility:**
 - Other pre-existing payment endpoints (verify, reject, mark-paid, record-payment, record, walk-in, payment-method, revert-unpaid) remain unchanged. Charge add/delete now follow the billing-redesign locking rules above.
@@ -312,6 +315,7 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 See `docs/VERSION_HISTORY.md` for complete version history.
 
 **Recent Versions:**
+- 01.39: Patient Payments Hub — centralized `/payments` page with status filters, GCash QR/account details, receipt upload entry points, invoice view/download; new patient-scoped `GET /api/v1/payments/me` and `GET /api/v1/invoices/me`; INVOICE_AVAILABLE notifications deep-link to the invoice/payments hub
 - 01.38: Patient Medical Records bug fixes — prescriptions tab no longer fails to load (bigint `medication_count` parsing), History tab shows "Dr." prefix and the visit doctor's real profile photo, prescription detail can open PDFs again; shared AppHeader 16px overflow fixed; back buttons added to the Medical Records screens
 - 01.37: Schedule-change confirmation workflow — pending secretary approval for exception/break-period changes affecting active appointments, affected appointments flagged needs attention, patients notified via SCHEDULE_CHANGE_NOTICE
 - 01.37: Patient mobile Medical Records and Prescription access — prescriptions, visit history, prescription PDFs (released on branch `feature/mobile-patient-medical-records-prescriptions`, merged into dev in `52bb413`; both 01.37 entries are retained as released — the version number was claimed on both branches)

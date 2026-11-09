@@ -775,6 +775,15 @@ class _HomePageState extends State<HomePage> {
             Navigator.of(context).pushNamed('/medical-records');
           },
         ),
+        _buildActionRow(
+          key: const ValueKey('profile_payments'),
+          icon: Icons.receipt_long,
+          title: 'Payments & Invoices',
+          semanticLabel: 'Payments & Invoices',
+          onTap: () {
+            Navigator.of(context).pushNamed('/payments');
+          },
+        ),
       ],
     );
   }
@@ -1415,6 +1424,13 @@ class _HomePageState extends State<HomePage> {
           AppColors.tertiary,
         ),
         _buildQuickActionCard(
+          'Payments',
+          'Bills & Invoices',
+          Icons.receipt_long,
+          AppColors.secondaryContainer,
+          AppColors.secondary,
+        ),
+        _buildQuickActionCard(
           'My Profile',
           'Settings',
           Icons.person,
@@ -1445,6 +1461,8 @@ class _HomePageState extends State<HomePage> {
           });
         } else if (title == 'Medical Records') {
           Navigator.of(context).pushNamed('/medical-records');
+        } else if (title == 'Payments') {
+          Navigator.of(context).pushNamed('/payments');
         } else if (title == 'My Profile') {
           setState(() {
             _currentIndex = 4;

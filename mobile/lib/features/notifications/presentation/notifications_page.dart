@@ -4,6 +4,7 @@ import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/services/api_service.dart';
 import '../../payments/presentation/payment_screen.dart';
+import '../../payments/presentation/invoice_bottom_sheet.dart';
 
 class NotificationsPage extends StatefulWidget {
   final ApiService? apiService;
@@ -303,8 +304,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         final isAppointmentNotification = type == 'APPOINTMENT_CANCELLED' ||
                             type == 'APPOINTMENT_RESCHEDULED' ||
                             type == 'SCHEDULE_CHANGE_NOTICE';
-                            type == 'APPOINTMENT_RESCHEDULED';
                         final isPrescriptionNotification = type == 'PRESCRIPTION_AVAILABLE';
+                        final isInvoiceNotification = type == 'INVOICE_AVAILABLE';
 
                         return Card(
                           margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
@@ -345,6 +346,23 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     '/prescription-detail',
                                     arguments: {'prescriptionId': prescriptionId},
                                   );
+                                }
+                                return;
+                              }
+
+                              // Handle invoice notifications - open the invoice
+                              // preview directly, falling back to the payments hub.
+                              if (isInvoiceNotification) {
+                                final invoiceId = notification['related_entity_id']?.toString();
+                                if (invoiceId != null && invoiceId.isNotEmpty) {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (context) => InvoiceBottomSheet(invoiceId: invoiceId),
+                                  );
+                                } else {
+                                  Navigator.pushNamed(context, '/payments');
                                 }
                                 return;
                               }
@@ -453,6 +471,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                             ),
                                           ),
                                         ],
+                                      ),
+                                    ),
+                                  if (isInvoiceNotification)
+                                    Padding(
+                                      padding: EdgeInsets.only(top: spacing.AppSpacing.gutterXs),
+                                      child: Text(
+                                        'Tap to view invoice',
+                                        style: AppTextStyles.labelSm.copyWith(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                   if (isAppointmentNotification)
