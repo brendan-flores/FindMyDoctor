@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
@@ -423,6 +424,29 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
   Widget _buildInvoiceMessage(Message message, bool isFromPatient) {
     final invoiceNumber = message.invoice?.invoiceNumber ?? 'Unknown';
     final invoiceId = message.invoiceId;
+    final invoiceDate = message.invoice?.invoiceDate;
+    final totalAmount = message.invoice?.totalAmount;
+    final status = message.invoice?.status;
+
+    String formattedDate = '';
+    if (invoiceDate != null) {
+      try {
+        final date = DateTime.parse(invoiceDate);
+        formattedDate = DateFormat('MMM d, yyyy').format(date);
+      } catch (_) {
+        formattedDate = invoiceDate;
+      }
+    }
+
+    String formattedAmount = '';
+    if (totalAmount != null) {
+      formattedAmount = '₱${totalAmount.toStringAsFixed(2)}';
+    }
+
+    String displayStatus = '';
+    if (status != null) {
+      displayStatus = status == 'ACTIVE' ? 'Paid' : status;
+    }
 
     return InkWell(
       onTap: () {
@@ -449,12 +473,48 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
                   color: isFromPatient ? AppColors.onPrimary : AppColors.onSurface,
                 ),
               ),
+              if (formattedDate.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  formattedDate,
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: isFromPatient
+                        ? AppColors.onPrimary.withOpacity(0.9)
+                        : AppColors.onSurface.withOpacity(0.7),
+                  ),
+                ),
+              ],
+              if (formattedAmount.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  formattedAmount,
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: isFromPatient
+                        ? AppColors.onPrimary.withOpacity(0.9)
+                        : AppColors.onSurface.withOpacity(0.7),
+                  ),
+                ),
+              ],
+              if (displayStatus.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  displayStatus,
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: isFromPatient
+                        ? AppColors.onPrimary.withOpacity(0.9)
+                        : AppColors.onSurface.withOpacity(0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 4),
               Text(
-                'Tap to view invoice',
+                'View Invoice',
                 style: AppTextStyles.labelSm.copyWith(
                   color: isFromPatient
-                      ? AppColors.onPrimary.withOpacity(0.9)
-                      : AppColors.onSurface.withOpacity(0.7),
+                      ? AppColors.onPrimary.withOpacity(0.8)
+                      : AppColors.primary,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],

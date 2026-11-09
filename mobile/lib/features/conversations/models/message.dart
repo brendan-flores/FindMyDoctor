@@ -64,16 +64,29 @@ class Message {
 class InvoiceSummary {
   final String id;
   final String invoiceNumber;
+  final String? invoiceDate;
+  final double? totalAmount;
+  final String? status;
 
   InvoiceSummary({
     required this.id,
     required this.invoiceNumber,
+    this.invoiceDate,
+    this.totalAmount,
+    this.status,
   });
 
   factory InvoiceSummary.fromJson(Map<String, dynamic> json) {
     return InvoiceSummary(
       id: json['id'] as String,
       invoiceNumber: json['invoice_number'] as String,
+      invoiceDate: json['invoice_date'] as String?,
+      totalAmount: json['total_amount'] != null
+          ? (json['total_amount'] is String
+              ? double.tryParse(json['total_amount'] as String)
+              : json['total_amount'] as double?)
+          : null,
+      status: json['status'] as String?,
     );
   }
 
@@ -81,6 +94,9 @@ class InvoiceSummary {
     return {
       'id': id,
       'invoice_number': invoiceNumber,
+      'invoice_date': invoiceDate,
+      'total_amount': totalAmount,
+      'status': status,
     };
   }
 }
