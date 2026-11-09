@@ -301,13 +301,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         final isPaymentNotification = type == 'ADDITIONAL_CHARGE_ADDED' || type == 'PAYMENT_VERIFIED' || type == 'PAYMENT_REJECTED';
                         final isWaitlistNotification = type == 'WAITLIST_UPDATE';
                         final isAppointmentNotification = type == 'APPOINTMENT_CANCELLED' ||
-<<<<<<< HEAD
                             type == 'APPOINTMENT_RESCHEDULED' ||
                             type == 'SCHEDULE_CHANGE_NOTICE';
-=======
                             type == 'APPOINTMENT_RESCHEDULED';
                         final isPrescriptionNotification = type == 'PRESCRIPTION_AVAILABLE';
->>>>>>> feature/mobile-patient-medical-records-prescriptions
 
                         return Card(
                           margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
