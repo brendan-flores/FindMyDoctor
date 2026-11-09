@@ -338,7 +338,7 @@ router.get('/:id/messages', authenticate, async (req: AuthRequest, res: Response
     // Get messages with invoice summary for INVOICE message types
     const messagesResult = await query(
       `SELECT m.*, u.email as sender_email,
-              i.invoice_number, i.id as invoice_id
+              i.invoice_number, i.id as invoice_id, i.invoice_date, i.total_amount, i.status
        FROM messages m
        JOIN users u ON m.sender_user_id = u.id
        LEFT JOIN invoices i ON m.invoice_id = i.id
@@ -355,6 +355,9 @@ router.get('/:id/messages', authenticate, async (req: AuthRequest, res: Response
           invoice: {
             id: msg.invoice_id,
             invoice_number: msg.invoice_number,
+            invoice_date: msg.invoice_date,
+            total_amount: msg.total_amount,
+            status: msg.status,
           }
         };
       }

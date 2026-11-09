@@ -333,6 +333,75 @@ describe('Conversations Router', () => {
         .send({ message: '   ' });
       expect(response.status).toBe(400);
     });
+
+    it('sends an invoice message (SECRETARY only)', async () => {
+      authState.role = 'SECRETARY';
+      authState.userId = 'secretary-user-id';
+
+      mockedQuery.mockImplementation((sql: string) => {
+        if (sql.includes('patient_first_name')) {
+          return Promise.resolve({ rows: [CONVERSATION_ROW] });
+        }
+        if (sql.includes('SELECT i.invoice_number')) {
+          return Promise.resolve({
+            rows: [{ invoice_number: 'INV-0001', id: 'invoice-id' }]
+          });
+        }
+        if (sql.includes('INSERT INTO messages')) {
+          return Promise.resolve({
+            rows: [{ id: 'message-id', message_type: 'INVOICE', invoice_id: 'invoice-id' }]
+          });
+        }
+        if (sql.startsWith('UPDATE conversations SET updated_at')) {
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.includes('SELECT p.user_id')) {
+          return Promise.resolve({ rows: [{ user_id: 'patient-user-id' }] });
+        }
+        if (sql.includes('INSERT INTO notifications')) {
+          return Promise.resolve({ rows: [] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/conversations/conversation-id/messages')
+        .send({ messageType: 'INVOICE', invoiceId: 'invoice-id' });
+
+      expect(response.status).toBe(201);
+      const notificationCall = mockedQuery.mock.calls.find(
+        (call) => (call[0] as string).includes('INSERT INTO notifications')
+      ) as any[];
+      expect(notificationCall).toBeDefined();
+      expect(notificationCall[1][1]).toBe('INVOICE_AVAILABLE');
+      expect(mockedPush).toHaveBeenCalledWith(
+        'patient-user-id',
+        expect.objectContaining({
+          title: 'Invoice Available',
+          data: expect.objectContaining({
+            type: 'INVOICE_AVAILABLE',
+            invoiceId: 'invoice-id',
+            conversationId: 'conversation-id',
+          }),
+        }),
+      );
+    });
+
+    it('rejects invoice messages from non-secretary roles', async () => {
+      authState.role = 'PATIENT';
+      mockedQuery.mockImplementation((sql: string) => {
+        if (sql.includes('patient_first_name')) {
+          return Promise.resolve({ rows: [CONVERSATION_ROW] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/conversations/conversation-id/messages')
+        .send({ messageType: 'INVOICE', invoiceId: 'invoice-id' });
+
+      expect(response.status).toBe(403);
+    });
   });
 
   describe('PATCH /:id/read', () => {
