@@ -29,6 +29,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
   bool _isLoading = true;
   bool _isDownloading = false;
   String? _errorMessage;
+  final bool _useDirectDownload = false; // Fallback if signed URL fails
 
   @override
   void initState() {
@@ -85,7 +86,54 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         throw Exception('Invoice ID not found');
       }
 
-      final pdfBytes = await _apiService.downloadInvoicePdf(invoiceId);
+      List<int> pdfBytes;
+
+      // Try signed URL first (preferred method)
+      if (!_useDirectDownload) {
+        try {
+          final signedUrlResponse = await _apiService.getInvoiceDownloadUrl(invoiceId);
+          if (signedUrlResponse['success'] == true && signedUrlResponse['data'] != null) {
+            final signedUrl = signedUrlResponse['data']['downloadUrl'] as String?;
+            if (signedUrl != null && signedUrl.isNotEmpty) {
+              pdfBytes = await _apiService.downloadPdfFromUrl(signedUrl);
+            } else {
+              throw Exception('Failed to get download URL');
+            }
+          } else {
+            throw Exception('Failed to get download URL');
+          }
+        } catch (e) {
+          // Check if it's an expired link error
+          final errorStr = e.toString().toLowerCase();
+          if (errorStr.contains('expired') || errorStr.contains('unauthorized') || errorStr.contains('invalid')) {
+            if (mounted) {
+              setState(() {
+                _isDownloading = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Download link expired. Please try again.'),
+                  backgroundColor: AppColors.error,
+                  duration: const Duration(seconds: 5),
+                  action: SnackBarAction(
+                    label: 'Retry',
+                    textColor: AppColors.onPrimary,
+                    onPressed: () {
+                      _downloadInvoice();
+                    },
+                  ),
+                ),
+              );
+            }
+            return;
+          }
+          // Fallback to direct download if signed URL fails for other reasons
+          pdfBytes = await _apiService.downloadInvoicePdf(invoiceId);
+        }
+      } else {
+        // Use direct download (fallback)
+        pdfBytes = await _apiService.downloadInvoicePdf(invoiceId);
+      }
 
       if (pdfBytes.isEmpty) {
         throw Exception('Downloaded PDF is empty');
@@ -115,6 +163,13 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
             content: Text('Failed to download invoice: ${e.toString()}'),
             backgroundColor: AppColors.error,
             duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: AppColors.onPrimary,
+              onPressed: () {
+                _downloadInvoice();
+              },
+            ),
           ),
         );
       }
