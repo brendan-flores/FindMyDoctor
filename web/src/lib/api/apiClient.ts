@@ -7,7 +7,7 @@ import {
   shouldRetryResponse,
 } from './requestPolicy';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1';
 
 /** Error code returned when the caller aborted a request. */
 export const REQUEST_ABORTED_ERROR_CODE = 'REQUEST_ABORTED';

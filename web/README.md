@@ -90,7 +90,7 @@ npm start
 
 ## Backend Integration
 
-The web application communicates with the REST API located in `backend/`. Both frontend applications (mobile and web) use the same backend API at `http://localhost:3000/api/v1`.
+The web application communicates with the REST API located in `backend/`. By default, the web app uses `http://127.0.0.1:3000/api/v1` for local development. Set `NEXT_PUBLIC_API_URL` to override the API URL.
 
 ## Architecture Notes
 

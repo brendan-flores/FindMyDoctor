@@ -15,6 +15,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import SearchableMultiSelect from '@/components/ui/SearchableMultiSelect';
 
 const PRC_LICENSE_PATTERN = /^\d{7}$/;
+const apiOrigin = new URL(apiClient.getBaseUrl()).origin;
 
 export default function DoctorProfile() {
   const router = useRouter();
@@ -173,7 +174,7 @@ export default function DoctorProfile() {
           setPhotoPreview(
             response.data.professional_photo_url.startsWith('http')
               ? response.data.professional_photo_url
-              : `http://localhost:3000${response.data.professional_photo_url}`
+              : `${apiOrigin}${response.data.professional_photo_url}`
           );
         }
       } else {
@@ -567,7 +568,7 @@ export default function DoctorProfile() {
                         <img
                           src={photoPreview.startsWith('http') || photoPreview.startsWith('blob:')
                             ? photoPreview
-                            : `http://localhost:3000${photoPreview}`}
+                            : `${apiOrigin}${photoPreview}`}
                           alt="Professional Photo Preview"
                           className="w-32 h-32 rounded-xl object-cover border-2 border-[#E2E8F0]"
                           onError={(e) => {
@@ -978,7 +979,7 @@ export default function DoctorProfile() {
             <img
               src={photoPreview.startsWith('http') || photoPreview.startsWith('blob:')
                 ? photoPreview
-                : `http://localhost:3000${photoPreview}`}
+                : `${apiOrigin}${photoPreview}`}
               alt="Professional Photo"
               className="max-w-full max-h-[90vh] object-contain rounded-lg"
               onClick={(e) => e.stopPropagation()}

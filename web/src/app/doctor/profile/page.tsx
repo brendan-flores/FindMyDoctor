@@ -13,7 +13,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import SearchableMultiSelect from '@/components/ui/SearchableMultiSelect';
 
 const apiOrigin = new URL(
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'
+  process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1'
 ).origin;
 
 function Detail({ label, value, isEditing, onEdit, disabled, children }: { label: string; value?: string | number | null; isEditing?: boolean; onEdit?: (value: string) => void; disabled?: boolean; children?: React.ReactNode }) {
@@ -209,7 +209,7 @@ export default function DoctorProfilePage() {
       const uploadFormData = new FormData();
       uploadFormData.append('photo', file);
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/doctors/me/photo`, {
+      const response = await fetch(`${apiClient.getBaseUrl()}/doctors/me/photo`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
