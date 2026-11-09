@@ -179,6 +179,20 @@ Current System State (October 2026):
 - Invoice settings are stored in the `invoice_settings` table (migration 036_add_invoice_settings.sql) with `doctor_id` as primary key, scoped to the secretary's assigned doctor
 - Secretary-only API endpoints for invoice details: `GET /api/v1/secretaries/me/invoice-details` (fetches settings for assigned doctor) and `PUT /api/v1/secretaries/me/invoice-details` (updates/inserts settings for assigned doctor)
 - Invoice details form on secretary settings page loads existing settings on mount and saves changes via the API endpoints with validation (clinic name 1-200 chars, address 1-500 chars, contact number 1-50 chars, footer line max 200 chars)
+
+## Invoice Messaging via Conversations
+- Secretaries can send invoices to patients through the conversation thread at `/secretary/conversations` using the "Send Invoice to Patient" action
+- Backend endpoint `POST /api/v1/conversations/:id/messages` accepts `{ message, messageType: 'INVOICE', invoiceId }` (SECRETARY-only)
+- Invoice validation ensures the invoice belongs to the secretary's assigned doctor and the patient in the conversation
+- Backend `GET /api/v1/conversations/:id/messages` returns invoice summary including invoice_number, invoice_date, total_amount, and status for INVOICE message types
+- When an INVOICE message is sent, the backend creates an INVOICE_AVAILABLE notification for the patient with conversationId and invoiceId in the push payload
+- Mobile push notification service routes INVOICE_AVAILABLE notifications to the conversation thread when conversationId is present, with patient authorization verification, falling back to payments hub if conversationId is missing or unauthorized
+- Mobile conversation thread displays invoice messages as dedicated cards showing invoice number, formatted date (MMM d, yyyy), total amount (₱500.00 format), payment status, and "View Invoice" button
+- Tapping "View Invoice" opens the shared InvoiceBottomSheet component (reused from payments hub)
+- InvoiceBottomSheet uses signed URL download flow as primary method: calls `GET /api/v1/invoices/:id/download-url` for a 15-minute signed URL, downloads PDF using the URL, handles expired links with clear error message and retry button, falls back to direct download if signed URL fails for non-expiration reasons
+- Signed URL endpoint `GET /api/v1/invoices/:id/download-url` enforces authorization: only the patient in the conversation or the secretary for their assigned doctor may get the URL
+- Patients can access the same invoice from the payments hub (`/payments`) using the same InvoiceBottomSheet component
+- Invoice messaging maintains strict patient-secretary communication boundaries; patients cannot send invoice messages, and invoice access is enforced through conversation membership and patient-doctor associations
 - Doctor settings page at `/doctor/settings` provides a single labeled "Account" section containing the optional two-factor authentication toggle (description: "Require a verification code when you sign in from a new or untrusted browser."), a Change password card, and the Trusted Browsers card
 - Supabase is used only for OTP email verification and Storage, not for storing application data
 - Login OTP uses `shouldCreateUser: false` to prevent Supabase from creating application accounts

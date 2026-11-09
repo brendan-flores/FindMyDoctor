@@ -4,6 +4,36 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.40 (November 9, 2026)
+
+**Purpose:** Complete the invoice messaging functionality so patients can receive invoice messages from secretaries, view invoice details with full information in the conversation thread, and download invoice PDFs using short-lived signed URLs with retry capability on expiration.
+
+**Significant Features:**
+- Backend: Enhanced `GET /api/v1/conversations/:id/messages` to return additional invoice fields (invoice_date, total_amount, status) in the invoice summary for INVOICE message types.
+- Backend: Verified `notifyInvoiceRecipients()` in conversationService.ts includes conversationId in INVOICE_AVAILABLE push notification payload for proper deep-linking.
+- Mobile: Updated push notification service `handleNotificationTap()` for INVOICE_AVAILABLE notifications to route to conversation thread when conversationId is present, with patient authorization verification before opening, falling back to payments hub if conversationId is missing or unauthorized.
+- Mobile: Extended `InvoiceSummary` model to include invoiceDate, totalAmount, and status fields with proper JSON parsing and type handling.
+- Mobile: Enhanced conversation thread invoice card display to show invoice number, formatted date (MMM d, yyyy), total amount (₱500.00 format), payment status, and "View Invoice" button with proper styling.
+- Mobile: Added `downloadPdfFromUrl()` method to ApiService for downloading PDFs from signed URLs without authentication headers (token is in URL).
+- Mobile: Updated InvoiceBottomSheet download flow to use signed URL as primary method (15-minute expiry), with clear error message and retry button for expired links, falling back to direct download if signed URL fails for non-expiration reasons.
+- Mobile: Added retry action to error SnackBar for improved user experience when download links expire.
+
+**Improvements:**
+- Patients now receive INVOICE_AVAILABLE notifications that deep-link directly to the conversation thread where the invoice was sent, improving the notification-to-action flow.
+- Invoice cards in conversation threads now display complete information (number, date, amount, status) instead of just the invoice number, making it easier for patients to identify invoices at a glance.
+- Signed URL download flow provides better security with short-lived tokens and clear retry UX when links expire.
+- Same InvoiceBottomSheet component is reused from both conversation thread and payments hub, avoiding code duplication.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None (additive fields and notification routing enhancement; existing endpoints remain backward compatible).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.40, added version entry to `VERSION_HISTORY.md`, and updated `docs/prd.md` to include invoice messaging capabilities for patients (receive invoices through conversations, view invoice details, download invoice PDFs) and secretaries (send invoices to patients through conversations).
+
+---
+
 ### 01.39 (November 9, 2026)
 
 **Purpose:** Give patients a centralized Payments Hub in the mobile app to review payment records, pay via GCash QR, upload receipts, track verification status, and access invoices.

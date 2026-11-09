@@ -154,6 +154,9 @@ Patients can:
 - Reschedule eligible reservations.
 - Join waitlists.
 - Chat with secretaries.
+- Receive invoices from secretaries through conversations.
+- View invoice details.
+- Download invoice PDFs.
 - Use the AI chatbot.
 - Upload GCash payment receipts.
 - View payment status.
@@ -187,6 +190,7 @@ Secretaries can:
 
 - Manage patient-secretary conversations.
 - Answer patient questions.
+- Send invoices to patients through conversations.
 - Register walk-in patients.
 - Locate existing patient accounts.
 - Create patient accounts.
