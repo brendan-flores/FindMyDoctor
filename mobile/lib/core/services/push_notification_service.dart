@@ -198,8 +198,8 @@ class PushNotificationService {
     }
 
     if (type == 'INVOICE_AVAILABLE') {
-      // Invoice notifications belong to patients; open the payments hub
-      // which lists the invoice and links to the invoice preview.
+      // Invoice notifications belong to patients; open the conversation thread
+      // if conversationId is present, otherwise fall back to payments hub.
       try {
         final userResponse = await _apiService.getCurrentUser();
         if (userResponse['success'] != true || userResponse['data'] is! Map) {
@@ -210,9 +210,41 @@ class PushNotificationService {
         final role = (user['role'] ?? '').toString();
         if (role != 'PATIENT') return;
 
+        final conversationId = (data['conversationId'] ??
+                data['conversation_id'] ??
+                '')
+            .toString();
+
         final navigator = AppNavigator.key.currentState;
         if (navigator == null) return;
 
+        // If conversationId is present, open the conversation thread
+        if (conversationId.isNotEmpty &&
+            conversationId != 'null' &&
+            conversationId != 'undefined') {
+          // Verify the patient has access to this conversation
+          final conversationsResponse = await _apiService.getConversations();
+          if (conversationsResponse['success'] != true ||
+              conversationsResponse['data'] is! List) {
+            return;
+          }
+
+          final isAuthorized = (conversationsResponse['data'] as List).any(
+            (conversation) =>
+                conversation is Map &&
+                conversation['id']?.toString() == conversationId,
+          );
+
+          if (isAuthorized) {
+            await navigator.pushNamed(
+              '/conversation-thread',
+              arguments: {'conversationId': conversationId},
+            );
+            return;
+          }
+        }
+
+        // Fall back to payments hub if conversationId is missing or unauthorized
         await navigator.pushNamed('/payments');
       } catch (_) {
         // Never surface push-deep-link failures to the user.

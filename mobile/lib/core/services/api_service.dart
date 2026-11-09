@@ -960,6 +960,36 @@ class ApiService {
     }
   }
 
+  /// Download PDF from a signed URL (used for invoice downloads with short-lived tokens)
+  Future<List<int>> downloadPdfFromUrl(String signedUrl) async {
+    final client = _httpClient ?? http.Client();
+    final response = await client.get(
+      Uri.parse(signedUrl),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.bodyBytes;
+    } else {
+      try {
+        final body = jsonDecode(response.body);
+        throw ApiException(
+          message: body['error']?['message'] ?? 'Failed to download PDF',
+          code: body['error']?['code'] ?? 'DOWNLOAD_ERROR',
+          statusCode: response.statusCode,
+        );
+      } catch (e) {
+        if (e is ApiException) {
+          rethrow;
+        }
+        throw ApiException(
+          message: 'Failed to download PDF',
+          code: 'DOWNLOAD_ERROR',
+          statusCode: response.statusCode,
+        );
+      }
+    }
+  }
+
   // ===========================
   // WAITLIST METHODS
   // ===========================
