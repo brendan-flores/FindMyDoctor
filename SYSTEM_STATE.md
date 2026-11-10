@@ -2,9 +2,9 @@
 
 This document tracks the current state of the FindMyDoctor application, including key features, workflows, and system configurations.
 
-**Current Version:** 01.39
+**Current Version:** 01.41
 
-**Last Updated:** November 9, 2026
+**Last Updated:** November 10, 2026
 
 ---
 
@@ -129,7 +129,8 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 - `GET /api/v1/queue/today/me` (patient-only) resolves the patient from the bearer token and returns today's queue for every doctor the patient is scheduled with: `queueNumber`, `queueStatus`, `nowServing`, `patientsAhead`, `estimatedWaitMinutes`, `consultationDurationMinutes`, and doctor information (name, specialty, practice, room, photo, fee).
 - `nowServing` is the highest `queue_number` with status `CALLED`/`IN_CHECKUP`, falling back to the highest `COMPLETED`; `null` means the clinic has not started.
 - `patientsAhead` counts lower queue numbers still in `WAITING`/`CALLED`; `estimatedWaitMinutes` = `patientsAhead × consultation_duration_minutes` (default 30) from `daily_capacities`.
-- `GET /api/v1/queue/:date/patient/:patientId` is scoped: patients may read only their own entry (403 otherwise), doctors only entries for their own doctor, secretaries only for their assigned doctor, admins any. Invalid dates return 400, missing entries 404.
+- `GET /api/v1/queue/:date/patient/:patientId` is scoped to PATIENT/DOCTOR/SECRETARY: patients may read only their own entry (403 otherwise), doctors only entries for their own doctor, secretaries only for their assigned doctor. ADMIN/SUPERADMIN receive 403. Invalid dates return 400, missing entries 404.
+- `GET /api/v1/queue/:date` is DOCTOR/SECRETARY-only for clinic queue operations (ADMIN/SUPERADMIN receive 403). Doctor capacity, payment detail, invoice detail/PDF/by-payment, and consultation record read endpoints are likewise restricted to authorized doctor/secretary/patient roles as applicable; ADMIN/SUPERADMIN are denied clinic-operation access.
 
 **Queue numbering on removal:**
 - Cancelling or rescheduling away from a date closes the gap: higher numbers shift down by one in ascending order and each affected patient receives a `QUEUE_UPDATED` notification.
@@ -315,6 +316,7 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 See `docs/VERSION_HISTORY.md` for complete version history.
 
 **Recent Versions:**
+- 01.41: Week 8 authorization hardening — ADMIN/SUPERADMIN denied clinic-operation access to queue, doctor capacity, payment detail, invoice detail/PDF/by-payment, and consultation record read endpoints; expanded backend/mobile verification coverage for role-based workflows, waitlist, billing, and security controls
 - 01.39: Patient Payments Hub — centralized `/payments` page with status filters, GCash QR/account details, receipt upload entry points, invoice view/download; new patient-scoped `GET /api/v1/payments/me` and `GET /api/v1/invoices/me`; INVOICE_AVAILABLE notifications deep-link to the invoice/payments hub
 - 01.38: Patient Medical Records bug fixes — prescriptions tab no longer fails to load (bigint `medication_count` parsing), History tab shows "Dr." prefix and the visit doctor's real profile photo, prescription detail can open PDFs again; shared AppHeader 16px overflow fixed; back buttons added to the Medical Records screens
 - 01.37: Schedule-change confirmation workflow — pending secretary approval for exception/break-period changes affecting active appointments, affected appointments flagged needs attention, patients notified via SCHEDULE_CHANGE_NOTICE

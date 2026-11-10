@@ -4,6 +4,30 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.41 (November 10, 2026)
+
+**Purpose:** Harden clinic-operation authorization boundaries for Week 8 verification and expand end-to-end/mobile test coverage for role-based workflows, waitlist, billing, and security controls.
+
+**Significant Features:**
+- Backend authorization hardening (ADMIN/SUPERADMIN denied clinic-operation access): removed ADMIN from `GET /api/v1/queue/:date`; restricted `GET /api/v1/queue/:date/patient/:patientId` to PATIENT/DOCTOR/SECRETARY with role scoping (ADMIN receives 403); removed ADMIN from doctor capacity endpoints `GET/PUT/POST /api/v1/doctors/:id/capacity`; removed ADMIN access from payment detail endpoints `GET /api/v1/payments/:appointmentId` and `GET /api/v1/payments/by-id/:id`; removed ADMIN access from invoice endpoints `GET /api/v1/invoices/:id`, `GET /api/v1/invoices/by-payment/:paymentId`, and `GET /api/v1/invoices/:id/pdf` (`GET /api/v1/invoices/:id/download-url` remains PATIENT/SECRETARY only); scoped consultation record reads `GET /api/v1/visits/:id` and `GET /api/v1/visits/appointment/:appointmentId` to patient ownership, doctor ownership, or the assigned secretary (out-of-scope reads return 404, ADMIN receives 403).
+- Backend verification coverage: added Week 8 authorization matrix tests, waitlist flow tests, waitlist promotion service tests, billing-flow tests, and static security checks (ensuring mobile/web do not contain direct PostgreSQL/database credential or AI-provider key exposure and that patient-to-doctor chat boundaries remain denied).
+- Mobile test coverage: added injectable API/service seams where needed and added widget/integration tests for `/waitlist`, `/reschedule`, `/payments` (Payments Hub), `/payment` (receipt upload/payment screen), `/conversation-thread`, and `/doctor-schedule`, including schedule-change/waitlist interactions and GCash account-detail display from secretary-configured settings.
+
+**Improvements:**
+- Existing payment tests updated to reflect enforced ADMIN denial and current parameterized payment-state updates in mark-paid flows.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:**
+- ADMIN/SUPERADMIN users can no longer access clinic queue, doctor capacity, payment detail, invoice detail/PDF/by-payment, or consultation record read endpoints; these operations remain restricted to doctors and authorized secretaries (and patients for their own records where applicable).
+
+**Breaking Changes:**
+- API authorization change: clients or tooling relying on ADMIN access to queue, capacity, payments, invoices, or consultation records will now receive `403 Forbidden`.
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.41, added this version entry to `VERSION_HISTORY.md`, and synchronized `SYSTEM_STATE.md`, `docs/SYSTEM_STATE.md`, `docs/architecture.md`, `docs/architecture-essentials.md`, and `docs/prd.md` with the enforced clinic-operation authorization boundaries and Week 8 verification coverage.
+
+---
+
 ### 01.40 (November 9, 2026)
 
 **Purpose:** Complete the invoice messaging functionality so patients can receive invoice messages from secretaries, view invoice details with full information in the conversation thread, and download invoice PDFs using short-lived signed URLs with retry capability on expiration.
