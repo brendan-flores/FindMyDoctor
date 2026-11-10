@@ -22,6 +22,8 @@ class DoctorSchedulePage extends StatefulWidget {
   final String? consultationFee;
   final String? professionalPhotoUrl;
   final String? defaultDate;
+  final DoctorService? doctorService;
+  final ApiService? apiService;
 
   const DoctorSchedulePage({
     super.key,
@@ -32,6 +34,8 @@ class DoctorSchedulePage extends StatefulWidget {
     this.consultationFee,
     this.professionalPhotoUrl,
     this.defaultDate,
+    this.doctorService,
+    this.apiService,
   });
 
   @override
@@ -39,8 +43,8 @@ class DoctorSchedulePage extends StatefulWidget {
 }
 
 class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
-  final DoctorService _doctorService = DoctorService();
-  final ApiService _apiService = ApiService();
+  late final DoctorService _doctorService;
+  late final ApiService _apiService;
 
   DateTime? _selectedDate;
   String _selectedPaymentMethod = 'CASH'; // 'GCASH' or 'CASH'
@@ -68,6 +72,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
+    _doctorService = widget.doctorService ?? DoctorService(apiService: _apiService);
     // If defaultDate is provided, set it as selected date
     if (widget.defaultDate != null) {
       _selectedDate = DateTime.tryParse(widget.defaultDate!);

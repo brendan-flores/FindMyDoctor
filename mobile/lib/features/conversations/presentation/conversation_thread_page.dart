@@ -22,10 +22,15 @@ class ConversationThreadPage extends StatefulWidget {
   /// the patient-facing doctor/secretary header.
   final String? counterpartName;
 
+  /// Optional injected API service used by widget tests. Production callers
+  /// leave this null and fall back to the shared [ApiService] singleton.
+  final ApiService? apiService;
+
   const ConversationThreadPage({
     super.key,
     required this.conversationId,
     this.counterpartName,
+    this.apiService,
   });
 
   @override
@@ -33,7 +38,7 @@ class ConversationThreadPage extends StatefulWidget {
 }
 
 class _ConversationThreadPageState extends State<ConversationThreadPage> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   List<Message> _messages = [];
@@ -48,6 +53,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
     _loadConversationDetails();
     _loadCurrentUser().then((_) {
       _loadMessages(scrollToLatest: true);

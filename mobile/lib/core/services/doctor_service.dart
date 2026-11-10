@@ -3,7 +3,9 @@ import '../models/doctor.dart';
 import '../models/doctor_profile.dart';
 
 class DoctorService {
-  final ApiService _apiService = ApiService();
+  final ApiService _apiService;
+
+  DoctorService({ApiService? apiService}) : _apiService = apiService ?? ApiService();
 
   Future<List<Doctor>> getDoctors({
     String? specialty,

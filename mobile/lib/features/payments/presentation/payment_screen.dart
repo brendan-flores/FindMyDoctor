@@ -17,6 +17,7 @@ class PaymentScreen extends StatefulWidget {
   final String? consultationFee;
   final DateTime? appointmentDate;
   final String? doctorId;
+  final ApiService? apiService;
 
   const PaymentScreen({
     super.key,
@@ -25,6 +26,7 @@ class PaymentScreen extends StatefulWidget {
     this.consultationFee,
     this.appointmentDate,
     this.doctorId,
+    this.apiService,
   });
 
   @override
@@ -32,7 +34,7 @@ class PaymentScreen extends StatefulWidget {
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   final ImagePicker _imagePicker = ImagePicker();
 
   File? _receiptImage;
@@ -50,6 +52,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
     _fetchPaymentDetails();
     if (widget.doctorId != null) {
       _fetchGcashQr();
