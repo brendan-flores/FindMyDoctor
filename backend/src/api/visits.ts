@@ -5,6 +5,41 @@ import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
+/**
+ * Resolve the SQL scope that limits which visits the caller may read.
+ * Patients only see their own visits, doctors only visits they authored, and
+ * secretaries only visits belonging to their assigned doctor. Admins (and any
+ * other role) get no clinical-record access at all.
+ */
+async function resolveVisitScope(
+  userId: string,
+  role: string
+): Promise<{ allowed: false } | { allowed: true; clause: string; param: string }> {
+  if (role === 'PATIENT') {
+    const patientResult = await query('SELECT id FROM patients WHERE user_id = $1', [userId]);
+    if (patientResult.rows.length === 0) return { allowed: false };
+    return { allowed: true, clause: 'v.patient_id = $2', param: patientResult.rows[0].id };
+  }
+
+  if (role === 'DOCTOR') {
+    const doctorResult = await query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
+    if (doctorResult.rows.length === 0) return { allowed: false };
+    return { allowed: true, clause: 'v.doctor_id = $2', param: doctorResult.rows[0].id };
+  }
+
+  if (role === 'SECRETARY') {
+    const secretaryResult = await query(
+      'SELECT doctor_id FROM secretaries WHERE user_id = $1',
+      [userId]
+    );
+    if (secretaryResult.rows.length === 0) return { allowed: false };
+    return { allowed: true, clause: 'v.doctor_id = $2', param: secretaryResult.rows[0].doctor_id };
+  }
+
+  return { allowed: false };
+}
+
+
 // Get authenticated patient's visits (PATIENT-only)
 router.get('/me', authenticate, authorize('PATIENT'), async (req: AuthRequest, res: Response) => {
   try {
@@ -147,10 +182,16 @@ router.post('/', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res
   }
 });
 
-// Get visit by ID
-router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+// Get visit by ID (scoped to the owning patient, doctor, or assigned secretary)
+router.get('/:id', authenticate, authorize('PATIENT', 'DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const userId = req.user!.id;
+
+    const scope = await resolveVisitScope(userId, req.user!.role);
+    if (!scope.allowed) {
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You do not have access to this visit'));
+    }
 
     const result = await query(
       `SELECT v.*, 
@@ -159,8 +200,8 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
        FROM visits v
        JOIN patients p ON v.patient_id = p.id
        JOIN doctors d ON v.doctor_id = d.id
-       WHERE v.id = $1`,
-      [id]
+       WHERE v.id = $1 AND ${scope.clause}`,
+      [id, scope.param]
     );
 
     if (result.rows.length === 0) {
@@ -173,10 +214,16 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Get visit by appointment ID
-router.get('/appointment/:appointmentId', authenticate, async (req: AuthRequest, res: Response) => {
+// Get visit by appointment ID (scoped to the owning patient, doctor, or assigned secretary)
+router.get('/appointment/:appointmentId', authenticate, authorize('PATIENT', 'DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { appointmentId } = req.params;
+    const userId = req.user!.id;
+
+    const scope = await resolveVisitScope(userId, req.user!.role);
+    if (!scope.allowed) {
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'You do not have access to this visit'));
+    }
 
     const result = await query(
       `SELECT v.*, 
@@ -187,8 +234,8 @@ router.get('/appointment/:appointmentId', authenticate, async (req: AuthRequest,
        JOIN patients p ON v.patient_id = p.id
        JOIN doctors d ON v.doctor_id = d.id
        LEFT JOIN appointments a ON v.appointment_id = a.id
-       WHERE v.appointment_id = $1`,
-      [appointmentId]
+       WHERE v.appointment_id = $1 AND ${scope.clause}`,
+      [appointmentId, scope.param]
     );
 
     if (result.rows.length === 0) {

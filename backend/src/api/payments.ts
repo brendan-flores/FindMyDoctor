@@ -383,16 +383,6 @@ router.get('/:appointmentId', authenticate, requireSecretaryPasswordChange, requ
           AND a.doctor_id = $2
       `;
       params.push(assignedDoctorId);
-    } else if (role === 'ADMIN') {
-      queryText = `
-        SELECT p.*, 
-               pat.first_name as patient_first_name, pat.last_name as patient_last_name,
-               s.first_name as verified_by_first_name, s.last_name as verified_by_last_name
-        FROM payments p
-        JOIN patients pat ON p.patient_id = pat.id
-        LEFT JOIN secretaries s ON p.verified_by = s.id
-        WHERE p.appointment_id = $1
-      `;
     } else {
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Invalid role'));
     }
@@ -1782,16 +1772,6 @@ router.get('/by-id/:id', authenticate, async (req: AuthRequest, res: Response) =
         WHERE p.id = $1 AND a.doctor_id = $2
       `;
       params.push(assignedDoctorId);
-    } else if (role === 'ADMIN') {
-      queryText = `
-        SELECT p.*,
-               pat.first_name as patient_first_name, pat.last_name as patient_last_name,
-               s.first_name as verified_by_first_name, s.last_name as verified_by_last_name
-        FROM payments p
-        JOIN patients pat ON p.patient_id = pat.id
-        LEFT JOIN secretaries s ON p.verified_by = s.id
-        WHERE p.id = $1
-      `;
     } else {
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Invalid role'));
     }

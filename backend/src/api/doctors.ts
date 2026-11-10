@@ -733,7 +733,7 @@ router.post('/me/capacity/:date', authenticate, authorize('DOCTOR'), async (req:
 });
 
 // Get doctor capacity configuration
-router.get('/:id/capacity', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+router.get('/:id/capacity', authenticate, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { date, startDate, endDate } = req.query;
@@ -765,7 +765,7 @@ router.get('/:id/capacity', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMI
 });
 
 // Update doctor capacity configuration
-router.put('/:id/capacity', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+router.put('/:id/capacity', authenticate, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { date, configuredCapacity } = req.body;
@@ -841,7 +841,7 @@ router.put('/:id/capacity', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMI
 });
 
 // Set capacity for a specific date
-router.post('/:id/capacity/:date', authenticate, authorize('DOCTOR', 'SECRETARY', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/capacity/:date', authenticate, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { date } = req.params;

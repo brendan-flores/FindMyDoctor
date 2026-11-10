@@ -102,7 +102,7 @@ const toNumberOrNull = (value: unknown): number | null => {
 };
 
 // Get queue for a specific date
-router.get('/:date', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('DOCTOR', 'SECRETARY', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+router.get('/:date', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('DOCTOR', 'SECRETARY'), async (req: AuthRequest, res: Response) => {
   try {
     const { date } = req.params;
     const { doctorId } = req.query;
@@ -161,7 +161,7 @@ router.get('/:date', authenticate, requireSecretaryPasswordChange, requireSecret
       params.push(assignedDoctorId);
       queryText += ` AND q.doctor_id = $${params.length}`;
     } else if (doctorId) {
-      // Doctor and Admin: can optionally filter by doctorId
+      // Doctor: can optionally filter by doctorId
       params.push(String(doctorId));
       queryText += ` AND q.doctor_id = $${params.length}`;
     }
@@ -237,7 +237,8 @@ router.get('/:date/patient/:patientId', authenticate, async (req: AuthRequest, r
       }
 
       scopedDoctorId = secretaryResult.rows[0].doctor_id;
-    } else if (role !== 'ADMIN') {
+    } else {
+      // Admins (and any other role) have no clinic queue access.
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Invalid role for queue access'));
     }
 

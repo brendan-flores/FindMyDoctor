@@ -322,9 +322,6 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
         WHERE i.id = $1 AND i.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)
       `;
       params.push(userId);
-    } else if (role === 'ADMIN') {
-      // Admin can view all invoices
-      queryText = 'SELECT i.* FROM invoices i WHERE i.id = $1';
     } else {
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Invalid role'));
     }
@@ -383,13 +380,6 @@ router.get('/by-payment/:paymentId', authenticate, async (req: AuthRequest, res:
         WHERE i.payment_id = $1 AND i.doctor_id = (SELECT id FROM doctors WHERE user_id = $2) ${statusFilter}
       `;
       params.push(userId);
-    } else if (role === 'ADMIN') {
-      queryText = `
-        SELECT i.*, p.gcash_advance_amount, p.cash_tendered_amount, p.total_amount, p.amount_paid
-        FROM invoices i
-        JOIN payments p ON i.payment_id = p.id
-        WHERE i.payment_id = $1 ${statusFilter}
-      `;
     } else {
       client.release();
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Invalid role'));
@@ -669,13 +659,6 @@ router.get('/:id/pdf', authenticate, async (req: AuthRequest, res: Response) => 
         WHERE i.id = $1 AND i.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)
       `;
       params.push(userId);
-    } else if (role === 'ADMIN') {
-      queryText = `
-        SELECT i.*, p.gcash_advance_amount, p.cash_tendered_amount, p.total_amount, p.amount_paid
-        FROM invoices i
-        JOIN payments p ON i.payment_id = p.id
-        WHERE i.id = $1
-      `;
     } else {
       client.release();
       return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Invalid role'));

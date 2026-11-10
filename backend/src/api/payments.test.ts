@@ -407,29 +407,14 @@ describe('Secretary Payment Verification UI', () => {
       expect(response.status).toBe(200);
     });
 
-    it('should preserve admin access', async () => {
+    it('should deny admin access with 403', async () => {
       mockUser = { id: 'test-admin-id', role: 'ADMIN', mustChangePassword: false };
-
-      query.mockImplementation((sql: string, params: any[]) => {
-        if (sql.includes('WHERE p.appointment_id = $1') && !sql.includes('AND a.doctor_id =')) {
-          return Promise.resolve({
-            rows: [{
-              id: 'payment-1',
-              status: 'PAID',
-              consultation_amount: 500.00
-            }]
-          });
-        }
-        if (sql.includes('FROM payment_charges')) {
-          return Promise.resolve({ rows: [] });
-        }
-        return Promise.resolve({ rows: [] });
-      });
 
       const response = await request(app)
         .get('/api/v1/payments/appointment-1');
 
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(403);
+      expect(query).not.toHaveBeenCalled();
     });
 
     it('should return 404 if secretary profile not found', async () => {
@@ -2928,16 +2913,19 @@ describe('Secretary Payment Verification UI', () => {
             }]
           });
         }
-        if (sql.includes('UPDATE payments') && sql.includes('SET status = \'PAID\'')) {
-          // Verify amount_paid is set to total_amount via parameter
-          expect(sql).toContain('amount_paid = $1');
-          expect(params[0]).toBe(500.00); // payment.total_amount
-          return Promise.resolve();
+        if (sql.includes('UPDATE payments') && sql.includes('amount_paid = $2')) {
+          // Status is parameterized ($1 = 'PAID') and amount_paid = $2.
+          expect(params[0]).toBe('PAID');
+          expect(params[1]).toBe(500.00); // payment.total_amount
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.includes('SELECT id FROM invoices WHERE payment_id')) {
+          return Promise.resolve({ rows: [{ id: 'existing-invoice' }] });
         }
         if (sql.includes('COMMIT')) {
           return Promise.resolve();
         }
-        return Promise.resolve();
+        return Promise.resolve({ rows: [] });
       });
 
       // Mock the global query for createNotification calls
@@ -2993,16 +2981,19 @@ describe('Secretary Payment Verification UI', () => {
             }]
           });
         }
-        if (sql.includes('UPDATE payments') && sql.includes('SET status = \'PAID\'')) {
-          // Verify amount_paid is set to total_amount via parameter
-          expect(sql).toContain('amount_paid = $1');
-          expect(params[0]).toBe(500.00); // payment.total_amount
-          return Promise.resolve();
+        if (sql.includes('UPDATE payments') && sql.includes('amount_paid = $2')) {
+          // Status is parameterized ($1 = 'PAID') and amount_paid = $2.
+          expect(params[0]).toBe('PAID');
+          expect(params[1]).toBe(500.00); // payment.total_amount
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.includes('SELECT id FROM invoices WHERE payment_id')) {
+          return Promise.resolve({ rows: [{ id: 'existing-invoice' }] });
         }
         if (sql.includes('COMMIT')) {
           return Promise.resolve();
         }
-        return Promise.resolve();
+        return Promise.resolve({ rows: [] });
       });
 
       // Mock the global query for createNotification calls
