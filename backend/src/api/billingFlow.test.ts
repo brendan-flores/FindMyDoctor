@@ -153,13 +153,23 @@ describe('Billing flow', () => {
 
   it('stage 1: doctor issues a prescription with medicine items', async () => {
     query.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT id FROM doctors WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'doctor-1' }] });
+      }
       if (sql.includes('SELECT * FROM visits WHERE id')) {
-        return Promise.resolve({ rows: [{ id: 'visit-1', patient_id: 'patient-1', doctor_id: 'doctor-1' }] });
+        return Promise.resolve({
+          rows: [{
+            id: 'visit-1',
+            patient_id: 'patient-1',
+            doctor_id: 'doctor-1',
+            status: 'ISSUED',
+          }],
+        });
       }
-      if (sql.includes('INSERT INTO prescriptions')) {
-        return Promise.resolve({ rows: [{ id: 'prescription-1', patient_id: 'patient-1', doctor_id: 'doctor-1' }] });
+      if (sql.includes("FROM prescriptions WHERE visit_id = $1 AND status = 'ISSUED'")) {
+        return Promise.resolve({ rows: [] });
       }
-      if (sql.includes('INSERT INTO prescription_items')) {
+      if (sql.includes('FROM prescriptions') && sql.includes("status = 'VOIDED'")) {
         return Promise.resolve({ rows: [] });
       }
       if (sql.includes('SELECT user_id FROM patients')) {
@@ -167,6 +177,15 @@ describe('Billing flow', () => {
       }
       return Promise.resolve({ rows: [] });
     });
+
+    getClient.mockResolvedValue(
+      makeClient((sql: string) => {
+        if (sql.startsWith('INSERT INTO prescriptions')) {
+          return { rows: [{ id: 'prescription-1', patient_id: 'patient-1', doctor_id: 'doctor-1' }] };
+        }
+        return { rows: [] };
+      })
+    );
 
     const response = await request(app)
       .post('/api/v1/prescriptions')

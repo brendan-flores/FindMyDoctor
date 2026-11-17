@@ -78,6 +78,37 @@ describe('Queue API Security', () => {
       expect(response.body.data[0].doctor_id).toBe('assigned-doctor-id');
     });
 
+    it('should expose the doctor-finished indicator without changing queue status', async () => {
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM queue_entries q')) {
+          expect(sql).toContain('vf.doctor_finished_at IS NOT NULL');
+          return Promise.resolve({
+            rows: [{
+              id: 'queue-1',
+              patient_id: 'patient-1',
+              doctor_id: 'assigned-doctor-id',
+              queue_date: '2024-12-01',
+              queue_number: 1,
+              status: 'IN_CHECKUP',
+              doctor_finished: true,
+              patient_first_name: 'John',
+              patient_last_name: 'Doe',
+            }],
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app).get('/api/v1/queue/2024-12-01');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data[0].doctor_finished).toBe(true);
+      expect(response.body.data[0].status).toBe('IN_CHECKUP');
+    });
+
     it('should return empty array when no queue entries exist for the date', async () => {
       query.mockImplementation((sql: string, params: any[]) => {
         if (sql.includes('SELECT doctor_id FROM secretaries')) {
@@ -702,6 +733,14 @@ describe('Queue API Security', () => {
         expect.stringContaining('INSERT INTO visits'),
         ['appointment-1', 'patient-1', 'doctor-1']
       );
+
+      // A blank visit created by the secretary's Complete Checkup is final,
+      // so the doctor can still fill it in and issue it afterwards.
+      const visitInsert = mockClient.query.mock.calls.find((call: any[]) =>
+        String(call[0]).includes('INSERT INTO visits')
+      );
+      expect(visitInsert[0]).toContain("'ISSUED'");
+      expect(visitInsert[0]).toContain('issued_at');
     });
 
     it('should return 404 when secretary tries to complete another doctor\'s queue entry', async () => {

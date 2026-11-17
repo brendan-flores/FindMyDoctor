@@ -612,6 +612,7 @@ router.get('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
         SELECT
           p.id, p.user_id, p.first_name, p.middle_name, p.last_name, p.date_of_birth, p.sex, p.phone, p.address,
           p.emergency_contact_name, p.emergency_contact_phone, p.medical_history, p.allergies, p.current_medications,
+          p.allergies_confirmed_none, p.medications_confirmed_none,
           u.email
         FROM patients p
         JOIN users u ON u.id = p.user_id
@@ -1138,7 +1139,9 @@ router.put('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
           emergency_contact_phone = CASE WHEN $13::boolean THEN $14 ELSE emergency_contact_phone END,
           medical_history = CASE WHEN $15::boolean THEN $16 ELSE medical_history END,
           allergies = CASE WHEN $17::boolean THEN $18 ELSE allergies END,
+          allergies_confirmed_none = CASE WHEN $17::boolean AND $18 IS NOT NULL THEN false ELSE allergies_confirmed_none END,
           current_medications = CASE WHEN $19::boolean THEN $20 ELSE current_medications END,
+          medications_confirmed_none = CASE WHEN $19::boolean AND $20 IS NOT NULL THEN false ELSE medications_confirmed_none END,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = $1
         AND (
@@ -1154,7 +1157,8 @@ router.put('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
           )
         )
         RETURNING id, first_name, middle_name, last_name, date_of_birth, sex, phone, address,
-                 emergency_contact_name, emergency_contact_phone, medical_history, allergies, current_medications
+                 emergency_contact_name, emergency_contact_phone, medical_history, allergies,
+                 allergies_confirmed_none, current_medications, medications_confirmed_none
       `;
     } else if (role === 'SECRETARY') {
       queryText = `
@@ -1170,7 +1174,9 @@ router.put('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
           emergency_contact_phone = CASE WHEN $13::boolean THEN $14 ELSE emergency_contact_phone END,
           medical_history = CASE WHEN $15::boolean THEN $16 ELSE medical_history END,
           allergies = CASE WHEN $17::boolean THEN $18 ELSE allergies END,
+          allergies_confirmed_none = CASE WHEN $17::boolean AND $18 IS NOT NULL THEN false ELSE allergies_confirmed_none END,
           current_medications = CASE WHEN $19::boolean THEN $20 ELSE current_medications END,
+          medications_confirmed_none = CASE WHEN $19::boolean AND $20 IS NOT NULL THEN false ELSE medications_confirmed_none END,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = $1
         AND (
@@ -1186,7 +1192,8 @@ router.put('/:id', authenticate, requirePasswordChange, async (req: AuthRequest,
           )
         )
         RETURNING id, first_name, middle_name, last_name, date_of_birth, sex, phone, address,
-                 emergency_contact_name, emergency_contact_phone, medical_history, allergies, current_medications
+                 emergency_contact_name, emergency_contact_phone, medical_history, allergies,
+                 allergies_confirmed_none, current_medications, medications_confirmed_none
       `;
     }
 

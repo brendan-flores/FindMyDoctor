@@ -70,12 +70,14 @@ router.get('/', authenticate, requirePasswordChange, async (req: AuthRequest, re
           COALESCE(q.registration_source, 'ONLINE') as registration_source,
           pay.id as payment_id,
           pay.status as payment_status,
-          pay.payment_method
+          pay.payment_method,
+          v.id as visit_id, v.status as visit_status, v.doctor_finished_at
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         JOIN doctors d ON a.doctor_id = d.id
         LEFT JOIN queue_entries q ON a.id = q.appointment_id
         LEFT JOIN payments pay ON a.id = pay.appointment_id
+        LEFT JOIN visits v ON a.id = v.appointment_id
         WHERE a.doctor_id = (SELECT id FROM doctors WHERE user_id = $1)
       `;
       params.push(userId);

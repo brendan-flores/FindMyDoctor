@@ -10,6 +10,7 @@ import prescriptionsRouter from './prescriptions';
 // Mock dependencies
 jest.mock('../database/connection', () => ({
   query: jest.fn(),
+  getClient: jest.fn(),
 }));
 
 jest.mock('../services/pushService', () => ({
@@ -32,7 +33,7 @@ jest.mock('../middleware/auth', () => ({
   },
 }));
 
-const { query } = require('../database/connection');
+const { query, getClient } = require('../database/connection');
 
 describe('Prescription Authorization', () => {
   let app: express.Application;
@@ -152,89 +153,23 @@ describe('Prescription Authorization', () => {
       expect(response.body.data).toHaveLength(0);
     });
 
-    it('should allow secretary to access prescriptions for their assigned doctor\'s patients', async () => {
+    it('should deny secretaries access to prescription history', async () => {
       mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
-
-      let callCount = 0;
-      query.mockImplementation((sql: string, params: any[]) => {
-        callCount++;
-        if (callCount === 1) {
-          // First call: get secretary's assigned doctor
-          return Promise.resolve({ rows: [{ doctor_id: 'doctor-456' }] });
-        } else if (callCount === 2) {
-          // Second call: fetch prescriptions for assigned doctor
-          return Promise.resolve({
-            rows: [
-              {
-                id: 'rx-1',
-                patient_id: 'patient-123',
-                doctor_id: 'doctor-456',
-                prescription_date: '2026-10-15',
-                doctor_first_name: 'Jane',
-                doctor_last_name: 'Smith'
-              }
-            ]
-          });
-        } else {
-          // Third call: fetch prescription items
-          return Promise.resolve({
-            rows: [
-              {
-                id: 'item-1',
-                prescription_id: 'rx-1',
-                medication_name: 'Paracetamol',
-                dosage: '500mg',
-                frequency: '3x daily',
-                duration: '7 days',
-                instructions: 'Take after meals'
-              }
-            ]
-          });
-        }
-      });
 
       const response = await request(app)
         .get('/api/v1/prescriptions/patients/patient-123');
 
-      expect(response.status).toBe(200);
-      expect(response.body.data).toHaveLength(1);
-      expect(response.body.data[0].patient_id).toBe('patient-123');
-      expect(response.body.data[0].doctor_id).toBe('doctor-456');
-      expect(response.body.data[0].items).toBeDefined();
-      expect(response.body.data[0].items).toHaveLength(1);
-      expect(response.body.data[0].items[0].medication_name).toBe('Paracetamol');
-
-      // Verify SQL checks secretary's assigned doctor
-      const secretaryCheckCall = query.mock.calls.find((call: any) =>
-        call[0].includes('SELECT doctor_id FROM secretaries WHERE user_id')
-      );
-      expect(secretaryCheckCall).toBeDefined();
-      expect(secretaryCheckCall[1]).toContain('secretary-user-id');
-
-      // Verify SQL restricts to assigned doctor
-      const prescriptionQueryCall = query.mock.calls.find((call: any) =>
-        call[0].includes('p.doctor_id = $2')
-      );
-      expect(prescriptionQueryCall).toBeDefined();
-      expect(prescriptionQueryCall[1]).toContain('doctor-456');
+      expect(response.status).toBe(403);
+      expect(query).not.toHaveBeenCalled();
     });
 
-    it('should deny secretary access to prescriptions for different doctor', async () => {
+    it('should deny secretaries access even for their assigned doctor\'s patients', async () => {
       mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
-
-      query.mockImplementation((sql: string, params: any[]) => {
-        if (sql.includes('SELECT doctor_id FROM secretaries WHERE user_id')) {
-          return Promise.resolve({ rows: [{ doctor_id: 'doctor-456' }] });
-        }
-        // Return empty results since the prescription belongs to a different doctor
-        return Promise.resolve({ rows: [] });
-      });
 
       const response = await request(app)
         .get('/api/v1/prescriptions/patients/patient-123');
 
-      expect(response.status).toBe(200);
-      expect(response.body.data).toHaveLength(0);
+      expect(response.status).toBe(403);
     });
 
     it('should return prescriptions without items for patient role (backward compatibility)', async () => {
@@ -266,11 +201,11 @@ describe('Prescription Authorization', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.data).toHaveLength(1);
-      // Patient role should not include items (backward compatibility)
-      expect(response.body.data[0].items).toBeUndefined();
+      // Items are attached (empty when the mock returns no item rows)
+      expect(response.body.data[0].items).toEqual([]);
     });
 
-    it('should return prescriptions without items for doctor role (backward compatibility)', async () => {
+    it('should attach items for the doctor role', async () => {
       mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
 
       query.mockResolvedValue({
@@ -291,8 +226,8 @@ describe('Prescription Authorization', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.data).toHaveLength(1);
-      // Doctor role should not include items (backward compatibility)
-      expect(response.body.data[0].items).toBeUndefined();
+      // Items are attached for the doctor (empty when the mock returns no item rows)
+      expect(response.body.data[0].items).toEqual([]);
     });
 
     it('should reject admin role with 403', async () => {
@@ -307,46 +242,63 @@ describe('Prescription Authorization', () => {
   });
 
   describe('POST /api/v1/prescriptions (notification and push)', () => {
-    it('should create notification for patient after prescription creation', async () => {
-      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
-
-      let callCount = 0;
-      query.mockImplementation((sql: string, params: any[]) => {
-        callCount++;
-        if (callCount === 1) {
-          // First call: fetch visit
+    const installMocks = (options: { notificationFails?: boolean; patientLookupEmpty?: boolean } = {}) => {
+      query.mockImplementation((sql: string) => {
+        if (sql.includes('SELECT id FROM doctors WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'doctor-456' }] });
+        }
+        if (sql.startsWith('SELECT * FROM visits WHERE id = $1 AND doctor_id = $2')) {
           return Promise.resolve({
             rows: [{
               id: 'visit-1',
               patient_id: 'patient-123',
-              doctor_id: 'doctor-456'
-            }]
+              doctor_id: 'doctor-456',
+              status: 'ISSUED',
+            }],
           });
-        } else if (callCount === 2) {
-          // Second call: insert prescription
-          return Promise.resolve({
-            rows: [{
-              id: 'rx-1',
-              visit_id: 'visit-1',
-              patient_id: 'patient-123',
-              doctor_id: 'doctor-456'
-            }]
-          });
-        } else if (callCount === 3) {
-          // Third call: insert prescription items
-          return Promise.resolve({ rows: [] });
-        } else if (callCount === 4) {
-          // Fourth call: get patient user_id for notification
-          return Promise.resolve({
-            rows: [{ user_id: 'patient-user-123' }]
-          });
-        } else if (callCount === 5) {
-          // Fifth call: create notification
-          return Promise.resolve({ rows: [] });
-        } else {
+        }
+        if (sql.includes("FROM prescriptions WHERE visit_id = $1 AND status = 'ISSUED'")) {
           return Promise.resolve({ rows: [] });
         }
+        if (sql.includes('FROM prescriptions') && sql.includes("status = 'VOIDED'")) {
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.startsWith('INSERT INTO notifications')) {
+          if (options.notificationFails) return Promise.reject(new Error('Database error'));
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.startsWith('SELECT user_id FROM patients WHERE id = $1')) {
+          return Promise.resolve({
+            rows: options.patientLookupEmpty ? [] : [{ user_id: 'patient-user-123' }],
+          });
+        }
+        return Promise.resolve({ rows: [] });
       });
+
+      getClient.mockImplementation(() =>
+        Promise.resolve({
+          query: (sql: string) => {
+            if (sql.startsWith('INSERT INTO prescriptions')) {
+              return Promise.resolve({
+                rows: [{
+                  id: 'rx-1',
+                  visit_id: 'visit-1',
+                  patient_id: 'patient-123',
+                  doctor_id: 'doctor-456',
+                }],
+              });
+            }
+            return Promise.resolve({ rows: [] });
+          },
+          release: jest.fn(),
+        })
+      );
+    };
+
+    it('should create notification for patient after prescription creation', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      installMocks();
 
       const response = await request(app)
         .post('/api/v1/prescriptions')
@@ -379,42 +331,7 @@ describe('Prescription Authorization', () => {
     it('should create prescription even if notification creation fails', async () => {
       mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
 
-      let callCount = 0;
-      query.mockImplementation((sql: string, params: any[]) => {
-        callCount++;
-        if (callCount === 1) {
-          // First call: fetch visit
-          return Promise.resolve({
-            rows: [{
-              id: 'visit-1',
-              patient_id: 'patient-123',
-              doctor_id: 'doctor-456'
-            }]
-          });
-        } else if (callCount === 2) {
-          // Second call: insert prescription
-          return Promise.resolve({
-            rows: [{
-              id: 'rx-1',
-              visit_id: 'visit-1',
-              patient_id: 'patient-123',
-              doctor_id: 'doctor-456'
-            }]
-          });
-        } else if (callCount === 3) {
-          // Third call: insert prescription items
-          return Promise.resolve({ rows: [] });
-        } else if (callCount === 4) {
-          // Fourth call: get patient user_id for notification
-          return Promise.resolve({
-            rows: [{ user_id: 'patient-user-123' }]
-          });
-        } else if (callCount === 5) {
-          // Fifth call: create notification - fail this one
-          return Promise.reject(new Error('Database error'));
-        }
-        return Promise.resolve({ rows: [] });
-      });
+      installMocks({ notificationFails: true });
 
       const response = await request(app)
         .post('/api/v1/prescriptions')
@@ -440,37 +357,7 @@ describe('Prescription Authorization', () => {
     it('should create prescription even if patient user lookup fails', async () => {
       mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
 
-      let callCount = 0;
-      query.mockImplementation((sql: string, params: any[]) => {
-        callCount++;
-        if (callCount === 1) {
-          // First call: fetch visit
-          return Promise.resolve({
-            rows: [{
-              id: 'visit-1',
-              patient_id: 'patient-123',
-              doctor_id: 'doctor-456'
-            }]
-          });
-        } else if (callCount === 2) {
-          // Second call: insert prescription
-          return Promise.resolve({
-            rows: [{
-              id: 'rx-1',
-              visit_id: 'visit-1',
-              patient_id: 'patient-123',
-              doctor_id: 'doctor-456'
-            }]
-          });
-        } else if (callCount === 3) {
-          // Third call: insert prescription items
-          return Promise.resolve({ rows: [] });
-        } else if (callCount === 4) {
-          // Fourth call: get patient user_id - return empty
-          return Promise.resolve({ rows: [] });
-        }
-        return Promise.resolve({ rows: [] });
-      });
+      installMocks({ patientLookupEmpty: true });
 
       const response = await request(app)
         .post('/api/v1/prescriptions')
@@ -495,38 +382,58 @@ describe('Prescription Authorization', () => {
   });
 
   describe('POST /api/v1/prescriptions (pricing guard)', () => {
-    it('should reject prescription creation with pricing fields', async () => {
+    it('should ignore pricing fields while keeping medication quantity', async () => {
       mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
 
-      let callCount = 0;
-      query.mockImplementation((sql: string, params: any[]) => {
-        callCount++;
-        if (callCount === 1) {
-          // First call: fetch visit
+      query.mockImplementation((sql: string) => {
+        if (sql.includes('SELECT id FROM doctors WHERE user_id')) {
+          return Promise.resolve({ rows: [{ id: 'doctor-456' }] });
+        }
+        if (sql.startsWith('SELECT * FROM visits WHERE id = $1 AND doctor_id = $2')) {
           return Promise.resolve({
             rows: [{
               id: 'visit-1',
               patient_id: 'patient-123',
-              doctor_id: 'doctor-456'
-            }]
+              doctor_id: 'doctor-456',
+              status: 'ISSUED',
+            }],
           });
-        } else if (callCount === 2) {
-          // Second call: insert prescription
-          return Promise.resolve({
-            rows: [{
-              id: 'rx-1',
-              visit_id: 'visit-1',
-              patient_id: 'patient-123',
-              doctor_id: 'doctor-456'
-            }]
-          });
-        } else {
-          // Third call: insert prescription items
+        }
+        if (sql.includes("FROM prescriptions WHERE visit_id = $1 AND status = 'ISSUED'")) {
           return Promise.resolve({ rows: [] });
         }
+        if (sql.includes('FROM prescriptions') && sql.includes("status = 'VOIDED'")) {
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.startsWith('INSERT INTO notifications')) {
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.startsWith('SELECT user_id FROM patients WHERE id = $1')) {
+          return Promise.resolve({ rows: [{ user_id: 'patient-user-123' }] });
+        }
+        return Promise.resolve({ rows: [] });
       });
 
-      // Attempt to create prescription with pricing fields (should be ignored, not validated)
+      const clientCalls: Array<{ sql: string; params?: any[] }> = [];
+      getClient.mockImplementation(() =>
+        Promise.resolve({
+          query: (sql: string, params?: any[]) => {
+            clientCalls.push({ sql, params });
+            if (sql.startsWith('INSERT INTO prescriptions')) {
+              return Promise.resolve({
+                rows: [{
+                  id: 'rx-1',
+                  visit_id: 'visit-1',
+                  patient_id: 'patient-123',
+                  doctor_id: 'doctor-456',
+                }],
+              });
+            }
+            return Promise.resolve({ rows: [] });
+          },
+          release: jest.fn(),
+        })
+      );
       const response = await request(app)
         .post('/api/v1/prescriptions')
         .send({
@@ -539,7 +446,7 @@ describe('Prescription Authorization', () => {
               duration: '7 days',
               instructions: 'Take after meals',
               unitPrice: 50.00, // Pricing field - should be ignored
-              quantity: 7 // Pricing field - should be ignored
+              quantity: 7 // Supported medication quantity
             }
           ],
           notes: 'Test prescription'
@@ -551,19 +458,93 @@ describe('Prescription Authorization', () => {
       expect(response.body.success).toBe(true);
 
       // Verify that the prescription was created without pricing fields
-      const insertPrescriptionCall = query.mock.calls.find((call: any) =>
-        call[0].includes('INSERT INTO prescriptions')
+      const insertPrescriptionCall = clientCalls.find((call) =>
+        call.sql.includes('INSERT INTO prescriptions')
       );
       expect(insertPrescriptionCall).toBeDefined();
 
       // Verify that prescription items were inserted without pricing fields
-      const insertItemsCall = query.mock.calls.find((call: any) =>
-        call[0].includes('INSERT INTO prescription_items')
+      const insertItemsCall = clientCalls.find((call) =>
+        call.sql.includes('INSERT INTO prescription_items')
       );
       expect(insertItemsCall).toBeDefined();
-      // The SQL should NOT include unit_price or quantity columns
-      expect(insertItemsCall[0]).not.toContain('unit_price');
-      expect(insertItemsCall[0]).not.toContain('quantity');
+      // The SQL should NOT include unit_price, but quantity is now supported
+      expect(insertItemsCall!.sql).not.toContain('unit_price');
+      expect(insertItemsCall!.sql).toContain('quantity');
     });
+  });
+});
+
+describe('Patient prescription visibility', () => {
+  let app: express.Application;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/prescriptions', prescriptionsRouter);
+    jest.clearAllMocks();
+    mockUser = { id: 'patient-user-id', role: 'PATIENT' };
+  });
+
+  it('returns only issued prescriptions in the patient list', async () => {
+    let capturedSql = '';
+    query.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'patient-1' }] });
+      }
+      if (sql.includes('FROM prescriptions p')) {
+        capturedSql = sql;
+        return Promise.resolve({ rows: [] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app).get('/api/v1/prescriptions/me');
+
+    expect(response.status).toBe(200);
+    expect(capturedSql).toContain("p.status = 'ISSUED'");
+  });
+
+  it('returns only issued prescriptions on a patient detail read', async () => {
+    let capturedSql = '';
+    query.mockImplementation((sql: string) => {
+      capturedSql = sql;
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app).get('/api/v1/prescriptions/rx-1');
+
+    expect(response.status).toBe(404);
+    expect(capturedSql).toContain("p.status = 'ISSUED'");
+  });
+
+  it('gives secretaries no access to a prescription detail', async () => {
+    mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+    const response = await request(app).get('/api/v1/prescriptions/rx-1');
+
+    expect(response.status).toBe(403);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('returns only issued prescriptions when a patient requests a PDF link', async () => {
+    let capturedSql = '';
+    query.mockImplementation((sql: string) => {
+      capturedSql = sql;
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app).get('/api/v1/prescriptions/rx-1/pdf-url');
+
+    expect(response.status).toBe(404);
+    expect(capturedSql).toContain('status = \'ISSUED\'');
+  });
+
+  it('gives secretaries no access to prescription PDF links', async () => {
+    mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+    const response = await request(app).get('/api/v1/prescriptions/rx-1/pdf-url');
+
+    expect(response.status).toBe(403);
   });
 });

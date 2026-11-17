@@ -294,3 +294,125 @@ describe('Visit API Authorization', () => {
     });
   });
 });
+
+describe('Visit lifecycle and patient visibility', () => {
+  let app: express.Application;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/visits', visitsRouter);
+    jest.clearAllMocks();
+    mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+  });
+
+  it('returns only issued visits to patients', async () => {
+    mockUser = { id: 'patient-user-id', role: 'PATIENT' };
+    let capturedSql = '';
+    query.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'patient-id' }] });
+      }
+      if (sql.includes('FROM visits v')) {
+        capturedSql = sql;
+        return Promise.resolve({ rows: [] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app).get('/api/v1/visits/me');
+
+    expect(response.status).toBe(200);
+    expect(capturedSql).toContain("v.status = 'ISSUED'");
+  });
+
+  it('returns only issued visits to patients on a single visit read', async () => {
+    mockUser = { id: 'patient-user-id', role: 'PATIENT' };
+    let capturedSql = '';
+    query.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'patient-id' }] });
+      }
+      if (sql.includes('FROM visits v')) {
+        capturedSql = sql;
+        return Promise.resolve({ rows: [] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app).get('/api/v1/visits/visit-1');
+
+    expect(response.status).toBe(404);
+    expect(capturedSql).toContain("v.status = 'ISSUED'");
+    expect(capturedSql).toContain('v.patient_id = $2');
+  });
+
+  it('gives secretaries no access to a visit', async () => {
+    mockUser = { id: 'secretary-user-id', role: 'SECRETARY' };
+
+    const response = await request(app).get('/api/v1/visits/visit-1');
+
+    expect(response.status).toBe(403);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('records an edit mark and change trail when an issued visit is corrected', async () => {
+    let historyParams: any[] | null = null;
+    query.mockImplementation((sql: string, params: any[]) => {
+      if (sql.includes('SELECT id FROM doctors WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'doctor-id' }] });
+      }
+      if (sql.startsWith('SELECT * FROM visits WHERE id = $1 AND doctor_id = $2')) {
+        return Promise.resolve({
+          rows: [{
+            id: 'visit-1',
+            doctor_id: 'doctor-id',
+            status: 'ISSUED',
+            reason_for_visit: 'Checkup',
+            diagnosis: 'Flu',
+            notes: null,
+            blood_pressure: null,
+            weight: null,
+            height: null,
+            temperature: null,
+          }],
+        });
+      }
+      if (sql.startsWith('INSERT INTO visit_edit_history')) {
+        historyParams = params;
+        return Promise.resolve({ rows: [] });
+      }
+      if (sql.startsWith('UPDATE visits')) {
+        expect(sql).toContain("is_edited = CASE WHEN status = 'ISSUED' THEN true ELSE is_edited END");
+        expect(sql).toContain("edited_at = CASE WHEN status = 'ISSUED' THEN CURRENT_TIMESTAMP ELSE edited_at END");
+        return Promise.resolve({ rows: [{ id: 'visit-1', is_edited: true, diagnosis: params[1] }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .put('/api/v1/visits/visit-1')
+      .send({ diagnosis: 'Influenza', editReason: 'Corrected diagnosis' });
+
+    expect(response.status).toBe(200);
+    expect(historyParams).not.toBeNull();
+    const changes = JSON.parse(historyParams![2]);
+    expect(changes.diagnosis).toEqual({ from: 'Flu', to: 'Influenza' });
+    expect(historyParams![3]).toBe('Corrected diagnosis');
+  });
+
+  it('does not let a doctor edit another doctor’s visit', async () => {
+    query.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT id FROM doctors WHERE user_id')) {
+        return Promise.resolve({ rows: [{ id: 'doctor-id' }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .put('/api/v1/visits/visit-1')
+      .send({ diagnosis: 'Influenza' });
+
+    expect(response.status).toBe(404);
+  });
+});

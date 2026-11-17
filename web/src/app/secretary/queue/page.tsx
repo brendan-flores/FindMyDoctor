@@ -714,6 +714,12 @@ export default function SecretaryQueue() {
                             {QUEUE_STATUS_LABELS[entry.status] || entry.status}
                             {entry.status !== 'COMPLETED' && getTimeAgo(entry.called_at)}
                           </span>
+                          {entry.status === 'IN_CHECKUP' && entry.doctor_finished && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                              <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                              Doctor finished
+                            </span>
+                          )}
                           {/* Payment Status (only for completed and not PAID) */}
                           {entry.status === 'COMPLETED' && entry.payment_status && entry.payment_status !== 'PAID' && (() => {
                             const ps = entry.payment_status === 'PENDING_VERIFICATION' ? 'FOR_REVIEW' : entry.payment_status;

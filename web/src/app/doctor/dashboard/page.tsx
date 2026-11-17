@@ -256,6 +256,66 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
+      {/* Now in checkup */}
+      {dashboardData?.nowInCheckup && dashboardData.nowInCheckup.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-slate-800">Now in checkup</h3>
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+              {dashboardData.nowInCheckup.length} patient{dashboardData.nowInCheckup.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {dashboardData.nowInCheckup.map((patient) => (
+              <div
+                key={`${patient.appointmentId}-${patient.queueNumber}`}
+                className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 flex flex-col gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
+                    {patient.queueNumber}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900 truncate">{patient.patientName}</p>
+                    <p className="text-xs text-slate-500">
+                      Queue #{patient.queueNumber}
+                      {patient.startedAt ? ` · since ${new Date(patient.startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  {patient.doctorFinished ? (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                      Doctor finished
+                    </span>
+                  ) : patient.hasDraft ? (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                      Draft in progress
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                      Not started
+                    </span>
+                  )}
+                  {patient.appointmentId && (
+                    <button
+                      onClick={() => router.push(`/doctor/appointments/${patient.appointmentId}`)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                    >
+                      {patient.doctorFinished
+                        ? 'View'
+                        : patient.hasDraft
+                        ? 'Continue consultation'
+                        : 'Start consultation'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Today's Queue */}
       <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
         <h3 className="text-xl font-bold text-slate-800 mb-4">Today&apos;s Queue</h3>

@@ -123,6 +123,11 @@ router.get('/:date', authenticate, requireSecretaryPasswordChange, requireSecret
                ORDER BY i.created_at DESC
                LIMIT 1) as payment_invoice_number,
              (COALESCE(pay.consultation_amount, 0) + COALESCE(pay.total_additional_charges, 0)) as payment_bill_total,
+             EXISTS (
+               SELECT 1 FROM visits vf
+               WHERE vf.appointment_id = q.appointment_id
+                 AND vf.doctor_finished_at IS NOT NULL
+             ) as doctor_finished,
              COALESCE((
                SELECT SUM(CASE WHEN pt.kind = 'PAYMENT' THEN pt.amount ELSE -pt.amount END)
                FROM payment_transactions pt
@@ -528,8 +533,8 @@ router.post('/:id/complete', authenticate, requireSecretaryPasswordChange, requi
     // Note: reason_for_visit, diagnosis, notes, and vitals are initially null
     // and can be filled in later by the doctor via the visits API
     await client.query(
-      `INSERT INTO visits (appointment_id, patient_id, doctor_id, visit_date)
-       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+      `INSERT INTO visits (appointment_id, patient_id, doctor_id, visit_date, status, issued_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP, 'ISSUED', CURRENT_TIMESTAMP)
        ON CONFLICT (appointment_id) DO NOTHING`,
       [appointment_id, patient_id, doctor_id]
     );

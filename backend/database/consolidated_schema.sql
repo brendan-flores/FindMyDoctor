@@ -1,7 +1,7 @@
 -- ============================================================================
 -- FindMyDoctor consolidated schema
 -- Run on a fresh, empty database for a full deployment.
--- Includes all migrations through: 047_add_schedule_change_requests.sql
+-- Includes all migrations through: 048_consultation_workspace.sql
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -343,7 +343,10 @@ CREATE TABLE IF NOT EXISTS patients (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     phone character varying(20),
     middle_name character varying(100),
-    sex character varying(20) NOT NULL DEFAULT 'NOT_SPECIFIED'::character varying
+    sex character varying(20) NOT NULL DEFAULT 'NOT_SPECIFIED'::character varying,
+    -- Source migration: 048_consultation_workspace.sql
+    allergies_confirmed_none boolean NOT NULL DEFAULT false,
+    medications_confirmed_none boolean NOT NULL DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS payment_charges (
@@ -415,6 +418,19 @@ CREATE TABLE IF NOT EXISTS pending_patient_signups (
     phone character varying(20)
 );
 
+-- Source migration: 048_consultation_workspace.sql
+CREATE TABLE IF NOT EXISTS prescription_favorites (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    doctor_id uuid NOT NULL,
+    medication_name character varying(255) NOT NULL,
+    dosage character varying(100),
+    frequency character varying(100),
+    duration character varying(100),
+    instructions text,
+    created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS prescription_items (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     prescription_id uuid NOT NULL,
@@ -423,7 +439,9 @@ CREATE TABLE IF NOT EXISTS prescription_items (
     frequency character varying(100),
     duration character varying(100),
     instructions text,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    -- Source migration: 048_consultation_workspace.sql
+    quantity integer
 );
 
 CREATE TABLE IF NOT EXISTS prescriptions (
@@ -435,7 +453,13 @@ CREATE TABLE IF NOT EXISTS prescriptions (
     pdf_url text,
     notes text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    -- Source migration: 048_consultation_workspace.sql
+    status character varying(20) NOT NULL DEFAULT 'ISSUED'::character varying,
+    voided_at timestamp with time zone,
+    void_reason text,
+    voided_by uuid,
+    replaces_prescription_id uuid
 );
 
 CREATE TABLE IF NOT EXISTS queue_entries (
@@ -530,7 +554,25 @@ CREATE TABLE IF NOT EXISTS visits (
     height numeric(5,2),
     temperature numeric(4,1),
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    -- Source migration: 048_consultation_workspace.sql
+    status character varying(20) NOT NULL DEFAULT 'DRAFT'::character varying,
+    issued_at timestamp with time zone,
+    doctor_finished_at timestamp with time zone,
+    is_edited boolean NOT NULL DEFAULT false,
+    edited_at timestamp with time zone,
+    prescription_draft jsonb,
+    draft_updated_at timestamp with time zone
+);
+
+-- Source migration: 048_consultation_workspace.sql
+CREATE TABLE IF NOT EXISTS visit_edit_history (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    visit_id uuid NOT NULL,
+    edited_by uuid NOT NULL,
+    changes jsonb NOT NULL DEFAULT '{}'::jsonb,
+    reason text,
+    created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS waitlists (
@@ -1168,6 +1210,22 @@ DO $$ BEGIN
     ALTER TABLE visits ADD CONSTRAINT visits_appointment_id_key UNIQUE (appointment_id);
   END IF;
 END $$;
+-- Source migration: 048_consultation_workspace.sql
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='prescription_favorites'::regclass AND conname='prescription_favorites_doctor_name_dosage_key') THEN
+    ALTER TABLE prescription_favorites ADD CONSTRAINT prescription_favorites_doctor_name_dosage_key UNIQUE (doctor_id, medication_name, dosage);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='visits'::regclass AND conname='visits_status_check') THEN
+    ALTER TABLE visits ADD CONSTRAINT visits_status_check CHECK (status IN ('DRAFT', 'ISSUED'));
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='prescriptions'::regclass AND conname='prescriptions_status_check') THEN
+    ALTER TABLE prescriptions ADD CONSTRAINT prescriptions_status_check CHECK (status IN ('ISSUED', 'VOIDED'));
+  END IF;
+END $$;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='waitlists'::regclass AND conname='waitlists_patient_id_doctor_id_waitlist_date_key') THEN
     ALTER TABLE waitlists ADD CONSTRAINT waitlists_patient_id_doctor_id_waitlist_date_key UNIQUE (patient_id, doctor_id, waitlist_date);
@@ -1468,6 +1526,27 @@ DO $$ BEGIN
     ALTER TABLE prescriptions ADD CONSTRAINT prescriptions_visit_id_fkey FOREIGN KEY (visit_id) REFERENCES visits(id) ON DELETE CASCADE;
   END IF;
 END $$;
+-- Source migration: 048_consultation_workspace.sql
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='prescriptions'::regclass AND conname='prescriptions_replaces_prescription_id_fkey') THEN
+    ALTER TABLE prescriptions ADD CONSTRAINT prescriptions_replaces_prescription_id_fkey FOREIGN KEY (replaces_prescription_id) REFERENCES prescriptions(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='prescription_favorites'::regclass AND conname='prescription_favorites_doctor_id_fkey') THEN
+    ALTER TABLE prescription_favorites ADD CONSTRAINT prescription_favorites_doctor_id_fkey FOREIGN KEY (doctor_id) REFERENCES doctors(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='visit_edit_history'::regclass AND conname='visit_edit_history_visit_id_fkey') THEN
+    ALTER TABLE visit_edit_history ADD CONSTRAINT visit_edit_history_visit_id_fkey FOREIGN KEY (visit_id) REFERENCES visits(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='visit_edit_history'::regclass AND conname='visit_edit_history_edited_by_fkey') THEN
+    ALTER TABLE visit_edit_history ADD CONSTRAINT visit_edit_history_edited_by_fkey FOREIGN KEY (edited_by) REFERENCES users(id) ON DELETE CASCADE;
+  END IF;
+END $$;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='queue_entries'::regclass AND conname='queue_entries_appointment_id_fkey') THEN
     ALTER TABLE queue_entries ADD CONSTRAINT queue_entries_appointment_id_fkey FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE SET NULL;
@@ -1607,6 +1686,11 @@ CREATE INDEX IF NOT EXISTS idx_pending_patient_signups_expires_at ON pending_pat
 CREATE INDEX IF NOT EXISTS idx_prescriptions_doctor_id ON prescriptions USING btree (doctor_id);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_patient_id ON prescriptions USING btree (patient_id);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_visit_id ON prescriptions USING btree (visit_id);
+-- Source migration: 048_consultation_workspace.sql
+CREATE INDEX IF NOT EXISTS idx_prescriptions_status ON prescriptions USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_visit_status ON prescriptions USING btree (visit_id, status);
+CREATE INDEX IF NOT EXISTS idx_prescription_favorites_doctor_id ON prescription_favorites USING btree (doctor_id);
+CREATE INDEX IF NOT EXISTS idx_visit_edit_history_visit_id ON visit_edit_history USING btree (visit_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_queue_entries_doctor_id ON queue_entries USING btree (doctor_id);
 CREATE INDEX IF NOT EXISTS idx_queue_entries_patient_id ON queue_entries USING btree (patient_id);
 CREATE INDEX IF NOT EXISTS idx_queue_entries_queue_date ON queue_entries USING btree (queue_date);
@@ -1625,6 +1709,9 @@ CREATE INDEX IF NOT EXISTS idx_users_username ON users USING btree (username);
 CREATE INDEX IF NOT EXISTS idx_visits_appointment_id ON visits USING btree (appointment_id);
 CREATE INDEX IF NOT EXISTS idx_visits_doctor_id ON visits USING btree (doctor_id);
 CREATE INDEX IF NOT EXISTS idx_visits_patient_id ON visits USING btree (patient_id);
+-- Source migration: 048_consultation_workspace.sql
+CREATE INDEX IF NOT EXISTS idx_visits_status ON visits USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_visits_doctor_finished_at ON visits USING btree (doctor_finished_at);
 CREATE INDEX IF NOT EXISTS idx_waitlists_doctor_date_status ON waitlists USING btree (doctor_id, waitlist_date, status);
 CREATE INDEX IF NOT EXISTS idx_waitlists_patient_id ON waitlists USING btree (patient_id);
 
@@ -1660,6 +1747,9 @@ CREATE TRIGGER update_secretaries_updated_at BEFORE UPDATE ON secretaries FOR EA
 -- Source migration: 047_add_schedule_change_requests.sql
 DROP TRIGGER IF EXISTS update_schedule_change_requests_updated_at ON schedule_change_requests;
 CREATE TRIGGER update_schedule_change_requests_updated_at BEFORE UPDATE ON schedule_change_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Source migration: 048_consultation_workspace.sql
+DROP TRIGGER IF EXISTS update_prescription_favorites_updated_at ON prescription_favorites;
+CREATE TRIGGER update_prescription_favorites_updated_at BEFORE UPDATE ON prescription_favorites FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 DROP TRIGGER IF EXISTS update_visits_updated_at ON visits;

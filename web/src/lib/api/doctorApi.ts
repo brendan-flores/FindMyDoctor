@@ -84,6 +84,10 @@ export interface Prescription {
   patient_last_name?: string;
   visit_date?: string;
   has_pdf?: boolean;
+  status?: 'ISSUED' | 'VOIDED';
+  voided_at?: string | null;
+  void_reason?: string | null;
+  replaces_prescription_id?: string | null;
   items?: PrescriptionItem[];
 }
 
@@ -94,6 +98,7 @@ export interface PrescriptionItem {
   dosage?: string;
   frequency?: string;
   duration?: string;
+  quantity?: number | null;
   instructions?: string;
 }
 
@@ -144,6 +149,11 @@ export interface Visit {
   appointment_date?: string;
   doctor_first_name?: string;
   doctor_last_name?: string;
+  status?: 'DRAFT' | 'ISSUED';
+  issued_at?: string | null;
+  doctor_finished_at?: string | null;
+  is_edited?: boolean;
+  edited_at?: string | null;
 }
 
 export const doctorApi = {
@@ -285,6 +295,14 @@ export interface DoctorDashboard {
     patientName: string;
     appointmentId: string | null;
   } | null;
+  nowInCheckup: Array<{
+    queueNumber: number;
+    patientName: string;
+    appointmentId: string | null;
+    startedAt: string | null;
+    hasDraft: boolean;
+    doctorFinished: boolean;
+  }>;
   todayQueue: Array<{
     queueNumber: number;
     patientName: string;

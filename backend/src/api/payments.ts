@@ -1272,11 +1272,11 @@ router.post('/:id/charges', authenticate, requireSecretaryPasswordChange, requir
     // Validate prescription item if provided (medicine charges only)
     if (finalChargeType === 'MEDICINE' && prescriptionItemId) {
       const prescriptionItemResult = await client.query(
-        `SELECT pi.*, p.prescription_id, p.patient_id, p.doctor_id, v.appointment_id
+        `SELECT pi.*, p.patient_id, p.doctor_id, v.appointment_id
          FROM prescription_items pi
          JOIN prescriptions p ON pi.prescription_id = p.id
          JOIN visits v ON p.visit_id = v.id
-         WHERE pi.id = $1`,
+         WHERE pi.id = $1 AND p.status = 'ISSUED'`,
         [prescriptionItemId]
       );
 

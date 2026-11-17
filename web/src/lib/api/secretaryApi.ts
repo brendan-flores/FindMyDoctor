@@ -167,11 +167,12 @@ export interface QueueEntry {
   payment_bill_total?: number;
   payment_net_paid?: number;
   payment_balance?: number;
+  doctor_finished?: boolean;
 }
 
 export const secretaryApi = {
   // Get secretary profile (includes assigned doctor_id)
-  getProfile: async (options?: GetOptions): Promise<{ success: boolean; data?: SecretaryProfile; error?: string }> => {
+  getProfile: async (options?: GetOptions): Promise<{ success: boolean; data?: SecretaryProfile; error?: string; httpStatus?: number }> => {
     return apiClient.get<SecretaryProfile>('/secretaries/me', options);
   },
 

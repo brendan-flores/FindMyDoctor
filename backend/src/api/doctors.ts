@@ -1103,6 +1103,7 @@ router.get('/me/dashboard', authenticate, authorize('DOCTOR'), async (req: AuthR
       exceptionsResult,
       dailyCapacityResult,
       consultationsNeedingRecordsResult,
+      nowInCheckupResult,
     ] = await Promise.all([
       query(
         `SELECT
@@ -1181,6 +1182,16 @@ router.get('/me/dashboard', authenticate, authorize('DOCTOR'), async (req: AuthR
          LIMIT 10`,
         [doctorId]
       ),
+      query(
+        `SELECT q.queue_number, q.started_at, p.first_name, p.last_name, q.appointment_id,
+                v.id as visit_id, v.status as visit_status, v.doctor_finished_at
+         FROM queue_entries q
+         JOIN patients p ON q.patient_id = p.id
+         LEFT JOIN visits v ON v.appointment_id = q.appointment_id
+         WHERE q.doctor_id = $1 AND q.queue_date = $2 AND q.status = 'IN_CHECKUP'
+         ORDER BY q.queue_number ASC`,
+        [doctorId, targetDate]
+      ),
     ]);
 
     const appointmentCounts = appointmentCountsResult.rows[0];
@@ -1224,6 +1235,14 @@ router.get('/me/dashboard', authenticate, authorize('DOCTOR'), async (req: AuthR
         reason: row.reason_for_visit,
         status: row.status,
         appointmentId: row.appointment_id,
+      })),
+      nowInCheckup: nowInCheckupResult.rows.map(row => ({
+        queueNumber: row.queue_number,
+        patientName: `${row.first_name} ${row.last_name}`,
+        appointmentId: row.appointment_id,
+        startedAt: row.started_at,
+        hasDraft: row.visit_id !== null && row.visit_status === 'DRAFT',
+        doctorFinished: row.doctor_finished_at !== null,
       })),
       upcomingAppointments: upcomingResult.rows.map(row => ({
         date: row.appointment_date,
