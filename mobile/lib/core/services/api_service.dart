@@ -541,6 +541,7 @@ class ApiService {
   }) async {
     return await post(
       '/patients/submit-details',
+      requireAuth: true,
       body: {
         'doctorId': doctorId,
         'firstName': firstName,
