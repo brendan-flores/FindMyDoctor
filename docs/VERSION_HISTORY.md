@@ -4,6 +4,47 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.42 (November 15, 2026)
+
+**Purpose:** Replace the split "Edit Visit" and "Create Prescription" modals with a single doctor consultation workspace that records the visit and prescription on one page, autosaves a draft, supports review/corrections, and manages the issued/voided prescription lifecycle.
+
+**Significant Features:**
+- Doctor consultation workspace at `/doctor/appointments/[id]` replaces the read-only appointment detail page: visit fields and prescription items are recorded on one page with an autosaved draft, a read-only review step, and Back to edit / Issue actions. No modals are used for the main flow.
+- Draft lifecycle: `POST /api/v1/consultation/appointments/:appointmentId/start` creates the draft visit once per appointment (idempotent while the appointment is In Checkup) and reopens an existing draft; `PATCH /api/v1/consultation/visits/:visitId/draft` autosaves visit fields and the prescription draft (`visits.prescription_draft jsonb`) with optimistic concurrency (`baseUpdatedAt`), returning HTTP 409 with a reload instruction when another tab saved first.
+- Issue flow: `POST /api/v1/consultation/visits/:visitId/issue` requires a reason for visit and the patient's date of birth and sex, finalizes the visit (`status = 'ISSUED'`, `issued_at`, `doctor_finished_at`), creates a prescription only when at least one medication is present, generates the PDF, and sends a generic `PRESCRIPTION_AVAILABLE` notification. Issuing commits the visit and prescription before PDF generation; a failed PDF leaves the issued record intact and can be retried.
+- Prescription lifecycle: prescriptions are never edited or deleted. `POST /api/v1/consultation/prescriptions/:prescriptionId/void` requires a reason and sets `status = 'VOIDED'` with `voided_at`, `void_reason`, and `voided_by`; `POST /api/v1/consultation/visits/:visitId/prescriptions` issues a replacement linked through `replaces_prescription_id` and requires the previous prescription to be voided first.
+- Corrections: editing an issued visit keeps the record, sets `is_edited`/`edited_at`, and appends to the new `visit_edit_history` table (who, what changed, optional reason). `GET /api/v1/consultation/visits/:visitId/edit-history` exposes the trail.
+- Patient banner with three-state allergy and current-medication display: "not recorded yet", "confirmed none" (`allergies_confirmed_none` / `medications_confirmed_none`), or the recorded text. Blank values are never presented as "no allergies". Inline add/edit saves through `PATCH /api/v1/consultation/patients/:patientId`.
+- "First visit" label when the patient has no earlier issued visit with the doctor; medication suggestions derived from the doctor's own prior prescriptions and a `prescription_favorites` list (no external drug database).
+- Entry points: the Doctor Dashboard shows "Now in checkup" cards, and the Appointments list shows Start consultation / Continue consultation / View consultation plus a "Doctor finished" chip. `GET /api/v1/doctors/me/dashboard` adds `nowInCheckup`; `GET /api/v1/appointments` adds `visit_id`, `visit_status`, and `doctor_finished_at`.
+- Secretary queue shows a derived `doctor_finished` chip on `IN_CHECKUP` rows without any queue status change; the secretary still presses Complete Checkup, and a completed checkup still inserts a blank final visit (`status = 'ISSUED'`).
+- Patient-facing visibility: `GET /api/v1/visits/me`, `GET /api/v1/visits/me/:id`, `GET /api/v1/prescriptions/me`, `GET /api/v1/prescriptions/:id`, and `GET /api/v1/prescriptions/:id/pdf-url` return only `ISSUED` records. Drafts and voided prescriptions never appear for patients.
+- Migration `048_consultation_workspace.sql` (mirrored into `consolidated_schema.sql`) adds the visit draft/issued lifecycle, `prescription_draft`, `doctor_finished_at`, edit marks, `visit_edit_history`, prescription issued/voided lifecycle with replacement links, `prescription_items.quantity`, `prescription_favorites`, and `allergies_confirmed_none` / `medications_confirmed_none`. Existing visits and prescriptions are backfilled as final/issued.
+
+**Improvements:**
+- The doctor no longer re-selects the patient and visit when writing a prescription, and no longer loses work when navigating away mid-consultation.
+- The Prescriptions page is now a history/search list with Issued/Voided state, void reasons, replacement links, and PDF actions.
+- Prescription PDFs print patient age and sex and the doctor's PRC license number when present, plus per-item quantity.
+
+**Bug Fixes:**
+- Prescription creation and replacement are transactional, so a prescription can no longer exist without its items.
+- Visits and prescriptions are ownership-checked per doctor; cross-doctor reads and writes return not found.
+
+**Removed/Modified Functionality:**
+- Removed the standalone "Create Prescription" modal from the doctor Prescriptions page; prescriptions are now issued only from the consultation workspace because the backend requires an issued visit.
+- Removed the "Record Visit" modal from the doctor Appointments page; the same flow is now the consultation workspace.
+- Removed `SECRETARY` access from visit and prescription read endpoints. Billing keeps its internal prescription-item validation and now filters to `ISSUED` items.
+- Added the `PRESCRIPTION_UPDATED` notification type for void/replace flows.
+
+**Breaking Changes:**
+- SECRETARY tokens now receive `403` on visit and prescription read endpoints (`/visits/:id`, `/visits/appointment/:appointmentId`, `/visits/patient/:patientId`, `/prescriptions/patients/:id`).
+- Patient-facing visit and prescription reads omit non-`ISSUED` records that were previously returned.
+- Web doctor pages that relied on the removed Record Visit and Create Prescription modals must use the consultation workspace.
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.42, added this version entry to `VERSION_HISTORY.md`, and synchronized `docs/prd.md`, `docs/architecture.md`, `docs/architecture-essentials.md`, and `docs/SYSTEM_STATE.md` with the consultation workspace, the visit/prescription lifecycle, new endpoints, notification changes, and migration 048.
+
+---
+
 ### 01.41 (November 10, 2026)
 
 **Purpose:** Harden clinic-operation authorization boundaries for Week 8 verification and expand end-to-end/mobile test coverage for role-based workflows, waitlist, billing, and security controls.

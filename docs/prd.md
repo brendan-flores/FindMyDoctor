@@ -162,7 +162,7 @@ Patients can:
 - View payment status.
 - View consultation history.
 - View available medical records.
-- View prescription history.
+- View prescription history (issued prescriptions only; drafts and voided prescriptions are never shown).
 - Access prescription PDFs.
 - Receive notifications.
 
@@ -179,8 +179,15 @@ Doctors can:
 - View queue information where authorized.
 - View authorized patient information.
 - View consultation history.
-- Record visit information.
+- Open a consultation workspace from an appointment that is In Checkup.
+- Record the visit and the prescription on one page, with an autosaved draft, then review and issue it.
+- Record a consultation without a prescription, or with one or more medications.
+- Issue a replacement prescription only after voiding the previous one with a required reason.
+- Correct an issued visit; the record keeps an "edited" mark and an audit trail of who changed what.
+- See patient allergy and current-medication status as "not recorded yet", "confirmed none", or the recorded text.
 - Create digital prescriptions.
+
+Doctors never change the queue status. The secretary still starts and completes the checkup. The doctor sees the appointment as "In checkup" and the queue shows a "Doctor finished" marker once the visit is issued.
 
 Doctors do not directly chat with patients.
 
@@ -1369,7 +1376,8 @@ Patient Views Professional Details
 - Appointments.
 - Authorized patient information.
 - Consultation history.
-- Prescription creation.
+- Consultation workspace (visit + prescription in one flow, autosaved draft, review and issue).
+- Prescription creation, void and replace.
 - Self-registration (account created with PENDING status, requires admin approval).
 
 ### Secretary
@@ -1431,7 +1439,8 @@ The web application provides role-specific dashboards for doctors, secretaries, 
 - Appointments management
 - Schedule management
 - Patient information
-- Prescription creation
+- Consultation workspace (visit + prescription on one page, draft autosave, review, issue, corrections, void and replace)
+- Prescription history with issued/voided status
 
 **Secretary Web Dashboard:**
 - Daily queue management

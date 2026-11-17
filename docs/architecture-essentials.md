@@ -565,6 +565,35 @@ Prescription
 
 Do not create disconnected temporary medical records for walk-in patients.
 
+## 25.1 Consultation Workspace and Prescription Lifecycle
+
+The doctor records a visit and its prescription on one page, opened from an appointment that the secretary has moved to `IN_CHECKUP`:
+
+```text
+Appointment (In Checkup)
+ ↓
+Draft visit (autosaved, doctor-only)
+ ↓
+Review
+ ↓
+Issue
+ ↓
+Final visit (ISSUED) + optional issued prescription + PDF
+```
+
+Rules:
+
+- The draft is created once per appointment and reopens on later visits. Drafts are never visible to patients or secretaries.
+- Autosave uses optimistic concurrency; a second tab receives a conflict and must reload before saving, so edits are never silently lost.
+- Issuing requires the patient's date of birth and sex, and a reason for visit. The PDF prints age, sex, and the doctor's PRC license number when present.
+- A prescription is created only when at least one medication is present. A consultation may be issued without a prescription.
+- Prescriptions are never edited or deleted. Voiding requires a reason; a replacement is a new prescription linked to the voided one.
+- Patients see only `ISSUED` prescriptions. Voided and replaced prescriptions stay in the doctor's history.
+- Correcting an issued visit keeps the record, marks it as edited, and stores who changed what and why.
+- The doctor never changes queue status. The secretary still presses Complete Checkup; the secretary queue shows a "Doctor finished" chip based on the visit, not a queue status change.
+- Allergy and current-medication values have three states: not recorded yet, confirmed none, and recorded text. Never show a blank value as "no allergies".
+- Prescription PDFs remain short-lived signed links.
+
 ---
 
 # 26. Patient Data Rules
@@ -694,9 +723,11 @@ schedule_change_requests
 appointments
 queue_entries
 
-visits
-prescriptions
-prescription_items
+visits (status: DRAFT, ISSUED; prescription_draft; edit mark)
+visit_edit_history
+prescriptions (status: ISSUED, VOIDED; void reason; replacement link)
+prescription_items (with quantity)
+prescription_favorites
 
 payments
 payment_charges
@@ -737,13 +768,17 @@ login_otp_challenges (for login OTP challenge state)
 - `022_add_trusted_browsers.sql` - Creates the `trusted_browsers` table for trusted-device sessions (hashed tokens, device info, 30-day expiry, revocation timestamps)
 - `032_add_session_version.sql` - Adds `users.session_version` for account-wide refresh-token revocation on password change/reset, deactivation, and "Sign out of all devices"
 - `040_add_invoice_status.sql` - Adds `invoices.status` field to support invoice voiding and reissue workflow (status: ACTIVE, VOID). Applied via `npm run migrate:invoice-status`.
-- `consolidated_schema.sql` - Complete, idempotent representation of the schema the application expects (tables, columns, indexes, constraints, triggers). Safe to run repeatedly; creates missing objects and never drops tables, columns, or data.
+- `047_add_schedule_change_requests.sql` - Adds schedule change requests for proposed exception and break-period changes.
+- `048_consultation_workspace.sql` - Adds visit draft/issued lifecycle, `prescription_draft`, `doctor_finished_at`, edit marks, `visit_edit_history`, prescription issued/voided lifecycle with replacement links, `prescription_items.quantity`, `prescription_favorites`, and `allergies_confirmed_none` / `medications_confirmed_none`.
+- `consolidated_schema.sql` - Complete, idempotent bootstrap of the schema the application expects (tables, columns, indexes, constraints, triggers). Applied first by the runner on every run; safe to run repeatedly; creates missing objects and never drops tables, columns, or data.
 
 **Migration Runner:**
 - `npm run migrate` runs `backend/src/database/migrate.ts`, which is the single schema entry point.
-- Applied files are tracked in `schema_migrations` (primary key `filename`; also `version`, `checksum`, `applied_at`, `execution_time_ms`, `note`). Already-recorded files are skipped, so reruns are safe.
-- Each pending migration runs in its own transaction; a failure rolls it back and stops the run. The runner verifies required columns and tables on success.
-- Migrations `001`–`041` are baselined (recorded, never executed) because several are destructive or non-idempotent. `consolidated_schema.sql` is the only migration actually applied; historical files remain for audit.
+- The runner applies `consolidated_schema.sql` first as the bootstrap, then tracks applied files in `schema_migrations` (primary key `filename`; also `version`, `checksum`, `applied_at`, `execution_time_ms`, `note`). Already-recorded files are skipped, so reruns are safe.
+- Each pending future migration runs in its own transaction; a failure rolls it back and stops the run. The runner verifies required columns and tables on success.
+- Migrations `001`–`041` are baselined (recorded, never executed) because several are destructive or non-idempotent.
+- Migrations `042`–`048` are recorded as covered by the bootstrap (recorded, never executed) because their final state is already folded into `consolidated_schema.sql`; replaying them is unsafe (for example, `045_billing_fk_reconcile.sql` renames columns that the bootstrap already creates with their final names).
+- New migrations from `049` onward run normally after the bootstrap.
 - `--dry-run` previews without writing; `--force` is refused; checksum changes on recorded files only warn and are not re-applied.
 
 ---
@@ -964,6 +999,7 @@ Patient Can Login
 - `/secretary/*` routes - Allow only SECRETARY users
 - All role verification uses backend-returned role, not frontend selector
 - Cross-role access is blocked and credentials are cleared on mismatch
+- A Secretary token with no corresponding `secretaries` row (deleted account or a session from a previous database) is treated as an invalid session: clear it and return to `/secretary-login`, never to profile completion. Only a real profile row with blank first name, last name, or contact number goes to `/secretary/complete-profile`.
 
 ### Doctor–Secretary Data Isolation
 

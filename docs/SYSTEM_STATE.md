@@ -2,7 +2,7 @@
 
 This document contains the current system state for the FindMyDoctor project. It should be updated whenever changes are made that affect the documented system state, including authentication, registration, OTP verification, doctor approval workflows, database structures, API endpoints, application behavior, or architecture.
 
-Current System State (October 2026):
+Current System State (November 2026):
 
 ## AI Chatbot (Patient-Only)
 - MediGuide is an AI health information assistant available only to patients in the mobile app; doctors, secretaries, and admins have no AI access
@@ -249,6 +249,7 @@ Current System State (October 2026):
 - `login_otp_challenges` retains `remember_me` for schema compatibility; new challenges store `false` and the client cannot use it to upgrade to trust.
 - Device trust never bypasses password, account status, role, or approval checks; failures stay generic and token validation is rate-limited and logged without token values.
 - Secretary password change takes precedence over the device-trust prompt; profile completion follows the trust choice. The trust pages bypass the dashboard shell.
+- The secretary layout validates the stored session against `GET /api/v1/secretaries/me` before rendering dashboard pages. A `404`/`401`/`403` there (token with no secretary profile, e.g. an account deleted after sign-in or a session issued against an earlier database) clears the secretary token, refresh token, session metadata, and role cookies, then redirects to `/secretary-login`; it is never sent to `/secretary/complete-profile`. Only an existing profile row with a blank first name, last name, or contact number routes to the profile-completion page. That page repeats the same check on mount (invalid session → sign-in, already complete → `/secretary/dashboard`) and prefills any values already stored. Access-token validation in `backend/src/middleware/auth.ts` remains stateless (no per-request `users` lookup), so this stale-session case is handled by the client guard rather than by rejecting the token.
 - **Deployment note:** migration `032_add_session_version.sql` (`npm run migrate:session-version`) was applied to the configured PostgreSQL database on 2026-10-23, and `users.session_version` was verified as `integer NOT NULL DEFAULT 0`. Migration `033_add_gcash_qr_updated_at.sql` (`npm run migrate:gcash-qr-updated-at`) was also applied on 2026-10-23, adding `doctors.gcash_qr_updated_at` for the secretary settings QR status card. Any other environment must run both idempotent migrations before deploying this behavior. No new migration is required for the device-trust prompt; it reuses `trusted_browsers`.
 
 ## API Rate Limiting and Read Performance
@@ -282,6 +283,7 @@ Current System State (October 2026):
 - Prescriptions tab displays prescriptions with prescription date, doctor name, medication count, and status
 - Both tabs support date filters (Last 7 days, Last 30 days, All time), pull-to-refresh, loading states, empty states, and retryable error states
 - Patient-scoped backend endpoints: `GET /api/v1/visits/me` (list all patient visits; each row includes `doctor_professional_photo_url` from `doctors.professional_photo_url`), `GET /api/v1/visits/me/:id` (single visit), `GET /api/v1/prescriptions/me` (list all patient prescriptions)
+- Patient-facing visit and prescription reads return only `ISSUED` records; draft visits and draft or voided prescriptions are never returned
 - All patient-scoped endpoints enforce ownership verification and return only the authenticated patient's data; cross-patient access returns HTTP 403
 - Prescription detail page at `/prescription-detail` shows full prescription information including each medication's name, dosage, frequency, duration, and instructions
 - PDF access uses the existing patient-authorized endpoint `GET /api/v1/prescriptions/:id/pdf-url` which generates a signed URL for download/viewing; the mobile app opens it via `launchUrl(..., LaunchMode.externalApplication)` and handles the boolean result (no `canLaunchUrl` gate, which misreports https links on Android 11+)
@@ -477,16 +479,34 @@ Current System State (October 2026):
 - TypeScript interfaces for Patient, Prescription, UpdatePatientRequest, AssociatePatientRequest, and Visit are defined in `doctorApi.ts`
 
 ## Doctor Dashboard Appointment Details
-- Web Doctor Dashboard includes appointment detail page at `/doctor/appointments/[id]` for viewing appointment information
-- Doctor appointment detail page displays selected appointment's patient information, appointment details, and prescription history
-- Doctor appointment detail page fetches appointment details via `GET /api/v1/appointments/:id` with proper authorization (DOCTOR-only with doctor_id restriction)
-- Doctor appointment detail page fetches patient details via `GET /api/v1/patients/:id` with proper authorization
-- Doctor appointment detail page fetches patient prescription history via `GET /api/v1/prescriptions/patients/:id` (DOCTOR-authorized endpoint)
-- Backend `GET /api/v1/appointments/:id` endpoint enforces doctor_id restriction via SQL WHERE clause: appointment must belong to authenticated doctor
+- Web Doctor Dashboard includes appointment detail page at `/doctor/appointments/[id]`, which now hosts the consultation workspace (see below)
+- The appointment detail page renders `ConsultationWorkspace` for the selected appointment instead of the previous read-only detail view
+- All data is loaded through the DOCTOR-only `/api/v1/consultation/*` endpoints, which are scoped to the authenticated doctor's own appointments, visits, and prescriptions
 - Backend authorization prevents doctors from accessing another doctor's appointments (returns 404 for unauthorized access)
-- Doctor appointment list page at `/doctor/appointments` includes visibility icon button to navigate to appointment detail page
-- Doctor appointment detail page includes navigation back to appointment list
-- Backend tests verify doctor appointment detail authorization: allow access to own appointments, deny access to other doctors' appointments, enforce doctor_id restriction in SQL query
+
+## Doctor Consultation Workspace
+- One page combines the visit and the prescription: `/doctor/appointments/[id]` opens the workspace for the appointment. There are no modals for the main flow.
+- Entry points: the Doctor Dashboard shows "Now in checkup" cards (with `hasDraft`/`doctorFinished` state and Start consultation / Continue consultation / View), and the Appointments list rows show the same Start/Continue/View consultation action plus a "Doctor finished" chip.
+- The workspace is available when the secretary has moved the appointment's queue entry to `IN_CHECKUP`. The doctor never changes queue status.
+- `POST /api/v1/consultation/appointments/:appointmentId/start` creates the draft visit exactly once per appointment (idempotent; safe to call on every load) and reopens an existing draft or issued visit.
+- Draft visit fields and the prescription draft (`visits.prescription_draft jsonb`) autosave through `PATCH /api/v1/consultation/visits/:visitId/draft`. Autosave sends `baseUpdatedAt`; if another tab saved first, the endpoint returns HTTP 409 and the UI warns the doctor and offers "Reload latest" so edits are never silently lost.
+- Finishing opens a read-only review with "Back to edit" and "Issue".
+- `POST /api/v1/consultation/visits/:visitId/issue` requires a reason for visit and the patient's date of birth and sex (so the PDF can print age and sex). It finalizes the visit (`status = 'ISSUED'`, `issued_at`, `doctor_finished_at`), creates a prescription only when at least one medication has a name, generates the PDF, and sends a generic prescription notification with no clinical details.
+- Issuing commits the visit and prescription before the PDF is generated; if PDF generation fails the issued record stands and the workspace offers a PDF retry.
+- A consultation may be issued with no prescription; no prescription row is created in that case.
+- Correcting an issued visit from the workspace keeps the record and sets `is_edited`/`edited_at`, appends to `visit_edit_history` (who changed what, optional reason), and shows an "edited" mark in the record.
+- Prescriptions are never edited or deleted. `POST /api/v1/consultation/prescriptions/:prescriptionId/void` requires a reason (at least three characters) and sets `status = 'VOIDED'`, `voided_at`, `void_reason`, `voided_by`. `POST /api/v1/consultation/visits/:visitId/prescriptions` issues a replacement linked through `replaces_prescription_id` and requires the current prescription to be voided first.
+- `GET /api/v1/consultation/visits/:visitId/edit-history` returns the edit trail for the visit.
+- Patient banner states: allergies and current medications each render as "not recorded yet", "confirmed none" (`allergies_confirmed_none` / `medications_confirmed_none`), or the recorded text. A blank value is never shown as "no allergies". Inline add/edit saves to the patient record through `PATCH /api/v1/consultation/patients/:patientId` (restricted to the medical/demographic fields the workspace needs).
+- "Last visit with this doctor" shows "First visit" when there is no earlier issued visit.
+- Medication helpers: `prescription_favorites` (list/add/delete) and `GET /api/v1/consultation/medication-suggestions` (derived from the doctor's own prior issued prescriptions). No external drug database is used.
+- Secretary queue shows a derived `doctor_finished` flag (`GET /api/v1/queue/:date`) rendered as a "Doctor finished" chip on `IN_CHECKUP` rows. Queue statuses, the Complete Checkup action, and all other queue behaviour are unchanged. A completed checkup still inserts a blank final visit (`status = 'ISSUED'`) when none exists.
+- `GET /api/v1/doctors/me/dashboard` includes `nowInCheckup`; `GET /api/v1/appointments` (doctor scope) includes `visit_id`, `visit_status`, and `doctor_finished_at`.
+- Visits and prescriptions created before the workspace are treated as final/issued.
+- Patients see only `ISSUED` prescriptions and only `ISSUED` visits on the patient-facing endpoints. Drafts and voided prescriptions never appear.
+- Secretaries have no access to visit or prescription reads (`SECRETARY` was removed from those endpoints). Billing still validates medicine charges internally against `ISSUED` prescription items.
+- The Patients page keeps the quick "Edit Visit" modal for corrections; edits there go through `PUT /api/v1/visits/:id`, which records the edit mark and history. An "Add past visit" action is not offered because `visits.appointment_id` is `NOT NULL UNIQUE` — a visit cannot exist without an appointment.
+- The Prescriptions page is now a history/search list showing Issued/Voided state, void reasons, replacement links, and PDF actions; the standalone Create Prescription modal was removed and prescriptions are issued only from the consultation workspace.
 
 ## Walk-in Registration Security
 - Walk-in registration endpoints enforce secretary-to-doctor assignment verification before allowing any operation
@@ -580,16 +600,19 @@ Current System State (October 2026):
 - Doctor registration uses separate first name, middle name (optional), and last name fields instead of a single full name field
 - `patients.middle_name` (nullable) and `patients.sex` (`VARCHAR(20) NOT NULL DEFAULT 'NOT_SPECIFIED'`) are required by patient registration; `patient_doctor_associations` stores the persistent patient-doctor relationship and its `details_completion_status` (PENDING, COMPLETE)
 - `schema_migrations` records which migration files have been applied (primary key `filename`, plus `version`, `checksum`, `applied_at`, `execution_time_ms`, `note`)
+- Migration `048_consultation_workspace.sql` adds the consultation workspace schema: `visits.status` (`DRAFT`/`ISSUED`), `issued_at`, `doctor_finished_at`, `is_edited`, `edited_at`, `prescription_draft` (jsonb), `draft_updated_at`; the `visit_edit_history` table; `prescriptions.status` (`ISSUED`/`VOIDED`), `voided_at`, `void_reason`, `voided_by`, `replaces_prescription_id`; `prescription_items.quantity`; the `prescription_favorites` table; and `patients.allergies_confirmed_none` / `patients.medications_confirmed_none`. Existing visits and prescriptions are backfilled as final/issued.
 
 ## Database Migrations
 - `npm run migrate` (`backend/src/database/migrate.ts`) is the single schema entry point and replaces ad-hoc per-feature `apply*.ts` execution for schema setup
-- The runner discovers `backend/database/NNN_*.sql` files, loads applied rows from `schema_migrations`, skips files already recorded, and applies each pending file inside its own transaction; a failure rolls back that file and stops the run
+- On every run the runner applies `consolidated_schema.sql` first as the idempotent bootstrap, then loads applied rows from `schema_migrations`, skips files already recorded, and applies each pending future migration inside its own transaction; a failure rolls back that file and stops the run
 - Migrations `001`–`041` are recorded as baselined (note: superseded by `consolidated_schema.sql`) and are never executed by the runner, because several are destructive (`004_clear_all_data.sql`), insert sample data, or are not idempotent
+- Migrations `042`–`048` are recorded as covered by the bootstrap (note: folded into `consolidated_schema.sql`) and are never executed, because their final state is already part of the bootstrap; this also avoids replaying non-idempotent files such as `045_billing_fk_reconcile.sql`, which renames columns the bootstrap already creates with their final names
 - `consolidated_schema.sql` is the complete idempotent schema applied to every environment: it creates missing tables, columns, indexes, constraints, and triggers but never drops tables, columns, or data; it is verified to apply cleanly on an empty schema and to be safe to rerun
+- New migrations from `049` onward run normally after the bootstrap and are recorded individually
 - After applying, the runner verifies required columns (`patients.middle_name`, `patients.sex`) and tables (`patient_doctor_associations`, `waitlists`, `schema_migrations`) exist
 - `--dry-run` reports what would be applied without writing; `--force` is refused by design; checksum mismatches on already-recorded files produce a warning but are never re-applied automatically
 - Historical migration files are preserved for audit; do not re-run them manually against an existing database
-- The configured development database was migrated and verified on 2026-11-06; reruns report `applied: 0, skipped: <all>, pending: 0`
+- The Render database `findmydoctor_db_tfg2` was bootstrapped and verified on 2026-11-18 (37 public tables including `schema_migrations`; 52 baselined, 7 covered, 1 bootstrap record); reruns report `applied: 0, skipped: 60, pending: 0`
 
 ## Doctor Schedule Management
 - Doctor schedule management feature allows doctors to create, view, edit, deactivate, and reactivate recurring weekly working hours

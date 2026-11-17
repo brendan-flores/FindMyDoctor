@@ -614,6 +614,7 @@ The backend enforces a single session policy in `backend/src/modules/auth/sessio
 - Secretary layout (`/secretary/*`) - Allows only SECRETARY users
 - All role verification uses backend-returned role, not frontend selector
 - Cross-role access is blocked and cleared credentials on mismatch
+- A Secretary session whose token has no corresponding `secretaries` row (deleted account, or a session issued against a previous database) is invalid: the Secretary layout and the profile-completion page clear the stored session, sign out, and redirect to `/secretary-login`. Only an existing profile row with blank required fields routes to `/secretary/complete-profile`.
 
 ### Doctor–Secretary Relationship
 
@@ -1712,29 +1713,54 @@ Responsibilities:
 
 # 42. Visit Module
 
-Recommended:
-
 ```text
 visits
 ------
 id
-appointment_id
+appointment_id            (unique; NOT NULL)
 patient_id
 doctor_id
 visit_date
 reason_for_visit
+diagnosis
 notes
+blood_pressure
+weight
+height
+temperature
+status                    ('DRAFT' | 'ISSUED')
+issued_at
+doctor_finished_at
+is_edited
+edited_at
+prescription_draft        (jsonb; autosaved prescription draft)
+draft_updated_at
 created_at
 updated_at
 ```
 
-Completed consultations should be associated with the patient account.
+Completed consultations are always associated with the patient account. A visit is created as a `DRAFT` when the doctor opens the consultation workspace for an appointment that the secretary has moved to `IN_CHECKUP`. Drafts autosave and reopen; they are never visible to patients or secretaries. The doctor issues the draft to make it final (`ISSUED`), which sets `issued_at` and `doctor_finished_at`. Visits that predate the workspace are treated as `ISSUED`.
+
+Correcting an issued visit keeps the record, sets `is_edited`/`edited_at`, and appends an entry to `visit_edit_history` describing the changed fields, who changed them, and an optional reason.
+
+```text
+visit_edit_history
+------------------
+id
+visit_id
+edited_by                 (users.id)
+changes                   (jsonb; { field: { from, to } })
+reason
+created_at
+```
+
+The legacy "record visit" path treats a new record as final (`ISSUED`). The Patients page keeps the quick "Edit Visit" modal for corrections; when an issued visit is corrected there, the same edit mark and history apply. A visit cannot exist without an appointment (`appointment_id` is `NOT NULL UNIQUE`), so there is no separate "past visit" record that is disconnected from an appointment.
+
+The queue status is owned by the secretary. A completed secretarial checkup inserts a blank final visit if one does not exist, preserving the existing queue behaviour; the doctor does not change queue statuses.
 
 ---
 
 # 43. Prescription Module
-
-Recommended:
 
 ```text
 prescriptions
@@ -1746,6 +1772,11 @@ doctor_id
 prescription_date
 pdf_url
 notes
+status                    ('ISSUED' | 'VOIDED')
+voided_at
+void_reason
+voided_by
+replaces_prescription_id
 created_at
 updated_at
 ```
@@ -1759,8 +1790,27 @@ medication_name
 dosage
 frequency
 duration
+quantity
 instructions
 ```
+
+```text
+prescription_favorites
+----------------------
+id
+doctor_id
+medication_name
+dosage
+frequency
+duration
+instructions
+created_at
+updated_at
+```
+
+A prescription is created only as part of issuing a consultation, and only when the draft contains at least one medication with a name. If the draft has no medications, no prescription row is created. Issuing commits the visit and prescription before the PDF is generated; a failed PDF leaves the issued record intact and can be retried.
+
+Prescriptions are never edited or deleted. They are voided with a required reason (`status = 'VOIDED'`, `voided_at`, `void_reason`, `voided_by`), and a replacement is issued as a new row linked through `replaces_prescription_id`. Draft, voided and superseded prescriptions are not visible to patients; only `ISSUED` prescriptions are returned by the patient-facing endpoints.
 
 ---
 
@@ -1773,7 +1823,7 @@ Notifications may be generated when:
 - A patient sends a chat message (NEW_PATIENT_MESSAGE, to the secretaries of the conversation's doctor).
 - A secretary sends a chat message (NEW_SECRETARY_MESSAGE, to the patient).
 - Payment is verified.
-- Prescription is created.
+- A prescription is created (`PRESCRIPTION_AVAILABLE`) or voided/replaced (`PRESCRIPTION_UPDATED`).
 - Appointment changes.
 - A confirmed exception or break-period change affects dates with active appointments.
 - Waitlist status changes.
@@ -1933,7 +1983,36 @@ GET  /prescriptions/:id/pdf-url
 
 `GET /prescriptions/me` is a PATIENT-only endpoint that returns the authenticated patient's prescriptions (prescription date, doctor, medication count, status). Cross-patient access returns HTTP 403.
 
-`GET /prescriptions/:id` and `GET /prescriptions/:id/pdf-url` are existing patient-authorized endpoints for viewing prescription details and accessing signed PDF URLs. The PDF URL endpoint generates a short-lived signed URL for download/viewing; expired links require a retry to generate a fresh URL.
+`GET /prescriptions/:id` and `GET /prescriptions/:id/pdf-url` are existing patient-authorized endpoints for viewing prescription details and accessing signed PDF URLs. The PDF URL endpoint generates a short-lived signed URL for download/viewing; expired links require a retry to generate a fresh URL. Patients can only read `ISSUED` prescriptions; drafts and voided prescriptions return not found.
+
+### Doctor Consultation Workspace
+
+```text
+GET    /consultation/appointments/:appointmentId
+POST   /consultation/appointments/:appointmentId/start
+PATCH  /consultation/visits/:visitId/draft
+POST   /consultation/visits/:visitId/issue
+POST   /consultation/visits/:visitId/prescriptions      (replacement after a void)
+POST   /consultation/prescriptions/:prescriptionId/void
+GET    /consultation/visits/:visitId/edit-history
+PATCH  /consultation/patients/:patientId
+GET    /consultation/favorites
+POST   /consultation/favorites
+DELETE /consultation/favorites/:id
+GET    /consultation/medication-suggestions
+```
+
+All routes are DOCTOR-only and scoped to the authenticated doctor's own appointments, visits and prescriptions. The context endpoint returns the appointment, patient (including `allergies`/`allergies_confirmed_none` and `current_medications`/`medications_confirmed_none`), visit, prescriptions, previous prescription, favorites, edit history, last visit date (or a first-visit flag), queue state, and whether the consultation can be started or issued.
+
+`start` creates the draft exactly once per appointment (safe on every load while the appointment is In Checkup) and reopens an existing visit. `draft` autosaves visit fields and the prescription draft; it accepts `baseUpdatedAt` and returns HTTP 409 with a reload instruction when another tab changed the draft first. `issue` requires the patient's date of birth and sex (so the PDF can print age and sex), requires a reason for visit, finalizes the visit, creates a prescription only when at least one medication is present, generates the PDF, and sends the generic prescription notification. The email/notification never contains clinical details.
+
+`void` requires a reason of at least three characters, never deletes the prescription, and allows `prescriptions` to issue a replacement linked through `replaces_prescription_id`. `patients/:patientId` accepts only the medical/demographic fields the workspace needs (allergies, confirmed-none flags, current medications, date of birth, sex) and requires an existing doctor-patient association or appointment.
+
+Secretaries have no access to visit or prescription reads. Billing validates medicine charges against `ISSUED` prescription items through its own internal query.
+
+### Doctor Appointment Entry Points
+
+`GET /doctors/me/dashboard` includes `nowInCheckup`: the doctor's current `IN_CHECKUP` queue entries with queue number, patient name, appointment id, start time, whether a draft exists, and whether the doctor has finished. `GET /appointments` (doctor scope) includes `visit_id`, `visit_status` and `doctor_finished_at` so the Appointments list can show Start/Continue consultation and the finished state. `GET /queue/:date` includes a derived `doctor_finished` flag for the "Doctor finished" chip on the secretary queue; queue statuses and the Complete Checkup action are unchanged.
 
 ### Payments
 
@@ -2360,7 +2439,7 @@ Since Tailwind CSS is already configured, shadcn/ui components can be added as n
 ### Database Layer
 - **Database**: PostgreSQL
 - **ORM**: To be determined (Prisma, TypeORM, or raw SQL)
-- **Migrations**: `npm run migrate` (`backend/src/database/migrate.ts`). Tracks applied files in `schema_migrations`, skips recorded files, runs each pending migration in its own transaction, and verifies required schema after applying. `001`–`041` are baselined as superseded; the idempotent `consolidated_schema.sql` is the schema that is actually applied. Rerunnable; never drops tables, columns, or data; `--force` is refused.
+- **Migrations**: `npm run migrate` (`backend/src/database/migrate.ts`). Applies the idempotent `consolidated_schema.sql` bootstrap first, tracks files in `schema_migrations`, skips recorded files, runs each pending future migration in its own transaction, and verifies required schema after applying. `001`–`041` are baselined as superseded; `042`–`048` are recorded as covered by the bootstrap and are never executed. Rerunnable; never drops tables, columns, or data; `--force` is refused.
 - **Connection Pooling**: To be configured
 
 ### External Services
