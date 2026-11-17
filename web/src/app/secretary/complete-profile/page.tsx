@@ -1,8 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
+import { secretaryApi } from '@/lib/api/secretaryApi';
+import {
+  clearSecretarySession,
+  isInvalidSecretarySessionStatus,
+} from '@/lib/auth/secretarySession';
 import Toast from '@/components/ui/Toast';
 
 export default function SecretaryCompleteProfile() {
@@ -13,7 +18,62 @@ export default function SecretaryCompleteProfile() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    let active = true;
+
+    // This page can be reached directly, so it must verify the session on its
+    // own. A token with no secretary row (deleted account, or a session from a
+    // previous database) is still accepted by the API, but there is no profile
+    // to complete: send the user back to the sign-in page.
+    secretaryApi.getProfile()
+      .then((response) => {
+        if (!active) return;
+
+        if (!response.success) {
+          if (isInvalidSecretarySessionStatus(response.httpStatus)) {
+            clearSecretarySession();
+            router.replace('/secretary-login');
+            return;
+          }
+
+          // Transient failure: render the form; submitting will surface the error.
+          setIsCheckingAccess(false);
+          return;
+        }
+
+        const profile = response.data;
+        const firstName = profile?.first_name?.trim() ?? '';
+        const lastName = profile?.last_name?.trim() ?? '';
+        const contactNumber = profile?.contact_number?.trim() ?? '';
+        const isComplete = firstName !== '' && lastName !== '' && contactNumber !== '';
+
+        // Password changes come first; the layout owns that redirect.
+        if (isComplete && profile?.must_change_password !== true) {
+          router.replace('/secretary/dashboard');
+          return;
+        }
+
+        // Keep whatever the profile already has so the user only fills the blanks.
+        setFirstName(firstName);
+        setMiddleName(profile?.middle_name ?? '');
+        setLastName(lastName);
+        setContactNumber(contactNumber);
+        setIsCheckingAccess(false);
+      })
+      .catch(() => {
+        // Do not strand the page on a network failure; the form still validates.
+        if (active) {
+          setIsCheckingAccess(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +131,10 @@ export default function SecretaryCompleteProfile() {
       setIsLoading(false);
     }
   };
+
+  if (isCheckingAccess) {
+    return null;
+  }
 
   return (
     <>

@@ -5,6 +5,11 @@ import { useRouter, usePathname } from 'next/navigation';
 import SecretarySidebar from '@/components/layout/SecretarySidebar';
 import SecretaryHeader from '@/components/layout/SecretaryHeader';
 import { apiClient } from '@/lib/api/apiClient';
+import { secretaryApi } from '@/lib/api/secretaryApi';
+import {
+  clearSecretarySession,
+  isInvalidSecretarySessionStatus,
+} from '@/lib/auth/secretarySession';
 
 interface SecretaryLayoutProps {
   children: React.ReactNode;
@@ -23,6 +28,8 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
+
     // Check authentication - prefer role-scoped HttpOnly cookies, fall back to localStorage
     const getCookie = (name: string): string | null => {
       const value = `; ${document.cookie}`;
@@ -41,12 +48,25 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
     let shouldRedirect = false;
     let redirectPath = '';
     let asyncLoadNeeded = false;
+    let sessionCleared = false;
 
     // Forgot-password and reset-password are public pages; skip auth check.
     if (isPublicPage) {
       setIsLoading(false);
       return;
     }
+
+    // A token with no secretary account behind it (deleted account, or a
+    // session issued before the database was reset) is still cryptographically
+    // valid, so the API accepts it and answers without a profile. Never read
+    // that as "profile incomplete": sign the user out instead.
+    const handleInvalidSession = () => {
+      sessionCleared = true;
+      clearSecretarySession();
+      if (active) {
+        router.replace('/secretary-login');
+      }
+    };
 
     if (!token) {
       shouldRedirect = true;
@@ -78,38 +98,46 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
             !isTrustPage
           ) {
             asyncLoadNeeded = true;
-            // Fetch secretary profile to check completion status and get real name
-            apiClient.get('/users/me')
+            // Fetch the secretary profile to check completion status and get the real name.
+            // A 404 here means the token has no secretary row: the account no longer exists.
+            secretaryApi.getProfile()
               .then((response) => {
-                if (response.success && response.data) {
-                  const secretary = response.data as any;
-                  // Check if required fields are complete
-                  const isComplete =
-                    secretary.first_name &&
-                    secretary.first_name.trim() !== '' &&
-                    secretary.last_name &&
-                    secretary.last_name.trim() !== '' &&
-                    secretary.contact_number &&
-                    secretary.contact_number.trim() !== '';
+                if (!active) return;
 
-                  if (!isComplete) {
-                    router.push('/secretary/complete-profile');
-                  } else {
-                    // If profile is complete, use real name
-                    if (secretary.first_name && secretary.last_name) {
-                      setUserName(`${secretary.first_name} ${secretary.last_name}`);
-                    } else {
-                      // Fallback to username if real name not available
-                      setUserName(user.email.split('@')[0] || 'Secretary');
-                    }
+                if (!response.success) {
+                  if (isInvalidSecretarySessionStatus(response.httpStatus)) {
+                    handleInvalidSession();
+                    return;
                   }
+
+                  // Transient failure (network/5xx): keep the session and fall back to the username.
+                  setUserName(user.email.split('@')[0] || 'Secretary');
+                  setIsLoading(false);
+                  return;
+                }
+
+                const secretary = response.data;
+                const firstName = secretary?.first_name?.trim() ?? '';
+                const lastName = secretary?.last_name?.trim() ?? '';
+                const contactNumber = secretary?.contact_number?.trim() ?? '';
+                const isComplete = firstName !== '' && lastName !== '' && contactNumber !== '';
+
+                if (!isComplete) {
+                  router.push('/secretary/complete-profile');
+                  return;
+                }
+
+                // If profile is complete, use real name. Fall back to the username
+                // when the profile has no usable name.
+                if (firstName && lastName) {
+                  setUserName(`${firstName} ${lastName}`);
                 } else {
-                  // Fallback to username if API call fails
                   setUserName(user.email.split('@')[0] || 'Secretary');
                 }
                 setIsLoading(false);
               })
               .catch((err) => {
+                if (!active) return;
                 console.error('Error checking profile completion:', err);
                 // On error, fallback to username and allow access to avoid blocking
                 setUserName(user.email.split('@')[0] || 'Secretary');
@@ -124,15 +152,24 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
           apiClient.setToken(token);
         }
       }
+    } else {
+      // A token with no stored user metadata cannot be tied to a secretary
+      // account (for example a role cookie left over from a previous session).
+      // Verify nothing, sign out, and let the user authenticate again.
+      handleInvalidSession();
     }
 
     if (shouldRedirect) {
       router.push(redirectPath);
     }
 
-    if (!asyncLoadNeeded) {
+    if (!asyncLoadNeeded && !sessionCleared) {
       setIsLoading(false);
     }
+
+    return () => {
+      active = false;
+    };
   }, [router, pathname, isTrustPage]);
 
   if (isLoading) {
