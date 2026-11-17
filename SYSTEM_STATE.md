@@ -295,8 +295,9 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 
 **Migration Runner:**
 - `npm run migrate` (`backend/src/database/migrate.ts`) is the single schema entry point.
-- It discovers numbered `.sql` files, records applied files in `schema_migrations` (keyed by filename), skips already-recorded files, runs each pending migration inside its own transaction, and verifies required columns/tables after applying.
-- Migrations `001`–`041` are baselined (recorded, never executed) because several are destructive or non-idempotent; `consolidated_schema.sql` is the complete idempotent schema that is actually applied.
+- On every run it applies `consolidated_schema.sql` **first** as the idempotent bootstrap, then records files in `schema_migrations` (keyed by filename), skips already-recorded files, and verifies required columns/tables.
+- Migrations `001`–`041` are baselined (recorded, never executed) because several are destructive or non-idempotent. Migrations `042`–`048` are recorded as "covered" by the bootstrap and are never executed, because their final state is already folded into `consolidated_schema.sql` (for example, `045_billing_fk_reconcile.sql` renames columns that the bootstrap already creates with their final names).
+- New migrations (`049+`) are applied normally after the bootstrap, each inside its own transaction.
 - The runner refuses `--force`, never drops tables or data, and supports `--dry-run`. It is safe to rerun.
 
 **Invoice Status:**

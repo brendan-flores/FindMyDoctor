@@ -125,6 +125,8 @@ cp .env.example .env
 createdb findmydoctor
 
 # Run migrations
+# Applies consolidated_schema.sql as the bootstrap, then records 001-041 as
+# baselined and 042-048 as covered. Future migrations (049+) run normally.
 npm run migrate
 ```
 
@@ -465,15 +467,15 @@ CORS_ORIGIN=http://localhost:3000,http://localhost:8080
 npm run migrate
 ```
 
-Additional migrations are applied individually:
+`npm run migrate` is the only supported schema entry point. It applies
+`consolidated_schema.sql` first as the bootstrap, records `001`–`041` as
+baselined and `042`–`048` as covered, then applies any future migrations
+individually and records them in `schema_migrations`.
 
-```bash
-npm run migrate:remove-clinics       # 003_remove_clinics.sql
-npm run migrate:doctor-registration  # 005_doctor_self_registration.sql
-```
-
-**Important Migration Note:**
-Migration `025_restore_phone_column.sql` restores the `phone` column to the `patients` table. This column is required by the patient-details and profile-completion workflows. If your existing database is missing the `phone` column, you must apply migration 025 before migration 024_add_walk_in_completion_status.sql to avoid errors during the update logic that references `p.phone`. Fresh databases created from migration 001 already include the column.
+Do **not** run the numbered SQL files or the legacy `migrate:*` / `apply*.ts`
+scripts manually. They bypass migration tracking, and several are destructive
+(`004_clear_all_data.sql`), insert sample data, or are not idempotent. The
+runner refuses to execute them for that reason.
 
 ### Building for Production
 ```bash

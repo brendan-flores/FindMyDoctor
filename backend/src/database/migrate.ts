@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../database');
 
 /**
- * Everything below 042 is superseded by consolidated_schema.sql.
+ * consolidated_schema.sql is the bootstrap, not a normal incremental migration.
  *
  * The historical migrations were written to be run once, by hand, against a
  * schema that was known at the time. Several of them are destructive
@@ -19,11 +19,20 @@ const MIGRATIONS_DIR = path.resolve(__dirname, '../../database');
  * database would either fail or damage data.
  *
  * The consolidated migration is a complete, idempotent description of the
- * schema the application expects. Legacy files are therefore recorded as
- * "baselined" (never executed by this runner) and the consolidated migration
- * is applied on top. The files themselves are preserved for history.
+ * schema the application expects through 048_consultation_workspace.sql. It
+ * must be applied FIRST so that a fresh, empty database gains the base tables
+ * that the incremental files alter. Files 001-041 are therefore recorded as
+ * "baselined" (never executed by this runner). Files 042-048 are recorded as
+ * "covered" by the bootstrap, because their end state is already part of
+ * consolidated_schema.sql and replaying them is not safe (for example,
+ * 045_billing_fk_reconcile.sql renames columns that the bootstrap already
+ * created with their final names).
+ *
+ * Files themselves are preserved for history, and future migrations (049+)
+ * continue to run normally after the bootstrap.
  */
 const CONSOLIDATED_VERSION = '042';
+const COVERED_THROUGH_VERSION = '048';
 const CONSOLIDATED_FILENAME = 'consolidated_schema.sql';
 const MIGRATIONS_TABLE = 'schema_migrations';
 
@@ -115,50 +124,123 @@ function databaseLabel(): string {
 }
 
 /**
- * Legacy migrations are recorded, never executed. The consolidated migration
- * (042) is a full, idempotent superset of everything that came before it.
+ * Applies one migration file inside its own transaction and records it.
  */
-async function baselineLegacyMigrations(
+async function applyMigrationFile(client: any, migration: Migration): Promise<number> {
+  const content = fs.readFileSync(migration.filepath, 'utf8');
+  const startedAt = Date.now();
+
+  await client.query('BEGIN');
+  try {
+    await client.query(content);
+    const duration = Date.now() - startedAt;
+    await client.query(
+      `INSERT INTO ${MIGRATIONS_TABLE} (filename, version, checksum, execution_time_ms, note)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [migration.filename, migration.version, checksum(content), duration, null]
+    );
+    await client.query('COMMIT');
+    return duration;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
+}
+
+/**
+ * Records files that must never be executed by this runner because
+ * consolidated_schema.sql already describes their end state:
+ *   - legacy 001-041: destructive / sample-data / non-idempotent
+ *   - covered 042-048: folded into the bootstrap itself
+ */
+async function recordSupersededMigrations(
   client: any,
   migrations: Migration[],
   applied: Map<string, AppliedMigration>,
   dryRun: boolean
-): Promise<string[]> {
-  const legacy = migrations.filter((m) => m.version < CONSOLIDATED_VERSION);
-  const missing = legacy.filter((m) => !applied.has(m.filename));
-  if (missing.length === 0) {
-    return [];
-  }
+): Promise<{ legacy: string[]; covered: string[] }> {
+  const superseded = migrations.filter((m) => m.filename !== CONSOLIDATED_FILENAME);
 
-  if (dryRun) {
-    console.log(
-      `[dry-run] Would baseline ${missing.length} legacy migration(s) as already applied.`
-    );
-    return missing.map((m) => m.filename);
-  }
-
-  console.log(
-    `Baselining ${missing.length} legacy migration(s) that are superseded by the consolidated schema...`
+  const legacy = superseded.filter((m) => m.version < CONSOLIDATED_VERSION);
+  const covered = superseded.filter(
+    (m) => m.version >= CONSOLIDATED_VERSION && m.version <= COVERED_THROUGH_VERSION
   );
 
-  for (const migration of missing) {
-    const content = fs.readFileSync(migration.filepath, 'utf8');
-    await client.query(
-      `INSERT INTO ${MIGRATIONS_TABLE} (filename, version, checksum, execution_time_ms, note)
-       VALUES ($1, $2, $3, 0, $4)
-       ON CONFLICT (filename) DO NOTHING`,
-      [
-        migration.filename,
-        migration.version,
-        checksum(content),
-        'Baselined: pre-consolidated schema; superseded by consolidated_schema.sql',
-      ]
-    );
-    console.log(`  baselined ${migration.filename}`);
+  const missingLegacy = legacy.filter((m) => !applied.has(m.filename));
+  const missingCovered = covered.filter((m) => !applied.has(m.filename));
+
+  if (dryRun) {
+    if (missingLegacy.length > 0) {
+      console.log(
+        `[dry-run] Would baseline ${missingLegacy.length} legacy migration(s) (001-041).`
+      );
+    }
+    if (missingCovered.length > 0) {
+      console.log(
+        `[dry-run] Would record ${missingCovered.length} migration(s) 042-048 as covered by the bootstrap.`
+      );
+    }
+    return {
+      legacy: missingLegacy.map((m) => m.filename),
+      covered: missingCovered.map((m) => m.filename),
+    };
   }
 
-  console.log('Legacy migrations baselined (files preserved, not executed).');
-  return missing.map((m) => m.filename);
+  if (missingLegacy.length > 0) {
+    console.log(
+      `Baselining ${missingLegacy.length} legacy migration(s) (001-041, superseded by the consolidated schema)...`
+    );
+  }
+  if (missingCovered.length > 0) {
+    console.log(
+      `Recording ${missingCovered.length} migration(s) 042-048 as covered by the consolidated bootstrap...`
+    );
+  }
+
+  await client.query('BEGIN');
+  try {
+    for (const migration of missingLegacy) {
+      const content = fs.readFileSync(migration.filepath, 'utf8');
+      await client.query(
+        `INSERT INTO ${MIGRATIONS_TABLE} (filename, version, checksum, execution_time_ms, note)
+         VALUES ($1, $2, $3, 0, $4)
+         ON CONFLICT (filename) DO NOTHING`,
+        [
+          migration.filename,
+          migration.version,
+          checksum(content),
+          'Baselined: pre-consolidated schema; superseded by consolidated_schema.sql',
+        ]
+      );
+      console.log(`  baselined ${migration.filename}`);
+    }
+
+    for (const migration of missingCovered) {
+      const content = fs.readFileSync(migration.filepath, 'utf8');
+      await client.query(
+        `INSERT INTO ${MIGRATIONS_TABLE} (filename, version, checksum, execution_time_ms, note)
+         VALUES ($1, $2, $3, 0, $4)
+         ON CONFLICT (filename) DO NOTHING`,
+        [
+          migration.filename,
+          migration.version,
+          checksum(content),
+          'Covered by consolidated_schema.sql bootstrap; file preserved for history',
+        ]
+      );
+      console.log(`  covered  ${migration.filename}`);
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
+
+  return {
+    legacy: missingLegacy.map((m) => m.filename),
+    covered: missingCovered.map((m) => m.filename),
+  };
 }
 
 async function verifyRequiredSchema(client: any) {
@@ -215,9 +297,11 @@ export async function runMigrations(options: { dryRun?: boolean } = {}) {
   if (migrations.length === 0) {
     throw new Error(`No numbered migration files found in ${MIGRATIONS_DIR}`);
   }
-  if (!migrations.some((m) => m.version === CONSOLIDATED_VERSION)) {
+
+  const consolidated = migrations.find((m) => m.filename === CONSOLIDATED_FILENAME);
+  if (!consolidated) {
     throw new Error(
-      `Required consolidated migration (${CONSOLIDATED_VERSION}_*) is missing from ${MIGRATIONS_DIR}`
+      `Required consolidated bootstrap (${CONSOLIDATED_FILENAME}) is missing from ${MIGRATIONS_DIR}`
     );
   }
 
@@ -225,36 +309,52 @@ export async function runMigrations(options: { dryRun?: boolean } = {}) {
   let appliedCount = 0;
   let skippedCount = 0;
   let baselinedCount = 0;
+  let coveredCount = 0;
 
   try {
     if (!dryRun) {
       await ensureMigrationsTable(client);
     }
-    await client.query('BEGIN');
-    const baselinedFilenames: string[] = await baselineLegacyMigrations(
-      client,
-      migrations,
-      await loadApplied(client),
-      dryRun
-    );
-    await client.query(dryRun ? 'ROLLBACK' : 'COMMIT');
-    baselinedCount = baselinedFilenames.length;
+    let applied = await loadApplied(client);
 
-    // Re-read after baselining so the loop sees the newly recorded rows. In a
-    // dry run nothing was written, so treat the reported baselines as applied.
-    const applied = await loadApplied(client);
-    for (const filename of baselinedFilenames) {
-      if (!applied.has(filename)) {
-        applied.set(filename, {
-          filename,
-          version: filename.slice(0, 3),
-          checksum: checksum(fs.readFileSync(path.join(MIGRATIONS_DIR, filename), 'utf8')),
-          note: 'baselined',
-        });
+    // Keep an in-memory view for dry runs, where nothing is written.
+    const recorded = new Set(applied.keys());
+
+    // 1. Bootstrap first. On an existing database this is a no-op thanks to
+    //    the idempotent guards in the consolidated file.
+    if (!recorded.has(CONSOLIDATED_FILENAME)) {
+      console.log(`Applying ${CONSOLIDATED_FILENAME} (bootstrap)...`);
+      if (dryRun) {
+        console.log(`  [dry-run] ${CONSOLIDATED_FILENAME} would be applied`);
+        recorded.add(CONSOLIDATED_FILENAME);
+      } else {
+        const duration = await applyMigrationFile(client, consolidated);
+        recorded.add(CONSOLIDATED_FILENAME);
+        console.log(`  applied ${CONSOLIDATED_FILENAME} in ${duration}ms`);
+        // Reload so checksum comparison and skip counts use persisted rows.
+        applied = await loadApplied(client);
       }
+      appliedCount += 1;
+    } else {
+      console.log(`Skipping ${CONSOLIDATED_FILENAME} (already recorded).`);
+      skippedCount += 1;
     }
 
+    // 2. Record 001-041 as baselined and 042-048 as covered by the bootstrap.
+    //    Neither group is ever executed.
+    const superseded = await recordSupersededMigrations(client, migrations, applied, dryRun);
+    baselinedCount = superseded.legacy.length;
+    coveredCount = superseded.covered.length;
+    for (const filename of [...superseded.legacy, ...superseded.covered]) {
+      recorded.add(filename);
+    }
+
+    // 3. Apply anything not covered by the bootstrap (future migrations).
     for (const migration of migrations) {
+      if (migration.filename === CONSOLIDATED_FILENAME) {
+        continue;
+      }
+
       const content = fs.readFileSync(migration.filepath, 'utf8');
       const existing = applied.get(migration.filename);
 
@@ -270,28 +370,25 @@ export async function runMigrations(options: { dryRun?: boolean } = {}) {
         continue;
       }
 
+      if (recorded.has(migration.filename)) {
+        // Baselined or covered earlier in this run; never executed.
+        continue;
+      }
+
       console.log(`Applying ${migration.filename}...`);
       if (dryRun) {
         console.log(`  [dry-run] ${migration.filename} would be applied`);
+        recorded.add(migration.filename);
         appliedCount += 1;
         continue;
       }
 
-      const startedAt = Date.now();
       try {
-        await client.query('BEGIN');
-        await client.query(content);
-        const duration = Date.now() - startedAt;
-        await client.query(
-          `INSERT INTO ${MIGRATIONS_TABLE} (filename, version, checksum, execution_time_ms, note)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [migration.filename, migration.version, checksum(content), duration, null]
-        );
-        await client.query('COMMIT');
+        const duration = await applyMigrationFile(client, migration);
+        recorded.add(migration.filename);
         appliedCount += 1;
         console.log(`  applied ${migration.filename} in ${duration}ms`);
       } catch (error: any) {
-        await client.query('ROLLBACK');
         console.error(`  FAILED ${migration.filename}: ${error?.message || error}`);
         throw error;
       }
@@ -308,14 +405,15 @@ export async function runMigrations(options: { dryRun?: boolean } = {}) {
   console.log('Migration summary:');
   console.log(`  applied:   ${appliedCount}`);
   console.log(`  skipped:   ${skippedCount} (already recorded)`);
-  console.log(`  baselined: ${baselinedCount} (legacy, superseded by consolidated schema)`);
+  console.log(`  baselined: ${baselinedCount} (legacy 001-041, superseded by consolidated schema)`);
+  console.log(`  covered:   ${coveredCount} (042-048, folded into consolidated schema)`);
   console.log(`  pending:   0`);
   if (dryRun) {
     console.log('Dry run: no changes were written.');
   }
   console.log('Migrations completed successfully.');
 
-  return { appliedCount, skippedCount, baselinedCount };
+  return { appliedCount, skippedCount, baselinedCount, coveredCount };
 }
 
 const normalizePath = (p: string) =>
