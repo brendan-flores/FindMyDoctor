@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,20 +12,25 @@ import '../../../core/services/api_service.dart';
 import '../../../core/constants/ai_constants.dart';
 
 class AiConversationPage extends StatefulWidget {
-  const AiConversationPage({super.key});
+  const AiConversationPage({super.key, this.apiService});
+
+  /// Optional API service override for tests. Production code leaves this
+  /// null and the shared [ApiService] singleton is used.
+  final ApiService? apiService;
 
   @override
   State<AiConversationPage> createState() => _AiConversationPageState();
 }
 
 class _AiConversationPageState extends State<AiConversationPage> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService = widget.apiService ?? ApiService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
+
   List<Map<String, dynamic>> _messages = [];
   String? _currentConversationId;
   bool _isSending = false;
+  String? _pendingUserMessage;
   bool _hasShownFirstUseNotice = false;
   String? _limitReachedMessage;
   bool _isAiUnavailable = false;
@@ -38,13 +44,16 @@ class _AiConversationPageState extends State<AiConversationPage> {
   Future<void> _loadFirstUseNotice() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _hasShownFirstUseNotice = prefs.getBool('ai_first_use_notice_shown') ?? false;
+      _hasShownFirstUseNotice =
+          prefs.getBool('ai_first_use_notice_shown') ?? false;
     });
   }
 
   Future<void> _loadConversation(String conversationId) async {
     try {
-      final response = await _apiService.getAiConversationMessages(conversationId);
+      final response = await _apiService.getAiConversationMessages(
+        conversationId,
+      );
       if (response['success'] == true && response['data'] != null) {
         setState(() {
           _messages = List<Map<String, dynamic>>.from(response['data']);
@@ -62,7 +71,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
 
     setState(() {
       _isSending = true;
+      _pendingUserMessage = message;
     });
+    _scrollToBottom();
 
     try {
       final response = await _apiService.sendAiMessage(
@@ -76,12 +87,13 @@ class _AiConversationPageState extends State<AiConversationPage> {
           _currentConversationId = response['data']['conversationId'];
           _limitReachedMessage = null;
         });
-        
+
         // Always load conversation to get user's message
         await _loadConversation(_currentConversationId!);
-        
+
         // Check if response contains doctor lookup results and add doctor cards (without showing the JSON message)
-        if (response['data']['type'] == 'doctor_lookup' && response['data']['doctors'] != null) {
+        if (response['data']['type'] == 'doctor_lookup' &&
+            response['data']['doctors'] != null) {
           setState(() {
             _messages.add({
               'role': 'ASSISTANT',
@@ -95,7 +107,8 @@ class _AiConversationPageState extends State<AiConversationPage> {
         final errorCode = response['error']?['code'];
         if (errorCode == 'RATE_LIMIT') {
           setState(() {
-            _limitReachedMessage = response['error']?['message'] ?? 'Daily limit reached';
+            _limitReachedMessage =
+                response['error']?['message'] ?? 'Daily limit reached';
           });
         } else if (errorCode == 'AI_SERVICE_UNAVAILABLE') {
           setState(() {
@@ -126,8 +139,18 @@ class _AiConversationPageState extends State<AiConversationPage> {
     } finally {
       setState(() {
         _isSending = false;
+        _pendingUserMessage = null;
       });
+      _scrollToBottom();
     }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
   }
 
   Future<void> _dismissFirstUseNotice() async {
@@ -156,15 +179,13 @@ class _AiConversationPageState extends State<AiConversationPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(
-          AiConstants.name,
-          style: AppTextStyles.bodyMdMedium,
-        ),
+        title: Text(AiConstants.name, style: AppTextStyles.bodyMdMedium),
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () async {
-              final result = await Navigator.of(context).pushNamed('/ai-conversation-history');
+              final result = await Navigator.of(context)
+                  .pushNamed('/ai-conversation-history');
               if (result != null && result is String) {
                 _loadConversation(result);
               }
@@ -191,7 +212,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.1),
               border: Border(
-                bottom: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                bottom: BorderSide(
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                ),
               ),
             ),
             child: Row(
@@ -217,12 +240,18 @@ class _AiConversationPageState extends State<AiConversationPage> {
               decoration: BoxDecoration(
                 color: AppColors.urgentAmber.withValues(alpha: 0.1),
                 border: Border(
-                  bottom: BorderSide(color: AppColors.urgentAmber.withValues(alpha: 0.3)),
+                  bottom: BorderSide(
+                    color: AppColors.urgentAmber.withValues(alpha: 0.3),
+                  ),
                 ),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning_amber_outlined, color: AppColors.urgentAmber, size: 20),
+                  Icon(
+                    Icons.warning_amber_outlined,
+                    color: AppColors.urgentAmber,
+                    size: 20,
+                  ),
                   const SizedBox(width: spacing.AppSpacing.gutterSm),
                   Expanded(
                     child: Text(
@@ -249,7 +278,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
               decoration: BoxDecoration(
                 color: AppColors.error.withValues(alpha: 0.1),
                 border: Border(
-                  bottom: BorderSide(color: AppColors.error.withValues(alpha: 0.3)),
+                  bottom: BorderSide(
+                    color: AppColors.error.withValues(alpha: 0.3),
+                  ),
                 ),
               ),
               child: Row(
@@ -275,7 +306,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
               decoration: BoxDecoration(
                 color: AppColors.secondary.withValues(alpha: 0.1),
                 border: Border(
-                  bottom: BorderSide(color: AppColors.secondary.withValues(alpha: 0.3)),
+                  bottom: BorderSide(
+                    color: AppColors.secondary.withValues(alpha: 0.3),
+                  ),
                 ),
               ),
               child: Row(
@@ -295,7 +328,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
             ),
 
           // Empty state (shown when no messages in current conversation)
-          if (_messages.isEmpty)
+          if (_messages.isEmpty && _pendingUserMessage == null)
             Expanded(
               child: SingleChildScrollView(
                 padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
@@ -328,7 +361,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
                         padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                          borderRadius: BorderRadius.circular(
+                            spacing.AppSpacing.radiusLg,
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -340,7 +375,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
                                   width: 40,
                                   height: 40,
                                 ),
-                                const SizedBox(width: spacing.AppSpacing.gutterMd),
+                                const SizedBox(
+                                  width: spacing.AppSpacing.gutterMd,
+                                ),
                                 Text(
                                   "Hi, I'm ${AiConstants.name}",
                                   style: AppTextStyles.bodyLgMedium,
@@ -356,18 +393,30 @@ class _AiConversationPageState extends State<AiConversationPage> {
                             ),
                             const SizedBox(height: spacing.AppSpacing.gutterMd),
                             Container(
-                              padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+                              padding: EdgeInsets.all(
+                                spacing.AppSpacing.gutterMd,
+                              ),
                               decoration: BoxDecoration(
-                                color: AppColors.urgentAmber.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                                color: AppColors.urgentAmber.withValues(
+                                  alpha: 0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  spacing.AppSpacing.radiusLg,
+                                ),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.warning_amber_outlined, color: AppColors.urgentAmber, size: 20),
-                                      const SizedBox(width: spacing.AppSpacing.gutterSm),
+                                      Icon(
+                                        Icons.warning_amber_outlined,
+                                        color: AppColors.urgentAmber,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(
+                                        width: spacing.AppSpacing.gutterSm,
+                                      ),
                                       Expanded(
                                         child: Text(
                                           'Important',
@@ -379,7 +428,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: spacing.AppSpacing.gutterSm),
+                                  const SizedBox(
+                                    height: spacing.AppSpacing.gutterSm,
+                                  ),
                                   Text(
                                     'I cannot diagnose, prescribe, or replace a doctor. In an emergency, contact your local emergency number immediately.',
                                     style: AppTextStyles.bodySm.copyWith(
@@ -398,7 +449,11 @@ class _AiConversationPageState extends State<AiConversationPage> {
                     ],
                     // Unavailable state (shown when AI is unavailable)
                     if (_isAiUnavailable) ...[
-                      Icon(Icons.cloud_off, color: AppColors.secondary, size: 64),
+                      Icon(
+                        Icons.cloud_off,
+                        color: AppColors.secondary,
+                        size: 64,
+                      ),
                       const SizedBox(height: spacing.AppSpacing.gutterMd),
                       Text(
                         '${AiConstants.name} is currently unavailable.',
@@ -442,16 +497,26 @@ class _AiConversationPageState extends State<AiConversationPage> {
                 ),
               ),
             ),
-          // Active conversation messages
-          if (_currentConversationId != null && _messages.isNotEmpty)
+          // Active conversation messages (plus the optimistic pending turn)
+          if ((_currentConversationId != null && _messages.isNotEmpty) ||
+              _pendingUserMessage != null)
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
                 padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
-                itemCount: _messages.length,
+                itemCount:
+                    _messages.length + (_pendingUserMessage != null ? 2 : 0),
                 itemBuilder: (context, index) {
-                  final message = _messages[index];
-                  return _buildAiMessageBubble(message);
+                  if (index < _messages.length) {
+                    return _buildAiMessageBubble(_messages[index]);
+                  }
+                  if (index == _messages.length) {
+                    return _buildAiMessageBubble({
+                      'role': 'USER',
+                      'content': _pendingUserMessage,
+                    });
+                  }
+                  return _buildTypingIndicator();
                 },
               ),
             ),
@@ -466,7 +531,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
     final content = message['content'] as String;
 
     // M5: Check if response contains doctor lookup results
-    if (!isFromUser && message['isDoctorLookup'] == true && message['doctors'] != null) {
+    if (!isFromUser &&
+        message['isDoctorLookup'] == true &&
+        message['doctors'] != null) {
       return _buildDoctorCards(message['doctors'] as List<dynamic>);
     }
 
@@ -490,24 +557,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
         children: [
           if (!isFromUser) ...[
             // M8: MediGuide badge icon for AI messages
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(
-                  spacing.AppSpacing.radiusFull,
-                ),
-              ),
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/images/mediguide_badge.png',
-                  width: 36,
-                  height: 36,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
+            _buildAssistantAvatar(),
             const SizedBox(width: spacing.AppSpacing.gutterSm),
           ],
           Column(
@@ -532,7 +582,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
                   ),
                   // M8: Different bubble style for AI
                   border: !isFromUser
-                      ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
+                      ? Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                        )
                       : null,
                 ),
                 child: isFromUser
@@ -544,38 +596,326 @@ class _AiConversationPageState extends State<AiConversationPage> {
                         softWrap: true,
                         overflow: TextOverflow.visible,
                       )
-                    : MarkdownBody(
-                        data: content,
-                        styleSheet: MarkdownStyleSheet(
-                          p: AppTextStyles.bodyMd.copyWith(
-                            color: AppColors.onSurface,
-                          ),
-                          h1: AppTextStyles.bodyLgMedium.copyWith(
-                            color: AppColors.onSurface,
-                          ),
-                          h2: AppTextStyles.bodyMdMedium.copyWith(
-                            color: AppColors.onSurface,
-                          ),
-                          h3: AppTextStyles.bodyMdMedium.copyWith(
-                            color: AppColors.onSurface,
-                          ),
-                          listBullet: AppTextStyles.bodyMd.copyWith(
-                            color: AppColors.onSurface,
-                          ),
-                          code: AppTextStyles.bodySm.copyWith(
-                            color: AppColors.onSurface,
-                            fontFamily: 'monospace',
-                          ),
-                          codeblockDecoration: BoxDecoration(
-                            color: AppColors.surfaceContainer,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ),
+                    : _buildAssistantMarkdown(content),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  // M8: MediGuide badge avatar shared by AI bubbles and the typing indicator
+  Widget _buildAssistantAvatar() {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+      ),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/mediguide_badge.png',
+          width: 36,
+          height: 36,
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+
+  // Typing/replying indicator shown while the backend AI request is pending
+  Widget _buildTypingIndicator() {
+    return Padding(
+      padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _buildAssistantAvatar(),
+          const SizedBox(width: spacing.AppSpacing.gutterSm),
+          Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.8,
+            ),
+            padding: EdgeInsets.symmetric(
+              horizontal: spacing.AppSpacing.gutterSm,
+              vertical: spacing.AppSpacing.gutterSm,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainer,
+              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const _TypingDots(),
+                const SizedBox(width: spacing.AppSpacing.gutterSm),
+                Flexible(
+                  child: Text(
+                    'MediGuide is typing',
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.secondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  MarkdownStyleSheet get _aiMarkdownStyleSheet => MarkdownStyleSheet(
+    blockSpacing: 8,
+    p: AppTextStyles.bodyMd.copyWith(color: AppColors.onSurface),
+    pPadding: const EdgeInsets.only(bottom: 4),
+    h1: AppTextStyles.headlineSm.copyWith(color: AppColors.onSurface),
+    h1Padding: const EdgeInsets.only(top: 8, bottom: 4),
+    h2: AppTextStyles.bodyLgMedium.copyWith(color: AppColors.onSurface),
+    h2Padding: const EdgeInsets.only(top: 8, bottom: 4),
+    h3: AppTextStyles.bodyMdMedium.copyWith(color: AppColors.onSurface),
+    h3Padding: const EdgeInsets.only(top: 6, bottom: 2),
+    h4: AppTextStyles.bodyMdMedium.copyWith(color: AppColors.onSurface),
+    h4Padding: const EdgeInsets.only(top: 6, bottom: 2),
+    h5: AppTextStyles.bodyMdMedium.copyWith(color: AppColors.onSurface),
+    h5Padding: const EdgeInsets.only(top: 4, bottom: 2),
+    h6: AppTextStyles.bodyMdMedium.copyWith(color: AppColors.onSurface),
+    h6Padding: const EdgeInsets.only(top: 4, bottom: 2),
+    strong: AppTextStyles.bodyMdMedium.copyWith(color: AppColors.onSurface),
+    em: AppTextStyles.bodyMd.copyWith(
+      color: AppColors.onSurface,
+      fontStyle: FontStyle.italic,
+    ),
+    listIndent: 20,
+    listBullet: AppTextStyles.bodyMd.copyWith(color: AppColors.secondary),
+    listBulletPadding: const EdgeInsets.only(right: 6),
+    code: AppTextStyles.bodySm.copyWith(
+      color: AppColors.onSurface,
+      fontFamily: 'monospace',
+    ),
+    codeblockPadding: const EdgeInsets.all(8),
+    codeblockDecoration: BoxDecoration(
+      color: AppColors.surfaceContainer,
+      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusSm),
+    ),
+    blockquote: AppTextStyles.bodyMd.copyWith(
+      color: AppColors.onSurfaceVariant,
+      fontStyle: FontStyle.italic,
+    ),
+    blockquotePadding: const EdgeInsets.only(left: 12),
+    blockquoteDecoration: BoxDecoration(
+      border: Border(
+        left: BorderSide(
+          color: AppColors.primary.withValues(alpha: 0.4),
+          width: 3,
+        ),
+      ),
+    ),
+    horizontalRuleDecoration: BoxDecoration(
+      border: Border(top: BorderSide(color: AppColors.outlineVariant)),
+    ),
+  );
+
+  // Renders assistant Markdown. GFM table blocks are split out and rendered
+  // separately inside a horizontally scrollable table so wide tables never
+  // overflow small screens; everything else goes through MarkdownBody.
+  Widget _buildAssistantMarkdown(String content) {
+    final segments = _splitMarkdownSegments(content);
+    if (segments.length == 1 && !segments.single.isTable) {
+      return MarkdownBody(
+        data: segments.single.text,
+        styleSheet: _aiMarkdownStyleSheet,
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < segments.length; i++) ...[
+          if (i > 0) SizedBox(height: spacing.AppSpacing.gutterSm),
+          if (segments[i].isTable)
+            _buildMarkdownTable(segments[i].table!)
+          else
+            MarkdownBody(
+              data: segments[i].text,
+              styleSheet: _aiMarkdownStyleSheet,
+            ),
+        ],
+      ],
+    );
+  }
+
+  // Splits Markdown into text and table segments. Any parsing problem falls
+  // back to treating the whole content as plain text so malformed Markdown
+  // can never break the layout.
+  List<_AiMarkdownSegment> _splitMarkdownSegments(String content) {
+    try {
+      final lines = content.split('\n');
+      final segments = <_AiMarkdownSegment>[];
+      final textBuffer = StringBuffer();
+      var i = 0;
+
+      void flushText() {
+        final text = textBuffer.toString().trim();
+        textBuffer.clear();
+        if (text.isNotEmpty) {
+          segments.add(_AiMarkdownSegment.text(text));
+        }
+      }
+
+      var inFence = false;
+      while (i < lines.length) {
+        final trimmed = lines[i].trim();
+        if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
+          inFence = !inFence;
+          textBuffer.writeln(lines[i]);
+          i++;
+          continue;
+        }
+        if (!inFence && _isTableStart(lines, i)) {
+          flushText();
+          final tableLines = <String>[];
+          while (i < lines.length && _isTableRowLine(lines[i])) {
+            tableLines.add(lines[i]);
+            i++;
+          }
+          final table = _parseMarkdownTable(tableLines);
+          if (table != null) {
+            segments.add(_AiMarkdownSegment.table(table));
+          } else {
+            // Malformed table: keep the lines as regular text.
+            segments.add(_AiMarkdownSegment.text(tableLines.join('\n')));
+          }
+        } else {
+          textBuffer.writeln(lines[i]);
+          i++;
+        }
+      }
+      flushText();
+      return segments;
+    } catch (_) {
+      return [_AiMarkdownSegment.text(content)];
+    }
+  }
+
+  // A table starts at a row containing '|' when the next line is a GFM
+  // divider row such as "| --- | --- |".
+  bool _isTableStart(List<String> lines, int i) {
+    if (i + 1 >= lines.length) return false;
+    if (!_isTableRowLine(lines[i])) return false;
+    return _isTableDivider(lines[i + 1]);
+  }
+
+  bool _isTableDivider(String line) {
+    final trimmed = line.trim();
+    if (!trimmed.contains('|') || !trimmed.contains('-')) return false;
+    return RegExp(r'^[\s|:\-]+$').hasMatch(trimmed);
+  }
+
+  bool _isTableRowLine(String line) {
+    final trimmed = line.trim();
+    return trimmed.isNotEmpty && trimmed.contains('|');
+  }
+
+  _AiMarkdownTable? _parseMarkdownTable(List<String> lines) {
+    if (lines.length < 2) return null;
+    final headers = _splitTableRow(lines[0]);
+    if (headers.isEmpty) return null;
+
+    final rows = <List<String>>[];
+    for (var i = 2; i < lines.length; i++) {
+      final cells = _splitTableRow(lines[i]);
+      if (cells.isNotEmpty) rows.add(cells);
+    }
+
+    var colCount = headers.length;
+    for (final row in rows) {
+      if (row.length > colCount) colCount = row.length;
+    }
+
+    List<String> normalize(List<String> cells) => List<String>.generate(
+      colCount,
+      (j) => j < cells.length ? cells[j] : '',
+    );
+
+    return _AiMarkdownTable(
+      headers: normalize(headers),
+      rows: rows.map(normalize).toList(),
+    );
+  }
+
+  List<String> _splitTableRow(String line) {
+    var row = line.trim();
+    if (row.startsWith('|')) row = row.substring(1);
+    if (row.endsWith('|')) row = row.substring(0, row.length - 1);
+    if (row.trim().isEmpty) return const [];
+    return row.split('|').map(_cleanTableCell).toList();
+  }
+
+  String _cleanTableCell(String cell) {
+    return cell
+        .trim()
+        .replaceAll('**', '')
+        .replaceAll('__', '')
+        .replaceAll('`', '')
+        .trim();
+  }
+
+  // Tables scroll horizontally so headers and rows stay aligned without
+  // overflowing the chat bubble on small screens.
+  Widget _buildMarkdownTable(_AiMarkdownTable table) {
+    final borderColor = AppColors.outlineVariant;
+
+    Widget cell(String text, {required bool isHeader}) {
+      final style = isHeader
+          ? AppTextStyles.labelSm.copyWith(
+              color: AppColors.onSurface,
+              fontWeight: FontWeight.w700,
+            )
+          : AppTextStyles.bodySm.copyWith(color: AppColors.onSurface);
+      return Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: spacing.AppSpacing.gutterSm,
+          vertical: spacing.AppSpacing.gutterSm,
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 220),
+          child: Text(text, style: style),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: borderColor),
+          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Table(
+            defaultColumnWidth: const IntrinsicColumnWidth(),
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+            border: TableBorder.all(color: borderColor, width: 0.5),
+            children: [
+              TableRow(
+                decoration: BoxDecoration(color: AppColors.surfaceContainer),
+                children: table.headers
+                    .map((h) => cell(h, isHeader: true))
+                    .toList(),
+              ),
+              for (final row in table.rows)
+                TableRow(
+                  children: row.map((c) => cell(c, isHeader: false)).toList(),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -601,12 +941,11 @@ class _AiConversationPageState extends State<AiConversationPage> {
             ),
           ),
           const SizedBox(height: spacing.AppSpacing.gutterSm),
-          Text(
-            'Available doctors',
-            style: AppTextStyles.bodyMdMedium,
-          ),
+          Text('Available doctors', style: AppTextStyles.bodyMdMedium),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
-          ...doctors.map((doctor) => _buildDoctorCard(doctor as Map<String, dynamic>)),
+          ...doctors.map(
+            (doctor) => _buildDoctorCard(doctor as Map<String, dynamic>),
+          ),
         ],
       ),
     );
@@ -625,7 +964,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
                 height: 48,
                 decoration: BoxDecoration(
                   color: AppColors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                  borderRadius: BorderRadius.circular(
+                    spacing.AppSpacing.radiusLg,
+                  ),
                 ),
                 child: Icon(Icons.person, color: AppColors.outline),
               ),
@@ -676,7 +1017,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
       padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
       child: Container(
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.urgentAmber.withValues(alpha: 0.5)),
+          border: Border.all(
+            color: AppColors.urgentAmber.withValues(alpha: 0.5),
+          ),
           borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
         ),
         child: AppCard(
@@ -709,10 +1052,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
                 ],
               ),
               const SizedBox(height: spacing.AppSpacing.gutterSm),
-              Text(
-                content,
-                style: AppTextStyles.bodyMd,
-              ),
+              Text(content, style: AppTextStyles.bodyMd),
               const SizedBox(height: spacing.AppSpacing.gutterMd),
               // M6: "Find a doctor" and "Book appointment" actions
               Row(
@@ -752,7 +1092,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.emergencyCrimson.withValues(alpha: 0.1),
-          border: Border.all(color: AppColors.emergencyCrimson.withValues(alpha: 0.5)),
+          border: Border.all(
+            color: AppColors.emergencyCrimson.withValues(alpha: 0.5),
+          ),
           borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
         ),
         child: AppCard(
@@ -785,10 +1127,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
                 ],
               ),
               const SizedBox(height: spacing.AppSpacing.gutterSm),
-              Text(
-                content,
-                style: AppTextStyles.bodyMd,
-              ),
+              Text(content, style: AppTextStyles.bodyMd),
               const SizedBox(height: spacing.AppSpacing.gutterMd),
               // M6: "Find a doctor" and "Book appointment" actions
               Row(
@@ -822,13 +1161,22 @@ class _AiConversationPageState extends State<AiConversationPage> {
   }
 
   bool _isDiagnosisRefusal(String content) {
-    final refusalKeywords = ['cannot diagnose', 'not a doctor', 'diagnosis', 'medical advice'];
-    return refusalKeywords.any((keyword) => content.toLowerCase().contains(keyword));
+    final refusalKeywords = [
+      'cannot diagnose',
+      'not a doctor',
+      'diagnosis',
+      'medical advice',
+    ];
+    return refusalKeywords.any(
+      (keyword) => content.toLowerCase().contains(keyword),
+    );
   }
 
   bool _isUrgentCareMessage(String content) {
     final urgentKeywords = ['urgent', 'emergency', 'immediate', 'serious'];
-    return urgentKeywords.any((keyword) => content.toLowerCase().contains(keyword));
+    return urgentKeywords.any(
+      (keyword) => content.toLowerCase().contains(keyword),
+    );
   }
 
   Widget _buildMessageInput() {
@@ -873,7 +1221,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
                   maxLines: null,
                   maxLength: 2000, // F4: Message length cap
                   textInputAction: TextInputAction.send,
-                  onSubmitted: _limitReachedMessage == null ? (_) => _sendMessage() : null,
+                  onSubmitted: _limitReachedMessage == null
+                      ? (_) => _sendMessage()
+                      : null,
                 ),
               ),
             ),
@@ -900,7 +1250,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
                         ),
                       )
                     : const Icon(Icons.send, color: AppColors.onPrimary),
-                onPressed: _isSending || _limitReachedMessage != null ? null : _sendMessage,
+                onPressed: _isSending || _limitReachedMessage != null
+                    ? null
+                    : _sendMessage,
               ),
             ),
           ],
@@ -921,26 +1273,103 @@ class _AiConversationPageState extends State<AiConversationPage> {
       children: [
         Text(
           'Optional starter chips:',
-          style: AppTextStyles.labelSm.copyWith(
-            color: AppColors.secondary,
-          ),
+          style: AppTextStyles.labelSm.copyWith(color: AppColors.secondary),
         ),
         const SizedBox(height: spacing.AppSpacing.gutterSm),
         Wrap(
           spacing: spacing.AppSpacing.gutterSm,
           runSpacing: spacing.AppSpacing.gutterSm,
-          children: chips.map((chip) => ActionChip(
-            label: Text(chip),
-            onPressed: () {
-              _messageController.text = chip;
-            },
-            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-            labelStyle: AppTextStyles.bodySm.copyWith(
-              color: AppColors.primary,
-            ),
-          )).toList(),
+          children: chips
+              .map(
+                (chip) => ActionChip(
+                  label: Text(chip),
+                  onPressed: () {
+                    _messageController.text = chip;
+                  },
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                  labelStyle: AppTextStyles.bodySm.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              )
+              .toList(),
         ),
       ],
     );
   }
+}
+
+// Three pulsing dots shown inside the "MediGuide is typing" bubble.
+class _TypingDots extends StatefulWidget {
+  const _TypingDots();
+
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (index) {
+            final t = (_controller.value + index / 3) % 1.0;
+            final wave = t < 0.5 ? t * 2 : (1 - t) * 2;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Opacity(
+                opacity: 0.3 + 0.7 * wave,
+                child: Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+}
+
+class _AiMarkdownTable {
+  _AiMarkdownTable({required this.headers, required this.rows});
+
+  final List<String> headers;
+  final List<List<String>> rows;
+}
+
+class _AiMarkdownSegment {
+  _AiMarkdownSegment.text(this.text) : table = null;
+  _AiMarkdownSegment.table(this.table) : text = '';
+
+  final String text;
+  final _AiMarkdownTable? table;
+
+  bool get isTable => table != null;
 }
