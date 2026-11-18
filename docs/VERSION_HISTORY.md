@@ -4,6 +4,29 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.43 (November 19, 2026)
+
+**Purpose:** Modernize the MediGuide AI conversation experience with a typing indicator and richer Markdown response formatting.
+
+**Significant Features:**
+- Typing indicator: sending a message now shows the patient's bubble immediately plus an animated "MediGuide is typing" bubble with three pulsing dots until the backend response (or error) arrives; the indicator is removed on success, error, rate-limit, and AI-unavailable outcomes.
+- Markdown response formatting: assistant replies render with distinct heading levels (h1-h6), paragraph spacing, list indentation, and styled inline code, blockquotes, and horizontal rules.
+- Scrollable tables: GFM table blocks in AI responses are extracted and rendered in a horizontally scrollable table so wide comparisons never overflow small screens; malformed table syntax safely falls back to plain text rendering.
+
+**Improvements:**
+- The chat list now appears as soon as a message is sent, even before the first server conversation exists, and scrolls to the latest message.
+- `AiConversationPage` accepts an optional `ApiService` for tests (no production behavior change).
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.43, added this version entry to `VERSION_HISTORY.md`, and synchronized `docs/SYSTEM_STATE.md` with the new chat UX. No PRD, architecture, API, or database changes were required.
+
+---
+
 ### 01.42 (November 15, 2026)
 
 **Purpose:** Replace the split "Edit Visit" and "Create Prescription" modals with a single doctor consultation workspace that records the visit and prescription on one page, autosaves a draft, supports review/corrections, and manages the issued/voided prescription lifecycle.
