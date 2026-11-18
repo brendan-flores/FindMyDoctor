@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -21,6 +21,10 @@ class BookingConfirmationPage extends StatefulWidget {
   final String? paymentMethod;
   final String? professionalPhotoUrl;
 
+  /// Optional injected API service used by widget tests. Production callers
+  /// leave this null and fall back to the shared [ApiService] singleton.
+  final ApiService? apiService;
+
   const BookingConfirmationPage({
     super.key,
     this.doctorId,
@@ -31,15 +35,18 @@ class BookingConfirmationPage extends StatefulWidget {
     this.selectedDate,
     this.paymentMethod,
     this.professionalPhotoUrl,
+    this.apiService,
   });
 
   @override
-  State<BookingConfirmationPage> createState() => _BookingConfirmationPageState();
+  State<BookingConfirmationPage> createState() =>
+      _BookingConfirmationPageState();
 }
 
 class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   bool _isSubmitting = false;
+  bool _isOpeningChat = false;
   String? _errorMessage;
   String? _queueNumber;
   int? _totalPatients;
@@ -61,7 +68,8 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
 
     try {
       // Use only the date (no time)
-      final appointmentDate = DateFormat('yyyy-MM-dd').format(widget.selectedDate!);
+      final appointmentDate = DateFormat('yyyy-MM-dd')
+          .format(widget.selectedDate!);
 
       final response = await _apiService.bookAppointment(
         doctorId: widget.doctorId!,
@@ -80,7 +88,8 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
         });
       } else {
         setState(() {
-          _errorMessage = response['error']?['message'] ?? 'Failed to book appointment';
+          _errorMessage =
+              response['error']?['message'] ?? 'Failed to book appointment';
           _isSubmitting = false;
         });
       }
@@ -92,11 +101,10 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
     }
   }
 
-
-
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
     // Auto-submit when page loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _submitReservation();
@@ -116,36 +124,38 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
         }
       },
       child: Scaffold(
-      backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          AppHeader(
-            showBackButton: true,
-            onBackPressed: _isSuccess ? _goToAppointments : () => Navigator.of(context).pop(),
-            showNotifications: false,
-            showProfile: false,
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: spacing.AppSpacing.gutterLg),
-                    if (_isSubmitting)
-                      _buildLoadingState()
-                    else if (_errorMessage != null)
-                      _buildErrorState()
-                    else if (_isSuccess)
-                      _buildSuccessContent(),
-                  ],
+        backgroundColor: AppColors.background,
+        body: Column(
+          children: [
+            AppHeader(
+              showBackButton: true,
+              onBackPressed: _isSuccess
+                  ? _goToAppointments
+                  : () => Navigator.of(context).pop(),
+              showNotifications: false,
+              showProfile: false,
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: spacing.AppSpacing.gutterLg),
+                      if (_isSubmitting)
+                        _buildLoadingState()
+                      else if (_errorMessage != null)
+                        _buildErrorState()
+                      else if (_isSuccess)
+                        _buildSuccessContent(),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          if (_isSuccess) _buildBottomButton(context),
-        ],
+            if (_isSuccess) _buildBottomButton(context),
+          ],
         ),
       ),
     );
@@ -155,10 +165,8 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
   /// (same destination as the "View in Appointments" success button) so the
   /// already-consumed booking form can never be surfaced again.
   void _goToAppointments() {
-    Navigator.of(context).pushReplacementNamed(
-      '/home',
-      arguments: {'initialTab': 2},
-    );
+    Navigator.of(context)
+        .pushReplacementNamed('/home', arguments: {'initialTab': 2});
   }
 
   Widget _buildLoadingState() {
@@ -182,17 +190,11 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
         padding: EdgeInsets.all(32.0),
         child: Column(
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: AppColors.error,
-            ),
+            Icon(Icons.error_outline, size: 64, color: AppColors.error),
             const SizedBox(height: 16),
             Text(
               _errorMessage!,
-              style: AppTextStyles.bodyMd.copyWith(
-                color: AppColors.error,
-              ),
+              style: AppTextStyles.bodyMd.copyWith(color: AppColors.error),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -215,8 +217,10 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
         const SizedBox(height: spacing.AppSpacing.gutterLg),
         _buildQueueSlip(),
         const SizedBox(height: spacing.AppSpacing.gutterLg),
-        if (widget.paymentMethod?.toUpperCase() == 'GCASH') _buildUploadReceiptButton(),
-        if (widget.paymentMethod?.toUpperCase() == 'GCASH') const SizedBox(height: spacing.AppSpacing.gutterLg),
+        if (widget.paymentMethod?.toUpperCase() == 'GCASH')
+          _buildUploadReceiptButton(),
+        if (widget.paymentMethod?.toUpperCase() == 'GCASH')
+          const SizedBox(height: spacing.AppSpacing.gutterLg),
         _buildSecretaryChat(),
         const SizedBox(height: spacing.AppSpacing.gutterLg),
         _buildLocationCard(),
@@ -243,19 +247,13 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
                 ),
               ],
             ),
-            child: Icon(
-              Icons.check_circle,
-              color: AppColors.primary,
-              size: 36,
-            ),
+            child: Icon(Icons.check_circle, color: AppColors.primary, size: 36),
           ),
         ),
         const SizedBox(height: spacing.AppSpacing.gutterMd),
         Text(
           'Appointment Confirmed!',
-          style: AppTextStyles.headlineMd.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: AppTextStyles.headlineMd.copyWith(fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
       ],
@@ -297,7 +295,9 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
                       height: 32,
                       decoration: BoxDecoration(
                         color: AppColors.surfaceLowest.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+                        borderRadius: BorderRadius.circular(
+                          spacing.AppSpacing.radiusMd,
+                        ),
                       ),
                       child: Icon(
                         Icons.local_hospital,
@@ -312,7 +312,9 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
                         Text(
                           'CareFlow Verified Slip',
                           style: AppTextStyles.labelSm.copyWith(
-                            color: AppColors.primaryFixed.withValues(alpha: 0.9),
+                            color: AppColors.primaryFixed.withValues(
+                              alpha: 0.9,
+                            ),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -337,11 +339,14 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.primaryFixed,
-                        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                        borderRadius: BorderRadius.circular(
+                          spacing.AppSpacing.radiusFull,
+                        ),
                       ),
                       child: Text(
                         widget.selectedDate != null
-                            ? DateFormat('MMM d, yyyy').format(widget.selectedDate!)
+                            ? DateFormat('MMM d, yyyy')
+                                  .format(widget.selectedDate!)
                             : 'Date',
                         style: AppTextStyles.labelSm.copyWith(
                           fontWeight: FontWeight.bold,
@@ -364,9 +369,7 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
           // Doctor info
           Container(
             padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLow,
-            ),
+            decoration: BoxDecoration(color: AppColors.surfaceLow),
             child: Row(
               children: [
                 DoctorProfileImage(
@@ -435,7 +438,9 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.secondaryFixed,
-                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                    borderRadius: BorderRadius.circular(
+                      spacing.AppSpacing.radiusFull,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -468,6 +473,104 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
     );
   }
 
+  Future<void> _openSecretaryChat() async {
+    final doctorId = widget.doctorId;
+    if (doctorId == null || doctorId.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to open chat: missing doctor information.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (_isOpeningChat) return;
+
+    setState(() {
+      _isOpeningChat = true;
+    });
+
+    try {
+      final response = await _apiService.createConversation(doctorId: doctorId);
+
+      if (!mounted) return;
+
+      if (response['success'] != true || response['data'] == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to open conversation. Please try again.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
+      final data = response['data'] as Map<String, dynamic>;
+      final conversationId = data['id']?.toString();
+      if (conversationId == null || conversationId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to open conversation. Please try again.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
+      final secretaryFirst = (data['secretary_first_name'] ?? '')
+          .toString()
+          .trim();
+      final secretaryLast = (data['secretary_last_name'] ?? '')
+          .toString()
+          .trim();
+      final counterpartName = [
+        secretaryFirst,
+        secretaryLast,
+      ].where((part) => part.isNotEmpty).join(' ');
+
+      await Navigator.of(context).pushNamed(
+        '/conversation-thread',
+        arguments: {
+          'conversationId': conversationId,
+          if (counterpartName.isNotEmpty) 'counterpartName': counterpartName,
+        },
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      String message;
+      if (e.statusCode == 403) {
+        message = 'You are not authorized to open this conversation.';
+      } else if (e.statusCode == 404) {
+        message = 'No secretary is available for this doctor right now.';
+      } else {
+        message = e.message.isNotEmpty
+            ? e.message
+            : 'Failed to open conversation. Please try again.';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: AppColors.error),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Network error. Please check your connection and try again.',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningChat = false;
+        });
+      }
+    }
+  }
+
   Widget _buildSecretaryChat() {
     return Container(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
@@ -476,15 +579,7 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
         borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
       ),
       child: InkWell(
-        onTap: () {
-          // Launch SMS to secretary
-          final Uri smsUri = Uri(
-            scheme: 'sms',
-            path: '09178823490',
-            queryParameters: {'body': 'Hello Secretary Grace, this is Juan Michael Reyes regarding Queue #04'},
-          );
-          launchUrl(smsUri);
-        },
+        onTap: _isOpeningChat ? null : _openSecretaryChat,
         borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
         child: Row(
           children: [
@@ -495,35 +590,30 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
                 color: AppColors.primaryFixed,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.chat,
-                color: AppColors.primary,
-                size: spacing.AppSpacing.iconMd,
-              ),
+              child: _isOpeningChat
+                  ? const Padding(
+                      padding: EdgeInsets.all(10.0),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      Icons.chat,
+                      color: AppColors.primary,
+                      size: spacing.AppSpacing.iconMd,
+                    ),
             ),
             const SizedBox(width: spacing.AppSpacing.gutterMd),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Clinic Secretary Grace Lim',
-                        style: AppTextStyles.bodyMdMedium,
-                      ),
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: AppColors.tertiaryContainer,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'Chat with Clinic Secretary',
+                    style: AppTextStyles.bodyMdMedium,
                   ),
                   Text(
-                    'Tap to chat with secretary desk',
+                    _isOpeningChat
+                        ? 'Opening conversation...'
+                        : 'Tap to chat with secretary desk',
                     style: AppTextStyles.labelSm.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w500,
@@ -585,7 +675,9 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
           const SizedBox(width: spacing.AppSpacing.gutterSm),
           Container(
             height: 36,
-            padding: EdgeInsets.symmetric(horizontal: spacing.AppSpacing.gutterSm),
+            padding: EdgeInsets.symmetric(
+              horizontal: spacing.AppSpacing.gutterSm,
+            ),
             decoration: BoxDecoration(
               color: AppColors.surfaceContainer,
               borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
@@ -598,10 +690,7 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
                   size: spacing.AppSpacing.iconSm,
                 ),
                 const SizedBox(width: spacing.AppSpacing.gutterXs),
-                Text(
-                  'Map',
-                  style: AppTextStyles.labelMd,
-                ),
+                Text('Map', style: AppTextStyles.labelMd),
               ],
             ),
           ),
@@ -688,10 +777,8 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
         child: PrimaryButton(
           text: 'View in Appointments',
           onPressed: () {
-            Navigator.of(context).pushReplacementNamed(
-              '/home',
-              arguments: {'initialTab': 2},
-            );
+            Navigator.of(context)
+                .pushReplacementNamed('/home', arguments: {'initialTab': 2});
           },
           icon: const Icon(Icons.event_available, size: 20),
         ),

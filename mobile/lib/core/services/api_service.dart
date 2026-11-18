@@ -126,7 +126,7 @@ class ApiService {
     final fileName = file.path.split('/').last;
     final fileExtension = fileName.split('.').last.toLowerCase();
     String contentType = 'application/octet-stream';
-    
+
     switch (fileExtension) {
       case 'jpg':
       case 'jpeg':
@@ -472,10 +472,7 @@ class ApiService {
   }) async {
     return await post(
       ApiConstants.passwordResetVerify,
-      body: {
-        'email': email,
-        'otp': otp,
-      },
+      body: {'email': email, 'otp': otp},
       requireAuth: false,
     );
   }
@@ -551,11 +548,14 @@ class ApiService {
         'sex': sex,
         'phone': phone,
         'address': address,
-        if (emergencyContactName != null) 'emergencyContactName': emergencyContactName,
-        if (emergencyContactPhone != null) 'emergencyContactPhone': emergencyContactPhone,
+        if (emergencyContactName != null)
+          'emergencyContactName': emergencyContactName,
+        if (emergencyContactPhone != null)
+          'emergencyContactPhone': emergencyContactPhone,
         if (medicalHistory != null) 'medicalHistory': medicalHistory,
         if (allergies != null) 'allergies': allergies,
-        if (currentMedications != null) 'currentMedications': currentMedications,
+        if (currentMedications != null)
+          'currentMedications': currentMedications,
       },
     );
   }
@@ -726,6 +726,23 @@ class ApiService {
     );
   }
 
+  // Create or retrieve the patient's conversation for a doctor.
+  // The backend reuses an existing conversation for patient+doctor when present,
+  // otherwise creates a new one. Returns the conversation payload (data.id).
+  Future<Map<String, dynamic>> createConversation({
+    required String doctorId,
+    String? secretaryId,
+  }) async {
+    return await post(
+      ApiConstants.conversations,
+      body: {
+        'doctorId': doctorId,
+        if (secretaryId != null) 'secretaryId': secretaryId,
+      },
+      requireAuth: true,
+    );
+  }
+
   // Read-only appointment summary for the secretary patient-info sheet
   Future<Map<String, dynamic>> getAppointmentSummary(
     String conversationId,
@@ -755,15 +772,11 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getAiConversations() async {
-    return await get(
-      ApiConstants.aiConversations,
-    );
+    return await get(ApiConstants.aiConversations);
   }
 
   Future<Map<String, dynamic>> getAiConversation(String id) async {
-    return await get(
-      '${ApiConstants.aiConversations}/$id',
-    );
+    return await get('${ApiConstants.aiConversations}/$id');
   }
 
   Future<Map<String, dynamic>> getAiConversationMessages(String id) async {
@@ -779,7 +792,10 @@ class ApiService {
     );
   }
 
-  Future<Map<String, dynamic>> renameAiConversation(String id, String title) async {
+  Future<Map<String, dynamic>> renameAiConversation(
+    String id,
+    String title,
+  ) async {
     return await patch(
       '${ApiConstants.aiConversations}/$id',
       body: {'title': title},
@@ -832,10 +848,15 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getUnreadNotificationCount() async {
-    return await get('${ApiConstants.notifications}/unread-count', requireAuth: true);
+    return await get(
+      '${ApiConstants.notifications}/unread-count',
+      requireAuth: true,
+    );
   }
 
-  Future<Map<String, dynamic>> markNotificationRead(String notificationId) async {
+  Future<Map<String, dynamic>> markNotificationRead(
+    String notificationId,
+  ) async {
     return await patch(
       '${ApiConstants.notifications}/$notificationId${ApiConstants.notificationRead}',
       requireAuth: true,
@@ -854,11 +875,17 @@ class ApiService {
   // ===========================
 
   Future<Map<String, dynamic>> getPayment(String appointmentId) async {
-    return await get('${ApiConstants.payments}/$appointmentId', requireAuth: true);
+    return await get(
+      '${ApiConstants.payments}/$appointmentId',
+      requireAuth: true,
+    );
   }
 
   Future<Map<String, dynamic>> getPaymentById(String paymentId) async {
-    return await get('${ApiConstants.paymentsById}/$paymentId', requireAuth: true);
+    return await get(
+      '${ApiConstants.paymentsById}/$paymentId',
+      requireAuth: true,
+    );
   }
 
   Future<Map<String, dynamic>> uploadPaymentReceipt({
@@ -925,16 +952,15 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getInvoiceById(String invoiceId) async {
-    return await get(
-      '${ApiConstants.invoices}/$invoiceId',
-      requireAuth: true,
-    );
+    return await get('${ApiConstants.invoices}/$invoiceId', requireAuth: true);
   }
 
   Future<List<int>> downloadInvoicePdf(String invoiceId) async {
     final client = _httpClient ?? http.Client();
     final response = await client.get(
-      Uri.parse('$baseUrl${ApiConstants.invoices}/$invoiceId${ApiConstants.invoicePdf}'),
+      Uri.parse(
+        '$baseUrl${ApiConstants.invoices}/$invoiceId${ApiConstants.invoicePdf}',
+      ),
       headers: _getHeaders(requireAuth: true),
     );
 
@@ -964,9 +990,7 @@ class ApiService {
   /// Download PDF from a signed URL (used for invoice downloads with short-lived tokens)
   Future<List<int>> downloadPdfFromUrl(String signedUrl) async {
     final client = _httpClient ?? http.Client();
-    final response = await client.get(
-      Uri.parse(signedUrl),
-    );
+    final response = await client.get(Uri.parse(signedUrl));
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response.bodyBytes;
@@ -1002,10 +1026,7 @@ class ApiService {
   }) async {
     return await post(
       '/waitlists',
-      body: {
-        'doctorId': doctorId,
-        'waitlistDate': waitlistDate,
-      },
+      body: {'doctorId': doctorId, 'waitlistDate': waitlistDate},
       requireAuth: true,
     );
   }
