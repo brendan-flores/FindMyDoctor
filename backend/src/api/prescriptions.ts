@@ -4,8 +4,13 @@ import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 import { createNotification, NotificationTypes } from './notifications';
 import { sendPushToUser } from '../services/pushService';
-import { generateSignedPrescriptionUrl } from '../services/storageService';
-import { generatePrescriptionPdfFile } from '../services/prescriptionPdfService';
+import {
+  generatePrescriptionPdfFile,
+  ensurePrescriptionPdf,
+  buildPrescriptionNumber,
+  buildPrescriptionDownloadFileName,
+} from '../services/prescriptionPdfService';
+import { downloadPrescriptionPdf } from '../services/storageService';
 
 const router = Router();
 
@@ -202,12 +207,22 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     if (role === 'PATIENT') {
       queryText = `
         SELECT p.*,
-               d.first_name as doctor_first_name, d.last_name as doctor_last_name,
-               v.visit_date,
+               d.first_name as doctor_first_name, d.middle_name as doctor_middle_name,
+               d.last_name as doctor_last_name, d.specialty as doctor_specialty,
+               d.credentials as doctor_credentials, d.prc_license_number,
+               d.practice_name, d.practice_address, d.practice_phone, d.room_number,
+               d.professional_photo_url as doctor_professional_photo_url,
+               pat.first_name as patient_first_name, pat.middle_name as patient_middle_name,
+               pat.last_name as patient_last_name, pat.date_of_birth, pat.sex,
+               v.visit_date, v.reason_for_visit, v.diagnosis,
+               orig.id as replaces_original_id,
+               orig.prescription_date as replaces_original_date,
                CASE WHEN p.pdf_url IS NOT NULL AND p.pdf_url != '' THEN true ELSE false END as has_pdf
         FROM prescriptions p
         JOIN doctors d ON p.doctor_id = d.id
+        JOIN patients pat ON p.patient_id = pat.id
         JOIN visits v ON p.visit_id = v.id
+        LEFT JOIN prescriptions orig ON orig.id = p.replaces_prescription_id
         WHERE p.id = $1 AND p.patient_id = (SELECT id FROM patients WHERE user_id = $2)
           AND p.status = 'ISSUED'
       `;
@@ -215,12 +230,22 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     } else if (role === 'DOCTOR') {
       queryText = `
         SELECT p.*,
-               pat.first_name as patient_first_name, pat.last_name as patient_last_name,
-               v.visit_date,
+               pat.first_name as patient_first_name, pat.middle_name as patient_middle_name,
+               pat.last_name as patient_last_name, pat.date_of_birth, pat.sex,
+               d.first_name as doctor_first_name, d.middle_name as doctor_middle_name,
+               d.last_name as doctor_last_name, d.specialty as doctor_specialty,
+               d.credentials as doctor_credentials, d.prc_license_number,
+               d.practice_name, d.practice_address, d.practice_phone, d.room_number,
+               d.professional_photo_url as doctor_professional_photo_url,
+               v.visit_date, v.reason_for_visit, v.diagnosis,
+               orig.id as replaces_original_id,
+               orig.prescription_date as replaces_original_date,
                CASE WHEN p.pdf_url IS NOT NULL AND p.pdf_url != '' THEN true ELSE false END as has_pdf
         FROM prescriptions p
         JOIN patients pat ON p.patient_id = pat.id
+        JOIN doctors d ON p.doctor_id = d.id
         JOIN visits v ON p.visit_id = v.id
+        LEFT JOIN prescriptions orig ON orig.id = p.replaces_prescription_id
         WHERE p.id = $1 AND p.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)
       `;
       params.push(userId);
@@ -236,12 +261,22 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 
     // Get prescription items
     const itemsResult = await query(
-      'SELECT * FROM prescription_items WHERE prescription_id = $1',
+      'SELECT * FROM prescription_items WHERE prescription_id = $1 ORDER BY created_at ASC',
       [id]
     );
 
     const prescription = result.rows[0];
     prescription.items = itemsResult.rows;
+    prescription.prescription_number = buildPrescriptionNumber(
+      prescription.id,
+      prescription.prescription_date
+    );
+    if (prescription.replaces_original_id) {
+      prescription.replaces_prescription_number = buildPrescriptionNumber(
+        prescription.replaces_original_id,
+        prescription.replaces_original_date
+      );
+    }
 
     res.json(success(prescription));
   } catch (err: any) {
@@ -343,10 +378,97 @@ router.get('/:id/pdf', authenticate, authorize('DOCTOR'), async (req: AuthReques
       return res.status(500).json(error(ErrorCodes.SERVER_ERROR, result.error || 'Failed to generate PDF'));
     }
 
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    });
+
     res.json(success({ signedUrl: result.signedUrl }, 'PDF generated successfully'));
   } catch (err: any) {
     console.error('Error generating prescription PDF:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to generate prescription PDF'));
+  }
+});
+
+// Download the stored prescription PDF as an authenticated file attachment.
+router.get('/:id/download', authenticate, authorize('DOCTOR', 'PATIENT'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+    const role = req.user!.role;
+
+    let ownershipSql: string;
+    if (role === 'PATIENT') {
+      ownershipSql = `SELECT p.pdf_url, p.prescription_date, p.replaces_prescription_id,
+          pat.first_name AS patient_first_name, pat.last_name AS patient_last_name,
+          orig.prescription_date AS replaces_original_date,
+          EXISTS (
+            SELECT 1 FROM prescriptions replacement
+            WHERE replacement.replaces_prescription_id = p.id
+          ) AS is_superseded
+        FROM prescriptions p
+        JOIN patients pat ON pat.id = p.patient_id
+        LEFT JOIN prescriptions orig ON orig.id = p.replaces_prescription_id
+        WHERE p.id = $1 AND p.patient_id = (SELECT id FROM patients WHERE user_id = $2)
+          AND p.status = 'ISSUED'`;
+    } else if (role === 'DOCTOR') {
+      ownershipSql = `SELECT p.pdf_url, p.prescription_date, p.replaces_prescription_id,
+          pat.first_name AS patient_first_name, pat.last_name AS patient_last_name,
+          orig.prescription_date AS replaces_original_date,
+          EXISTS (
+            SELECT 1 FROM prescriptions replacement
+            WHERE replacement.replaces_prescription_id = p.id
+          ) AS is_superseded
+        FROM prescriptions p
+        JOIN patients pat ON pat.id = p.patient_id
+        LEFT JOIN prescriptions orig ON orig.id = p.replaces_prescription_id
+        WHERE p.id = $1 AND p.doctor_id = (SELECT id FROM doctors WHERE user_id = $2)`;
+    } else {
+      return res.status(403).json(error(ErrorCodes.FORBIDDEN, 'Invalid role'));
+    }
+
+    const owned = await query(ownershipSql, [id, userId]);
+    if (owned.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Prescription not found'));
+    }
+    if (!owned.rows[0].pdf_url) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'PDF not generated for this prescription'));
+    }
+
+    const pdfResult = await ensurePrescriptionPdf(id);
+    if (!pdfResult.success || !pdfResult.filePath) {
+      return res.status(500).json(error(ErrorCodes.SERVER_ERROR, pdfResult.error || 'Failed to prepare prescription PDF'));
+    }
+
+    const downloadResult = await downloadPrescriptionPdf(pdfResult.filePath);
+    if (!downloadResult.success || !downloadResult.buffer) {
+      return res.status(500).json(error(ErrorCodes.SERVER_ERROR, downloadResult.error || 'Failed to download prescription PDF'));
+    }
+
+    const fileName = buildPrescriptionDownloadFileName({
+      prescriptionId: id,
+      prescriptionDate: owned.rows[0].prescription_date,
+      patientFirstName: owned.rows[0].patient_first_name,
+      patientLastName: owned.rows[0].patient_last_name,
+      replacesPrescriptionId: owned.rows[0].replaces_prescription_id,
+      replacesPrescriptionDate: owned.rows[0].replaces_original_date,
+      superseded: Boolean(owned.rows[0].is_superseded),
+    });
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+      'Access-Control-Expose-Headers': 'Content-Disposition',
+      'Content-Length': String(downloadResult.buffer.length),
+      'Accept-Ranges': 'none',
+    });
+    res.send(downloadResult.buffer);
+  } catch (err: any) {
+    console.error('Prescription PDF download error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to download prescription PDF'));
   }
 });
 
@@ -384,13 +506,21 @@ router.get('/:id/pdf-url', authenticate, authorize('DOCTOR', 'PATIENT'), async (
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'PDF not generated for this prescription'));
     }
 
-    const signedUrlResult = await generateSignedPrescriptionUrl(prescription.pdf_url);
-
-    if (!signedUrlResult.success) {
-      return res.status(500).json(error(ErrorCodes.SERVER_ERROR, signedUrlResult.error || 'Failed to generate signed URL'));
+    // Serve the stored artifact, regenerating it only when it predates the
+    // current layout. The prescription and its medications are never modified;
+    // the stored object is replaced by a new one and the old one is retained.
+    const pdfResult = await ensurePrescriptionPdf(id);
+    if (!pdfResult.success || !pdfResult.signedUrl) {
+      return res.status(500).json(error(ErrorCodes.SERVER_ERROR, pdfResult.error || 'Failed to prepare prescription PDF'));
     }
 
-    res.json(success({ signedUrl: signedUrlResult.signedUrl }, 'Signed URL generated successfully'));
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    });
+
+    res.json(success({ signedUrl: pdfResult.signedUrl }, 'Signed URL generated successfully'));
   } catch (err: any) {
     console.error('Error generating signed URL:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to generate signed URL'));

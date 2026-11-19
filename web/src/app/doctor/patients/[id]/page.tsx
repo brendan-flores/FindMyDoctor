@@ -154,11 +154,18 @@ export default function PatientDetails() {
 
   const handleDownloadPdf = async (prescriptionId: string) => {
     try {
-      const response = await doctorApi.getPrescriptionPdfUrl(prescriptionId);
-      if (response.success && response.data?.signedUrl) {
-        window.open(response.data.signedUrl, '_blank');
+      const response = await doctorApi.downloadPrescriptionPdf(prescriptionId);
+      if (response.success && response.data && response.fileName) {
+        const url = URL.createObjectURL(response.data);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = response.fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       } else {
-        alert(response.error || 'Failed to get PDF URL');
+        alert(response.error || 'Failed to download PDF');
       }
     } catch (err) {
       alert('Network error occurred');
@@ -397,13 +404,22 @@ export default function PatientDetails() {
                   </div>
                   <div className="ml-4 flex gap-2">
                     {prescription.has_pdf ? (
-                      <button
-                        onClick={() => handleDownloadPdf(prescription.id)}
-                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                        title="Download PDF"
-                      >
-                        <span className="material-symbols-outlined">download</span>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleDownloadPdf(prescription.id)}
+                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Download PDF"
+                        >
+                          <span className="material-symbols-outlined">download</span>
+                        </button>
+                        <button
+                          onClick={() => handleGeneratePdf(prescription.id)}
+                          className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                          title="Regenerate PDF"
+                        >
+                          <span className="material-symbols-outlined">refresh</span>
+                        </button>
+                      </>
                     ) : (
                       <button
                         onClick={() => handleGeneratePdf(prescription.id)}

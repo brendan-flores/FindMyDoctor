@@ -7,7 +7,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/api_constants.dart';
 
+class DownloadedPdf {
+  final List<int> bytes;
+  final String fileName;
+
+  const DownloadedPdf({required this.bytes, required this.fileName});
+}
+
 class ApiService {
+  /// Same contract as the backend naming function and the web client:
+  /// `SURNAME_Firstname_RX-YYYYMMDD-XXXXXXXX.pdf`, optional `_replaces-...`
+  /// and `_SUPERSEDED` markers, or the name-free RX fallback.
+  static final RegExp _prescriptionFileNamePattern = RegExp(
+    r'^(?:[A-Z0-9-]+_[A-Za-z0-9][A-Za-z0-9-]*_RX-\d{8}-[A-Z0-9]+(?:_replaces-[A-Z0-9]+)?(?:_SUPERSEDED)?|RX-\d{8}-[A-Z0-9]+)\.pdf$',
+  );
+
   final String baseUrl = ApiConstants.baseUrl;
   String? _accessToken;
   http.Client? _httpClient;
@@ -126,7 +140,7 @@ class ApiService {
     final fileName = file.path.split('/').last;
     final fileExtension = fileName.split('.').last.toLowerCase();
     String contentType = 'application/octet-stream';
-    
+
     switch (fileExtension) {
       case 'jpg':
       case 'jpeg':
@@ -472,10 +486,7 @@ class ApiService {
   }) async {
     return await post(
       ApiConstants.passwordResetVerify,
-      body: {
-        'email': email,
-        'otp': otp,
-      },
+      body: {'email': email, 'otp': otp},
       requireAuth: false,
     );
   }
@@ -551,11 +562,14 @@ class ApiService {
         'sex': sex,
         'phone': phone,
         'address': address,
-        if (emergencyContactName != null) 'emergencyContactName': emergencyContactName,
-        if (emergencyContactPhone != null) 'emergencyContactPhone': emergencyContactPhone,
+        if (emergencyContactName != null)
+          'emergencyContactName': emergencyContactName,
+        if (emergencyContactPhone != null)
+          'emergencyContactPhone': emergencyContactPhone,
         if (medicalHistory != null) 'medicalHistory': medicalHistory,
         if (allergies != null) 'allergies': allergies,
-        if (currentMedications != null) 'currentMedications': currentMedications,
+        if (currentMedications != null)
+          'currentMedications': currentMedications,
       },
     );
   }
@@ -578,6 +592,54 @@ class ApiService {
   // Get prescription PDF URL
   Future<Map<String, dynamic>> getPrescriptionPdfUrl(String id) async {
     return await get('/prescriptions/$id/pdf-url', requireAuth: true);
+  }
+
+  /// The backend generates the filename and returns it in
+  /// `Content-Disposition`. The app saves that exact name; it never builds a
+  /// prescription filename of its own.
+  Future<DownloadedPdf> downloadPrescriptionPdf(String id) async {
+    final client = _httpClient ?? http.Client();
+    final uri = Uri.parse('$baseUrl/prescriptions/$id/download');
+    final response = await client.get(
+      uri,
+      headers: _getHeaders(requireAuth: true),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final disposition = response.headers['content-disposition'] ?? '';
+      final fileName = RegExp(
+        r'filename="?([^";]+)"?',
+        caseSensitive: false,
+      ).firstMatch(disposition)?.group(1);
+      if (fileName == null || fileName.isEmpty) {
+        throw FormatException(
+          'The server did not provide a prescription PDF filename',
+        );
+      }
+      if (!_prescriptionFileNamePattern.hasMatch(fileName)) {
+        throw FormatException(
+          'The server provided an invalid prescription PDF filename',
+        );
+      }
+      return DownloadedPdf(bytes: response.bodyBytes, fileName: fileName);
+    }
+
+    try {
+      final body = jsonDecode(response.body);
+      throw ApiException(
+        message:
+            body['error']?['message'] ?? 'Failed to download prescription PDF',
+        code: body['error']?['code'] ?? 'DOWNLOAD_ERROR',
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(
+        message: 'Failed to download prescription PDF',
+        code: 'DOWNLOAD_ERROR',
+        statusCode: response.statusCode,
+      );
+    }
   }
 
   // ===========================
@@ -755,15 +817,11 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getAiConversations() async {
-    return await get(
-      ApiConstants.aiConversations,
-    );
+    return await get(ApiConstants.aiConversations);
   }
 
   Future<Map<String, dynamic>> getAiConversation(String id) async {
-    return await get(
-      '${ApiConstants.aiConversations}/$id',
-    );
+    return await get('${ApiConstants.aiConversations}/$id');
   }
 
   Future<Map<String, dynamic>> getAiConversationMessages(String id) async {
@@ -779,7 +837,10 @@ class ApiService {
     );
   }
 
-  Future<Map<String, dynamic>> renameAiConversation(String id, String title) async {
+  Future<Map<String, dynamic>> renameAiConversation(
+    String id,
+    String title,
+  ) async {
     return await patch(
       '${ApiConstants.aiConversations}/$id',
       body: {'title': title},
@@ -832,10 +893,15 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getUnreadNotificationCount() async {
-    return await get('${ApiConstants.notifications}/unread-count', requireAuth: true);
+    return await get(
+      '${ApiConstants.notifications}/unread-count',
+      requireAuth: true,
+    );
   }
 
-  Future<Map<String, dynamic>> markNotificationRead(String notificationId) async {
+  Future<Map<String, dynamic>> markNotificationRead(
+    String notificationId,
+  ) async {
     return await patch(
       '${ApiConstants.notifications}/$notificationId${ApiConstants.notificationRead}',
       requireAuth: true,
@@ -854,11 +920,17 @@ class ApiService {
   // ===========================
 
   Future<Map<String, dynamic>> getPayment(String appointmentId) async {
-    return await get('${ApiConstants.payments}/$appointmentId', requireAuth: true);
+    return await get(
+      '${ApiConstants.payments}/$appointmentId',
+      requireAuth: true,
+    );
   }
 
   Future<Map<String, dynamic>> getPaymentById(String paymentId) async {
-    return await get('${ApiConstants.paymentsById}/$paymentId', requireAuth: true);
+    return await get(
+      '${ApiConstants.paymentsById}/$paymentId',
+      requireAuth: true,
+    );
   }
 
   Future<Map<String, dynamic>> uploadPaymentReceipt({
@@ -925,16 +997,15 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getInvoiceById(String invoiceId) async {
-    return await get(
-      '${ApiConstants.invoices}/$invoiceId',
-      requireAuth: true,
-    );
+    return await get('${ApiConstants.invoices}/$invoiceId', requireAuth: true);
   }
 
   Future<List<int>> downloadInvoicePdf(String invoiceId) async {
     final client = _httpClient ?? http.Client();
     final response = await client.get(
-      Uri.parse('$baseUrl${ApiConstants.invoices}/$invoiceId${ApiConstants.invoicePdf}'),
+      Uri.parse(
+        '$baseUrl${ApiConstants.invoices}/$invoiceId${ApiConstants.invoicePdf}',
+      ),
       headers: _getHeaders(requireAuth: true),
     );
 
@@ -964,9 +1035,7 @@ class ApiService {
   /// Download PDF from a signed URL (used for invoice downloads with short-lived tokens)
   Future<List<int>> downloadPdfFromUrl(String signedUrl) async {
     final client = _httpClient ?? http.Client();
-    final response = await client.get(
-      Uri.parse(signedUrl),
-    );
+    final response = await client.get(Uri.parse(signedUrl));
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response.bodyBytes;
@@ -1002,10 +1071,7 @@ class ApiService {
   }) async {
     return await post(
       '/waitlists',
-      body: {
-        'doctorId': doctorId,
-        'waitlistDate': waitlistDate,
-      },
+      body: {'doctorId': doctorId, 'waitlistDate': waitlistDate},
       requireAuth: true,
     );
   }

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/core/services/api_service.dart';
+import 'package:mobile/core/services/file_save_service.dart';
 import 'package:mobile/core/widgets/doctor_profile_image.dart';
 import 'package:mobile/features/medical-records/models/prescription.dart';
 import 'package:mobile/features/medical-records/models/visit.dart';
@@ -76,39 +77,43 @@ Map<String, dynamic> buildPrescriptionDetail(Map<String, dynamic> extra) {
   };
 }
 
-/// Mocks the prescription detail + PDF URL endpoints used by
+/// Mocks the prescription detail + PDF download endpoints used by
 /// [PrescriptionDetailPage].
 ApiService buildMockPdfApiService({
-  bool pdfUrlFails = false,
-  String signedUrl = 'https://example.supabase.co/storage/v1/object/sign/prescriptions/p.pdf?token=abc',
+  bool pdfDownloadFails = false,
+  String fileName = 'FLORES_Beavz_RX-20261020-ABCDEF12.pdf',
+  Map<String, dynamic>? detail,
 }) {
   final mockClient = MockClient((request) async {
     final path = request.url.path;
-    if (path.endsWith('/prescriptions/prescription-1/pdf-url')) {
-      if (pdfUrlFails) {
+    if (path.endsWith('/prescriptions/prescription-1/download')) {
+      if (pdfDownloadFails) {
         return http.Response(
           jsonEncode({
             'success': false,
             'error': {
               'code': 'SERVER_ERROR',
-              'message': 'Failed to generate signed URL',
+              'message': 'Failed to download prescription PDF',
             },
           }),
           500,
         );
       }
-      return http.Response(
-        jsonEncode({
-          'success': true,
-          'data': {'signedUrl': signedUrl},
-          'message': 'Signed URL generated successfully',
-        }),
+      return http.Response.bytes(
+        utf8.encode('%PDF-1.7 prescription'),
         200,
+        headers: {
+          'content-type': 'application/pdf',
+          'content-disposition': 'attachment; filename="$fileName"',
+        },
       );
     }
     if (path.endsWith('/prescriptions/prescription-1')) {
       return http.Response(
-        jsonEncode({'success': true, 'data': buildPrescriptionDetail({})}),
+        jsonEncode({
+          'success': true,
+          'data': buildPrescriptionDetail(detail ?? {}),
+        }),
         200,
       );
     }
@@ -148,17 +153,15 @@ ApiService buildMockApiService({
         200,
       );
     }
-    if (path.endsWith('/prescriptions/prescription-1/pdf-url')) {
-      return http.Response(
-        jsonEncode({
-          'success': true,
-          'data': {
-            'signedUrl':
-                'https://example.supabase.co/storage/v1/object/sign/prescriptions/p.pdf?token=abc',
-          },
-          'message': 'Signed URL generated successfully',
-        }),
+    if (path.endsWith('/prescriptions/prescription-1/download')) {
+      return http.Response.bytes(
+        utf8.encode('%PDF-1.7 prescription'),
         200,
+        headers: {
+          'content-type': 'application/pdf',
+          'content-disposition':
+              'attachment; filename="FLORES_Beavz_RX-20261020-ABCDEF12.pdf"',
+        },
       );
     }
     if (path.endsWith('/prescriptions/prescription-1')) {
@@ -175,15 +178,17 @@ ApiService buildMockApiService({
 void main() {
   group('Prescription model parsing', () {
     test('parses medication_count delivered as a bigint string', () {
-      final prescription =
-          Prescription.fromJson(buildPrescription({'medication_count': '3'}));
+      final prescription = Prescription.fromJson(
+        buildPrescription({'medication_count': '3'}),
+      );
 
       expect(prescription.medicationCount, 3);
     });
 
     test('parses medication_count delivered as a number', () {
-      final prescription =
-          Prescription.fromJson(buildPrescription({'medication_count': 4}));
+      final prescription = Prescription.fromJson(
+        buildPrescription({'medication_count': 4}),
+      );
 
       expect(prescription.medicationCount, 4);
     });
@@ -201,14 +206,81 @@ void main() {
     });
   });
 
+  group('PrescriptionDetail model parsing', () {
+    test('parses the professional prescription detail payload', () {
+      final detail = PrescriptionDetail.fromJson(
+        buildPrescriptionDetail({
+          'prescription_number': 'RX-20261020-ABCD1234',
+          'patient_first_name': 'Maria',
+          'patient_middle_name': 'Santos',
+          'patient_last_name': 'Cruz',
+          'date_of_birth': '1990-05-14T00:00:00.000Z',
+          'sex': 'FEMALE',
+          'doctor_middle_name': 'Reyes',
+          'doctor_specialty': 'Internal Medicine',
+          'doctor_credentials': 'MD',
+          'prc_license_number': 'PRC-7654321',
+          'practice_name': 'Riverside Clinic',
+          'practice_address': '12 Mabini St.',
+          'practice_phone': '0281234567',
+          'room_number': '204',
+          'reason_for_visit': 'Persistent cough',
+          'diagnosis': 'Acute bronchitis',
+          'replaces_prescription_number': 'RX-20261010-9999AAAA',
+          'items': [
+            {
+              'id': 'item-1',
+              'medication_name': 'Amoxicillin',
+              'dosage': '500mg',
+              'frequency': '3x daily',
+              'duration': '7 days',
+              'quantity': 21,
+              'instructions': 'After meals',
+            },
+            {
+              'id': 'item-2',
+              'medication_name': 'Paracetamol',
+              'quantity': '12',
+            },
+          ],
+        }),
+      );
+
+      expect(detail.prescriptionNumber, 'RX-20261020-ABCD1234');
+      expect(detail.patientFullName, 'Maria Santos Cruz');
+      expect(detail.formattedSex, 'Female');
+      expect(detail.patientAge, isNotNull);
+      expect(detail.doctorFullName, 'Juan Reyes Dela Cruz');
+      expect(detail.doctorSpecialty, 'Internal Medicine');
+      expect(detail.doctorCredentials, 'MD');
+      expect(detail.prcLicenseNumber, 'PRC-7654321');
+      expect(detail.practiceName, 'Riverside Clinic');
+      expect(detail.practiceAddress, '12 Mabini St.');
+      expect(detail.practicePhone, '0281234567');
+      expect(detail.roomNumber, '204');
+      expect(detail.reasonForVisit, 'Persistent cough');
+      expect(detail.diagnosis, 'Acute bronchitis');
+      expect(detail.replacesPrescriptionNumber, 'RX-20261010-9999AAAA');
+      expect(detail.items, hasLength(2));
+      expect(detail.items[0].quantity, 21);
+      // quantity may arrive as a numeric string from PostgreSQL.
+      expect(detail.items[1].quantity, 12);
+    });
+
+    test('tolerates a missing items array', () {
+      final detail = PrescriptionDetail.fromJson(
+        buildPrescriptionDetail({'items': null}),
+      );
+
+      expect(detail.items, isEmpty);
+    });
+  });
+
   group('Visit model parsing', () {
     test('parses doctor_professional_photo_url', () {
       final visit = Visit.fromJson(buildVisit({}));
 
-      expect(
-        visit.doctorProfessionalPhotoUrl,
-        'https://example.com/juan.png',
-      );
+      expect(visit.doctorProfessionalPhotoUrl, 'https://example.com/juan.png');
     });
 
     test('returns null photo url when missing or empty', () {
@@ -238,42 +310,39 @@ void main() {
       await apiService.init();
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: MedicalRecordsPage(apiService: apiService),
-        ),
+        MaterialApp(home: MedicalRecordsPage(apiService: apiService)),
       );
       await tester.pumpAndSettle(const Duration(seconds: 2));
     }
 
-    testWidgets(
-      'History tab shows "Dr." prefix and the visit doctor photo',
-      (WidgetTester tester) async {
-        final apiService = buildMockApiService(
-          visits: [
-            buildVisit({}),
-            buildVisit({
-              'id': 'visit-2',
-              'doctor_first_name': 'Maria',
-              'doctor_last_name': 'Santos',
-              'doctor_professional_photo_url': null,
-            }),
-          ],
-        );
-        await pumpPage(tester, apiService: apiService);
+    testWidgets('History tab shows "Dr." prefix and the visit doctor photo', (
+      WidgetTester tester,
+    ) async {
+      final apiService = buildMockApiService(
+        visits: [
+          buildVisit({}),
+          buildVisit({
+            'id': 'visit-2',
+            'doctor_first_name': 'Maria',
+            'doctor_last_name': 'Santos',
+            'doctor_professional_photo_url': null,
+          }),
+        ],
+      );
+      await pumpPage(tester, apiService: apiService);
 
-        expect(tester.takeException(), isNull);
-        expect(find.text('Dr. Juan Dela Cruz'), findsOneWidget);
-        expect(find.text('Dr. Maria Santos'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      expect(find.text('Dr. Juan Dela Cruz'), findsOneWidget);
+      expect(find.text('Dr. Maria Santos'), findsOneWidget);
 
-        final images = tester
-            .widgetList<DoctorProfileImage>(find.byType(DoctorProfileImage))
-            .toList();
-        expect(images, hasLength(2));
-        expect(images[0].photoUrl, 'https://example.com/juan.png');
-        // Falls back to the default avatar when the doctor has no photo
-        expect(images[1].photoUrl, isNull);
-      },
-    );
+      final images = tester
+          .widgetList<DoctorProfileImage>(find.byType(DoctorProfileImage))
+          .toList();
+      expect(images, hasLength(2));
+      expect(images[0].photoUrl, 'https://example.com/juan.png');
+      // Falls back to the default avatar when the doctor has no photo
+      expect(images[1].photoUrl, isNull);
+    });
 
     testWidgets(
       'Prescriptions tab renders prescriptions (bigint medication_count)',
@@ -341,10 +410,7 @@ void main() {
 
       final navigatorKey = GlobalKey<NavigatorState>();
       await tester.pumpWidget(
-        MaterialApp(
-          navigatorKey: navigatorKey,
-          home: home,
-        ),
+        MaterialApp(navigatorKey: navigatorKey, home: home),
       );
       navigatorKey.currentState!.push(
         MaterialPageRoute(
@@ -357,9 +423,7 @@ void main() {
     testWidgets(
       'Medical Records page back button returns to the previous view',
       (WidgetTester tester) async {
-        final apiService = buildMockApiService(
-          visits: [buildVisit({})],
-        );
+        final apiService = buildMockApiService(visits: [buildVisit({})]);
         await pumpWithNavigator(
           tester,
           apiService: apiService,
@@ -394,7 +458,6 @@ void main() {
             builder: (_) => PrescriptionDetailPage(
               prescriptionId: 'prescription-1',
               apiService: apiService,
-              openUrl: (uri) async => true,
             ),
           ),
         );
@@ -409,73 +472,73 @@ void main() {
       },
     );
 
-    testWidgets(
-      'returning from a prescription keeps the tab and date filter',
-      (WidgetTester tester) async {
-        final recent = DateTime.now().subtract(const Duration(days: 2));
-        final recentIso = recent.toUtc().toIso8601String();
-        final apiService = buildMockApiService(
-          visits: [buildVisit({'visit_date': recentIso})],
-          prescriptions: [buildPrescription({'prescription_date': recentIso})],
-        );
-        await pumpWithNavigator(
-          tester,
-          apiService: apiService,
-          home: const Scaffold(body: Center(child: Text('Dummy Home'))),
-        );
+    testWidgets('returning from a prescription keeps the tab and date filter', (
+      WidgetTester tester,
+    ) async {
+      final recent = DateTime.now().subtract(const Duration(days: 2));
+      final recentIso = recent.toUtc().toIso8601String();
+      final apiService = buildMockApiService(
+        visits: [
+          buildVisit({'visit_date': recentIso}),
+        ],
+        prescriptions: [
+          buildPrescription({'prescription_date': recentIso}),
+        ],
+      );
+      await pumpWithNavigator(
+        tester,
+        apiService: apiService,
+        home: const Scaffold(body: Center(child: Text('Dummy Home'))),
+      );
 
-        expect(tester.takeException(), isNull);
+      expect(tester.takeException(), isNull);
 
-        // Switch to the Prescriptions tab
-        await tester.tap(find.text('Prescriptions'));
-        await tester.pumpAndSettle();
-        expect(find.text('2 medications'), findsOneWidget);
+      // Switch to the Prescriptions tab
+      await tester.tap(find.text('Prescriptions'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 medications'), findsOneWidget);
 
-        // Apply the Last 7 days filter
-        await tester.tap(find.byIcon(Icons.filter_list));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Last 7 days'));
-        await tester.pumpAndSettle();
-        expect(find.text('2 medications'), findsOneWidget);
+      // Apply the Last 7 days filter
+      await tester.tap(find.byIcon(Icons.filter_list));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Last 7 days'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 medications'), findsOneWidget);
 
-        // Open the prescription detail view
-        await tester.tap(find.text('2 medications'));
-        await tester.pumpAndSettle(const Duration(seconds: 2));
-        expect(find.text('Download PDF'), findsOneWidget);
+      // Open the prescription detail view
+      await tester.tap(find.text('2 medications'));
+      await tester.pumpAndSettle(const Duration(seconds: 2));
+      expect(find.text('Download PDF'), findsOneWidget);
 
-        // Go back - tab and filter must still be prescriptions + Last 7 days
-        await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
-        await tester.pumpAndSettle();
+      // Go back - tab and filter must still be prescriptions + Last 7 days
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
+      await tester.pumpAndSettle();
 
-        expect(find.text('Dummy Home'), findsNothing);
-        expect(find.text('2 medications'), findsOneWidget);
-        expect(find.text('Download PDF'), findsNothing);
-      },
-    );
+      expect(find.text('Dummy Home'), findsNothing);
+      expect(find.text('2 medications'), findsOneWidget);
+      expect(find.text('Download PDF'), findsNothing);
+    });
 
-    testWidgets(
-      'back button works on a desktop-sized window',
-      (WidgetTester tester) async {
-        tester.view.physicalSize = const Size(1920, 1080);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
+    testWidgets('back button works on a desktop-sized window', (
+      WidgetTester tester,
+    ) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
 
-        final apiService = buildMockApiService(
-          visits: [buildVisit({})],
-        );
-        await pumpWithNavigator(
-          tester,
-          apiService: apiService,
-          home: const Scaffold(body: Center(child: Text('Dummy Home'))),
-        );
+      final apiService = buildMockApiService(visits: [buildVisit({})]);
+      await pumpWithNavigator(
+        tester,
+        apiService: apiService,
+        home: const Scaffold(body: Center(child: Text('Dummy Home'))),
+      );
 
-        expect(tester.takeException(), isNull);
-        await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
-        await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
+      await tester.pumpAndSettle();
 
-        expect(find.text('Dummy Home'), findsOneWidget);
-      },
-    );
+      expect(find.text('Dummy Home'), findsOneWidget);
+    });
   });
 
   group('PrescriptionDetailPage PDF download', () {
@@ -488,7 +551,7 @@ void main() {
     Future<void> pumpDetailPage(
       WidgetTester tester, {
       required ApiService apiService,
-      Future<bool> Function(Uri)? openUrl,
+      Future<SavedFile> Function(List<int>, String)? savePdf,
     }) async {
       await apiService.init();
 
@@ -497,7 +560,7 @@ void main() {
           home: PrescriptionDetailPage(
             prescriptionId: 'prescription-1',
             apiService: apiService,
-            openUrl: openUrl,
+            savePdf: savePdf,
           ),
         ),
       );
@@ -505,68 +568,221 @@ void main() {
     }
 
     testWidgets(
-      'opens the signed PDF url in an external application',
+      'saves the authenticated PDF download with a prescription filename',
       (WidgetTester tester) async {
         final apiService = buildMockPdfApiService();
-        Uri? openedUri;
+        String? savedFileName;
+        List<int>? savedBytes;
         await pumpDetailPage(
           tester,
           apiService: apiService,
-          openUrl: (uri) async {
-            openedUri = uri;
-            return true;
+          savePdf: (bytes, fileName) async {
+            savedBytes = bytes;
+            savedFileName = fileName;
+            return const SavedFile(
+              path: 'Downloads/FLORES_Beavz_RX-20261020-ABCDEF12.pdf',
+              displayLocation: 'Downloads',
+            );
           },
         );
 
         expect(tester.takeException(), isNull);
         expect(find.text('Download PDF'), findsOneWidget);
 
+        await tester.ensureVisible(find.text('Download PDF'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Download PDF'));
         await tester.pumpAndSettle();
 
         expect(tester.takeException(), isNull);
+        expect(savedFileName, 'FLORES_Beavz_RX-20261020-ABCDEF12.pdf');
+        expect(savedBytes, utf8.encode('%PDF-1.7 prescription'));
         expect(
-          openedUri?.toString(),
-          'https://example.supabase.co/storage/v1/object/sign/prescriptions/p.pdf?token=abc',
+          find.textContaining('Prescription saved to Downloads'),
+          findsOneWidget,
         );
-        expect(find.text('Could not open PDF'), findsNothing);
       },
     );
 
     testWidgets(
-      'shows a retryable error when the PDF cannot be opened',
+      'renders the professional prescription layout with all detail sections',
       (WidgetTester tester) async {
-        final apiService = buildMockPdfApiService();
-        await pumpDetailPage(
-          tester,
-          apiService: apiService,
-          openUrl: (uri) async => false,
+        final longInstructions =
+            'Take with food. '
+            'Continue until the full course is finished.';
+        final apiService = buildMockPdfApiService(
+          detail: {
+            'prescription_number': 'RX-20261020-ABCD1234',
+            'patient_first_name': 'Maria',
+            'patient_middle_name': 'Santos',
+            'patient_last_name': 'Cruz',
+            'date_of_birth': '1990-05-14T00:00:00.000Z',
+            'sex': 'FEMALE',
+            'doctor_middle_name': 'Reyes',
+            'doctor_specialty': 'Internal Medicine',
+            'doctor_credentials': 'MD',
+            'prc_license_number': 'PRC-7654321',
+            'doctor_professional_photo_url': null,
+            'practice_name': 'Riverside Clinic',
+            'practice_address': '12 Mabini St.',
+            'practice_phone': '0281234567',
+            'room_number': '204',
+            'visit_date': '2026-10-20T00:00:00.000Z',
+            'reason_for_visit': 'Persistent cough',
+            'diagnosis': 'Acute bronchitis',
+            'notes': 'Drink plenty of fluids.',
+            'replaces_prescription_number': 'RX-20261010-9999AAAA',
+            'items': [
+              {
+                'id': 'item-1',
+                'medication_name': 'Amoxicillin',
+                'dosage': '500mg',
+                'frequency': '3x daily',
+                'duration': '7 days',
+                'quantity': 21,
+                'instructions': 'After meals',
+              },
+              {
+                'id': 'item-2',
+                'medication_name': 'Paracetamol',
+                'dosage': '500mg',
+                'frequency': 'Every 6 hours',
+                'duration': '3 days',
+                'quantity': 12,
+                'instructions': longInstructions,
+              },
+            ],
+          },
         );
+        await pumpDetailPage(tester, apiService: apiService);
 
-        await tester.tap(find.text('Download PDF'));
-        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
 
-        expect(find.text('Could not open PDF'), findsOneWidget);
-        // The button stays available so the user can retry
+        // Doctor and clinic identity
+        expect(find.text('Dr. Juan Reyes Dela Cruz'), findsOneWidget);
+        expect(find.text('Internal Medicine'), findsOneWidget);
+        expect(find.text('MD'), findsOneWidget);
+        expect(find.text('PRC License No.: PRC-7654321'), findsOneWidget);
+        expect(find.text('CLINIC INFORMATION'), findsOneWidget);
+        expect(find.text('Riverside Clinic · Room 204'), findsOneWidget);
+        expect(find.text('12 Mabini St.'), findsOneWidget);
+        expect(find.text('Contact: 0281234567'), findsOneWidget);
+
+        // Prescription identity
+        expect(find.text('RX-20261020-ABCD1234'), findsOneWidget);
+        expect(find.text('Issue date'), findsOneWidget);
+
+        // Patient and consultation
+        expect(find.text('Patient Information'), findsOneWidget);
+        expect(find.text('Maria Santos Cruz'), findsOneWidget);
+        expect(find.text('Female'), findsOneWidget);
+        expect(find.text('Consultation'), findsOneWidget);
+        expect(find.text('Persistent cough'), findsOneWidget);
+        expect(find.text('Acute bronchitis'), findsOneWidget);
+
+        // Medications, quantities, and long instructions
+        expect(find.text('Amoxicillin'), findsOneWidget);
+        expect(find.text('Paracetamol'), findsOneWidget);
+        expect(find.text('Quantity:'), findsNWidgets(2));
+        expect(find.text('21'), findsOneWidget);
+        expect(find.text('12'), findsOneWidget);
+        expect(find.text(longInstructions), findsOneWidget);
+
+        // Notes and replacement reference
+        expect(find.text('Doctor\'s Notes'), findsOneWidget);
+        expect(find.text('Drink plenty of fluids.'), findsOneWidget);
+        expect(find.text('Replacement prescription'), findsOneWidget);
+        expect(find.text('Replaces RX-20261010-9999AAAA.'), findsOneWidget);
+
         expect(find.text('Download PDF'), findsOneWidget);
       },
     );
 
-    testWidgets(
-      'shows an error when the PDF url cannot be generated',
-      (WidgetTester tester) async {
-        final apiService = buildMockPdfApiService(pdfUrlFails: true);
-        await pumpDetailPage(
-          tester,
-          apiService: apiService,
-          openUrl: (uri) async => true,
+    testWidgets('shows an error when the PDF cannot be downloaded', (
+      WidgetTester tester,
+    ) async {
+      final apiService = buildMockPdfApiService(pdfDownloadFails: true);
+      await pumpDetailPage(tester, apiService: apiService);
+
+      await tester.ensureVisible(find.text('Download PDF'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Download PDF'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Failed to download PDF'), findsOneWidget);
+    });
+  });
+
+  group('Prescription PDF filename contract', () {
+    Uri? requestedUri;
+
+    ApiService buildDownloadApi(String? fileName) {
+      final client = MockClient((request) async {
+        requestedUri = request.url;
+        final headers = <String, String>{'content-type': 'application/pdf'};
+        if (fileName != null) {
+          headers['content-disposition'] = 'attachment; filename="$fileName"';
+        }
+        return http.Response.bytes(
+          utf8.encode('%PDF-1.7 prescription'),
+          200,
+          headers: headers,
         );
+      });
+      return ApiService.createWithClient(client);
+    }
 
-        await tester.tap(find.text('Download PDF'));
-        await tester.pumpAndSettle();
+    setUp(() {
+      SharedPreferences.setMockInitialValues({
+        'access_token': 'test-access-token-12345',
+      });
+      requestedUri = null;
+    });
 
-        expect(find.text('Failed to load PDF'), findsOneWidget);
-      },
-    );
+    test('saves the server-provided clinic filename without a sharing query', () async {
+      final api = buildDownloadApi('FLORES_Beavz_RX-20261020-ABCDEF12.pdf');
+      await api.init();
+
+      final download = await api.downloadPrescriptionPdf('prescription-1');
+
+      expect(download.fileName, 'FLORES_Beavz_RX-20261020-ABCDEF12.pdf');
+      expect(requestedUri!.queryParameters, isEmpty);
+    });
+
+    test('accepts replacement and superseded names', () async {
+      final replacementApi = buildDownloadApi(
+        'FLORES_Beavz_RX-20261020-ABCDEF12_replaces-41A6B551.pdf',
+      );
+      await replacementApi.init();
+      expect(
+        (await replacementApi.downloadPrescriptionPdf('prescription-1')).fileName,
+        'FLORES_Beavz_RX-20261020-ABCDEF12_replaces-41A6B551.pdf',
+      );
+
+      final supersededApi = buildDownloadApi(
+        'FLORES_Beavz_RX-20261020-41A6B551_SUPERSEDED.pdf',
+      );
+      await supersededApi.init();
+      expect(
+        (await supersededApi.downloadPrescriptionPdf('prescription-1')).fileName,
+        'FLORES_Beavz_RX-20261020-41A6B551_SUPERSEDED.pdf',
+      );
+    });
+
+    test('rejects a missing or legacy-format server filename', () async {
+      final missingApi = buildDownloadApi(null);
+      await missingApi.init();
+      await expectLater(
+        missingApi.downloadPrescriptionPdf('prescription-1'),
+        throwsFormatException,
+      );
+
+      final legacyApi = buildDownloadApi('RX-abc123.pdf');
+      await legacyApi.init();
+      await expectLater(
+        legacyApi.downloadPrescriptionPdf('prescription-1'),
+        throwsFormatException,
+      );
+    });
   });
 }
