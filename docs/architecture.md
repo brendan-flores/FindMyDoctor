@@ -264,6 +264,26 @@ web/
 
 The web application uses Next.js 14 with App Router, TypeScript, and Tailwind CSS.
 
+### UI/UX Consistency
+
+The Doctor portal serves as the visual reference for the entire web application. All authenticated pages within the Secretary and Admin portals follow the same design tokens and component patterns as the Doctor portal:
+
+- **Layout:** Sidebar width (w-64), header height (h-16), nav item styling, active states
+- **Surfaces:** Card border radius (rounded-2xl), card shadows (shadow-md), border colors (border-slate-100)
+- **Typography:** Heading hierarchy (text-xl font-bold text-slate-800 for section titles), label/body sizes
+- **Icons:** Material Symbols icon set, 20px/28px sizing, gradient backgrounds for metric cards
+- **Components:** Tables, status badges, buttons, forms, filters consistent across portals
+
+**Header Dropdowns:**
+- Doctor, Admin, and Secretary portals use header dropdowns for account actions (Profile, Settings, Sign Out)
+- Dropdowns open on click of the avatar/name, close on outside click, and remain accessible on narrow viewports
+- Profile and Settings have been removed from sidebar nav items to eliminate duplication
+- Sign Out has been removed from sidebar bottom sections (now only in header dropdown)
+
+**Admin Users Navigation:**
+- The Users nav item in the Admin sidebar is visible for regular ADMIN users (not just SUPERADMIN)
+- Backend endpoint `GET /api/v1/admin/users` authorizes both ADMIN and SUPERADMIN roles
+
 ## Web Authentication and Routing
 
 ### Route Structure
