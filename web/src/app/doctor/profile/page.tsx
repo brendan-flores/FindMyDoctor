@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
 import { doctorApi, DoctorProfile, UpdateProfileRequest } from '@/lib/api/doctorApi';
+import { validateSignatureFile, shouldRefreshSignaturePreview } from '@/lib/doctorSignature';
 import { CEBU_FACILITIES } from '@/data/cebuFacilities';
 import { MEDICAL_SPECIALTIES } from '@/data/medicalSpecialties';
 import { MEDICAL_CREDENTIALS } from '@/data/medicalCredentials';
@@ -42,6 +43,47 @@ export default function DoctorProfilePage() {
   const [editForm, setEditForm] = useState<UpdateProfileRequest & { email?: string }>({});
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+  // Signature management state
+  const [hasSignature, setHasSignature] = useState(false);
+  const [signaturePreviewUrl, setSignaturePreviewUrl] = useState<string | null>(null);
+  const [isLoadingSignature, setIsLoadingSignature] = useState(false);
+  const [isUploadingSignature, setIsUploadingSignature] = useState(false);
+  const [isDeletingSignature, setIsDeletingSignature] = useState(false);
+  const signatureRetryRef = useRef(false);
+
+  const loadSignaturePreview = useCallback(async () => {
+    setIsLoadingSignature(true);
+    try {
+      const response = await doctorApi.getSignatureUrl();
+      if (response.success && response.data?.signedUrl) {
+        setSignaturePreviewUrl(response.data.signedUrl);
+        setHasSignature(true);
+        signatureRetryRef.current = false;
+      } else {
+        // 404 means the doctor has not uploaded a signature yet.
+        if (response.httpStatus === 404) {
+          setSignaturePreviewUrl(null);
+          setHasSignature(false);
+        } else {
+          setSignaturePreviewUrl(null);
+          setError(response.error || 'Failed to load your signature preview.');
+        }
+      }
+    } catch (signatureError) {
+      console.error('Load signature preview error:', signatureError);
+      setSignaturePreviewUrl(null);
+    } finally {
+      setIsLoadingSignature(false);
+    }
+  }, []);
+
+  const handleSignatureImageError = () => {
+    if (shouldRefreshSignaturePreview(hasSignature, signatureRetryRef.current)) {
+      signatureRetryRef.current = true;
+      void loadSignaturePreview();
+    }
+  };
 
   // Dropdown options
   const specialtyOptions = MEDICAL_SPECIALTIES.map((specialty) => ({
@@ -107,6 +149,12 @@ export default function DoctorProfilePage() {
                 : `${apiOrigin}${response.data.professional_photo_url}`
             );
           }
+          if (response.data.has_signature) {
+            setHasSignature(true);
+          }
+          // Always ask for a fresh short-lived preview URL; the endpoint
+          // returns 404 when no signature is stored.
+          void loadSignaturePreview();
         } else {
           setError(response.error || 'Failed to load your profile.');
         }
@@ -116,7 +164,7 @@ export default function DoctorProfilePage() {
         setError('An error occurred while loading your profile.');
       })
       .finally(() => setIsLoading(false));
-  }, [router]);
+  }, [router, loadSignaturePreview]);
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -237,6 +285,72 @@ export default function DoctorProfilePage() {
       setError('An error occurred while uploading your photo');
     } finally {
       setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Allow selecting the same file again after a failed attempt.
+    e.target.value = '';
+    if (!file) return;
+
+    const validation = validateSignatureFile(file);
+    if (!validation.valid) {
+      setError(validation.error || 'Invalid signature file');
+      setSuccessMessage('');
+      return;
+    }
+
+    setIsUploadingSignature(true);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const wasExisting = hasSignature;
+      const response = await doctorApi.uploadSignature(file);
+      if (response.success) {
+        setHasSignature(true);
+        await loadSignaturePreview();
+        setSuccessMessage(wasExisting ? 'Signature replaced successfully' : 'Signature uploaded successfully');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setError(response.error || 'Failed to upload your signature. Please try again.');
+      }
+    } catch (uploadError) {
+      console.error('Signature upload error:', uploadError);
+      setError('An error occurred while uploading your signature.');
+    } finally {
+      setIsUploadingSignature(false);
+    }
+  };
+
+  const handleSignatureDelete = async () => {
+    if (!hasSignature) return;
+    const confirmed = window.confirm(
+      'Remove your signature? New prescription PDFs will show a blank Physician\'s Signature line until you upload a new one.'
+    );
+    if (!confirmed) return;
+
+    setIsDeletingSignature(true);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const response = await doctorApi.deleteSignature();
+      if (response.success) {
+        setHasSignature(false);
+        setSignaturePreviewUrl(null);
+        signatureRetryRef.current = false;
+        setSuccessMessage('Signature deleted successfully');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setError(response.error || 'Failed to delete your signature. Please try again.');
+      }
+    } catch (deleteError) {
+      console.error('Signature deletion error:', deleteError);
+      setError('An error occurred while deleting your signature.');
+    } finally {
+      setIsDeletingSignature(false);
     }
   };
 
@@ -533,6 +647,97 @@ export default function DoctorProfilePage() {
             {profile.biography || 'Not provided'}
           </p>
         )}
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center">
+            <span className="material-symbols-outlined text-blue-600 text-[20px]">draw</span>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Signature</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Your signature is printed on prescription PDFs. Upload a PNG image of your actual signature (maximum 4MB).
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+          {isUploadingSignature || isDeletingSignature ? (
+            <div className="flex h-28 items-center justify-center gap-3 text-sm font-medium text-slate-600">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+              {isUploadingSignature ? 'Uploading signature...' : 'Removing signature...'}
+            </div>
+          ) : signaturePreviewUrl ? (
+            <div className="flex h-28 items-center justify-center rounded-lg bg-white p-3">
+              {/* Signed URL from the backend; the private storage path is never exposed. */}
+              <img
+                src={signaturePreviewUrl}
+                alt="Your uploaded signature preview"
+                className="max-h-24 max-w-full object-contain"
+                onError={handleSignatureImageError}
+              />
+            </div>
+          ) : isLoadingSignature ? (
+            <div className="flex h-28 items-center justify-center gap-3 text-sm font-medium text-slate-600">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+              Loading signature preview...
+            </div>
+          ) : (
+            <div className="flex h-28 flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white px-4 text-center">
+              <span className="material-symbols-outlined text-slate-400 text-[28px]">signature</span>
+              <p className="mt-1 text-sm font-medium text-slate-600">No signature uploaded</p>
+              <p className="text-xs text-slate-500">
+                Prescription PDFs will show a blank &quot;Physician&apos;s Signature&quot; line.
+              </p>
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <label
+              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all ${
+                isUploadingSignature || isDeletingSignature
+                  ? 'cursor-not-allowed bg-slate-400'
+                  : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">upload</span>
+              {isUploadingSignature ? 'Uploading...' : hasSignature ? 'Replace signature' : 'Upload signature'}
+              <input
+                type="file"
+                accept="image/png"
+                onChange={handleSignatureUpload}
+                disabled={isUploadingSignature || isDeletingSignature}
+                className="hidden"
+              />
+            </label>
+
+            {hasSignature && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void loadSignaturePreview()}
+                  disabled={isLoadingSignature || isUploadingSignature || isDeletingSignature}
+                  className="rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-all hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Refresh preview
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSignatureDelete}
+                  disabled={isDeletingSignature || isUploadingSignature}
+                  className="rounded-xl border-2 border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 transition-all hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Delete signature
+                </button>
+              </>
+            )}
+          </div>
+
+          <p className="mt-3 text-xs text-slate-500">
+            PNG only, up to 4MB. Signatures are stored privately and shown through short-lived secure links.
+          </p>
+        </div>
       </section>
 
       {isEditing && (
