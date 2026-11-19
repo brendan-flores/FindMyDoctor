@@ -96,6 +96,7 @@ export const config = {
     gcashStorageBucket: process.env.SUPABASE_GCASH_BUCKET || 'gcash-qr-codes',
     receiptStorageBucket: process.env.SUPABASE_RECEIPT_BUCKET || 'payment-receipts',
     prescriptionStorageBucket: process.env.SUPABASE_PRESCRIPTION_BUCKET || 'prescription-pdfs',
+    signatureStorageBucket: process.env.SUPABASE_SIGNATURE_BUCKET || 'doctor-signatures',
   },
 
   // Push notifications (FCM / APNs credentials remain backend-only)

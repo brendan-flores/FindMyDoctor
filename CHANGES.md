@@ -1,5 +1,20 @@
 # Changes
 
+## Prescription PDF filename unification (2026-11-19)
+
+**Scope:** Prescription PDF export filenames across the backend, doctor web pages, and mobile patient app. No prescription content, PDF layout, role, or schema change.
+
+**Status:** Implemented and tested. **Not committed or pushed.**
+
+### Changes
+
+- New `backend/src/services/prescriptionFileName.ts` is the single naming authority. It builds `SURNAME_Firstname_RX-YYYYMMDD-XXXXXXXX.pdf` from the issued prescription number and patient name.
+- Names fold diacritics (ñ to n), remove apostrophes, turn spaces/separators into hyphens, uppercase the surname, title-case the first name, and keep only letters, digits, hyphens, and the `_` separators. A missing or invalid surname/first name falls back to `RX-YYYYMMDD-XXXXXXXX.pdf`.
+- Replacements append `_replaces-<original 8-character number>`; the replaced prescription appends `_SUPERSEDED`. The earlier stored PDF remains in storage.
+- `GET /api/v1/prescriptions/:id/download` uses the function for `Content-Disposition`; the PDF document Title metadata uses the same value for print-to-PDF.
+- The "Download for sharing" actions and the `purpose=sharing` RX-only filename were removed. The web client and mobile app save the server-provided filename verbatim and reject missing or non-conforming names; they never construct a filename.
+- Updated backend, web, and mobile tests with multi-part names, ñ/apostrophes, missing names, replacement, and superseded cases. Updated `docs/prd.md`, `docs/architecture.md`, `docs/architecture-essentials.md`, `SYSTEM_STATE.md`, and `docs/SYSTEM_STATE.md`.
+
 ## Dashboard 429 elimination: rate limits, read caching, and query batching (2026-10-24)
 
 **Scope:** Web Doctor/Secretary/Admin dashboard navigation, backend rate limiting, availability reads, and dashboard/payment query patterns. No API contract, schema, role, or authorization change.

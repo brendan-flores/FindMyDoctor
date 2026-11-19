@@ -7,7 +7,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/api_constants.dart';
 
+class DownloadedPdf {
+  final List<int> bytes;
+  final String fileName;
+
+  const DownloadedPdf({required this.bytes, required this.fileName});
+}
+
 class ApiService {
+  /// Same contract as the backend naming function and the web client:
+  /// `SURNAME_Firstname_RX-YYYYMMDD-XXXXXXXX.pdf`, optional `_replaces-...`
+  /// and `_SUPERSEDED` markers, or the name-free RX fallback.
+  static final RegExp _prescriptionFileNamePattern = RegExp(
+    r'^(?:[A-Z0-9-]+_[A-Za-z0-9][A-Za-z0-9-]*_RX-\d{8}-[A-Z0-9]+(?:_replaces-[A-Z0-9]+)?(?:_SUPERSEDED)?|RX-\d{8}-[A-Z0-9]+)\.pdf$',
+  );
+
   final String baseUrl = ApiConstants.baseUrl;
   String? _accessToken;
   http.Client? _httpClient;
@@ -578,6 +592,54 @@ class ApiService {
   // Get prescription PDF URL
   Future<Map<String, dynamic>> getPrescriptionPdfUrl(String id) async {
     return await get('/prescriptions/$id/pdf-url', requireAuth: true);
+  }
+
+  /// The backend generates the filename and returns it in
+  /// `Content-Disposition`. The app saves that exact name; it never builds a
+  /// prescription filename of its own.
+  Future<DownloadedPdf> downloadPrescriptionPdf(String id) async {
+    final client = _httpClient ?? http.Client();
+    final uri = Uri.parse('$baseUrl/prescriptions/$id/download');
+    final response = await client.get(
+      uri,
+      headers: _getHeaders(requireAuth: true),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final disposition = response.headers['content-disposition'] ?? '';
+      final fileName = RegExp(
+        r'filename="?([^";]+)"?',
+        caseSensitive: false,
+      ).firstMatch(disposition)?.group(1);
+      if (fileName == null || fileName.isEmpty) {
+        throw FormatException(
+          'The server did not provide a prescription PDF filename',
+        );
+      }
+      if (!_prescriptionFileNamePattern.hasMatch(fileName)) {
+        throw FormatException(
+          'The server provided an invalid prescription PDF filename',
+        );
+      }
+      return DownloadedPdf(bytes: response.bodyBytes, fileName: fileName);
+    }
+
+    try {
+      final body = jsonDecode(response.body);
+      throw ApiException(
+        message:
+            body['error']?['message'] ?? 'Failed to download prescription PDF',
+        code: body['error']?['code'] ?? 'DOWNLOAD_ERROR',
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(
+        message: 'Failed to download prescription PDF',
+        code: 'DOWNLOAD_ERROR',
+        statusCode: response.statusCode,
+      );
+    }
   }
 
   // ===========================

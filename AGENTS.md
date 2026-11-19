@@ -1,51 +1,26 @@
-Single Source of Truth: Never invent requirements, roles, or database schemas. Always read /docs/prd.md, /docs/architecture.md, and /docs/architecture-essentials.md before executing a task.
+# AGENTS.md
 
-Strict Architecture Enforcement: The Flutter mobile application in /mobile must NEVER connect directly to PostgreSQL. All database interactions must occur through the Node.js API in /backend.
+## Core rules
+- Source of truth: never invent requirements, roles, or database schemas. Before a task, read /docs/architecture-essentials.md. Read only the relevant sections of /docs/prd.md and /docs/architecture.md for the feature you are touching (search by heading; do not load whole files). Use /docs/INDEX.md to find them if it exists.
+- Architecture: the Flutter app (/mobile) never connects to PostgreSQL. All data access goes through the Node.js API (/backend). Use the documented modular monolith + PostgreSQL only; no Kafka, GraphQL, microservices, or other over-engineered frameworks.
+- Communication: no direct patient-to-doctor chat. Messaging is only Patient <-> Secretary or Patient <-> AI Chatbot.
+- Security: AI provider API keys and database URLs stay on the backend and are never exposed to mobile.
+- Access control: before modifying a module, check the current implementation so you do not bypass role-based access (Patient, Doctor, Secretary, Clinic Staff, Admin).
 
-Hard Communication Boundary: The system must never provide direct patient-to-doctor chat. Any messaging feature you build must strictly adhere to Patient ↔ Secretary or Patient ↔ AI Chatbot boundaries.
+## Database
+- For any new or changed SQL in /backend/database, run the migration immediately (npm scripts in backend/package.json or direct SQL). Do not commit schema files you have not executed.
+- Also mirror the final state into backend/database/consolidated_schema.sql in the same task. Full rules: /docs/db-rules.md (read it whenever you touch SQL).
+- Never edit an already-applied migration; create a new one. If a change cannot be mirrored cleanly (conflicts, ambiguous ordering, destructive changes), stop and ask.
+- In the final summary, list the migration files added and where they were mirrored.
 
-Security & AI Credentials: AI provider API keys must remain safely on the backend. Never expose these keys or database URLs to the mobile application.
+## Documentation
+- When a change adds, modifies, replaces, or removes a requirement, workflow, business rule, role permission, or architecture decision, update the relevant /docs files in the same task and make sure no outdated or conflicting text remains.
+- Keep SYSTEM_STATE.md in sync with the actual implementation (auth, registration, OTP, doctor approval, database structure, API endpoints, behavior, architecture). Do not duplicate its details here.
 
-No Speculative Dependencies: Do not introduce Kafka, GraphQL, microservices, or any over-engineered frameworks. Stick to the documented Modular Monolith Backend and PostgreSQL setup.
+## Versioning
+- Read /docs/CURRENT_VERSION.md before changes (format 00.00). Rules: /docs/VERSION.md. History: /docs/VERSION_HISTORY.md.
+- Do not change version files without user approval. If a bump seems warranted (new business rules or workflows, breaking changes, API/schema/auth/architecture changes), say so in the final summary and ask.
 
-Verify Before Changing: Before modifying existing modules, analyze the current implementation to ensure you do not accidentally bypass the established role-based access controls (Patient, Doctor, Secretary, Clinic Staff, Admin).
-
-Database Migration Execution: When adding new database schema changes (SQL migration files in /backend/database), immediately run the migration to apply the changes to the database. Do not commit new schema files without executing them. This ensures the database is always in sync with the codebase and prevents other team members from encountering schema mismatch errors. Use the appropriate npm scripts in backend/package.json (e.g., npm run migrate:patient-required-fields) or direct SQL execution to apply migrations.
-
-Database migrations and the consolidated schema: Whenever you create or change any migration or .sql file in backend\database\ (schema changes, new tables, columns, indexes, constraints, functions, triggers, views, RLS/policies, or required seed or reference data), you must ALSO apply the same change to backend\database\consolidated_schema.sql in the same task. Never leave the two out of sync. Keep the new migration file as its own file too (for incremental deployments). The consolidated file is an addition, not a replacement. The consolidated file must stay runnable on a fresh, empty database from top to bottom: keep statements in dependency order (tables before foreign keys, functions before triggers that use them, etc.); prefer the final state of each object. If a later change alters or drops something, merge it into the object's definition rather than leaving a CREATE followed by a chain of ALTERs, unless ordering requires it. Do not duplicate objects that already exist in the file. Make statements idempotent where the SQL dialect allows (IF NOT EXISTS, CREATE OR REPLACE, etc.), consistent with the file's current style. Include only schema and required reference data. Exclude test, demo, and one-off data-fix statements unless they are needed for a fresh deployment, and flag them to me if unsure. Add a short comment above each added section naming its source migration file, so changes can be traced. Update the "Includes all migrations through:" line in the file's header comment every time a migration is mirrored into it. The file name is consolidated_schema.sql and must not be given a numeric prefix. It is not a migration, so never number it and never run it as one. Never edit an already-applied migration file to change history. Make a new migration, and mirror its end result into the consolidated file. Before finishing any task that touched SQL, verify that the consolidated file contains the change, and mention in your final summary which migration file(s) were added and where they were mirrored. If a change can't be mirrored cleanly (conflicts, ambiguous ordering, destructive changes), stop and ask me instead of guessing.
-
-Documentation Synchronization: When a user-requested feature change adds, modifies, replaces, or removes a documented requirement, workflow, business rule, role permission, or architecture decision, update the relevant files in `/docs/prd.md`, `/docs/architecture.md`, and/or `/docs/architecture-essentials.md` as part of the same task. The codebase and documentation must remain consistent. Before completing the task, verify that no outdated or conflicting documentation remains.
-
-System State Synchronization: `SYSTEM_STATE.md` is the dedicated document for the project's current system state. When making changes that affect the documented system state, update `SYSTEM_STATE.md` in the same task. This includes changes to authentication, registration, OTP verification, doctor approval workflows, database structures, API endpoints, application behavior, or architecture. Do not duplicate the detailed system-state information in `AGENTS.md`; keep it in `SYSTEM_STATE.md`. Always keep `SYSTEM_STATE.md` synchronized with the actual implementation.
-
-Git Operations: Do not automatically commit and push changes. Git commits should only be made when explicitly requested by the user or as part of a clearly defined task. Always ask for confirmation before committing or pushing changes.
-
-Application Version Management: Always read `/docs/CURRENT_VERSION.md` before making changes. This file contains only the current system version number (e.g., `01.00`) and is the authoritative source for the current version. `/docs/VERSION.md` contains the versioning rules. `/docs/VERSION_HISTORY.md` contains the complete version history. Use the `00.00` version format.
-
-**Version Update Process:**
-1. After implementing changes, evaluate the overall scope and impact to determine whether a version update is warranted
-2. If an update is warranted, automatically apply the version update without user permission
-3. Update the version files in this order:
-   - Rewrite the version number in `/docs/CURRENT_VERSION.md` with the new version
-   - Add a new version entry to `/docs/VERSION_HISTORY.md` with detailed changes
-   - Ensure CURRENT_VERSION.md and the latest entry in VERSION_HISTORY.md match
-4. If no update is warranted, leave both files unchanged
-
-**Mandatory Version Update Criteria:**
-- New business rules or workflows
-- Breaking changes to existing functionality
-- API endpoint changes that affect clients
-- Database schema changes
-- Authentication/authorization flow changes
-- Architectural restructuring
-
-**Discretionary Version Update Criteria:**
-- Bug fixes and patches
-- UI/UX improvements
-- Performance optimizations
-- Documentation updates
-- Non-breaking API additions
-
-Maintain one system-wide version covering the web application, mobile application, and backend API. Do not change the version files without user approval.
-
-Code Cleanup: When creating temporary files for testing or debugging (e.g., .js test files, scratch scripts, temporary config files), remove them immediately after the issue is resolved or the feature is complete. Do not commit temporary test files to the repository. Keep the codebase clean and free of debugging artifacts.
+## Git and cleanup
+- Never commit or push without explicit user confirmation.
+- Delete temporary test/debug files when done; never commit them.

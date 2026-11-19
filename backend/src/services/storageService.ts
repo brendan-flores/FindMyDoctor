@@ -35,6 +35,15 @@ const STORAGE_BUCKET = config.supabase.storageBucket || 'doctor-photos';
 const GCASH_STORAGE_BUCKET = config.supabase.gcashStorageBucket || 'gcash-qr-codes';
 const RECEIPT_STORAGE_BUCKET = config.supabase.receiptStorageBucket || 'payment-receipts';
 const PRESCRIPTION_STORAGE_BUCKET = config.supabase.prescriptionStorageBucket || 'prescription-pdfs';
+const SIGNATURE_STORAGE_BUCKET = config.supabase.signatureStorageBucket || 'doctor-signatures';
+
+/**
+ * Doctor signatures live in a PRIVATE bucket. Previews use short-lived signed
+ * URLs (5 minutes) so a profile page can render the image without exposing the
+ * object path or a public URL. Prescription PDFs embed the object directly and
+ * never use this URL.
+ */
+export const SIGNATURE_PREVIEW_URL_EXPIRY_SECONDS = 300;
 
 /**
  * Upload a doctor professional photo to Supabase Storage
@@ -623,6 +632,208 @@ export async function generateSignedReceiptUrl(
 }
 
 /**
+ * Upload a doctor signature image to the PRIVATE doctor-signatures bucket.
+ *
+ * The returned `path` is the object path to persist in `doctors.signature_url`.
+ * No public URL is ever produced for this bucket.
+ */
+export async function uploadDoctorSignature(
+  fileBuffer: Buffer,
+  fileName: string,
+  mimeType: string
+): Promise<{ success: boolean; path?: string; error?: string }> {
+  try {
+    if (!supabaseAdmin) {
+      return {
+        success: false,
+        error: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to backend/.env.'
+      };
+    }
+
+    console.log(`Uploading doctor signature to Supabase Storage: ${fileName}`);
+
+    const { error } = await supabaseAdmin.storage
+      .from(SIGNATURE_STORAGE_BUCKET)
+      .upload(fileName, fileBuffer, {
+        contentType: mimeType,
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Supabase Storage signature upload error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to upload signature to storage'
+      };
+    }
+
+    console.log(`Doctor signature uploaded successfully: ${fileName}`);
+    return { success: true, path: fileName };
+  } catch (err: any) {
+    console.error('Error uploading doctor signature:', err);
+    return {
+      success: false,
+      error: err.message || 'Signature upload failed'
+    };
+  }
+}
+
+/**
+ * Delete a doctor signature object from the PRIVATE doctor-signatures bucket.
+ *
+ * The value must be the stored object path, never a public/legacy URL. Missing
+ * objects are treated as already deleted so cleanup is idempotent.
+ */
+export async function deleteDoctorSignature(
+  filePath: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!filePath) {
+      return { success: true };
+    }
+
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      console.error('Refusing to delete doctor signature: value is a URL, not a private object path');
+      return {
+        success: false,
+        error: 'Signature path is invalid. Only private storage object paths can be deleted.'
+      };
+    }
+
+    if (!supabaseAdmin) {
+      return {
+        success: false,
+        error: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to backend/.env.'
+      };
+    }
+
+    console.log(`Deleting doctor signature from Supabase Storage: ${filePath}`);
+
+    const { error } = await supabaseAdmin.storage
+      .from(SIGNATURE_STORAGE_BUCKET)
+      .remove([filePath]);
+
+    if (error) {
+      console.error('Supabase Storage signature delete error:', error);
+      if (error.message?.includes('not found') || error.message?.includes('No such file')) {
+        console.log('Signature file not found in storage (may have been already deleted)');
+        return { success: true };
+      }
+      return {
+        success: false,
+        error: error.message || 'Failed to delete signature from storage'
+      };
+    }
+
+    console.log(`Doctor signature deleted successfully: ${filePath}`);
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error deleting doctor signature:', err);
+    return {
+      success: false,
+      error: err.message || 'Signature deletion failed'
+    };
+  }
+}
+
+/**
+ * Download a doctor signature object from the PRIVATE bucket for PDF rendering.
+ * Returns the raw image bytes; callers must never forward this data to clients.
+ */
+export async function downloadDoctorSignature(
+  filePath: string
+): Promise<{ success: boolean; buffer?: Buffer; error?: string }> {
+  try {
+    if (!filePath) {
+      return { success: false, error: 'Signature path is missing' };
+    }
+
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      return { success: false, error: 'Signature path is invalid: expected a private storage object path' };
+    }
+
+    if (!supabaseAdmin) {
+      return {
+        success: false,
+        error: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to backend/.env.'
+      };
+    }
+
+    console.log(`Downloading doctor signature from Supabase Storage: ${filePath}`);
+
+    const { data, error } = await supabaseAdmin.storage
+      .from(SIGNATURE_STORAGE_BUCKET)
+      .download(filePath);
+
+    if (error || !data) {
+      console.error('Supabase Storage signature download error:', error);
+      return {
+        success: false,
+        error: error?.message || 'Failed to download signature from storage'
+      };
+    }
+
+    const arrayBuffer = await data.arrayBuffer();
+    return { success: true, buffer: Buffer.from(arrayBuffer) };
+  } catch (err: any) {
+    console.error('Error downloading doctor signature:', err);
+    return {
+      success: false,
+      error: err.message || 'Signature download failed'
+    };
+  }
+}
+
+/**
+ * Generate a short-lived signed URL for a doctor signature preview.
+ * The private object path never leaves the backend.
+ */
+export async function generateSignedDoctorSignatureUrl(
+  filePath: string,
+  expiresIn: number = SIGNATURE_PREVIEW_URL_EXPIRY_SECONDS
+): Promise<{ success: boolean; signedUrl?: string; error?: string }> {
+  try {
+    if (!filePath) {
+      return { success: false, error: 'Signature path is missing' };
+    }
+
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      return {
+        success: false,
+        error: 'Signature path is invalid: expected a private storage object path'
+      };
+    }
+
+    if (!supabaseAdmin) {
+      return {
+        success: false,
+        error: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to backend/.env.'
+      };
+    }
+
+    const { data, error } = await supabaseAdmin.storage
+      .from(SIGNATURE_STORAGE_BUCKET)
+      .createSignedUrl(filePath, expiresIn);
+
+    if (error) {
+      console.error('Supabase Storage signature signed URL error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to generate signed signature URL'
+      };
+    }
+
+    return { success: true, signedUrl: data.signedUrl };
+  } catch (err: any) {
+    console.error('Error generating signed signature URL:', err);
+    return {
+      success: false,
+      error: err.message || 'Signed URL generation failed'
+    };
+  }
+}
+
+/**
  * Upload a prescription PDF to Supabase Storage
  *
  * @param fileBuffer - Buffer containing the PDF data
@@ -669,6 +880,45 @@ export async function uploadPrescriptionPdf(
     return {
       success: false,
       error: err.message || 'PDF upload failed'
+    };
+  }
+}
+
+/**
+ * Download a prescription PDF from the private storage bucket.
+ */
+export async function downloadPrescriptionPdf(
+  filePath: string
+): Promise<{ success: boolean; buffer?: Buffer; error?: string }> {
+  try {
+    if (!filePath || filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      return { success: false, error: 'Prescription PDF path is invalid' };
+    }
+
+    if (!supabaseAdmin) {
+      return {
+        success: false,
+        error: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to backend/.env.'
+      };
+    }
+
+    const { data, error } = await supabaseAdmin.storage
+      .from(PRESCRIPTION_STORAGE_BUCKET)
+      .download(filePath);
+
+    if (error || !data) {
+      return {
+        success: false,
+        error: error?.message || 'Failed to download prescription PDF from storage'
+      };
+    }
+
+    return { success: true, buffer: Buffer.from(await data.arrayBuffer()) };
+  } catch (err: any) {
+    console.error('Error downloading prescription PDF:', err);
+    return {
+      success: false,
+      error: err.message || 'Prescription PDF download failed'
     };
   }
 }

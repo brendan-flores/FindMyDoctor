@@ -12,7 +12,16 @@ import multer from 'multer';
 import path from 'path';
 import { config } from '../config';
 import { toClinicDateString, getClinicDate } from '../utils/date';
-import { uploadDoctorPhoto, deleteDoctorPhoto, replaceDoctorPhoto, validateImageFile } from '../services/storageService';
+import {
+  uploadDoctorPhoto,
+  deleteDoctorPhoto,
+  replaceDoctorPhoto,
+  validateImageFile,
+  uploadDoctorSignature,
+  deleteDoctorSignature,
+  generateSignedDoctorSignatureUrl,
+  SIGNATURE_PREVIEW_URL_EXPIRY_SECONDS,
+} from '../services/storageService';
 
 const router = Router();
 
@@ -50,6 +59,24 @@ const upload = multer({
   }
 });
 
+// Multer errors (wrong format, oversized file) are turned into the same 400
+// validation response shape the rest of the API uses.
+const signatureUpload = (req: any, res: Response, next: any) => {
+  upload.single('signature')(req, res, (err: any) => {
+    if (!err) {
+      next();
+      return;
+    }
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'File size exceeds 4MB limit'));
+    }
+    return res.status(400).json(error(
+      ErrorCodes.VALIDATION_ERROR,
+      err.message || 'Invalid signature file. Upload a PNG image.'
+    ));
+  });
+};
+
 // Get current doctor (authenticated)
 router.get('/me', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
   try {
@@ -62,7 +89,8 @@ router.get('/me', authenticate, authorize('DOCTOR'), async (req: AuthRequest, re
         d.contact_number, d.professional_photo_url, d.years_of_experience, d.areas_of_expertise,
         d.biography, d.consultation_fee, d.languages_spoken,
         d.two_factor_enabled, d.is_approved, d.approval_status, d.profile_completion_status,
-        d.profile_submitted_at, d.rejection_reason
+        d.profile_submitted_at, d.rejection_reason,
+        (d.signature_url IS NOT NULL AND d.signature_url <> '') AS has_signature
        FROM doctors d
        JOIN users u ON u.id = d.user_id
        WHERE d.user_id = $1`,
@@ -1381,6 +1409,157 @@ router.delete('/me/photo', authenticate, authorize('DOCTOR'), async (req: AuthRe
   } catch (err: any) {
     console.error('Photo deletion error:', err);
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete photo'));
+  }
+});
+
+// ============================================
+// DOCTOR SIGNATURE ENDPOINTS
+// ============================================
+//
+// Signatures are stored in the PRIVATE `doctor-signatures` Supabase Storage
+// bucket. `doctors.signature_url` holds the object path only; previews use
+// short-lived signed URLs and prescription PDFs embed the downloaded object.
+
+// Upload or replace the doctor's signature image (PNG, max 4MB)
+router.post('/me/signature', authenticate, authorize('DOCTOR'), signatureUpload, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    if (!req.file) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'No file uploaded'));
+    }
+
+    // Validate MIME type, size and the actual PNG signature bytes
+    const validation = validateImageFile(req.file.buffer, req.file.mimetype);
+    if (!validation.valid) {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, validation.error));
+    }
+
+    const doctorResult = await query(
+      'SELECT id, signature_url FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const doctorId = doctorResult.rows[0].id;
+    const currentSignaturePath = doctorResult.rows[0].signature_url;
+
+    // Signatures are always stored as PNG objects.
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const fileName = `doctor_signature_${doctorId}_${uniqueSuffix}.png`;
+
+    const uploadResult = await uploadDoctorSignature(req.file.buffer, fileName, 'image/png');
+    if (!uploadResult.success || !uploadResult.path) {
+      return res.status(500).json(error(ErrorCodes.SERVER_ERROR, uploadResult.error || 'Failed to upload signature'));
+    }
+
+    try {
+      await query(
+        `UPDATE doctors
+         SET signature_url = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $2`,
+        [uploadResult.path, userId]
+      );
+    } catch (dbError) {
+      // Do not leave an orphaned object behind when the database write fails.
+      await deleteDoctorSignature(uploadResult.path);
+      throw dbError;
+    }
+
+    // The previous object is only removed after the new path is persisted.
+    if (currentSignaturePath) {
+      const deleteResult = await deleteDoctorSignature(currentSignaturePath);
+      if (!deleteResult.success) {
+        console.error('Failed to delete previous signature object:', deleteResult.error);
+      }
+    }
+
+    res.json(success({
+      hasSignature: true,
+      message: 'Signature uploaded successfully'
+    }, 'Signature uploaded successfully'));
+  } catch (err: any) {
+    console.error('Signature upload error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to upload signature'));
+  }
+});
+
+// Delete the doctor's signature image and clear the stored path
+router.delete('/me/signature', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    const doctorResult = await query(
+      'SELECT signature_url FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const currentSignaturePath = doctorResult.rows[0].signature_url;
+
+    if (currentSignaturePath) {
+      const deleteResult = await deleteDoctorSignature(currentSignaturePath);
+      if (!deleteResult.success) {
+        console.error('Failed to delete signature from storage:', deleteResult.error);
+        return res.status(500).json(error(
+          ErrorCodes.SERVER_ERROR,
+          'The stored signature could not be removed. Please try again.'
+        ));
+      }
+    }
+
+    await query(
+      'UPDATE doctors SET signature_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1',
+      [userId]
+    );
+
+    res.json(success({ hasSignature: false }, 'Signature deleted successfully'));
+  } catch (err: any) {
+    console.error('Signature deletion error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete signature'));
+  }
+});
+
+// Get a short-lived signed URL for displaying the doctor's signature
+router.get('/me/signature-url', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    const doctorResult = await query(
+      'SELECT signature_url FROM doctors WHERE user_id = $1',
+      [userId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
+    }
+
+    const signaturePath = doctorResult.rows[0].signature_url;
+    if (!signaturePath) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'No signature uploaded'));
+    }
+
+    const signedUrlResult = await generateSignedDoctorSignatureUrl(signaturePath);
+    if (!signedUrlResult.success || !signedUrlResult.signedUrl) {
+      return res.status(500).json(error(
+        ErrorCodes.SERVER_ERROR,
+        signedUrlResult.error || 'Failed to generate signed signature URL'
+      ));
+    }
+
+    res.json(success({
+      signedUrl: signedUrlResult.signedUrl,
+      expiresInSeconds: SIGNATURE_PREVIEW_URL_EXPIRY_SECONDS,
+    }, 'Signed signature URL generated successfully'));
+  } catch (err: any) {
+    console.error('Signature signed URL error:', err);
+    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to generate signed signature URL'));
   }
 });
 

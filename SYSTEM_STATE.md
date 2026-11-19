@@ -2,9 +2,9 @@
 
 This document tracks the current state of the FindMyDoctor application, including key features, workflows, and system configurations.
 
-**Current Version:** 01.41
+**Current Version:** 01.44
 
-**Last Updated:** November 10, 2026
+**Last Updated:** November 19, 2026
 
 ---
 
@@ -265,9 +265,27 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 
 **PDF Generation:**
 - On-demand generation via `GET /api/v1/prescriptions/:id/pdf`
-- Doctor and Patient access (via signed URLs)
+- Doctor and owning Patient access to the named PDF attachment through `GET /api/v1/prescriptions/:id/download`; the existing signed-URL endpoint remains available
+- Every prescription PDF export uses the same generated filename: `SURNAME_Firstname_RX-YYYYMMDD-XXXXXXXX.pdf`. Names are sanitized to ASCII letters/digits, hyphens, and underscores; surname uppercase, first name title case, spaces become hyphens, diacritics fold to plain letters, and apostrophes/other special characters are removed. Missing or invalid name parts use the exact name-free fallback `RX-YYYYMMDD-XXXXXXXX.pdf` (no replacement/superseded suffix).
+- A replacement keeps its own prescription number and appends `_replaces-<original number>`; the superseded earlier file keeps its own number and appends `_SUPERSEDED`. The earlier PDF is retained, never overwritten or deleted.
+- `backend/src/services/prescriptionFileName.ts` is the single naming authority. `GET /api/v1/prescriptions/:id/download` uses it for `Content-Disposition`; the PDF document Title metadata uses the same value for print-to-PDF. The web pages and mobile patient app save the server-provided filename verbatim and never build a filename. The former "Download for sharing" action and the `purpose=sharing` RX-only filename were removed.
 - Stored in Supabase private bucket
-- 60-second signed URL expiry
+- 60-second expiry for signed URLs returned by `GET /api/v1/prescriptions/:id/pdf-url`
+- Professional A4 portrait layout: clinic header, "MEDICAL PRESCRIPTION" title, prescription number, issue and visit dates, side-by-side unboxed prescriber/patient text blocks, clinical information, a plain seven-column medication table, additional instructions, and an italic replacement line under the prescription number. Sections use consistent thin gray rules; the signature area is unboxed and prints the handwritten image when available, a line, and the doctor's name, specialty, and license.
+- Stored PDF artifacts are layout-versioned in their object path (`prescription_<id>_v5_<uuid>.pdf`). When preparing a download, `ensurePrescriptionPdf` serves current `v5` PDFs without re-rendering and regenerates older artifacts using original clinical data and the latest doctor signature. Previous storage objects are retained. Doctors can also trigger regeneration via `GET /api/v1/prescriptions/:id/pdf` or the "Regenerate PDF" button in the web interface (`/doctor/prescriptions` and `/doctor/patients/[id]`)
+- The medication table prints stored fields (`medication_name`, `dosage`, `frequency`, `duration`, `quantity`, `instructions`); missing optional values remain blank because there are no separate brand, strength, dosage-form, dose, or route columns
+- Prescription number is derived as `RX-YYYYMMDD-<first 8 hex of the UUID>` (no number column exists)
+- Embeds the doctor's uploaded signature image when present; the signature line is followed by the doctor's printed name, specialty, and license, with no containing box or extra badge
+- Fails instead of generating a PDF when a stored signature cannot be retrieved or embedded
+- `GET /api/v1/prescriptions/:id` returns patient/doctor/clinic detail, `prescription_number`, and `replaces_prescription_number`; the mobile prescription detail page renders those sections
+
+**Doctor Signature:**
+- Stored in the PRIVATE Supabase Storage bucket `doctor-signatures` (configurable via `SUPABASE_SIGNATURE_BUCKET`)
+- `doctors.signature_url` holds only the private object path (migration `049_add_doctor_signature_url.sql`)
+- `POST /api/v1/doctors/me/signature`, `DELETE /api/v1/doctors/me/signature`, and `GET /api/v1/doctors/me/signature-url` (DOCTOR only)
+- PNG only, maximum 4MB, with MIME type and PNG magic-number validation
+- Preview signed URLs expire after 300 seconds; the object path is never returned to clients
+- `GET /api/v1/doctors/me` returns `has_signature` only
 
 ---
 
@@ -310,6 +328,10 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 - PNG format only, max 4MB
 - Server-side validation for file type, size, and PNG magic number
 
+**Doctor Signature:**
+- `doctors.signature_url` (migration 049) stores the private `doctor-signatures` object path
+- The bucket is private; only short-lived signed URLs are returned for previews
+
 ---
 
 ## Version History
@@ -317,6 +339,7 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 See `docs/VERSION_HISTORY.md` for complete version history.
 
 **Recent Versions:**
+- 01.44: Doctor signature upload (private `doctor-signatures` bucket) and professional prescription PDF redesign with embedded signature; mobile prescription detail redesign; migration 049 (`doctors.signature_url`)
 - 01.41: Week 8 authorization hardening — ADMIN/SUPERADMIN denied clinic-operation access to queue, doctor capacity, payment detail, invoice detail/PDF/by-payment, and consultation record read endpoints; expanded backend/mobile verification coverage for role-based workflows, waitlist, billing, and security controls
 - 01.39: Patient Payments Hub — centralized `/payments` page with status filters, GCash QR/account details, receipt upload entry points, invoice view/download; new patient-scoped `GET /api/v1/payments/me` and `GET /api/v1/invoices/me`; INVOICE_AVAILABLE notifications deep-link to the invoice/payments hub
 - 01.38: Patient Medical Records bug fixes — prescriptions tab no longer fails to load (bigint `medication_count` parsing), History tab shows "Dr." prefix and the visit doctor's real profile photo, prescription detail can open PDFs again; shared AppHeader 16px overflow fixed; back buttons added to the Medical Records screens

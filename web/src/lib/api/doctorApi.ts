@@ -1,4 +1,8 @@
 import { apiClient, type GetOptions } from './apiClient';
+import {
+  isPrescriptionFileName,
+  prescriptionFileNameFromDisposition,
+} from '../prescriptionPdf';
 
 export interface DoctorProfile {
   id: string;
@@ -25,6 +29,7 @@ export interface DoctorProfile {
   approval_status?: 'PENDING' | 'REJECTED' | 'ACTIVE';
   rejection_reason?: string | null;
   two_factor_enabled?: boolean;
+  has_signature?: boolean;
 }
 
 export interface UpdateProfileRequest {
@@ -197,6 +202,33 @@ export const doctorApi = {
     return apiClient.delete<{ success: boolean }>('/doctors/me/photo');
   },
 
+  // Upload or replace the doctor's signature image (PNG, max 4MB)
+  uploadSignature: async (file: File): Promise<{ success: boolean; data?: { hasSignature: boolean }; error?: string }> => {
+    const formData = new FormData();
+    formData.append('signature', file);
+    return apiClient.post<{ hasSignature: boolean }>('/doctors/me/signature', formData, {
+      isFormData: true,
+    });
+  },
+
+  // Delete the doctor's signature image
+  deleteSignature: async (): Promise<{ success: boolean; data?: { hasSignature: boolean }; error?: string }> => {
+    return apiClient.delete<{ hasSignature: boolean }>('/doctors/me/signature');
+  },
+
+  // Get a short-lived signed URL for the signature preview
+  getSignatureUrl: async (): Promise<{
+    success: boolean;
+    data?: { signedUrl: string; expiresInSeconds: number };
+    error?: string;
+    httpStatus?: number;
+  }> => {
+    return apiClient.get<{ signedUrl: string; expiresInSeconds: number }>(
+      '/doctors/me/signature-url',
+      { skipCache: true, cacheTtlMs: 0 }
+    );
+  },
+
   // Get patients for the authenticated doctor
   getPatients: async (doctorId: string): Promise<{ success: boolean; data?: Patient[]; error?: string }> => {
     return apiClient.get<Patient[]>(`/patients/doctor/${doctorId}`);
@@ -275,6 +307,41 @@ export const doctorApi = {
   // Get signed URL for existing prescription PDF
   getPrescriptionPdfUrl: async (prescriptionId: string): Promise<{ success: boolean; data?: { signedUrl: string }; error?: string }> => {
     return apiClient.get<{ signedUrl: string }>(`/prescriptions/${prescriptionId}/pdf-url`);
+  },
+
+  // Download an owned prescription PDF through the authenticated API.
+  // The backend generates and returns the filename; clients never build one.
+  downloadPrescriptionPdf: async (
+    prescriptionId: string
+  ): Promise<{ success: boolean; data?: Blob; fileName?: string; error?: string }> => {
+    const token = apiClient.getToken();
+    const url = new URL(
+      `${apiClient.getBaseUrl()}/prescriptions/${prescriptionId}/download`
+    );
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      return {
+        success: false,
+        error: errorData?.error?.message || errorData?.message || 'Failed to download prescription PDF',
+      };
+    }
+
+    const disposition = response.headers.get('content-disposition') || '';
+    const fileName = prescriptionFileNameFromDisposition(disposition);
+    if (!fileName) {
+      return { success: false, error: 'The server did not provide a prescription PDF filename' };
+    }
+    if (!isPrescriptionFileName(fileName)) {
+      return { success: false, error: 'The server provided an invalid prescription PDF filename' };
+    }
+    return { success: true, data: await response.blob(), fileName };
   },
 };
 
