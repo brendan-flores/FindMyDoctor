@@ -288,8 +288,9 @@ Current System State (November 2026):
 - Patient-facing visit and prescription reads return only `ISSUED` records; draft visits and draft or voided prescriptions are never returned
 - All patient-scoped endpoints enforce ownership verification and return only the authenticated patient's data; cross-patient access returns HTTP 403
 - Prescription detail page at `/prescription-detail` shows full prescription information including each medication's name, dosage, frequency, duration, and instructions
-- PDF access uses the existing patient-authorized endpoint `GET /api/v1/prescriptions/:id/pdf-url` which generates a signed URL for download/viewing; the mobile app opens it via `launchUrl(..., LaunchMode.externalApplication)` and handles the boolean result (no `canLaunchUrl` gate, which misreports https links on Android 11+)
-- Expired PDF links show a retry button to generate a fresh signed URL
+- PDF downloads use authenticated `GET /api/v1/prescriptions/:id/download`; every view uses `SURNAME_Firstname_RX-YYYYMMDD-XXXXXXXX.pdf`, with `_replaces-<original number>` for a replacement and `_SUPERSEDED` for the replaced file, falling back to `RX-YYYYMMDD-XXXXXXXX.pdf` when a name part is missing or invalid. The mobile patient app saves the server-provided filename through the device file service.
+- Doctor prescription pages no longer offer a separate "Download for sharing" action; all downloads use the single generated name. Print-to-PDF uses the same value in the PDF document title metadata. The backend naming service `backend/src/services/prescriptionFileName.ts` is the single authority and clients never construct a filename.
+- The existing patient-authorized `GET /api/v1/prescriptions/:id/pdf-url` continues to provide 60-second signed URLs for compatible callers; the attachment download does not expose a storage URL or regenerate current PDFs
 - Entry points to medical records are available from Home quick actions and the Profile tab on `/home`
 - The Medical Records page (`/medical-records`) and the prescription detail view (`/prescription-detail`) both show a back button in the shared `AppHeader`; tapping it pops the navigator to the immediately previous view (Home / Medical Records). Medical Records keeps its selected tab, date filter, loaded data, and list scroll position across a push/pop round trip
 - The existing `PRESCRIPTION_AVAILABLE` notification type deep-links to `/prescription-detail` with the prescription ID when tapped
@@ -304,6 +305,25 @@ Current System State (November 2026):
 - Mobile app shows appropriate fallback messaging when QR code or account details are not configured
 - Web tests: `cd web && npm test` (Node built-in test runner). Backend tests include `rateLimit.test.ts`, `ttlCache.test.ts`, `availabilityCache.test.ts`, and `capacityService.test.ts`.
 - No database schema change or migration was required for this work.
+
+## Doctor Signature and Prescription PDF
+- Doctors upload a signature image from the web profile page (`/doctor/profile`) through a new signature section with preview, replace, delete, and refresh states.
+- Signatures are stored in the PRIVATE Supabase Storage bucket `doctor-signatures` (manually created and kept private). The bucket name is configurable through `SUPABASE_SIGNATURE_BUCKET`.
+- `doctors.signature_url` stores only the private object path. Migration `049_add_doctor_signature_url.sql` adds the nullable column and is mirrored into `consolidated_schema.sql`.
+- Signature endpoints are DOCTOR-only: `POST /api/v1/doctors/me/signature` (upload or replace), `DELETE /api/v1/doctors/me/signature`, and `GET /api/v1/doctors/me/signature-url` (300-second signed preview URL).
+- Uploads accept PNG only, maximum 4MB, and the backend validates the MIME type and the actual PNG magic-number bytes. Invalid or oversized files return `400 VALIDATION_ERROR`; non-doctors return `403`.
+- `GET /api/v1/doctors/me` returns the non-sensitive boolean `has_signature` and never returns the object path. The private object path never leaves the backend.
+- Replacement uploads the new object, persists the new path, then deletes the previous object. If the database write fails, the newly uploaded object is deleted. If deleting the previous object fails, the failure is logged and the new signature remains in use.
+- Prescription PDFs are regenerated with a professional A4 portrait layout: clinic header, "MEDICAL PRESCRIPTION" title, prescription number, issue and visit dates, side-by-side unboxed prescriber/patient text blocks, clinical information, a plain seven-column medication table, additional instructions, an italic replacement line under the prescription number, and an unboxed signature area. Sections use consistent thin gray rules and every page carries the clinic identity plus "Page X of Y".
+- Stored PDF artifacts are layout-versioned in their object path (`prescription_<id>_v5_<uuid>.pdf`). When preparing a download, `ensurePrescriptionPdf` serves current `v5` PDFs without re-rendering and regenerates older artifacts using the original clinical data and latest doctor signature. Previous storage objects are retained. Doctors can explicitly trigger regeneration via `GET /api/v1/prescriptions/:id/pdf` or the "Regenerate PDF" button in the web interface (`/doctor/prescriptions` and `/doctor/patients/[id]`).
+- Medication blocks print only the fields stored in `prescription_items` (`medication_name`, `dosage`, `frequency`, `duration`, `quantity`, `instructions`). Missing optional values are omitted; the schema has no separate brand, strength, dosage-form, dose, or route fields, so those are not printed or invented.
+- The PDF embeds the actual uploaded signature image when one exists. Its unboxed signature area has a horizontal line followed by the doctor's printed name, specialty, and license; it never fabricates an image. If a stored signature cannot be retrieved or embedded, PDF generation fails with a backend error instead of producing a PDF without the expected signature.
+- The prescription number is derived deterministically as `RX-YYYYMMDD-<first 8 hex of the prescription UUID>` because no number column exists.
+- `GET /api/v1/prescriptions/:id` now returns the fields needed by the detail screens: patient middle name/date of birth/sex, doctor middle name/specialty/credentials/PRC license/practice details/photo, visit reason and diagnosis, `prescription_number`, and `replaces_prescription_number`.
+- The mobile prescription detail page (`/prescription-detail`) was redesigned to show the doctor and clinic identity, prescription number and issue date, patient information, consultation details, medication cards with quantity and full instructions, doctor's notes, and replacement information, while keeping the existing PDF download behavior.
+- Prescription lifecycle rules are unchanged: issued prescriptions are immutable, voiding requires a reason, replacements link to the original through `replaces_prescription_id`, and patients only ever see `ISSUED` prescriptions.
+- Storage prerequisite: no database schema change beyond `doctors.signature_url`; the `doctor-signatures` private bucket must exist before uploads are used.
+- Verification: backend tests cover signature authorization, validation, replacement, deletion, preview URLs, and PDF signature present/blank/failure behavior; web tests cover client-side signature validation; mobile tests cover the redesigned detail sections and PDF download.
 
 ## Secretary Management
 - Each Secretary has a required `doctor_id` relationship to one Doctor; Doctors can list only their own Secretaries via the authenticated backend API
@@ -550,8 +570,12 @@ Current System State (November 2026):
 - Photo deletion clears the database field and deletes the file from Supabase Storage or legacy local filesystem
 - Photo deletion handles both Supabase URLs and legacy `/uploads/` paths for backward compatibility
 - Frontend displays photos using Supabase public URLs (new uploads) or legacy `/uploads/` URLs (existing photos)
-- No database migration required for Supabase Storage implementation (doctor photos stored externally, database only stores URL references)
+- No database migration was required for the doctor photo storage implementation (photos are stored externally, database only stores URL references)
 - Backend configuration includes `supabase.storageBucket` field for Supabase Storage bucket name (default: `doctor-photos`)
+- Doctor signatures use a separate PRIVATE bucket, `doctor-signatures` (configurable via `SUPABASE_SIGNATURE_BUCKET`), created manually and never made public
+- `doctors.signature_url` stores the private object path only; previews use 300-second signed URLs and prescription PDFs embed the downloaded object
+- Signature uploads use the same PNG-only, 4MB, MIME type, and PNG magic-number validation as professional photos
+- `backend/src/services/storageService.ts` provides `uploadDoctorSignature`, `deleteDoctorSignature`, `downloadDoctorSignature`, and `generateSignedDoctorSignatureUrl`; service-role credentials stay backend-only
 - Admin account creation via `POST /api/v1/admin/admins` includes Supabase Auth identity provisioning via `ensureAdminSupabaseIdentity` for regular Admins (idempotent, duplicate-safe)
 - Secretary account creation via Admin or Doctor includes Supabase Auth identity provisioning via `ensureSecretarySupabaseIdentity` (idempotent, duplicate-safe)
 - Admin reconciliation endpoint `POST /api/v1/admin/admins/reconcile-supabase` provisions Supabase identities for existing regular Admin accounts (SUPERADMIN only)
@@ -587,7 +611,8 @@ Current System State (November 2026):
 - Queue number assignment is concurrency-safe using `SELECT COALESCE(MAX(queue_number), 0) + 1` pattern
 - After successful booking, the appointment is immediately visible on patient, doctor, and secretary Appointments pages without requiring app restart or manual refresh
 - Mobile Appointments page uses `didUpdateWidget` to refresh data when returning to the tab
-- Supabase Storage service role key is required for backend photo operations and must not be exposed to frontend applications
+- Supabase Storage service role key is required for backend photo and signature operations and must not be exposed to frontend applications
+- Migration `049_add_doctor_signature_url.sql` adds the nullable `doctors.signature_url` column (private Supabase Storage object path) and is mirrored into `consolidated_schema.sql`
 
 ## Database Schema
 - Database schema includes approval status fields, pending doctor signups staging table (basic fields only), and pending patient signups staging table (username plus detailed patient fields: middle_name, date_of_birth, sex, phone, address)

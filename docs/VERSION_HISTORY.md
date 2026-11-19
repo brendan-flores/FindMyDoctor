@@ -4,6 +4,45 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.44 (November 19, 2026)
+
+**Purpose:** Let doctors upload a signature that is embedded in professional prescription PDFs, and redesign the prescription PDF and mobile prescription detail view for clinical use.
+
+**Significant Features:**
+- Doctor signature management on the web profile page (`/doctor/profile`): upload, replace, delete, preview, and refresh with loading/error states; client-side PNG and 4MB validation before upload.
+- New DOCTOR-only endpoints: `POST /api/v1/doctors/me/signature` (upload/replace), `DELETE /api/v1/doctors/me/signature`, and `GET /api/v1/doctors/me/signature-url` (300-second signed preview URL). Invalid or oversized files return `400 VALIDATION_ERROR`.
+- Signatures are stored in the PRIVATE Supabase Storage bucket `doctor-signatures` (configurable via `SUPABASE_SIGNATURE_BUCKET`). `doctors.signature_url` stores only the private object path; the path never leaves the backend.
+- Replacement uploads the new object, persists the new path, then deletes the previous object. A failed database write deletes the newly uploaded object to avoid orphans.
+- `GET /api/v1/doctors/me` now returns the non-sensitive `has_signature` boolean.
+- Professional prescription PDF redesign: A4 layout with doctor/clinic header, Rx badge, derived prescription number (`RX-YYYYMMDD-<8 hex>`), issue and consultation dates, patient information (name, age, sex, date of birth), medications table (medication, dosage, frequency, duration, quantity, instructions with page breaks), notes, diagnosis, replacement reference, signature block, and per-page footers.
+- The PDF embeds the actual uploaded signature. With no signature it prints a labelled "Physician's Signature" line and never fabricates an image. If a stored signature cannot be retrieved or embedded, generation fails with an error.
+- `GET /api/v1/prescriptions/:id` now returns patient middle name/date of birth/sex, doctor specialty/credentials/PRC license/practice details/photo, visit reason and diagnosis, `prescription_number`, and `replaces_prescription_number`.
+- Stored prescription PDF artifacts are layout-versioned in their storage path (`prescription_<id>_v2_<uuid>.pdf`). When downloading through `GET /api/v1/prescriptions/:id/pdf-url`, `ensurePrescriptionPdf` checks the artifact version: current `v2` PDFs are served directly via a signed URL without re-rendering, while legacy PDFs predating `v2` are automatically regenerated using original clinical data and updated in place with the redesigned layout and the latest doctor signature. Doctors can also explicitly trigger regeneration on demand via `GET /api/v1/prescriptions/:id/pdf` or the web UI's Regenerate button (`/doctor/prescriptions` and `/doctor/patients/[id]`).
+- Mobile prescription detail redesign: doctor and clinic identity, prescription number and issue date, patient information, consultation details, medication cards with quantity and full instructions, doctor's notes, and replacement information, with the existing 60-second PDF download flow preserved.
+
+**Improvements:**
+- Prescription PDFs are easier to read and print, with long medication lists flowing onto continuation pages and footers on every page.
+- Signature previews refresh once when an expired signed URL fails to load.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None
+
+**Database Changes:**
+- Migration `049_add_doctor_signature_url.sql` adds nullable `doctors.signature_url`, is mirrored into `consolidated_schema.sql`, and is applied to Render PostgreSQL.
+- The `doctor-signatures` Supabase Storage bucket must be created manually and kept private.
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.44, added this entry to `VERSION_HISTORY.md`, and synchronized `SYSTEM_STATE.md`, `docs/SYSTEM_STATE.md`, `docs/prd.md`, `docs/architecture.md`, and `docs/architecture-essentials.md` with the signature storage, endpoints, PDF behavior, and prescription detail payload.
+
+**Tests:**
+- Backend: `backend/src/api/doctorSignature.test.ts` and `backend/src/services/prescriptionPdfService.test.ts` added; both pass.
+- Web: `web/src/lib/doctorSignature.test.ts` added to `npm test`; all 16 web tests pass.
+- Mobile: `mobile/test/medical_records_page_test.dart` extended with detail-model parsing and redesigned-layout assertions; all 18 tests pass.
+
+---
+
 ### 01.43 (November 19, 2026)
 
 **Purpose:** Modernize the MediGuide AI conversation experience with a typing indicator and richer Markdown response formatting.

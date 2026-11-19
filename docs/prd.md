@@ -265,6 +265,7 @@ Each doctor profile should include:
 - Consultation/checkup fee.
 - Availability.
 - Professional photo (PNG, max 4MB, stored in Supabase Storage).
+- Digital signature image (PNG, max 4MB, stored in the private `doctor-signatures` Supabase Storage bucket and used on prescription PDFs).
 - Clinic/practice name, address, and room number.
 - Years of experience.
 - Areas of expertise.
@@ -278,6 +279,14 @@ The patient-facing profile is available only to authenticated patients and only 
 - PNG format only, maximum 4MB file size
 - Server-side validation for file type, size, and PNG magic number signature
 - Legacy `/uploads/` URLs supported for existing photos (backward compatibility)
+
+**Signature Storage:**
+- Doctor signatures are stored in the private Supabase Storage bucket `doctor-signatures` (created manually in the Supabase Dashboard and never made public)
+- Only the private object path is stored in `doctors.signature_url`; public URLs and service-role credentials are never exposed to the web or mobile clients
+- Signatures are PNG only, maximum 4MB, and the backend validates the MIME type plus the actual PNG magic-number bytes
+- Signature previews use short-lived signed URLs (5 minutes) generated on demand; prescription PDFs embed the downloaded object directly
+- Replacement uploads persist the new path before deleting the previous object; a failed database write removes the newly uploaded object so no orphan is left behind
+- The signature area uses a plain horizontal line with the doctor's printed name, specialty, and license number beneath it, whether or not an uploaded signature image is present.
 
 ---
 
@@ -809,7 +818,7 @@ A prescription may contain:
 - Instructions.
 - Additional notes.
 
-Patients can access their prescription history and prescription PDFs.
+Patients can access their prescription history and prescription PDFs. The mobile prescription detail view shows the doctor and clinic identity, prescription number and issue date, patient information, consultation details, every medication with dosage, frequency, duration, quantity, and instructions, doctor's notes, and a replacement reference when applicable.
 
 ---
 
@@ -1113,9 +1122,22 @@ Medical records shall remain associated with the correct patient account.
 
 Doctors shall be able to create digital prescriptions.
 
-## FR-038 — Prescription PDF
+## FR-038 - Prescription PDF
 
-The system shall generate prescription PDFs.
+The system shall generate professional prescription PDFs on demand for issued prescriptions.
+
+- The PDF uses an A4 portrait layout with a clinic header showing the clinic/practice name, address, room number, phone, and email when available, plus a typographic Rx seal. No logo is printed because the schema has no clinic-logo field, and unavailable clinic fields are omitted rather than filled with placeholder text.
+- It prints a prominent "MEDICAL PRESCRIPTION" title, the prescription number (derived deterministically from the prescription's issue date and UUID), the date issued, and the visit date separately.
+- It shows side-by-side "Prescribing Physician" (name and credentials, specialty, PRC license number) and "Patient Information" (name, age, sex, date of birth, and address when available) panels.
+- Clinical information (reason for visit and diagnosis) is presented in its own section, visually separate from the medication orders.
+- Each medication is rendered as its own block with the medication name and whichever of dosage, frequency, duration, quantity, and instructions exist. Missing optional medication values are omitted. The schema stores dosage as a single free-text field and has no separate brand, strength, dosage-form, dose, or route fields, so those are not printed or invented.
+- Additional instructions (prescription notes) appear only when present, and a replacement reference appears when the prescription replaces an earlier one.
+- When the doctor has uploaded a signature, the PDF embeds the actual stored signature image above the line. The line is followed by the doctor's printed name, specialty, and license number; no image is fabricated when none is uploaded.
+- Prescription sections use unboxed text blocks, consistent thin gray rules, and a plain medication table; replacement text appears in italics directly below the prescription number.
+- If a stored signature cannot be retrieved from private storage or embedded in the PDF, generation fails with an error instead of producing a PDF that silently omits the expected signature.
+- The PDF uses a white background, black regular text, restrained dark-navy accents for headings and important labels, and black or gray borders for print readability.
+- PDFs are stored in the private `prescription-pdfs` Supabase Storage bucket. The authenticated `GET /api/v1/prescriptions/:id/download` endpoint streams the existing PDF as a named attachment to its owning doctor or patient (patients may download issued prescriptions only); the legacy `GET /api/v1/prescriptions/:id/pdf-url` endpoint continues to issue 60-second signed URLs. Downloading an existing PDF does not regenerate or modify prescription data.
+- Every prescription PDF export uses one generated filename: `SURNAME_Firstname_RX-YYYYMMDD-XXXXXXXX.pdf`. Names are ASCII-cleaned (ñ and other diacritics fold to plain letters, apostrophes are removed, spaces become hyphens), the surname is uppercase, the first name is title case, and `_` only separates the surname, first name, and prescription number. A replacement adds `_replaces-<original 8-character number>`; the superseded earlier file keeps its own number and adds `_SUPERSEDED`. If either name part is missing or invalid, the exact name-free fallback `RX-YYYYMMDD-XXXXXXXX.pdf` is used instead. Names are generated automatically, are not user-editable, never include birthdate, diagnosis, medicine, or address data, and are used for the web, mobile, secretary/staff download, backend `Content-Disposition`, and print-to-PDF document title metadata. There is no name-free sharing variant; one shared backend naming function is the single authority and the web/mobile clients save the server-provided filename verbatim.
 
 ## FR-039 — Notification System
 

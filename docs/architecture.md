@@ -385,6 +385,15 @@ After successful OTP verification, doctors must complete their professional prof
   - Safely ignores missing files
   - Returns success/error response in the project's standard format
 
+- **Doctor Signature Endpoints:** (require Doctor authentication)
+  - `POST /api/v1/doctors/me/signature` accepts one `signature` file via multipart/form-data. PNG only, maximum 4MB, with MIME type and PNG magic-number validation. The object is uploaded to the private `doctor-signatures` bucket and only its object path is stored in `doctors.signature_url`; no public URL is produced.
+  - `DELETE /api/v1/doctors/me/signature` removes the stored object, then clears `doctors.signature_url`. If storage deletion fails, the stored path is kept so the doctor can retry.
+  - `GET /api/v1/doctors/me/signature-url` returns `{ signedUrl, expiresInSeconds }` for a short-lived preview (300 seconds). It returns 404 when no signature has been uploaded and never exposes the object path.
+  - Replacement uploads the new object, persists the new path, and only then deletes the previous object (best effort). If the database write fails, the newly uploaded object is deleted to avoid orphans.
+  - `GET /api/v1/doctors/me` returns the non-sensitive boolean `has_signature` and never returns `signature_url`.
+  - The bucket name is configurable via `SUPABASE_SIGNATURE_BUCKET` (default: `doctor-signatures`). The bucket must be created manually in the Supabase Dashboard and kept private.
+  - An invalid or oversized upload returns `400 VALIDATION_ERROR`. Non-doctor roles receive `403`.
+
 - **Profile Submission Endpoint:** `POST /api/v1/doctors/me/profile/submit` (requires Doctor authentication)
   - Validates the professional fields required for submission: verified email, specialty, credentials, PRC license number, hospital/clinic
   - Does not re-validate personal details (first/middle/last name, contact number), because sign-up owns those fields and the profile page does not edit or display them
@@ -1812,6 +1821,12 @@ A prescription is created only as part of issuing a consultation, and only when 
 
 Prescriptions are never edited or deleted. They are voided with a required reason (`status = 'VOIDED'`, `voided_at`, `void_reason`, `voided_by`), and a replacement is issued as a new row linked through `replaces_prescription_id`. Draft, voided and superseded prescriptions are not visible to patients; only `ISSUED` prescriptions are returned by the patient-facing endpoints.
 
+The prescription detail payload (`GET /api/v1/prescriptions/:id`) includes the patient's middle name, date of birth, and sex; the doctor's specialty, credentials, PRC license number, practice name, address, phone, room number, and professional photo; the visit reason and diagnosis; and replacement-origin information. The API derives `prescription_number` as `RX-YYYYMMDD-<first 8 hex of the prescription UUID>` and `replaces_prescription_number` for replacements. No prescription-number column exists, and the derivation is deterministic.
+
+Doctor signatures are stored in the private `doctor-signatures` bucket, and `doctors.signature_url` holds only the object path. Prescription PDFs are regenerated on demand from the issued record and embed the downloaded signature image when one exists. The unboxed signature area contains a horizontal line followed by the doctor's printed name, specialty, and license number. If no signature image exists, none is fabricated. If a stored signature cannot be downloaded or embedded, PDF generation fails rather than silently omitting it. PDFs remain in the private `prescription-pdfs` bucket; authorized callers download attachments through the backend, while the existing PDF URL endpoint remains a 60-second signed URL.
+
+The PDF layout uses a clinic header (practice name, address, room, phone, and email), a "MEDICAL PRESCRIPTION" title with the derived prescription number, date issued, and visit date, side-by-side unboxed physician and patient text blocks, a clinical-information section, a plain seven-column medication table, optional additional instructions, an italic replacement line directly under the prescription number, and an unboxed signature area. Medication table columns are `No.`, `Medicine`, `Dosage`, `Frequency`, `Duration`, `Quantity`, and `Instructions`; missing optional values are blank. Subsequent pages repeat a compact clinic header and medication table header, and every page carries the clinic identity plus "Page X of Y". Sections use consistent thin gray rules with no boxes, badges, filled panels, rounded corners, or accent bars.
+
 ---
 
 # 44. Notification Module
@@ -1977,13 +1992,14 @@ GET  /visits/me/:id
 GET  /prescriptions/me
 GET  /prescriptions/:id
 GET  /prescriptions/:id/pdf-url
+GET  /prescriptions/:id/download
 ```
 
 `GET /visits/me` is a PATIENT-only endpoint that returns the authenticated patient's completed consultations (visit date, doctor, doctor profile photo (`doctor_professional_photo_url`, from `doctors.professional_photo_url`), diagnosis, notes, linked appointment). `GET /visits/me/:id` returns a single completed consultation for the authenticated patient. Cross-patient access returns HTTP 403.
 
 `GET /prescriptions/me` is a PATIENT-only endpoint that returns the authenticated patient's prescriptions (prescription date, doctor, medication count, status). Cross-patient access returns HTTP 403.
 
-`GET /prescriptions/:id` and `GET /prescriptions/:id/pdf-url` are existing patient-authorized endpoints for viewing prescription details and accessing signed PDF URLs. The PDF URL endpoint generates a short-lived signed URL for download/viewing; expired links require a retry to generate a fresh URL. Patients can only read `ISSUED` prescriptions; drafts and voided prescriptions return not found.
+`GET /prescriptions/:id` and `GET /prescriptions/:id/pdf-url` are patient-authorized endpoints for viewing prescription details and accessing existing short-lived signed PDF URLs. The authenticated `GET /prescriptions/:id/download` endpoint returns the stored PDF as an `application/pdf` attachment after checking patient ownership and `ISSUED` status or doctor ownership. Every export uses the same generated filename: `SURNAME_Firstname_RX-YYYYMMDD-XXXXXXXX.pdf`. A replacement appends `_replaces-<original number>` and a replaced prescription appends `_SUPERSEDED`; if either name part is missing or invalid, the exact name-free fallback `RX-YYYYMMDD-XXXXXXXX.pdf` is used instead. The name is generated by the backend naming service (`backend/src/services/prescriptionFileName.ts`), which is the single naming authority; the web and mobile clients read the server-provided name and never construct one. Names use only ASCII letters/digits, hyphen, and underscore, never include birthdate, diagnosis, medicine, or address data, and are not user-editable. The same value is written to the PDF document Title metadata for print-to-PDF. The route serves the existing artifact without regeneration and streams bytes from private storage without exposing a storage URL. Patients can only read `ISSUED` prescriptions; drafts and voided prescriptions return not found.
 
 ### Doctor Consultation Workspace
 
