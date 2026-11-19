@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { apiClient } from '@/lib/api/apiClient';
 import { secretaryApi } from '@/lib/api/secretaryApi';
 
 interface SecretarySidebarProps {
@@ -51,8 +50,6 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
     { id: 'schedule', label: 'Schedule', icon: 'schedule' },
     { id: 'conversations', label: 'Conversations', icon: 'chat' },
     { id: 'payments', label: 'Payments', icon: 'payments' },
-    { id: 'profile', label: 'Profile', icon: 'account_circle' },
-    { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
   const handleNavClick = (tabId: string) => {
@@ -61,21 +58,6 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
       router.push('/secretary');
     } else {
       router.push(`/secretary/${tabId}`);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await apiClient.post('/auth/logout');
-    } catch (err) {
-      console.error('Logout error:', err);
-    } finally {
-      apiClient.clearToken();
-      localStorage.removeItem('secretary_refreshToken');
-      localStorage.removeItem('secretary_user');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-      router.push('/secretary-login');
     }
   };
 
@@ -136,17 +118,6 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
             </button>
           ))}
         </nav>
-      </div>
-
-      {/* Bottom Actions */}
-      <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-1">
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-        >
-          <span className="material-symbols-outlined text-[18px]">logout</span>
-          <span>Sign Out</span>
-        </button>
       </div>
     </aside>
   );

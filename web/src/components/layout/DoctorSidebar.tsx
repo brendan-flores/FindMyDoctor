@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
 import { doctorApi, DoctorProfile } from '@/lib/api/doctorApi';
 import { useEffect, useState } from 'react';
@@ -14,7 +14,6 @@ interface DoctorSidebarProps {
 
 export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doctor' }: DoctorSidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
   const [schedules, setSchedules] = useState<any[]>([]);
 
@@ -73,24 +72,7 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
     { id: 'patients', label: 'Patients', icon: 'people' },
     { id: 'secretary', label: 'Secretary', icon: 'badge' },
     { id: 'prescriptions', label: 'Prescriptions', icon: 'medication' },
-    { id: 'profile', label: 'Profile', icon: 'account_circle' },
-    { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
-
-  const handleLogout = async () => {
-    try {
-      await apiClient.post('/auth/logout');
-    } catch (err) {
-      console.error('Logout error:', err);
-    } finally {
-      apiClient.clearToken();
-      localStorage.removeItem('doctor_refreshToken');
-      localStorage.removeItem('doctor_user');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-      router.push('/doctor-login');
-    }
-  };
 
   return (
     <aside className="fixed left-0 top-0 w-64 h-screen bg-white border-r border-slate-200 flex flex-col justify-between z-30 select-none">
@@ -131,18 +113,6 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
             </Link>
           ))}
         </nav>
-      </div>
-
-      {/* Bottom Actions */}
-      <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-1">
-        <a
-          href="/doctor-login"
-          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-          onClick={handleLogout}
-        >
-          <span className="material-symbols-outlined text-[18px]">logout</span>
-          <span>Sign Out</span>
-        </a>
       </div>
     </aside>
   );
