@@ -187,9 +187,9 @@ export default function DoctorManagement() {
       {/* Summary Metric Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: TOTAL PHYSICIANS */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 transition-all">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex items-center justify-between hover:border-blue-300 transition-all">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-blue-50 text-[#1b5eb8] flex items-center justify-center">
+            <div className="w-11 h-11 rounded-2xl bg-blue-50 text-[#1b5eb8] flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">stethoscope</span>
             </div>
             <div>
@@ -203,9 +203,9 @@ export default function DoctorManagement() {
         </div>
 
         {/* Card 2: ACTIVE STATUS */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-emerald-300 transition-all">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex items-center justify-between hover:border-emerald-300 transition-all">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">check_circle</span>
             </div>
             <div>
@@ -220,9 +220,9 @@ export default function DoctorManagement() {
         </div>
 
         {/* Card 3: PENDING APPROVAL */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-amber-300 transition-all">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex items-center justify-between hover:border-amber-300 transition-all">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">schedule</span>
             </div>
             <div>
@@ -236,9 +236,9 @@ export default function DoctorManagement() {
         </div>
 
         {/* Card 4: REJECTED */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-red-300 transition-all">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex items-center justify-between hover:border-red-300 transition-all">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">cancel</span>
             </div>
             <div>
@@ -253,7 +253,7 @@ export default function DoctorManagement() {
       </div>
 
       {/* Search & Filter Toolbar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-3 items-center justify-between">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-md flex flex-col lg:flex-row gap-3 items-center justify-between">
         {/* Search Doctor input */}
         <div className="relative w-full lg:w-96">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
@@ -303,7 +303,7 @@ export default function DoctorManagement() {
       </div>
 
       {/* Doctors Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -436,8 +436,8 @@ export default function DoctorManagement() {
             <div className="p-6 space-y-6">
 
               {/* Basic Information Section */}
-              <div className="bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl p-5 border border-blue-100">
-                <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <div className="bg-gradient-to-br from-blue-50 to-slate-50 rounded-2xl p-5 border border-blue-100">
+                <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[20px] text-blue-600">person</span>
                   Basic Information
                 </h3>
@@ -481,8 +481,8 @@ export default function DoctorManagement() {
               </div>
 
               {/* Professional Information Section */}
-              <div className="bg-gradient-to-br from-emerald-50 to-slate-50 rounded-xl p-5 border border-emerald-100">
-                <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <div className="bg-gradient-to-br from-emerald-50 to-slate-50 rounded-2xl p-5 border border-emerald-100">
+                <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[20px] text-emerald-600">medical_services</span>
                   Professional Information
                 </h3>
@@ -498,7 +498,7 @@ export default function DoctorManagement() {
                           <img
                             src={selectedDoctor.professionalPhotoUrl}
                             alt="Professional Photo"
-                            className="w-28 h-28 rounded-full object-cover border-2 border-slate-200 shadow-sm"
+                            className="w-28 h-28 rounded-full object-cover border-2 border-slate-200 shadow-md"
                             onError={(e) => {
                               console.error('Image failed to load:', e.currentTarget.src);
                               console.error('Professional photo URL:', selectedDoctor.professionalPhotoUrl);
@@ -554,8 +554,8 @@ export default function DoctorManagement() {
               </div>
 
               {/* Available Schedule Section */}
-              <div className="bg-gradient-to-br from-amber-50 to-slate-50 rounded-xl p-5 border border-amber-100">
-                <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <div className="bg-gradient-to-br from-amber-50 to-slate-50 rounded-2xl p-5 border border-amber-100">
+                <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[20px] text-amber-600">schedule</span>
                   Available Schedule
                 </h3>
@@ -580,8 +580,8 @@ export default function DoctorManagement() {
               </div>
 
               {/* Status Section */}
-              <div className="bg-gradient-to-br from-purple-50 to-slate-50 rounded-xl p-5 border border-purple-100">
-                <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <div className="bg-gradient-to-br from-purple-50 to-slate-50 rounded-2xl p-5 border border-purple-100">
+                <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[20px] text-purple-600">info</span>
                   Account Status
                 </h3>
@@ -627,7 +627,7 @@ export default function DoctorManagement() {
                   setShowDetailModal(false);
                   setDoctorSchedules([]);
                 }}
-                className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors shadow-sm"
+                className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors shadow-md"
               >
                 Close
               </button>
@@ -635,13 +635,13 @@ export default function DoctorManagement() {
                 <div className="flex gap-3">
                   <button
                     onClick={handleRejectDoctor}
-                    className="px-5 py-2.5 text-sm font-semibold text-red-700 bg-white hover:bg-red-50 border border-red-300 rounded-lg transition-colors shadow-sm"
+                    className="px-5 py-2.5 text-sm font-semibold text-red-700 bg-white hover:bg-red-50 border border-red-300 rounded-lg transition-colors shadow-md"
                   >
                     Reject
                   </button>
                   <button
                     onClick={() => handleApproveDoctor(selectedDoctor.id)}
-                    className="px-5 py-2.5 text-sm font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-300 rounded-lg transition-colors shadow-sm"
+                    className="px-5 py-2.5 text-sm font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-300 rounded-lg transition-colors shadow-md"
                   >
                     Approve
                   </button>
@@ -651,7 +651,7 @@ export default function DoctorManagement() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => handleDeactivateDoctor(selectedDoctor)}
-                    className="px-5 py-2.5 text-sm font-semibold text-red-700 bg-white hover:bg-red-50 border border-red-300 rounded-lg transition-colors shadow-sm"
+                    className="px-5 py-2.5 text-sm font-semibold text-red-700 bg-white hover:bg-red-50 border border-red-300 rounded-lg transition-colors shadow-md"
                   >
                     Deactivate
                   </button>
@@ -676,7 +676,7 @@ export default function DoctorManagement() {
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Enter the reason for rejection..."
                 rows={4}
-                className="block w-full rounded-xl border border-slate-300 bg-white py-3 px-4 text-sm text-slate-900 placeholder-slate-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 transition-all resize-none"
+                className="block w-full rounded-2xl border border-slate-300 bg-white py-3 px-4 text-sm text-slate-900 placeholder-slate-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 transition-all resize-none"
               />
             </div>
             <div className="p-6 border-t border-slate-200 flex justify-end gap-3">

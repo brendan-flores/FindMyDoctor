@@ -96,7 +96,7 @@ export default function AuditLogPage() {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-3 items-center">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-md flex flex-col lg:flex-row gap-3 items-center">
         <div className="flex items-center gap-2 w-full lg:w-auto">
           <span className="text-xs text-slate-400 font-medium">Action:</span>
           <select
@@ -151,7 +151,7 @@ export default function AuditLogPage() {
       </div>
 
       {/* Audit Log Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>

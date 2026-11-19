@@ -142,7 +142,7 @@ export default function AdminLogin() {
               <label htmlFor="email" className="block text-[15px] font-bold text-[#1A202C]">
                 Email Address
               </label>
-              <div className="relative rounded-2xl shadow-sm">
+              <div className="relative rounded-2xl shadow-md">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="16" rx="3" strokeWidth="1.8" width="20" x="2" y="4"></rect>
@@ -171,7 +171,7 @@ export default function AdminLogin() {
                   Forgot Password?
                 </a>
               </div>
-              <div className="relative rounded-2xl shadow-sm">
+              <div className="relative rounded-2xl shadow-md">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
@@ -208,7 +208,7 @@ export default function AdminLogin() {
             </div>
 
             {/* Session policy notice: no device trust for administrators */}
-            <div className="rounded-xl border border-[#D6E2F5] bg-[#F5F8FD] px-4 py-3">
+            <div className="rounded-2xl border border-[#D6E2F5] bg-[#F5F8FD] px-4 py-3">
               <p className="text-[13px] leading-relaxed text-[#4A5B75]">
                 Administrator access always requires a verification code and ends after 2 hours of
                 inactivity or 8 hours in total. Stay signed in is not available for this portal.
@@ -220,7 +220,7 @@ export default function AdminLogin() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Signing in...' : 'Sign In'}
               </button>

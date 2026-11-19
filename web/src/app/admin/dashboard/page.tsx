@@ -102,112 +102,83 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       {/* Metric Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Pending Doctor Approvals */}
         <div
-          className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-amber-300 hover:shadow-md transition-all cursor-pointer"
+          className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4 cursor-pointer"
           onClick={() => router.push('/admin/doctors')}
         >
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Pending Approvals</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[18px]">schedule</span>
-            </div>
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+            <span className="material-symbols-outlined text-[28px]">schedule</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{stats.doctors.pending}</span>
-            <span className="text-xs text-slate-400">doctors</span>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-amber-600 font-medium">Awaiting review</span>
-            {stats.doctors.pending > 0 && (
-              <span className="text-amber-600 font-medium px-1.5 py-0.5 rounded bg-amber-50">Action needed</span>
-            )}
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Pending Approvals</span>
+            <span className="text-2xl font-bold text-slate-800">{stats.doctors.pending}</span>
+            <span className="text-xs text-slate-400">{stats.doctors.pending > 0 ? 'Action needed' : 'Awaiting review'}</span>
           </div>
         </div>
 
         {/* Doctors by Status */}
         <div
-          className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+          className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4 cursor-pointer"
           onClick={() => router.push('/admin/doctors')}
         >
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Doctors by Status</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1b5eb8] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[18px]">stethoscope</span>
-            </div>
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+            <span className="material-symbols-outlined text-[28px]">stethoscope</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{stats.doctors.total}</span>
-            <span className="text-xs text-slate-400">total</span>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-emerald-600 font-medium">{stats.doctors.active} active</span>
-            <span className="text-slate-400">{stats.doctors.rejected} rejected</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Doctors by Status</span>
+            <span className="text-2xl font-bold text-slate-800">{stats.doctors.total}</span>
+            <span className="text-xs text-slate-400">{stats.doctors.active} active • {stats.doctors.rejected} rejected</span>
           </div>
         </div>
 
         {/* Accounts by Role */}
         <div
-          className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+          className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4 cursor-pointer"
           onClick={() => router.push('/admin/users')}
         >
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Accounts by Role</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1b5eb8] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[18px]">group</span>
-            </div>
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+            <span className="material-symbols-outlined text-[28px]">group</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Accounts by Role</span>
+            <span className="text-2xl font-bold text-slate-800">
               {(stats.users.patient || 0) + (stats.users.doctor || 0) + (stats.users.secretary || 0) + (stats.users.admin || 0)}
             </span>
-            <span className="text-xs text-slate-400">total</span>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-emerald-600 font-medium">{stats.users.patient || 0} patients</span>
-            <span className="text-slate-400">{stats.users.doctor || 0} doctors</span>
+            <span className="text-xs text-slate-400">{stats.users.patient || 0} patients • {stats.users.doctor || 0} doctors</span>
           </div>
         </div>
 
         {/* Secretaries Without Doctor */}
         <div
-          className={`bg-white p-5 rounded-xl border shadow-sm hover:shadow-md transition-all cursor-pointer ${
+          className={`bg-white rounded-2xl p-5 shadow-md border hover:shadow-lg transition-shadow flex items-center gap-4 cursor-pointer ${
             stats.unassignedSecretaries > 0
-              ? 'border-amber-300 hover:border-amber-400'
-              : 'border-slate-200 hover:border-blue-300'
+              ? 'border-amber-300'
+              : 'border-slate-100'
           }`}
           onClick={() => router.push('/admin/secretaries')}
         >
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Unassigned Secretaries</span>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-              stats.unassignedSecretaries > 0
-                ? 'bg-amber-50 text-amber-600'
-                : 'bg-blue-50 text-[#1b5eb8]'
-            }`}>
-              <span className="material-symbols-outlined text-[18px]">badge</span>
-            </div>
+          <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br text-white flex items-center justify-center flex-shrink-0 shadow-md ${
+            stats.unassignedSecretaries > 0
+              ? 'from-amber-500 to-amber-600'
+              : 'from-blue-500 to-blue-600'
+          }`}>
+            <span className="material-symbols-outlined text-[28px]">badge</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{stats.unassignedSecretaries}</span>
-            <span className="text-xs text-slate-400">need doctor</span>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-            {stats.unassignedSecretaries > 0 ? (
-              <span className="text-amber-600 font-medium px-1.5 py-0.5 rounded bg-amber-50">Warning</span>
-            ) : (
-              <span className="text-emerald-600 font-medium">All assigned</span>
-            )}
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Unassigned Secretaries</span>
+            <span className="text-2xl font-bold text-slate-800">{stats.unassignedSecretaries}</span>
+            <span className="text-xs text-slate-400">{stats.unassignedSecretaries > 0 ? 'Warning' : 'All assigned'}</span>
           </div>
         </div>
       </div>
 
       {/* Pending Approvals List */}
       {stats.pendingApprovals.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+        <div className="bg-white rounded-2xl shadow-md border border-slate-100">
           <div className="p-5 border-b border-slate-100">
-            <h3 className="text-sm font-bold text-slate-900">Pending Doctor Approvals</h3>
+            <h3 className="text-xl font-bold text-slate-800">Pending Doctor Approvals</h3>
             <p className="text-xs text-slate-500 mt-1">Oldest submissions first</p>
           </div>
           <div className="overflow-x-auto">
@@ -270,10 +241,10 @@ export default function AdminDashboard() {
       )}
 
       {/* Recent Admin Activity */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-md">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold text-slate-900">Recent Admin Activity</h3>
+            <h3 className="text-xl font-bold text-slate-800">Recent Admin Activity</h3>
             <p className="text-xs text-slate-500 mt-1">Latest administrative actions</p>
           </div>
           <button
