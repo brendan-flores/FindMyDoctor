@@ -139,7 +139,7 @@ export default function SecretaryCompleteProfile() {
   return (
     <>
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl max-w-[460px] w-full">
+        <div className="bg-white rounded-2xl max-w-[460px] w-full">
           <div className="p-6 border-b border-slate-200">
             <h2 className="text-[28px] font-black tracking-tight text-[#0D1829] mb-2 leading-tight">
               Complete Your Profile
@@ -157,7 +157,7 @@ export default function SecretaryCompleteProfile() {
               <label htmlFor="firstName" className="block text-[15px] font-bold text-[#1A202C]">
                 First Name
               </label>
-              <div className="relative rounded-2xl shadow-sm">
+              <div className="relative rounded-2xl shadow-md">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
@@ -180,7 +180,7 @@ export default function SecretaryCompleteProfile() {
               <label htmlFor="middleName" className="block text-[15px] font-bold text-[#1A202C]">
                 Middle Name <span className="text-[#94A3B8] font-normal">(Optional)</span>
               </label>
-              <div className="relative rounded-2xl shadow-sm">
+              <div className="relative rounded-2xl shadow-md">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
@@ -202,7 +202,7 @@ export default function SecretaryCompleteProfile() {
               <label htmlFor="lastName" className="block text-[15px] font-bold text-[#1A202C]">
                 Last Name
               </label>
-              <div className="relative rounded-2xl shadow-sm">
+              <div className="relative rounded-2xl shadow-md">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
@@ -225,7 +225,7 @@ export default function SecretaryCompleteProfile() {
               <label htmlFor="contactNumber" className="block text-[15px] font-bold text-[#1A202C]">
                 Contact Number
               </label>
-              <div className="relative rounded-2xl shadow-sm">
+              <div className="relative rounded-2xl shadow-md">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
@@ -249,7 +249,7 @@ export default function SecretaryCompleteProfile() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Saving Profile...' : 'Complete Profile'}
               </button>
@@ -261,7 +261,7 @@ export default function SecretaryCompleteProfile() {
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 text-center">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 text-center">
             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
@@ -271,7 +271,7 @@ export default function SecretaryCompleteProfile() {
             <p className="text-sm text-slate-600 mb-6">Your profile has been updated. You can now proceed to the dashboard.</p>
             <button
               onClick={() => router.push('/secretary/dashboard')}
-              className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-[#0D3B75] hover:bg-[#092B57] transition-colors"
+              className="w-full py-3 px-4 rounded-2xl text-sm font-semibold text-white bg-[#0D3B75] hover:bg-[#092B57] transition-colors"
             >
               Continue to Dashboard
             </button>

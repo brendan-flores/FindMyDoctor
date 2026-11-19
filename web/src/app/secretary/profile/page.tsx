@@ -179,7 +179,7 @@ export default function SecretaryProfile() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Profile Content */}
         <div className="lg:col-span-3">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6">
             {/* Toast Notification */}
             {success && <Toast message={success} type="success" onClose={() => setSuccess('')} />}
             {error && <Toast message={error} type="error" onClose={() => setError('')} />}

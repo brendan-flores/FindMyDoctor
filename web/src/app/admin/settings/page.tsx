@@ -17,7 +17,7 @@ export default function AdminSettings() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Settings Navigation */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-4">
             <nav className="space-y-1">
               {settingsSections.map((section) => (
                 <button
@@ -25,7 +25,7 @@ export default function AdminSettings() {
                   onClick={() => setActiveSection(section.id)}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium text-sm transition-all ${
                     activeSection === section.id
-                      ? 'bg-[#1b5eb8] text-white shadow-sm shadow-blue-600/20'
+                      ? 'bg-[#1b5eb8] text-white shadow-md shadow-blue-600/20'
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
@@ -39,7 +39,7 @@ export default function AdminSettings() {
 
         {/* Settings Content */}
         <div className="lg:col-span-3">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6">
             {activeSection === 'profile' && (
               <div className="space-y-6">
                 <h2 className="text-lg font-bold text-slate-900">Profile Settings</h2>

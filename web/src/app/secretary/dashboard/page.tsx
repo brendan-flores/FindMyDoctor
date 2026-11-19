@@ -163,82 +163,60 @@ export default function SecretaryDashboard() {
       )}
 
       {/* Metric Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Today's Queue */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-purple-300 transition-all">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Today&apos;s Queue</span>
-            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[18px]">people</span>
-            </div>
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+            <span className="material-symbols-outlined text-[28px]">people</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{dashboardData?.queueCounts.waiting || 0}</span>
-            <span className="text-xs text-slate-400">waiting</span>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100">
-            <span className="text-purple-600 font-medium text-xs">
-              {dashboardData?.queueCounts.inConsultation || 0} in consultation • {dashboardData?.queueCounts.done || 0} done
-            </span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Today&apos;s Queue</span>
+            <span className="text-2xl font-bold text-slate-800">{dashboardData?.queueCounts.waiting || 0}</span>
+            <span className="text-xs text-slate-400">{dashboardData?.queueCounts.inConsultation || 0} in consultation • {dashboardData?.queueCounts.done || 0} done</span>
           </div>
         </div>
 
         {/* Remaining Capacity */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-emerald-300 transition-all">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Remaining Capacity</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[18px]">space_dashboard</span>
-            </div>
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+            <span className="material-symbols-outlined text-[28px]">space_dashboard</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{dashboardData?.capacity.remaining || 0}</span>
-            <span className="text-xs text-slate-400">of {dashboardData?.capacity.total || 0}</span>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100">
-            <span className="text-emerald-600 font-medium text-xs">Slots available</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Remaining Capacity</span>
+            <span className="text-2xl font-bold text-slate-800">{dashboardData?.capacity.remaining || 0} <span className="text-lg text-slate-400">of {dashboardData?.capacity.total || 0}</span></span>
+            <span className="text-xs text-slate-400">Slots available</span>
           </div>
         </div>
 
         {/* Pending Verification Payments */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-amber-300 transition-all">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Pending Verification</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[18px]">payments</span>
-            </div>
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+            <span className="material-symbols-outlined text-[28px]">payments</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{dashboardData?.pendingVerificationPayments || 0}</span>
-            <span className="text-xs text-slate-400">payments</span>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100">
-            <span className="text-amber-600 font-medium text-xs">Action needed</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Pending Verification</span>
+            <span className="text-2xl font-bold text-slate-800">{dashboardData?.pendingVerificationPayments || 0}</span>
+            <span className="text-xs text-slate-400">payments • Action needed</span>
           </div>
         </div>
 
         {/* Unread Messages */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-blue-300 transition-all">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Unread Messages</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1b5eb8] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[18px]">chat</span>
-            </div>
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+            <span className="material-symbols-outlined text-[28px]">chat</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{dashboardData?.unreadMessages || 0}</span>
-            <span className="text-xs text-slate-400">messages</span>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100">
-            <span className="text-[#1b5eb8] font-medium text-xs">Respond soon</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Unread Messages</span>
+            <span className="text-2xl font-bold text-slate-800">{dashboardData?.unreadMessages || 0}</span>
+            <span className="text-xs text-slate-400">messages • Respond soon</span>
           </div>
         </div>
       </div>
 
       {/* Today's Queue */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-slate-900">Today&apos;s Queue</h3>
+          <h3 className="text-xl font-bold text-slate-800">Today&apos;s Queue</h3>
           <button
             onClick={() => router.push('/secretary/queue')}
             className="text-xs text-[#1b5eb8] font-medium hover:underline"
@@ -251,20 +229,20 @@ export default function SecretaryDashboard() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200">
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Queue #</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Patient</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Reason</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Source</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Queue #</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Patient</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Reason</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Source</th>
                 </tr>
               </thead>
               <tbody>
                 {dashboardData.todayQueue.map((queueItem, index) => (
                   <tr key={index} className="border-b border-slate-100 last:border-0">
-                    <td className="py-2 px-3 text-sm font-medium text-slate-900">#{queueItem.queueNumber}</td>
-                    <td className="py-2 px-3 text-sm text-slate-700">{queueItem.patientName}</td>
-                    <td className="py-2 px-3 text-sm text-slate-600 truncate max-w-xs">{queueItem.reason || '-'}</td>
-                    <td className="py-2 px-3">
+                    <td className="py-3 px-4 text-sm font-medium text-slate-900">#{queueItem.queueNumber}</td>
+                    <td className="py-3 px-4 text-sm text-slate-700">{queueItem.patientName}</td>
+                    <td className="py-3 px-4 text-sm text-slate-600 truncate max-w-xs">{queueItem.reason || '-'}</td>
+                    <td className="py-3 px-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                         queueItem.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' :
                         queueItem.status === 'IN_CHECKUP' ? 'bg-blue-100 text-blue-700' :
@@ -275,7 +253,7 @@ export default function SecretaryDashboard() {
                         {queueItem.status.replace('_', ' ')}
                       </span>
                     </td>
-                    <td className="py-2 px-3">
+                    <td className="py-3 px-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                         queueItem.registrationSource === 'ONLINE' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
                       }`}>
@@ -296,9 +274,9 @@ export default function SecretaryDashboard() {
       </div>
 
       {/* Payments Needing Action */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-slate-900">Payments Needing Action</h3>
+          <h3 className="text-xl font-bold text-slate-800">Payments Needing Action</h3>
           <button
             onClick={() => router.push('/secretary/payments')}
             className="text-xs text-[#1b5eb8] font-medium hover:underline"
@@ -353,9 +331,9 @@ export default function SecretaryDashboard() {
       </div>
 
       {/* Schedule Alerts */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-slate-900">Schedule Alerts</h3>
+          <h3 className="text-xl font-bold text-slate-800">Schedule Alerts</h3>
           {!pendingLoading && pendingChanges.length > 0 && (
             <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full">
               {pendingChanges.length} awaiting confirmation
@@ -384,7 +362,7 @@ export default function SecretaryDashboard() {
         {pendingLoading ? (
           <div className="space-y-3">
             {[0, 1].map((i) => (
-              <div key={i} className="animate-pulse bg-slate-50 border border-slate-100 rounded-xl p-4 h-20" />
+              <div key={i} className="animate-pulse bg-slate-50 border border-slate-100 rounded-2xl p-4 h-20" />
             ))}
           </div>
         ) : pendingChanges.length === 0 ? (
@@ -401,7 +379,7 @@ export default function SecretaryDashboard() {
               return (
                 <div
                   key={request.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl"
                 >
                   <div className="flex items-start gap-3 min-w-0">
                     <span className="material-symbols-outlined text-amber-600 text-2xl">event_busy</span>
@@ -443,7 +421,7 @@ export default function SecretaryDashboard() {
       </div>
 
       {/* Recent Conversations */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-md">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-bold text-slate-900">Recent Conversations</h3>
           <button
@@ -489,7 +467,7 @@ export default function SecretaryDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-md">
         <h3 className="text-sm font-bold text-slate-900 mb-4">Quick Actions</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <button

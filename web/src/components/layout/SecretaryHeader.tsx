@@ -161,9 +161,9 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
     router.push('/secretary/profile');
   };
 
-  const handleChangePassword = () => {
+  const handleChangeSettings = () => {
     setIsDropdownOpen(false);
-    router.push('/secretary/change-password');
+    router.push('/secretary/settings');
   };
 
   const handleSignOut = async () => {
@@ -278,14 +278,14 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
                 className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">account_circle</span>
-                View Profile
+                Profile
               </button>
               <button
-                onClick={handleChangePassword}
+                onClick={handleChangeSettings}
                 className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px]">lock</span>
-                Change Password
+                <span className="material-symbols-outlined text-[18px]">settings</span>
+                Settings
               </button>
               <div className="border-t border-slate-100 my-1"></div>
               <button

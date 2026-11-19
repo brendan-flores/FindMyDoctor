@@ -280,7 +280,7 @@ export default function SecretarySettings() {
 
           <div className="space-y-6">
             {/* Two-Factor Authentication */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h3 className="font-semibold text-slate-900">Two-Factor Authentication</h3>
@@ -329,7 +329,7 @@ export default function SecretarySettings() {
 
           <div className="space-y-6">
             {/* Clinic Payment Settings (GCash QR) */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
               <div>
                 <h3 className="text-xl font-semibold text-slate-900">Clinic Payment Settings</h3>
                 <p className="text-sm text-slate-600 mt-1">
@@ -363,10 +363,10 @@ export default function SecretarySettings() {
                     <img
                       src={gcashQr!.gcashQrUrl!}
                       alt="GCash QR code"
-                      className="h-24 w-24 flex-shrink-0 rounded-xl border border-slate-200 object-contain bg-white p-1"
+                      className="h-24 w-24 flex-shrink-0 rounded-2xl border border-slate-200 object-contain bg-white p-1"
                     />
                   ) : (
-                    <div className="h-24 w-24 flex-shrink-0 rounded-xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center">
+                    <div className="h-24 w-24 flex-shrink-0 rounded-2xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center">
                       <span className="material-symbols-outlined text-slate-400">qr_code_2</span>
                     </div>
                   )}
@@ -400,7 +400,7 @@ export default function SecretarySettings() {
                 </div>
               )}
 
-              <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
+              <div className="mt-4 p-4 bg-amber-50 rounded-2xl border border-amber-200">
                 <p className="text-sm text-amber-800">
                   Patients see this QR code in the mobile app when they pay. Receipt review is on the Payments page.
                 </p>
@@ -408,7 +408,7 @@ export default function SecretarySettings() {
             </div>
 
             {/* Invoice Details */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
               <div>
                 <h3 className="font-semibold text-slate-900">Invoice details</h3>
                 <p className="text-sm text-slate-600 mt-1">
@@ -508,7 +508,7 @@ export default function SecretarySettings() {
             </div>
 
             {/* GCash Account Details */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
               <div>
                 <h3 className="font-semibold text-slate-900">GCash account details</h3>
                 <p className="text-sm text-slate-600 mt-1">

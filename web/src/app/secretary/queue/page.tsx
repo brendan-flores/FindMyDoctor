@@ -430,11 +430,11 @@ export default function SecretaryQueue() {
   if (loading && !secretary) {
     return (
       <div className="space-y-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100">
           <h1 className="text-lg font-bold text-slate-900">Daily Queue</h1>
           <p className="text-xs text-slate-500 mt-0.5">Manage the daily patient queue and call patients</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm text-center">
+        <div className="bg-white rounded-2xl p-8 shadow-md border border-slate-100 text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
           <p className="text-slate-600 mt-3">Loading queue...</p>
         </div>
@@ -469,74 +469,56 @@ export default function SecretaryQueue() {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+            <span className="material-symbols-outlined text-[28px]">groups</span>
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
               {isToday(selectedDate) ? 'Total Queue Today' : 'Total Queue'}
             </span>
-            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[18px]">groups</span>
-            </div>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{totalQueue}</span>
+            <span className="text-2xl font-bold text-slate-800">{totalQueue}</span>
             <span className="text-xs text-slate-400">Patients</span>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Waiting in Lobby</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[18px]">event_seat</span>
-            </div>
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+            <span className="material-symbols-outlined text-[28px]">event_seat</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{waitingInLobby}</span>
-            <span className="text-xs text-slate-400">Patients</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Waiting in Lobby</span>
+            <span className="text-2xl font-bold text-slate-800">{waitingInLobby}</span>
+            <span className="text-xs text-slate-400">{waitingInLobby > 0 ? `#${queueEntries.find(e => e.status === 'WAITING')?.queue_number} Next` : 'Patients'}</span>
           </div>
-          {waitingInLobby > 0 && (
-            <div className="mt-2 text-xs text-blue-600 font-medium">
-              {queueEntries.find(e => e.status === 'WAITING')?.queue_number} Next in Line
-            </div>
-          )}
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">In Consultation</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[18px]">medical_services</span>
-            </div>
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+            <span className="material-symbols-outlined text-[28px]">medical_services</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{inConsultation}</span>
-            <span className="text-xs text-slate-400">Patient</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">In Consultation</span>
+            <span className="text-2xl font-bold text-slate-800">{inConsultation}</span>
+            <span className="text-xs text-slate-400">{inConsultation > 0 ? `${secretary?.room_number || 'Room 101'} • Dr. ${secretary?.doctor_first_name} ${secretary?.doctor_last_name}` : 'Patient'}</span>
           </div>
-          {inConsultation > 0 && (
-            <div className="mt-2 text-xs text-emerald-600 font-medium">
-              {secretary?.room_number || 'Room 101'} • Dr. {secretary?.doctor_first_name} {secretary?.doctor_last_name}
-            </div>
-          )}
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Completed Checkups</span>
-            <div className="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[18px]">check_circle</span>
-            </div>
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-500 to-slate-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+            <span className="material-symbols-outlined text-[28px]">check_circle</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{completed}</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Completed Checkups</span>
+            <span className="text-2xl font-bold text-slate-800">{completed}</span>
             <span className="text-xs text-slate-400">Completed</span>
           </div>
         </div>
       </div>
 
       {/* Status Filter Bar and Search - Combined */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden">
         {/* Status Filter Tabs */}
         <nav className="flex overflow-x-auto gap-1 p-2 border-b border-slate-200">
           <button
@@ -635,7 +617,7 @@ export default function SecretaryQueue() {
       </div>
 
       {/* Queue Data Table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-md overflow-hidden">
         {!isToday(selectedDate) && (
           <div className="bg-amber-50 border-b border-amber-200 px-4 py-3">
             <div className="flex items-center gap-2 text-amber-700 text-sm">
@@ -875,7 +857,7 @@ export default function SecretaryQueue() {
       </div>
 
       {/* Footer */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-md">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span className="font-medium text-slate-700">FiDo Clinical Platform</span>

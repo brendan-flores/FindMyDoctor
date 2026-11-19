@@ -53,9 +53,9 @@ export default function UserManagement() {
       {/* Summary Metric Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: TOTAL USERS */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 transition-all">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex items-center justify-between hover:border-blue-300 transition-all">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-blue-50 text-[#1b5eb8] flex items-center justify-center">
+            <div className="w-11 h-11 rounded-2xl bg-blue-50 text-[#1b5eb8] flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">group</span>
             </div>
             <div>
@@ -69,9 +69,9 @@ export default function UserManagement() {
         </div>
 
         {/* Card 2: PATIENTS */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-emerald-300 transition-all">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex items-center justify-between hover:border-emerald-300 transition-all">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">person</span>
             </div>
             <div>
@@ -86,9 +86,9 @@ export default function UserManagement() {
         </div>
 
         {/* Card 3: DOCTORS */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 transition-all">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex items-center justify-between hover:border-blue-300 transition-all">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-blue-50 text-[#1b5eb8] flex items-center justify-center">
+            <div className="w-11 h-11 rounded-2xl bg-blue-50 text-[#1b5eb8] flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">stethoscope</span>
             </div>
             <div>
@@ -102,9 +102,9 @@ export default function UserManagement() {
         </div>
 
         {/* Card 4: SECRETARIES */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-purple-300 transition-all">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex items-center justify-between hover:border-purple-300 transition-all">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">badge</span>
             </div>
             <div>
@@ -119,7 +119,7 @@ export default function UserManagement() {
       </div>
 
       {/* Search & Filter Toolbar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-3 items-center justify-between">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-md flex flex-col lg:flex-row gap-3 items-center justify-between">
         {/* Search User input */}
         <div className="relative w-full lg:w-96">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
@@ -152,7 +152,7 @@ export default function UserManagement() {
       </div>
 
       {/* Users Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>

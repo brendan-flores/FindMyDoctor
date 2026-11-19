@@ -238,7 +238,7 @@ export default function SecretaryResetPassword() {
               <button
                 type="submit"
                 disabled={isVerifying || otp.length !== 6}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isVerifying ? 'Verifying...' : 'Verify Code'}
               </button>
@@ -251,7 +251,7 @@ export default function SecretaryResetPassword() {
               <label htmlFor="newPassword" className="block text-[15px] font-bold text-[#1A202C]">
                 New Password
               </label>
-              <div className="relative rounded-2xl shadow-sm">
+              <div className="relative rounded-2xl shadow-md">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
@@ -377,7 +377,7 @@ export default function SecretaryResetPassword() {
               <label htmlFor="confirmPassword" className="block text-[15px] font-bold text-[#1A202C]">
                 Confirm Password
               </label>
-              <div className="relative rounded-2xl shadow-sm">
+              <div className="relative rounded-2xl shadow-md">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
@@ -433,7 +433,7 @@ export default function SecretaryResetPassword() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Resetting...' : 'Reset Password'}
               </button>

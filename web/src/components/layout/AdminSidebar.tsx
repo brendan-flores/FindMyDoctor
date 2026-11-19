@@ -2,7 +2,6 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { apiClient } from '@/lib/api/apiClient';
 
 interface AdminSidebarProps {
   userName?: string;
@@ -23,10 +22,10 @@ export default function AdminSidebar({ userName = 'Eleanor Vance', userRole = 'S
     { id: 'doctors', label: 'Doctors', icon: 'stethoscope' },
     { id: 'secretaries', label: 'Secretaries', icon: 'badge' },
     { id: 'audit-log', label: 'Audit Log', icon: 'history' },
-    // Only show Admin and Users tabs for SUPERADMIN
+    { id: 'users', label: 'Users', icon: 'manage_accounts' },
+    // Only show Admin tab for SUPERADMIN
     ...(userRole === 'SUPERADMIN' ? [
-      { id: 'admin', label: 'Admin', icon: 'admin_panel_settings' },
-      { id: 'users', label: 'Users', icon: 'manage_accounts' }
+      { id: 'admin', label: 'Admin', icon: 'admin_panel_settings' }
     ] : []),
     { id: 'settings', label: 'Settings', icon: 'tune' },
   ];
@@ -38,16 +37,6 @@ export default function AdminSidebar({ userName = 'Eleanor Vance', userRole = 'S
     } else {
       router.push(`/admin/${tabId}`);
     }
-  };
-
-  const handleLogout = async () => {
-    await apiClient.post('/auth/logout', {});
-    apiClient.clearToken();
-    localStorage.removeItem('admin_refreshToken');
-    localStorage.removeItem('admin_user');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    router.push('/admin/login');
   };
 
   return (
@@ -102,18 +91,6 @@ export default function AdminSidebar({ userName = 'Eleanor Vance', userRole = 'S
             </button>
           ))}
         </nav>
-      </div>
-
-      {/* Bottom Actions */}
-      <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-1">
-        <a
-          href="/admin/login"
-          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-          onClick={handleLogout}
-        >
-          <span className="material-symbols-outlined text-[18px]">logout</span>
-          <span>Sign Out Console</span>
-        </a>
       </div>
     </aside>
   );

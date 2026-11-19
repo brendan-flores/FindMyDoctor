@@ -93,18 +93,18 @@ export default function SecretaryAppointments() {
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500 font-medium">Total</p>
               <p className="text-2xl font-bold text-slate-800">{appointments.length}</p>
             </div>
-            <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center">
               <span className="material-symbols-outlined text-purple-600 text-2xl">calendar_month</span>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500 font-medium">Scheduled</p>
@@ -112,12 +112,12 @@ export default function SecretaryAppointments() {
                 {appointments.filter(a => a.status === 'SCHEDULED').length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
               <span className="material-symbols-outlined text-emerald-600 text-2xl">event_available</span>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500 font-medium">Completed</p>
@@ -125,12 +125,12 @@ export default function SecretaryAppointments() {
                 {appointments.filter(a => a.status === 'COMPLETED').length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
               <span className="material-symbols-outlined text-blue-600 text-2xl">check_circle</span>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500 font-medium">Cancelled</p>
@@ -138,7 +138,7 @@ export default function SecretaryAppointments() {
                 {appointments.filter(a => a.status === 'CANCELLED').length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center">
               <span className="material-symbols-outlined text-red-600 text-2xl">cancel</span>
             </div>
           </div>
@@ -146,7 +146,7 @@ export default function SecretaryAppointments() {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+      <div className="bg-white rounded-2xl p-4 shadow-md border border-slate-100">
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setStatusFilter('ALL')}
@@ -202,7 +202,7 @@ export default function SecretaryAppointments() {
       </div>
 
       {/* Appointments List */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
         {isLoading ? (
           <div className="p-8 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>

@@ -214,11 +214,11 @@ export default function SecretaryWalkIns() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-md">
           <h1 className="text-lg font-bold text-slate-900">Walk-ins</h1>
           <p className="text-xs text-slate-500 mt-0.5">Register walk-in patients and manage queue</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm text-center">
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-md text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
           <p className="mt-4 text-slate-600">Loading...</p>
         </div>
@@ -229,11 +229,11 @@ export default function SecretaryWalkIns() {
   if (error && step !== 'success') {
     return (
       <div className="space-y-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-md">
           <h1 className="text-lg font-bold text-slate-900">Walk-ins</h1>
           <p className="text-xs text-slate-500 mt-0.5">Register walk-in patients and manage queue</p>
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
           <p className="text-red-600">{error}</p>
           <div className="flex gap-3 mt-4">
             <button
@@ -258,7 +258,7 @@ export default function SecretaryWalkIns() {
     <div className="space-y-6">
       {/* Direct Registration Form */}
       {step === 'form' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
           <h2 className="text-lg font-semibold text-slate-800 mb-4">Register Walk-in Patient</h2>
           <div className="space-y-4">
             {error && (
@@ -475,7 +475,7 @@ export default function SecretaryWalkIns() {
 
       {/* Success */}
       {step === 'success' && registrationResult && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
           <div className="text-center">
             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="material-symbols-outlined text-emerald-600 text-4xl">check_circle</span>

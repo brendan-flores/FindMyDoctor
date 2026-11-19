@@ -68,7 +68,7 @@ export default function SecretaryChangePassword() {
   return (
     <>
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl max-w-[460px] w-full">
+        <div className="bg-white rounded-2xl max-w-[460px] w-full">
           <div className="p-6 border-b border-slate-200">
             <h2 className="text-[28px] font-black tracking-tight text-[#0D1829] mb-2 leading-tight">
               Change Password
@@ -86,7 +86,7 @@ export default function SecretaryChangePassword() {
               <label htmlFor="currentPassword" className="block text-[15px] font-bold text-[#1A202C]">
                 Current Password
               </label>
-              <div className="relative rounded-2xl shadow-sm">
+              <div className="relative rounded-2xl shadow-md">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
@@ -126,7 +126,7 @@ export default function SecretaryChangePassword() {
               <label htmlFor="newPassword" className="block text-[15px] font-bold text-[#1A202C]">
                 New Password
               </label>
-              <div className="relative rounded-2xl shadow-sm">
+              <div className="relative rounded-2xl shadow-md">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
@@ -168,7 +168,7 @@ export default function SecretaryChangePassword() {
               <label htmlFor="confirmPassword" className="block text-[15px] font-bold text-[#1A202C]">
                 Confirm New Password
               </label>
-              <div className="relative rounded-2xl shadow-sm">
+              <div className="relative rounded-2xl shadow-md">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
@@ -209,7 +209,7 @@ export default function SecretaryChangePassword() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Changing Password...' : 'Change Password'}
               </button>
@@ -221,7 +221,7 @@ export default function SecretaryChangePassword() {
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 text-center">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 text-center">
             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
@@ -231,7 +231,7 @@ export default function SecretaryChangePassword() {
             <p className="text-sm text-slate-600 mb-6">Please log in again using your new password.</p>
             <button
               onClick={() => router.push('/secretary-login')}
-              className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-[#0D3B75] hover:bg-[#092B57] transition-colors"
+              className="w-full py-3 px-4 rounded-2xl text-sm font-semibold text-white bg-[#0D3B75] hover:bg-[#092B57] transition-colors"
             >
               Log In
             </button>

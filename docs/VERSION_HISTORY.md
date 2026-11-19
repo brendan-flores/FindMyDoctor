@@ -4,6 +4,7 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+<<<<<<< HEAD
 ### 01.44 (November 19, 2026)
 
 **Purpose:** Let doctors upload a signature that is embedded in professional prescription PDFs, and redesign the prescription PDF and mobile prescription detail view for clinical use.
@@ -63,6 +64,33 @@ This document contains the complete version history for the FindMyDoctor applica
 **Breaking Changes:** None
 
 **Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.43, added this version entry to `VERSION_HISTORY.md`, and synchronized `docs/SYSTEM_STATE.md` with the new chat UX. No PRD, architecture, API, or database changes were required.
+=======
+### 01.43 (November 19, 2026)
+
+**Purpose:** Portal-wide UI/UX consistency across Doctor, Secretary, and Admin web portals, with header dropdowns for account actions and restored Users navigation for ADMIN users.
+
+**Significant Features:**
+- DoctorHeader.tsx: Added clickable avatar/name dropdown with Profile, Settings, and Sign Out actions (matching SecretaryHeader reference pattern).
+- AdminHeader.tsx: Added clickable avatar/name dropdown with Settings and Sign Out actions.
+- DoctorSidebar.tsx: Removed Profile and Settings nav items, removed Sign Out from bottom section.
+- AdminSidebar.tsx: Removed Sign Out from bottom section, Users nav item now visible for ADMIN role (not just SUPERADMIN).
+- SecretarySidebar.tsx: Removed Profile and Settings nav items, removed Sign Out from bottom section (header dropdown provides these actions).
+- SecretaryHeader.tsx: Updated dropdown labels to "Profile" and "Settings" (was "View Profile" and "Change Password").
+
+**Improvements:**
+- All Secretary portal pages aligned to Doctor reference visual patterns: card border radius changed from `rounded-xl` to `rounded-2xl`, card shadow from `shadow-sm` to `shadow-md`, metric cards use gradient icon backgrounds, heading sizes increased to match Doctor (`text-xl font-bold text-slate-800`).
+- All Admin portal pages aligned to Doctor reference visual patterns: same card border radius, shadow, and heading changes.
+- Portal-wide consistency: shell/layout, surfaces, typography, icons, components, grouping, and hierarchy now match Doctor portal reference across all authenticated pages.
+
+**Bug Fixes:** None
+
+**Removed/Modified Functionality:**
+- Profile, Settings, and Sign Out actions moved from sidebars to header dropdowns for Doctor, Admin, and Secretary portals (functionality preserved, location changed).
+
+**Breaking Changes:** None (UI/UX alignment only; no functional changes to routes, authentication, or authorization).
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.43, added this version entry to `VERSION_HISTORY.md`.
+>>>>>>> feature/portal-ui-consistency-and-header-dropdowns
 
 ---
 
