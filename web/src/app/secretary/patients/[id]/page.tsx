@@ -160,7 +160,7 @@ export default function SecretaryPatientDetail() {
         <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-2xl p-6 shadow-lg">
           <h1 className="text-2xl font-bold text-white">Patient Details</h1>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center">
+        <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-8 text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
           <p className="mt-4 text-slate-600">Loading patient details...</p>
         </div>
@@ -174,7 +174,7 @@ export default function SecretaryPatientDetail() {
         <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-2xl p-6 shadow-lg">
           <h1 className="text-2xl font-bold text-white">Patient Details</h1>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center">
+        <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-8 text-center">
           <p className="text-red-600">{error || 'Patient not found'}</p>
           <button
             onClick={() => router.push('/secretary/patients')}
@@ -213,13 +213,13 @@ export default function SecretaryPatientDetail() {
       </div>
 
       {saveError && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
           <p className="text-red-600">{saveError}</p>
         </div>
       )}
 
       {/* Demographics Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
         <div className="p-6 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
             <span className="material-symbols-outlined text-emerald-600">person</span>
@@ -318,7 +318,7 @@ export default function SecretaryPatientDetail() {
       </div>
 
       {/* Contact Information Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
         <div className="p-6 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
             <span className="material-symbols-outlined text-emerald-600">contact_phone</span>
@@ -365,7 +365,7 @@ export default function SecretaryPatientDetail() {
       </div>
 
       {/* Medical Information Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
         <div className="p-6 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
             <span className="material-symbols-outlined text-emerald-600">medical_services</span>
@@ -435,7 +435,7 @@ export default function SecretaryPatientDetail() {
       </div>
 
       {/* Emergency Contact Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
         <div className="p-6 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
             <span className="material-symbols-outlined text-emerald-600">emergency</span>

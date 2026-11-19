@@ -197,7 +197,7 @@ export default function SecretaryPayments() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <input
@@ -228,7 +228,7 @@ export default function SecretaryPayments() {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-6">
+        <div className="bg-white rounded-lg shadow-md mb-6">
           <div className="flex border-b">
             {tabs.map((tab) => (
               <button
@@ -253,7 +253,7 @@ export default function SecretaryPayments() {
 
         {/* Day Summary (for Paid tab) */}
         {activeTab === 'paid' && (
-          <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Today&apos;s Summary</h3>
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
@@ -273,7 +273,7 @@ export default function SecretaryPayments() {
         )}
 
         {/* Payments List */}
-        <div className="bg-white rounded-lg shadow-sm">
+        <div className="bg-white rounded-lg shadow-md">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

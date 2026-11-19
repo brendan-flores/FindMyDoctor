@@ -229,7 +229,7 @@ export default function GcashQrManagement() {
         {success && <Toast message={success} type="success" onClose={() => setSuccess('')} />}
         {error && <Toast message={error} type="error" onClose={() => setError('')} />}
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+        <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6 mb-6">
           <h2 className="text-xl font-semibold text-slate-900 mb-4">Current GCash QR Code</h2>
 
           {gcashQrUrl ? (
@@ -287,7 +287,7 @@ export default function GcashQrManagement() {
           )}
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
           <h2 className="text-xl font-semibold text-slate-900 mb-4">Upload New QR Code</h2>
 
           <div className="space-y-4">
@@ -351,7 +351,7 @@ export default function GcashQrManagement() {
           </div>
         </div>
 
-        <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+        <div className="mt-6 p-4 bg-blue-50 rounded-2xl border border-blue-200">
           <h3 className="font-semibold text-blue-900 mb-2">About GCash QR Codes</h3>
           <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
             <li>The QR code displayed here will be shown to patients in the mobile app</li>

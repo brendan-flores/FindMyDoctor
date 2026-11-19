@@ -340,7 +340,7 @@ export default function SecretaryConversations() {
       {/* Three-column chat layout */}
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr_320px] gap-4 h-[calc(100vh-120px)] min-h-[560px]">
         {/* Column 1: Conversation list */}
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-md flex flex-col overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-100">
             <h2 className="text-sm font-bold text-slate-900">Chats</h2>
             <p className="text-xs text-slate-500">{conversations.length} conversation{conversations.length === 1 ? '' : 's'}</p>
@@ -395,7 +395,7 @@ export default function SecretaryConversations() {
         </div>
 
         {/* Column 2: Conversation thread */}
-        <div className="min-w-0 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
+        <div className="min-w-0 bg-white border border-slate-200 rounded-2xl shadow-md flex flex-col overflow-hidden">
           {selectedConversation ? (
             <>
               <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
@@ -531,7 +531,7 @@ export default function SecretaryConversations() {
         </div>
 
         {/* Column 3: Patient info sheet */}
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-md flex flex-col overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-100">
             <h2 className="text-sm font-bold text-slate-900">Patient Info</h2>
             <p className="text-xs text-slate-500">Read-only appointment details</p>
@@ -635,7 +635,7 @@ export default function SecretaryConversations() {
       {/* Invoice Picker Modal */}
       {showInvoicePicker && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900">Send Invoice to Patient</h3>
               <button

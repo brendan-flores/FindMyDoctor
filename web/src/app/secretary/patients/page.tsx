@@ -70,18 +70,18 @@ export default function SecretaryPatients() {
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500 font-medium">Total Patients</p>
               <p className="text-2xl font-bold text-slate-800">{patients.length}</p>
             </div>
-            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
               <span className="material-symbols-outlined text-emerald-600 text-2xl">people</span>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500 font-medium">Active Patients</p>
@@ -89,12 +89,12 @@ export default function SecretaryPatients() {
                 {patients.length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
               <span className="material-symbols-outlined text-emerald-600 text-2xl">person_check</span>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500 font-medium">Filtered Results</p>
@@ -102,12 +102,12 @@ export default function SecretaryPatients() {
                 {filteredPatients.length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
               <span className="material-symbols-outlined text-blue-600 text-2xl">filter_list</span>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500 font-medium">Search Active</p>
@@ -115,7 +115,7 @@ export default function SecretaryPatients() {
                 {searchTerm ? 'Yes' : 'No'}
               </p>
             </div>
-            <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center">
               <span className="material-symbols-outlined text-purple-600 text-2xl">search</span>
             </div>
           </div>
@@ -123,7 +123,7 @@ export default function SecretaryPatients() {
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+      <div className="bg-white rounded-2xl p-4 shadow-md border border-slate-100">
         <div className="relative">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
             search
@@ -139,7 +139,7 @@ export default function SecretaryPatients() {
       </div>
 
       {/* Patients List */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
         {isLoading ? (
           <div className="p-8 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
