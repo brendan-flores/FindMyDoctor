@@ -727,6 +727,7 @@ Current System State (November 2026):
 - Web application provides role-specific dashboards for Doctor, Secretary, and Admin users
 - Web application uses toast notifications (auto-dismiss after 2 seconds with close button) for success/error messages instead of inline banners
 - Toast component at web/src/components/ui/Toast.tsx provides consistent notification UI across all pages
+- Shared Select component at web/src/components/ui/Select.tsx standardizes dropdown styling (emerald focus ring, slate borders, chevron, outside-click close) across Doctor, Secretary, and Admin pages; SearchableSelect and SearchableMultiSelect share the same visual language
 - Web Doctors page displays real doctor records from database through backend API (no hardcoded data)
 - Web application authentication persists across page refreshes (Ctrl+R) via apiClient automatic localStorage token management (legacy)
 
