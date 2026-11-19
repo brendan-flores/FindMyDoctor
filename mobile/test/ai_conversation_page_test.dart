@@ -214,9 +214,12 @@ void main() {
         await sendMessage(tester);
 
         // Optimistic user bubble and typing indicator are visible immediately.
-        // (The text also still lives in the input field until the response
-        // succeeds, so at least one match is expected here.)
+        // The input field is cleared as soon as the message is submitted.
         expect(find.text(userQuestion), findsWidgets);
+        expect(
+          tester.widget<TextField>(find.byType(TextField)).controller!.text,
+          isEmpty,
+        );
         expect(find.text('MediGuide is typing'), findsOneWidget);
 
         // Complete the backend request; the conversation reloads and the
@@ -233,6 +236,42 @@ void main() {
         // The user question now comes from the reloaded history (exactly one).
         expect(find.text(userQuestion), findsOneWidget);
         expect(find.text('Here is some general information.'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'clears the input field and shows no send-button spinner while the '
+      'response is pending',
+      (tester) async {
+        final chatCompleter = Completer<http.Response>();
+        final apiService = ApiService.createWithClient(
+          buildClient(chatCompleter: chatCompleter),
+        );
+
+        await pumpPage(tester, apiService);
+        await sendMessage(tester);
+
+        // The optimistic user bubble and typing indicator are visible, the
+        // input field is already cleared, and the send button shows its
+        // normal icon instead of a loading spinner.
+        expect(find.text('MediGuide is typing'), findsOneWidget);
+        expect(
+          tester.widget<TextField>(find.byType(TextField)).controller!.text,
+          isEmpty,
+        );
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.byIcon(Icons.send), findsOneWidget);
+
+        chatCompleter.complete(
+          jsonResponse({
+            'success': true,
+            'data': {'conversationId': 'conv-1', 'type': 'message'},
+          }),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('MediGuide is typing'), findsNothing);
+        expect(find.byIcon(Icons.send), findsOneWidget);
       },
     );
 

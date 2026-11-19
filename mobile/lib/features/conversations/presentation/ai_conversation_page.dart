@@ -73,6 +73,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
       _isSending = true;
       _pendingUserMessage = message;
     });
+    // Clear the input immediately so the field stays empty and the character
+    // counter resets while MediGuide's response is pending.
+    _messageController.clear();
     _scrollToBottom();
 
     try {
@@ -82,7 +85,6 @@ class _AiConversationPageState extends State<AiConversationPage> {
       );
 
       if (response['success'] == true) {
-        _messageController.clear();
         setState(() {
           _currentConversationId = response['data']['conversationId'];
           _limitReachedMessage = null;
@@ -1052,7 +1054,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
                 ],
               ),
               const SizedBox(height: spacing.AppSpacing.gutterSm),
-              Text(content, style: AppTextStyles.bodyMd),
+              _buildAssistantMarkdown(content),
               const SizedBox(height: spacing.AppSpacing.gutterMd),
               // M6: "Find a doctor" and "Book appointment" actions
               Row(
@@ -1127,7 +1129,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
                 ],
               ),
               const SizedBox(height: spacing.AppSpacing.gutterSm),
-              Text(content, style: AppTextStyles.bodyMd),
+              _buildAssistantMarkdown(content),
               const SizedBox(height: spacing.AppSpacing.gutterMd),
               // M6: "Find a doctor" and "Book appointment" actions
               Row(
@@ -1230,7 +1232,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
             const SizedBox(width: spacing.AppSpacing.gutterSm),
             Container(
               decoration: BoxDecoration(
-                color: _isSending || _limitReachedMessage != null
+                color: _limitReachedMessage != null
                     ? AppColors.outline
                     : AppColors.primary,
                 borderRadius: BorderRadius.circular(
@@ -1238,21 +1240,8 @@ class _AiConversationPageState extends State<AiConversationPage> {
                 ),
               ),
               child: IconButton(
-                icon: _isSending
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.onPrimary,
-                          ),
-                        ),
-                      )
-                    : const Icon(Icons.send, color: AppColors.onPrimary),
-                onPressed: _isSending || _limitReachedMessage != null
-                    ? null
-                    : _sendMessage,
+                icon: const Icon(Icons.send, color: AppColors.onPrimary),
+                onPressed: _limitReachedMessage != null ? null : _sendMessage,
               ),
             ),
           ],
