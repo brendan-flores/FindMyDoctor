@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { adminApi, Doctor, DoctorSchedule } from '@/lib/api/adminApi';
+import Select from '@/components/ui/Select';
 
 export default function DoctorManagement() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -273,31 +274,33 @@ export default function DoctorManagement() {
           {/* Specialty Filter */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-400 font-medium hidden sm:inline">Specialty:</span>
-            <select
-              className="h-9 px-3 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20"
+            <Select
+              className="w-44"
+              triggerClassName="h-9 px-3 text-xs"
               value={specialtyFilter}
-              onChange={(e) => setSpecialtyFilter(e.target.value)}
-            >
-              <option value="all">All Specialties</option>
-              {specialties.map(specialty => (
-                <option key={specialty} value={specialty}>{specialty}</option>
-              ))}
-            </select>
+              onChange={setSpecialtyFilter}
+              options={[
+                { value: 'all', label: 'All Specialties' },
+                ...specialties.map(specialty => ({ value: specialty, label: specialty })),
+              ]}
+            />
           </div>
 
           {/* Status Filter */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-400 font-medium hidden sm:inline">Status:</span>
-            <select
-              className="h-9 px-3 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20"
+            <Select
+              className="w-36"
+              triggerClassName="h-9 px-3 text-xs"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">All Statuses</option>
-              <option value="Active">Active</option>
-              <option value="Pending">Pending</option>
-              <option value="Rejected">Rejected</option>
-            </select>
+              onChange={setStatusFilter}
+              options={[
+                { value: 'all', label: 'All Statuses' },
+                { value: 'Active', label: 'Active' },
+                { value: 'Pending', label: 'Pending' },
+                { value: 'Rejected', label: 'Rejected' },
+              ]}
+            />
           </div>
         </div>
       </div>

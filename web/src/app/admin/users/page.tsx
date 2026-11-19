@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { adminApi, User } from '@/lib/api/adminApi';
+import Select from '@/components/ui/Select';
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -137,17 +138,19 @@ export default function UserManagement() {
         {/* Role Filter */}
         <div className="flex items-center gap-1.5 w-full lg:w-auto">
           <span className="text-xs text-slate-400 font-medium hidden sm:inline">Role:</span>
-          <select
-            className="h-9 px-3 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20"
+          <Select
+            className="w-36"
+            triggerClassName="h-9 px-3 text-xs"
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-          >
-            <option value="all">All Roles</option>
-            <option value="PATIENT">Patients</option>
-            <option value="DOCTOR">Doctors</option>
-            <option value="SECRETARY">Secretaries</option>
-            <option value="ADMIN">Admins</option>
-          </select>
+            onChange={setRoleFilter}
+            options={[
+              { value: 'all', label: 'All Roles' },
+              { value: 'PATIENT', label: 'Patients' },
+              { value: 'DOCTOR', label: 'Doctors' },
+              { value: 'SECRETARY', label: 'Secretaries' },
+              { value: 'ADMIN', label: 'Admins' },
+            ]}
+          />
         </div>
       </div>
 

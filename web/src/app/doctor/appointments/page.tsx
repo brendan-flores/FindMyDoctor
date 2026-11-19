@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
+import Select from '@/components/ui/Select';
 
 interface Appointment {
   id: string;
@@ -222,16 +223,18 @@ export default function DoctorAppointments() {
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-500">Date:</span>
-            <select
+            <Select
+              className="w-36"
+              triggerClassName="px-3 py-2 text-sm"
               value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="TODAY">Today</option>
-              <option value="THIS_WEEK">This Week</option>
-              <option value="THIS_MONTH">This Month</option>
-              <option value="ALL_TIME">All Time</option>
-            </select>
+              onChange={setDateFilter}
+              options={[
+                { value: 'TODAY', label: 'Today' },
+                { value: 'THIS_WEEK', label: 'This Week' },
+                { value: 'THIS_MONTH', label: 'This Month' },
+                { value: 'ALL_TIME', label: 'All Time' },
+              ]}
+            />
           </div>
           <div className="flex flex-wrap gap-2">
             <button

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { adminApi, AuditLogEntry, AuditLogResponse } from '@/lib/api/adminApi';
+import Select from '@/components/ui/Select';
 
 export default function AuditLogPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -99,24 +100,26 @@ export default function AuditLogPage() {
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-md flex flex-col lg:flex-row gap-3 items-center">
         <div className="flex items-center gap-2 w-full lg:w-auto">
           <span className="text-xs text-slate-400 font-medium">Action:</span>
-          <select
-            className="h-9 px-3 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20"
+          <Select
+            className="w-52"
+            triggerClassName="h-9 px-3 text-xs"
             value={filters.action}
-            onChange={(e) => handleFilterChange('action', e.target.value)}
-          >
-            <option value="">All Actions</option>
-            <option value="APPROVE_DOCTOR">Approve Doctor</option>
-            <option value="REJECT_DOCTOR">Reject Doctor</option>
-            <option value="CREATE_ADMIN">Create Admin</option>
-            <option value="CREATE_SECRETARY">Create Secretary</option>
-            <option value="DEACTIVATE_DOCTOR">Deactivate Doctor</option>
-            <option value="REACTIVATE_DOCTOR">Reactivate Doctor</option>
-            <option value="DEACTIVATE_SECRETARY">Deactivate Secretary</option>
-            <option value="REACTIVATE_SECRETARY">Reactivate Secretary</option>
-            <option value="DEACTIVATE_ADMIN">Deactivate Admin</option>
-            <option value="REACTIVATE_ADMIN">Reactivate Admin</option>
-            <option value="RESET_SECRETARY_PASSWORD">Reset Secretary Password</option>
-          </select>
+            onChange={(value) => handleFilterChange('action', value)}
+            options={[
+              { value: '', label: 'All Actions' },
+              { value: 'APPROVE_DOCTOR', label: 'Approve Doctor' },
+              { value: 'REJECT_DOCTOR', label: 'Reject Doctor' },
+              { value: 'CREATE_ADMIN', label: 'Create Admin' },
+              { value: 'CREATE_SECRETARY', label: 'Create Secretary' },
+              { value: 'DEACTIVATE_DOCTOR', label: 'Deactivate Doctor' },
+              { value: 'REACTIVATE_DOCTOR', label: 'Reactivate Doctor' },
+              { value: 'DEACTIVATE_SECRETARY', label: 'Deactivate Secretary' },
+              { value: 'REACTIVATE_SECRETARY', label: 'Reactivate Secretary' },
+              { value: 'DEACTIVATE_ADMIN', label: 'Deactivate Admin' },
+              { value: 'REACTIVATE_ADMIN', label: 'Reactivate Admin' },
+              { value: 'RESET_SECRETARY_PASSWORD', label: 'Reset Secretary Password' },
+            ]}
+          />
         </div>
 
         <div className="flex items-center gap-2 w-full lg:w-auto">

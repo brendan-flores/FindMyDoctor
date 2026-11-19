@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { secretaryApi, QueueEntry, SecretaryProfile } from '@/lib/api/secretaryApi';
 import Toast from '@/components/ui/Toast';
 import BillingPanel from '@/components/BillingPanel';
+import Select from '@/components/ui/Select';
 
 
 
@@ -596,22 +597,25 @@ export default function SecretaryQueue() {
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1b5eb8] focus:border-transparent"
               />
             </div>
-            <select
+            <Select
+              className="w-56"
+              triggerClassName="px-4 py-2.5 text-sm"
               value={secretary?.doctor_id || ''}
               disabled
-              className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1b5eb8] focus:border-transparent bg-white disabled:bg-slate-50 disabled:cursor-not-allowed"
-            >
-              <option value="">Doctor: Dr. {secretary?.doctor_first_name} {secretary?.doctor_last_name}</option>
-            </select>
-            <select
+              onChange={() => {}}
+              options={[{ value: secretary?.doctor_id || '', label: `Doctor: Dr. ${secretary?.doctor_first_name} ${secretary?.doctor_last_name}` }]}
+            />
+            <Select
+              className="w-44"
+              triggerClassName="px-4 py-2.5 text-sm"
               value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value as 'all' | 'ONLINE' | 'WALK_IN')}
-              className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1b5eb8] focus:border-transparent bg-white"
-            >
-              <option value="all">Source: All Sources</option>
-              <option value="ONLINE">Source: Online</option>
-              <option value="WALK_IN">Source: Walk-in</option>
-            </select>
+              onChange={(value) => setSourceFilter(value as 'all' | 'ONLINE' | 'WALK_IN')}
+              options={[
+                { value: 'all', label: 'Source: All Sources' },
+                { value: 'ONLINE', label: 'Source: Online' },
+                { value: 'WALK_IN', label: 'Source: Walk-in' },
+              ]}
+            />
           </div>
         </div>
       </div>

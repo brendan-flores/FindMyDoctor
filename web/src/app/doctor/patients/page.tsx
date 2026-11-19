@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { doctorApi, Patient, AssociatePatientRequest } from '@/lib/api/doctorApi';
+import Select from '@/components/ui/Select';
 
 export default function DoctorPatients() {
   const router = useRouter();
@@ -366,16 +367,16 @@ export default function DoctorPatients() {
                 </div>
                 <div>
                   <label className="block text-sm text-slate-500 mb-1">Sex *</label>
-                  <select
+                  <Select
                     value={addFormData.sex}
-                    onChange={(e) => setAddFormData({ ...addFormData, sex: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                    <option value="OTHER">Other</option>
-                    <option value="NOT_SPECIFIED">Not Specified</option>
-                  </select>
+                    onChange={(value) => setAddFormData({ ...addFormData, sex: value })}
+                    options={[
+                      { value: 'MALE', label: 'Male' },
+                      { value: 'FEMALE', label: 'Female' },
+                      { value: 'OTHER', label: 'Other' },
+                      { value: 'NOT_SPECIFIED', label: 'Not Specified' },
+                    ]}
+                  />
                 </div>
               </div>
 

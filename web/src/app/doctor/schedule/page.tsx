@@ -1488,7 +1488,7 @@ export default function DoctorSchedule() {
                           <select
                             value={formData.startTime.split(':')[0]}
                             onChange={(e) => setFormData({ ...formData, startTime: `${e.target.value}:${formData.startTime.split(':')[1]}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 24 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -1502,7 +1502,7 @@ export default function DoctorSchedule() {
                           <select
                             value={formData.startTime.split(':')[1]}
                             onChange={(e) => setFormData({ ...formData, startTime: `${formData.startTime.split(':')[0]}:${e.target.value}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 60 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -1537,7 +1537,7 @@ export default function DoctorSchedule() {
                           <select
                             value={formData.endTime.split(':')[0]}
                             onChange={(e) => setFormData({ ...formData, endTime: `${e.target.value}:${formData.endTime.split(':')[1]}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 24 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -1551,7 +1551,7 @@ export default function DoctorSchedule() {
                           <select
                             value={formData.endTime.split(':')[1]}
                             onChange={(e) => setFormData({ ...formData, endTime: `${formData.endTime.split(':')[0]}:${e.target.value}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 60 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -1624,7 +1624,7 @@ export default function DoctorSchedule() {
                           <select
                             value={formData.startTime.split(':')[0]}
                             onChange={(e) => setFormData({ ...formData, startTime: `${e.target.value}:${formData.startTime.split(':')[1]}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 24 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -1638,7 +1638,7 @@ export default function DoctorSchedule() {
                           <select
                             value={formData.startTime.split(':')[1]}
                             onChange={(e) => setFormData({ ...formData, startTime: `${formData.startTime.split(':')[0]}:${e.target.value}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 60 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -1673,7 +1673,7 @@ export default function DoctorSchedule() {
                           <select
                             value={formData.endTime.split(':')[0]}
                             onChange={(e) => setFormData({ ...formData, endTime: `${e.target.value}:${formData.endTime.split(':')[1]}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 24 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -1687,7 +1687,7 @@ export default function DoctorSchedule() {
                           <select
                             value={formData.endTime.split(':')[1]}
                             onChange={(e) => setFormData({ ...formData, endTime: `${formData.endTime.split(':')[0]}:${e.target.value}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 60 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -1954,7 +1954,7 @@ export default function DoctorSchedule() {
                           <select
                             value={breakFormData.startTime.split(':')[0]}
                             onChange={(e) => setBreakFormData({ ...breakFormData, startTime: `${e.target.value}:${breakFormData.startTime.split(':')[1]}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 24 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -1968,7 +1968,7 @@ export default function DoctorSchedule() {
                           <select
                             value={breakFormData.startTime.split(':')[1]}
                             onChange={(e) => setBreakFormData({ ...breakFormData, startTime: `${breakFormData.startTime.split(':')[0]}:${e.target.value}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 60 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -2003,7 +2003,7 @@ export default function DoctorSchedule() {
                           <select
                             value={breakFormData.endTime.split(':')[0]}
                             onChange={(e) => setBreakFormData({ ...breakFormData, endTime: `${e.target.value}:${breakFormData.endTime.split(':')[1]}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 24 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -2017,7 +2017,7 @@ export default function DoctorSchedule() {
                           <select
                             value={breakFormData.endTime.split(':')[1]}
                             onChange={(e) => setBreakFormData({ ...breakFormData, endTime: `${breakFormData.endTime.split(':')[0]}:${e.target.value}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 60 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -2126,7 +2126,7 @@ export default function DoctorSchedule() {
                           <select
                             value={breakFormData.startTime.split(':')[0]}
                             onChange={(e) => setBreakFormData({ ...breakFormData, startTime: `${e.target.value}:${breakFormData.startTime.split(':')[1]}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 24 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -2140,7 +2140,7 @@ export default function DoctorSchedule() {
                           <select
                             value={breakFormData.startTime.split(':')[1]}
                             onChange={(e) => setBreakFormData({ ...breakFormData, startTime: `${breakFormData.startTime.split(':')[0]}:${e.target.value}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 60 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -2175,7 +2175,7 @@ export default function DoctorSchedule() {
                           <select
                             value={breakFormData.endTime.split(':')[0]}
                             onChange={(e) => setBreakFormData({ ...breakFormData, endTime: `${e.target.value}:${breakFormData.endTime.split(':')[1]}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 24 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>
@@ -2189,7 +2189,7 @@ export default function DoctorSchedule() {
                           <select
                             value={breakFormData.endTime.split(':')[1]}
                             onChange={(e) => setBreakFormData({ ...breakFormData, endTime: `${breakFormData.endTime.split(':')[0]}:${e.target.value}` })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 bg-white"
                           >
                             {Array.from({ length: 60 }, (_, i) => (
                               <option key={i} value={i.toString().padStart(2, '0')}>

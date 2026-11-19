@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { secretaryApi, SecretaryProfile, DirectWalkInRegistrationRequest } from '@/lib/api/secretaryApi';
 import DatePicker from '@/components/DatePicker';
+import Select from '@/components/ui/Select';
 
 type Step = 'form' | 'success';
 
@@ -30,9 +31,6 @@ export default function SecretaryWalkIns() {
 
   // Field-level errors
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  // Custom dropdown states
-  const [isSexDropdownOpen, setIsSexDropdownOpen] = useState(false);
 
   useEffect(() => {
     fetchSecretaryProfile();
@@ -184,32 +182,12 @@ export default function SecretaryWalkIns() {
     setRegistrationResult(null);
     setError(null);
     setFieldErrors({});
-    setIsSexDropdownOpen(false);
   };
 
   const handleReturnToForm = () => {
     setError(null);
     // NOTE: Do NOT call handleReset() - preserve current step and form data
   };
-
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      
-      // Check if click is outside any dropdown button or dropdown content
-      const isOutside = !target.closest('[data-dropdown]') && !target.closest('[data-dropdown-content]');
-      
-      if (isOutside) {
-        setIsSexDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isSexDropdownOpen]);
 
   if (isLoading) {
     return (
@@ -364,63 +342,16 @@ export default function SecretaryWalkIns() {
               </div>
               <div>
                 <label className="block text-sm text-slate-600 mb-2">Sex *</label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    data-dropdown
-                    onClick={() => setIsSexDropdownOpen(!isSexDropdownOpen)}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-left flex items-center justify-between bg-white hover:border-emerald-300 transition-colors"
-                  >
-                    {formData.sex === 'MALE' ? 'Male' : formData.sex === 'FEMALE' ? 'Female' : formData.sex === 'OTHER' ? 'Other' : 'Not Specified'}
-                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  {isSexDropdownOpen && (
-                    <div data-dropdown-content className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFormData(prev => ({ ...prev, sex: 'MALE' }));
-                          setIsSexDropdownOpen(false);
-                        }}
-                        className="w-full px-4 py-2 text-left hover:bg-emerald-50 hover:text-emerald-700 transition-colors first:rounded-t-lg"
-                      >
-                        Male
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFormData(prev => ({ ...prev, sex: 'FEMALE' }));
-                          setIsSexDropdownOpen(false);
-                        }}
-                        className="w-full px-4 py-2 text-left hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
-                      >
-                        Female
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFormData(prev => ({ ...prev, sex: 'OTHER' }));
-                          setIsSexDropdownOpen(false);
-                        }}
-                        className="w-full px-4 py-2 text-left hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
-                      >
-                        Other
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFormData(prev => ({ ...prev, sex: 'NOT_SPECIFIED' }));
-                          setIsSexDropdownOpen(false);
-                        }}
-                        className="w-full px-4 py-2 text-left hover:bg-emerald-50 hover:text-emerald-700 transition-colors last:rounded-b-lg"
-                      >
-                        Not Specified
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <Select
+                  value={formData.sex}
+                  onChange={(sex) => setFormData(prev => ({ ...prev, sex: sex as typeof formData.sex }))}
+                  options={[
+                    { value: 'MALE', label: 'Male' },
+                    { value: 'FEMALE', label: 'Female' },
+                    { value: 'OTHER', label: 'Other' },
+                    { value: 'NOT_SPECIFIED', label: 'Not Specified' },
+                  ]}
+                />
               </div>
             </div>
             <div>

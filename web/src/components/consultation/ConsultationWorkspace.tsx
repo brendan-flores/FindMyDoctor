@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Toast from '@/components/ui/Toast';
+import Select from '@/components/ui/Select';
 import { consultationApi, type ConsultationContext, type ConsultationPrescription, type MedicationInput } from '@/lib/api/consultationApi';
 
 interface ConsultationWorkspaceProps {
@@ -772,16 +773,16 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
           {context.missingPatientInfo.includes('sex') && (
             <div>
               <label className="block text-xs font-medium text-amber-900 mb-1">Sex</label>
-              <select
+              <Select
                 value={missingSex}
-                onChange={(event) => setMissingSex(event.target.value)}
-                className="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm bg-white"
-              >
-                <option value="">Select...</option>
-                <option value="MALE">Male</option>
-                <option value="FEMALE">Female</option>
-                <option value="OTHER">Other</option>
-              </select>
+                onChange={setMissingSex}
+                placeholder="Select..."
+                options={[
+                  { value: 'MALE', label: 'Male' },
+                  { value: 'FEMALE', label: 'Female' },
+                  { value: 'OTHER', label: 'Other' },
+                ]}
+              />
             </div>
           )}
         </div>

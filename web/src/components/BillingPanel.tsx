@@ -8,6 +8,7 @@ import {
   PaymentTransaction,
   BillingStatus,
 } from '@/lib/api/secretaryApi';
+import Select from '@/components/ui/Select';
 
 interface BillingPanelProps {
   isOpen: boolean;
@@ -626,15 +627,16 @@ export default function BillingPanel({
                     <div className="grid grid-cols-2 md:grid-cols-12 gap-3 items-end">
                       <div className="md:col-span-3">
                         <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
-                        <select
+                        <Select
                           value={chargeType}
-                          onChange={(e) => { setChargeType(e.target.value as ChargeType); setChargeError(''); }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                        >
-                          <option value="SERVICE">Service</option>
-                          <option value="MEDICINE">Medicine</option>
-                          <option value="OTHER">Other</option>
-                        </select>
+                          onChange={(value) => { setChargeType(value as ChargeType); setChargeError(''); }}
+                          triggerClassName="px-3 py-2 text-sm"
+                          options={[
+                            { value: 'SERVICE', label: 'Service' },
+                            { value: 'MEDICINE', label: 'Medicine' },
+                            { value: 'OTHER', label: 'Other' },
+                          ]}
+                        />
                       </div>
                       <div className="col-span-2 md:col-span-4">
                         <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
@@ -1032,17 +1034,17 @@ export default function BillingPanel({
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Reason (Required)</label>
-                  <select
+                  <Select
                     value={rejectReason}
-                    onChange={(e) => setRejectReason(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                  >
-                    <option value="">Select reason...</option>
-                    <option value="INVALID_RECEIPT">Invalid receipt</option>
-                    <option value="WRONG_AMOUNT">Wrong amount</option>
-                    <option value="DUPLICATE">Duplicate receipt</option>
-                    <option value="OTHER">Other</option>
-                  </select>
+                    onChange={setRejectReason}
+                    placeholder="Select reason..."
+                    options={[
+                      { value: 'INVALID_RECEIPT', label: 'Invalid receipt' },
+                      { value: 'WRONG_AMOUNT', label: 'Wrong amount' },
+                      { value: 'DUPLICATE', label: 'Duplicate receipt' },
+                      { value: 'OTHER', label: 'Other' },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Note (Optional)</label>
@@ -1134,17 +1136,17 @@ export default function BillingPanel({
               </p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Reason (Required)</label>
-                <select
+                <Select
                   value={correctReason}
-                  onChange={(e) => setCorrectReason(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  <option value="">Select reason...</option>
-                  <option value="Forgot item">Forgot item</option>
-                  <option value="Wrong amount">Wrong amount</option>
-                  <option value="Wrong price">Wrong price</option>
-                  <option value="Other">Other</option>
-                </select>
+                  onChange={setCorrectReason}
+                  placeholder="Select reason..."
+                  options={[
+                    { value: 'Forgot item', label: 'Forgot item' },
+                    { value: 'Wrong amount', label: 'Wrong amount' },
+                    { value: 'Wrong price', label: 'Wrong price' },
+                    { value: 'Other', label: 'Other' },
+                  ]}
+                />
               </div>
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Note (Optional)</label>

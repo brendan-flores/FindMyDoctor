@@ -159,9 +159,9 @@ export default function SearchableMultiSelect({
             inputRef.current?.focus();
           }
         }}
-        className={`min-h-[52px] w-full rounded-2xl border ${
-          error ? 'border-red-500' : 'border-[#E2E8F0]'
-        } bg-white py-2 px-3 flex flex-wrap items-center gap-1.5 cursor-text transition-all focus-within:border-[#1A62CD] focus-within:ring-2 focus-within:ring-[#1A62CD]/20 ${
+        className={`min-h-[44px] w-full rounded-lg border ${
+          error ? 'border-red-500' : 'border-slate-200'
+        } bg-white py-2 px-3 flex flex-wrap items-center gap-1.5 cursor-text transition-colors focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500 ${
           disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''
         }`}
       >
@@ -173,7 +173,7 @@ export default function SearchableMultiSelect({
           return (
             <span
               key={val}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#EBF3FC] text-[#165CBE] text-[13px] font-semibold border border-[#D0E2FB] shadow-xs"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-[13px] font-semibold border border-emerald-100 shadow-xs"
             >
               <span>{displayLabel}</span>
               {!disabled && (
@@ -181,7 +181,7 @@ export default function SearchableMultiSelect({
                   type="button"
                   onClick={(e) => removeValue(val, e)}
                   aria-label={`Remove ${displayLabel}`}
-                  className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-[#D0E2FB] hover:text-[#0D3B75] transition-colors"
+                  className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
@@ -216,7 +216,7 @@ export default function SearchableMultiSelect({
             }}
             onKeyDown={handleKeyDown}
             placeholder={value.length === 0 ? placeholder : 'Add another credential...'}
-            className="w-full bg-transparent border-0 py-1 px-1 text-[14px] text-gray-900 placeholder-[#94A3B8] focus:outline-none focus:ring-0"
+            className="w-full bg-transparent border-0 py-1 px-1 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-0"
           />
         </div>
 
@@ -226,7 +226,7 @@ export default function SearchableMultiSelect({
             <button
               type="button"
               onClick={handleClearAll}
-              className="text-[#94A3B8] hover:text-[#475569] p-1 rounded-full hover:bg-slate-100 transition-colors"
+              className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors"
               aria-label="Clear all credentials"
               tabIndex={-1}
             >
@@ -249,7 +249,7 @@ export default function SearchableMultiSelect({
               }
             }}
             tabIndex={-1}
-            className="text-[#94A3B8] hover:text-[#475569] p-1 transition-colors"
+            className="text-slate-400 hover:text-slate-600 p-1 transition-colors"
             aria-label="Toggle dropdown"
           >
             <svg
@@ -271,10 +271,10 @@ export default function SearchableMultiSelect({
           role="listbox"
           aria-multiselectable="true"
           tabIndex={-1}
-          className="absolute z-50 mt-1.5 max-h-60 w-full overflow-y-auto rounded-2xl bg-white p-1.5 shadow-xl border border-[#E2E8F0] focus:outline-none"
+          className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg bg-white shadow-xl border border-slate-200 focus:outline-none"
         >
           {filteredOptions.length === 0 ? (
-            <li className="px-4 py-3 text-center text-sm text-[#94A3B8]">
+            <li className="px-4 py-3 text-center text-sm text-slate-400">
               {noResultsText}
             </li>
           ) : (
@@ -293,19 +293,17 @@ export default function SearchableMultiSelect({
                     e.stopPropagation();
                     toggleSelect(opt.value);
                   }}
-                  className={`flex items-center justify-between px-3.5 py-2 rounded-xl cursor-pointer text-[14px] transition-colors ${
-                    isHighlighted
-                      ? 'bg-[#F1F5F9] text-[#0F172A]'
-                      : isSelected
-                      ? 'bg-[#EBF3FC] text-[#165CBE]'
-                      : 'text-[#334155] hover:bg-slate-50'
+                  className={`flex items-center justify-between px-4 py-2 cursor-pointer text-sm transition-colors ${
+                    isHighlighted || isSelected
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'
                   }`}
                 >
                   <div className="flex flex-col min-w-0 pr-2">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm">{opt.label}</span>
                       {opt.description && (
-                        <span className="text-[12px] text-[#64748B] truncate">
+                        <span className="text-xs text-slate-500 truncate">
                           - {opt.description}
                         </span>
                       )}
@@ -316,8 +314,8 @@ export default function SearchableMultiSelect({
                     <div
                       className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors ${
                         isSelected
-                          ? 'bg-[#165CBE] border-[#165CBE] text-white'
-                          : 'border-[#CBD5E1] bg-white'
+                          ? 'bg-emerald-600 border-emerald-600 text-white'
+                          : 'border-slate-300 bg-white'
                       }`}
                     >
                       {isSelected && (

@@ -11,6 +11,7 @@ import { MEDICAL_SPECIALTIES } from '@/data/medicalSpecialties';
 import { MEDICAL_CREDENTIALS } from '@/data/medicalCredentials';
 import { MEDICAL_EXPERTISE } from '@/data/medicalExpertise';
 import { LANGUAGES } from '@/data/languages';
+import Select from '@/components/ui/Select';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import SearchableMultiSelect from '@/components/ui/SearchableMultiSelect';
 
@@ -739,21 +740,15 @@ export default function DoctorProfile() {
                 <label className="block text-[15px] font-semibold text-[#334155] mb-2">
                   Areas of Expertise
                 </label>
-                <select
+                <Select
                   value={formData.areas_of_expertise}
-                  onChange={(e) => {
-                    setFormData({ ...formData, areas_of_expertise: e.target.value });
+                  onChange={(value) => {
+                    setFormData({ ...formData, areas_of_expertise: value });
                     setError('');
                   }}
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
-                >
-                  <option value="">Select area of expertise</option>
-                  {expertiseOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select area of expertise"
+                  options={expertiseOptions}
+                />
               </div>
 
               {/* Short Biography */}
@@ -834,16 +829,12 @@ export default function DoctorProfile() {
                   <div className="bg-gray-50 rounded-xl p-4 mb-4 space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Day of Week</label>
-                      <select
+                      <Select
                         value={scheduleForm.day_of_week}
-                        onChange={(e) => setScheduleForm({ ...scheduleForm, day_of_week: e.target.value })}
-                        className="block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm text-gray-900 focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]/20"
-                      >
-                        <option value="" className="text-gray-500">Select day</option>
-                        {dayOptions.map((day) => (
-                          <option key={day.value} value={day.value} className="text-gray-900">{day.label}</option>
-                        ))}
-                      </select>
+                        onChange={(value) => setScheduleForm({ ...scheduleForm, day_of_week: value })}
+                        placeholder="Select day"
+                        options={dayOptions}
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>

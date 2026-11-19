@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api/apiClient';
 import Toast from '@/components/ui/Toast';
+import Select from '@/components/ui/Select';
 import { scheduleChangesApi, isPendingResponse, pendingRequestDateLabel, pendingSummaryText, type ScheduleChangeRequest } from '@/lib/api/scheduleChangesApi';
 
 const DAYS_OF_WEEK = [
@@ -1301,15 +1302,11 @@ export default function SecretarySchedule() {
             <form onSubmit={handleBreakAddSubmit}>
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Day of Week</label>
-                <select
-                  value={breakFormData.dayOfWeek}
-                  onChange={(e) => setBreakFormData({ ...breakFormData, dayOfWeek: parseInt(e.target.value) })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  {DAYS_OF_WEEK.map((day) => (
-                    <option key={day.value} value={day.value}>{day.label}</option>
-                  ))}
-                </select>
+                <Select
+                  value={String(breakFormData.dayOfWeek)}
+                  onChange={(value) => setBreakFormData({ ...breakFormData, dayOfWeek: parseInt(value) })}
+                  options={DAYS_OF_WEEK.map((day) => ({ value: String(day.value), label: day.label }))}
+                />
               </div>
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Start Time</label>
@@ -1368,15 +1365,11 @@ export default function SecretarySchedule() {
             <form onSubmit={handleBreakEditSubmit}>
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Day of Week</label>
-                <select
-                  value={breakFormData.dayOfWeek}
-                  onChange={(e) => setBreakFormData({ ...breakFormData, dayOfWeek: parseInt(e.target.value) })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  {DAYS_OF_WEEK.map((day) => (
-                    <option key={day.value} value={day.value}>{day.label}</option>
-                  ))}
-                </select>
+                <Select
+                  value={String(breakFormData.dayOfWeek)}
+                  onChange={(value) => setBreakFormData({ ...breakFormData, dayOfWeek: parseInt(value) })}
+                  options={DAYS_OF_WEEK.map((day) => ({ value: String(day.value), label: day.label }))}
+                />
               </div>
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Start Time</label>

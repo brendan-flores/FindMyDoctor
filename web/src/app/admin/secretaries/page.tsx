@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { adminApi, Secretary } from '@/lib/api/adminApi';
+import Select from '@/components/ui/Select';
 
 export default function SecretaryManagement() {
   const [secretaries, setSecretaries] = useState<Secretary[]>([]);
@@ -184,15 +185,17 @@ export default function SecretaryManagement() {
         {/* Status Filter */}
         <div className="flex items-center gap-1.5 w-full lg:w-auto">
           <span className="text-xs text-slate-400 font-medium hidden sm:inline">Status:</span>
-          <select
-            className="h-9 px-3 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20"
+          <Select
+            className="w-36"
+            triggerClassName="h-9 px-3 text-xs"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">All Statuses</option>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
+            onChange={setStatusFilter}
+            options={[
+              { value: 'all', label: 'All Statuses' },
+              { value: 'Active', label: 'Active' },
+              { value: 'Inactive', label: 'Inactive' },
+            ]}
+          />
         </div>
       </div>
 

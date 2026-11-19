@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { secretaryApi, Patient, UpdatePatientRequest } from '@/lib/api/secretaryApi';
+import Select from '@/components/ui/Select';
 
 export default function SecretaryPatientDetail() {
   const router = useRouter();
@@ -271,17 +272,16 @@ export default function SecretaryPatientDetail() {
               </div>
               <div>
                 <label className="block text-sm text-slate-500 mb-1">Sex *</label>
-                <select
-                  name="sex"
+                <Select
                   value={formData.sex}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                  <option value="OTHER">Other</option>
-                  <option value="NOT_SPECIFIED">Not Specified</option>
-                </select>
+                  onChange={(value) => setFormData(prev => ({ ...prev, sex: value }))}
+                  options={[
+                    { value: 'MALE', label: 'Male' },
+                    { value: 'FEMALE', label: 'Female' },
+                    { value: 'OTHER', label: 'Other' },
+                    { value: 'NOT_SPECIFIED', label: 'Not Specified' },
+                  ]}
+                />
               </div>
               <div>
                 <label className="block text-sm text-slate-500 mb-1">Address *</label>
