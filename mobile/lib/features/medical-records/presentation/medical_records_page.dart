@@ -28,11 +28,13 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
 
   // History tab state
   List<Visit> _visits = [];
+  List<Visit> _allVisits = [];
   bool _isLoadingVisits = true;
   String? _visitsError;
 
   // Prescriptions tab state
   List<Prescription> _prescriptions = [];
+  List<Prescription> _allPrescriptions = [];
   bool _isLoadingPrescriptions = true;
   String? _prescriptionsError;
 
@@ -76,13 +78,11 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
                 .toList() ??
             [];
 
-        // Apply date filter
-        final filteredVisits = _filterByDate(visits);
-
         setState(() {
-          _visits = filteredVisits;
+          _allVisits = visits;
           _isLoadingVisits = false;
         });
+        _applyDateFilter();
       } else {
         setState(() {
           _visitsError = response['error']?['message'] ?? 'Failed to load visits';
@@ -114,13 +114,11 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
                 .toList() ??
             [];
 
-        // Apply date filter
-        final filteredPrescriptions = _filterByDate(prescriptions);
-
         setState(() {
-          _prescriptions = filteredPrescriptions;
+          _allPrescriptions = prescriptions;
           _isLoadingPrescriptions = false;
         });
+        _applyDateFilter();
       } else {
         setState(() {
           _prescriptionsError =
@@ -137,28 +135,39 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
     }
   }
 
-  List<T> _filterByDate<T extends dynamic>(List<T> items) {
-    if (_selectedDateFilter == 'all') return items;
+  void _applyDateFilter() {
+    if (_selectedDateFilter == 'all') {
+      setState(() {
+        _visits = List<Visit>.from(_allVisits);
+        _prescriptions = List<Prescription>.from(_allPrescriptions);
+      });
+      return;
+    }
 
     final now = DateTime.now();
     final cutoffDate = _selectedDateFilter == '7days'
         ? now.subtract(const Duration(days: 7))
         : now.subtract(const Duration(days: 30));
 
-    return items.where((item) {
-      final date = item is Visit
-          ? item.visitDate
-          : (item as Prescription).prescriptionDate;
-      if (date == null) return false;
-      return date.isAfter(cutoffDate);
-    }).toList();
+    setState(() {
+      _visits = _allVisits.where((visit) {
+        final date = visit.visitDate;
+        if (date == null) return false;
+        return date.isAfter(cutoffDate) && !date.isAfter(now);
+      }).toList();
+      _prescriptions = _allPrescriptions.where((prescription) {
+        final date = prescription.prescriptionDate;
+        if (date == null) return false;
+        return date.isAfter(cutoffDate) && !date.isAfter(now);
+      }).toList();
+    });
   }
 
   void _onDateFilterChanged(String filter) {
     setState(() {
       _selectedDateFilter = filter;
     });
-    _loadData();
+    _applyDateFilter();
   }
 
   @override

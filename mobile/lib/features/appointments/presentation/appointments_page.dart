@@ -124,7 +124,10 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     switch (_selectedFilter) {
       case 'upcoming':
         _appointments = _allAppointments
-            .where((a) => a['status'] == 'SCHEDULED')
+            .where((a) =>
+                a['status'] == 'SCHEDULED' ||
+                a['status'] == 'CONFIRMED' ||
+                a['status'] == 'IN_PROGRESS')
             .toList();
         break;
       case 'completed':
@@ -134,7 +137,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
         break;
       case 'cancelled':
         _appointments = _allAppointments
-            .where((a) => a['status'] == 'CANCELLED')
+            .where((a) =>
+                a['status'] == 'CANCELLED' || a['status'] == 'NO_SHOW')
             .toList();
         break;
     }
@@ -298,11 +302,13 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     final filteredAppointments = _appointments.where((a) {
       switch (_selectedFilter) {
         case 'upcoming':
-          return a['status'] == 'SCHEDULED';
+          return a['status'] == 'SCHEDULED' ||
+              a['status'] == 'CONFIRMED' ||
+              a['status'] == 'IN_PROGRESS';
         case 'completed':
           return a['status'] == 'COMPLETED';
         case 'cancelled':
-          return a['status'] == 'CANCELLED';
+          return a['status'] == 'CANCELLED' || a['status'] == 'NO_SHOW';
         default:
           return false;
       }
@@ -503,11 +509,13 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     final count = _allAppointments.where((a) {
       switch (filter) {
         case 'upcoming':
-          return a['status'] == 'SCHEDULED';
+          return a['status'] == 'SCHEDULED' ||
+              a['status'] == 'CONFIRMED' ||
+              a['status'] == 'IN_PROGRESS';
         case 'completed':
           return a['status'] == 'COMPLETED';
         case 'cancelled':
-          return a['status'] == 'CANCELLED';
+          return a['status'] == 'CANCELLED' || a['status'] == 'NO_SHOW';
         default:
           return false;
       }
