@@ -46,8 +46,14 @@ class _DoctorsPageState extends State<DoctorsPage> {
       _showAllHospitals ||
       _searchController.text.isNotEmpty;
 
-  List<String> get _displayHospitals =>
-      _hospitals.where((h) => h != 'All' && h.isNotEmpty).toList();
+  List<String> get _displayHospitals {
+    var hospitals = _hospitals.where((h) => h != 'All' && h.isNotEmpty).toList();
+    if (_showAllHospitals && _searchController.text.isNotEmpty) {
+      final query = _searchController.text.toLowerCase();
+      hospitals = hospitals.where((h) => h.toLowerCase().contains(query)).toList();
+    }
+    return hospitals;
+  }
 
   @override
   void initState() {
@@ -87,34 +93,6 @@ class _DoctorsPageState extends State<DoctorsPage> {
       // Fetch all doctors once (backend already filters for approval_status = 'ACTIVE')
       final allDoctors = await _doctorService.getDoctors();
 
-      // Apply filters client-side for better performance
-      var doctors = allDoctors;
-
-      // Filter by specialty
-      if (_selectedSpecialty.isNotEmpty) {
-        doctors = doctors.where((d) => d.specialty == _selectedSpecialty).toList();
-      }
-
-      // Filter by hospital/clinic
-      if (_selectedHospital != 'All') {
-        doctors = doctors.where((d) => d.practiceName != null && d.practiceName == _selectedHospital).toList();
-      }
-
-      // Filter by verified status
-      if (_verifiedOnlyFilter) {
-        doctors = doctors.where((d) => d.isApproved).toList();
-      }
-
-      // Filter by search
-      if (_searchController.text.isNotEmpty) {
-        final query = _searchController.text.toLowerCase();
-        doctors = doctors.where((d) =>
-            d.fullName.toLowerCase().contains(query) ||
-            d.specialty.toLowerCase().contains(query) ||
-            (d.practiceName?.toLowerCase().contains(query) ?? false)
-        ).toList();
-      }
-
       // Extract unique specialties
       final uniqueSpecialties = allDoctors
           .map((d) => d.specialty)
@@ -132,24 +110,54 @@ class _DoctorsPageState extends State<DoctorsPage> {
           .toList()
         ..sort();
 
-      // Filter hospitals by search if in all hospitals view
-      if (_showAllHospitals && _searchController.text.isNotEmpty) {
-        final query = _searchController.text.toLowerCase();
-        uniqueHospitals.retainWhere((h) => h.toLowerCase().contains(query));
-      }
-
       setState(() {
         _allDoctors = allDoctors;
         _specialties = uniqueSpecialties;
         _hospitals = ['All', ...uniqueHospitals];
-        _doctors = doctors;
         _isLoading = false;
       });
+      _applyFilters();
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
     }
+  }
+
+  void _applyFilters() {
+    var doctors = _allDoctors;
+
+    // Filter by specialty
+    if (_selectedSpecialty.isNotEmpty) {
+      doctors = doctors.where((d) => d.specialty == _selectedSpecialty).toList();
+    }
+
+    // Filter by hospital/clinic
+    if (_selectedHospital != 'All') {
+      doctors = doctors
+          .where((d) => d.practiceName != null && d.practiceName == _selectedHospital)
+          .toList();
+    }
+
+    // Filter by verified status
+    if (_verifiedOnlyFilter) {
+      doctors = doctors.where((d) => d.isApproved).toList();
+    }
+
+    // Filter by search (local only; no network request)
+    if (_searchController.text.isNotEmpty) {
+      final query = _searchController.text.toLowerCase();
+      doctors = doctors
+          .where((d) =>
+              d.fullName.toLowerCase().contains(query) ||
+              d.specialty.toLowerCase().contains(query) ||
+              (d.practiceName?.toLowerCase().contains(query) ?? false))
+          .toList();
+    }
+
+    setState(() {
+      _doctors = doctors;
+    });
   }
 
   @override
@@ -166,8 +174,9 @@ class _DoctorsPageState extends State<DoctorsPage> {
       _showAllDoctors = false;
       _showAllHospitals = false;
     });
+    _searchController.clear();
     widget.onClearSpecialtyFromHome?.call();
-    _loadDoctors();
+    _applyFilters();
     if (navigateHome) {
       widget.onNavigateToTab?.call(0);
     }
@@ -642,7 +651,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                           icon: const Icon(Icons.cancel),
                           onPressed: () {
                             _searchController.clear();
-                            _loadDoctors();
+                            _applyFilters();
                           },
                         )
                       : null,
@@ -654,7 +663,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                 ),
                 onChanged: (value) {
                   setState(() {});
-                  _loadDoctors();
+                  _applyFilters();
                 },
               ),
             ),
@@ -767,7 +776,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
               _showAllHospitals = false;
             }
           });
-          _loadDoctors();
+          _applyFilters();
         },
         child: Container(
           padding: EdgeInsets.symmetric(
@@ -914,7 +923,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                     _verifiedOnlyFilter = false;
                     _showAllDoctors = true;
                   });
-                  _loadDoctors();
+                  _applyFilters();
                 },
                 child: Row(
                   children: [
@@ -964,7 +973,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
           _selectedHospital = 'All';
           _verifiedOnlyFilter = false;
         });
-        _loadDoctors();
+        _applyFilters();
       },
       child: Container(
         margin: EdgeInsets.only(right: spacing.AppSpacing.gutterSm),
@@ -1040,7 +1049,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
       _showAllDoctors = false;
       _showAllHospitals = false;
     });
-    _loadDoctors();
+    _applyFilters();
   }
 
   void _openHospitalDoctorsList(String hospitalName) {
@@ -1052,7 +1061,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
       _showAllDoctors = false;
       _showAllHospitals = false;
     });
-    _loadDoctors();
+    _applyFilters();
   }
 
   Widget _buildTopDoctorsSection() {
@@ -1451,7 +1460,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                     _showAllDoctors = false;
                     _showAllHospitals = true;
                   });
-                  _loadDoctors();
+                  _applyFilters();
                 },
                 child: Row(
                   children: [
