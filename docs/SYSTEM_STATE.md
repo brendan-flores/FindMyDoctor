@@ -13,8 +13,8 @@ Current System State (November 2026):
 - Doctor names, IDs, schedules, and availability results are never sent to the external AI provider
 - Only active, approved doctors are returned from doctor lookup
 - Conversation history is scoped per patient with "New conversation" and history list
-- The mobile chat shows the patient's message immediately with an animated "MediGuide is typing" indicator while the request is pending; the indicator is removed when the response or an error arrives
-- AI replies render formatted Markdown (headings, lists, and horizontally scrollable tables) without affecting the safety cards for diagnosis refusals, urgent care, and doctor lookups
+- The mobile chat shows the patient's message immediately in a bubble, clears the input field and resets the character counter on send, and keeps the send button in its normal state while an animated "MediGuide is typing" indicator stays visible until the response or an error arrives
+- AI replies render formatted Markdown (headings, bold/italic, lists, and horizontally scrollable tables) in every assistant message path, including the diagnosis-refusal and urgent-care safety cards; malformed Markdown falls back to plain text without breaking the layout, and doctor-lookup cards are unaffected
 - Patient identifiers (name, email, phone, user IDs, patient IDs, doctor IDs) are stripped before sending to AI provider
 - AI API key is backend-only via environment variable (AI_API_KEY), never exposed to mobile or web
 - AI routes are PATIENT-only: POST /ai/chat, GET /ai/conversations, GET /ai/conversations/:id, GET /ai/conversations/:id/messages
