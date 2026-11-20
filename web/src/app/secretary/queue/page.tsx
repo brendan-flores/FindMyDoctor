@@ -519,7 +519,7 @@ export default function SecretaryQueue() {
       </div>
 
       {/* Status Filter Bar and Search - Combined */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
         {/* Status Filter Tabs */}
         <nav className="flex overflow-x-auto gap-1 p-2 border-b border-slate-200">
           <button

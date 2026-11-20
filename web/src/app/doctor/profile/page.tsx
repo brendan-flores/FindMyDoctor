@@ -94,7 +94,7 @@ export default function DoctorProfilePage() {
   const credentialsOptions = MEDICAL_CREDENTIALS.map((credential) => ({
     value: credential.value,
     label: credential.label,
-    sublabel: credential.description,
+    description: credential.description,
   }));
 
   const cebuFacilityOptions = CEBU_FACILITIES.map((facility) => ({
@@ -209,6 +209,23 @@ export default function DoctorProfilePage() {
       const response = await doctorApi.updateProfile(profileUpdateData);
       if (response.success && response.data) {
         setProfile(response.data);
+        setEditForm({
+          first_name: response.data.first_name || undefined,
+          middle_name: response.data.middle_name || undefined,
+          last_name: response.data.last_name || undefined,
+          contact_number: response.data.contact_number || undefined,
+          email: response.data.email || undefined,
+          specialty: response.data.specialty || undefined,
+          credentials: response.data.credentials || undefined,
+          prc_license_number: response.data.prc_license_number || undefined,
+          practice_name: response.data.practice_name || undefined,
+          years_of_experience: response.data.years_of_experience || undefined,
+          areas_of_expertise: response.data.areas_of_expertise || undefined,
+          biography: response.data.biography || undefined,
+          consultation_fee: response.data.consultation_fee || undefined,
+          languages_spoken: response.data.languages_spoken || undefined,
+          room_number: response.data.room_number || undefined,
+        });
         setIsEditing(false);
         setSuccessMessage('Profile updated successfully');
         setTimeout(() => setSuccessMessage(''), 3000);
@@ -545,10 +562,10 @@ export default function DoctorProfilePage() {
             </Detail>
             <Detail label="Credentials" value={profile.credentials}>
               {isEditing && (
-                <SearchableSelect
+                <SearchableMultiSelect
                   options={credentialsOptions}
-                  value={editForm.credentials || ''}
-                  onChange={(value) => setEditForm({ ...editForm, credentials: value })}
+                  value={editForm.credentials ? editForm.credentials.split(',').map((c) => c.trim()).filter(Boolean) : []}
+                  onChange={(value) => setEditForm({ ...editForm, credentials: value.join(', ') })}
                   placeholder="Select credentials"
                 />
               )}
