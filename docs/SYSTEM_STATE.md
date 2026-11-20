@@ -96,7 +96,7 @@ Current System State (November 2026):
 - The authenticated `GET /api/v1/doctors/me` endpoint includes the doctor's account email for display on their own profile page
 - The `/doctor/profile` page (with slash) features an Edit Profile button that toggles inline edit mode for updating profile information
 - Edit Profile feature allows editing of personal information (first name, middle name, last name, contact number) and most professional information (specialty, credentials, hospital/clinic, room number, years of experience, areas of expertise, biography, consultation fee, languages spoken)
-- Edit Profile feature uses the same searchable dropdown selectors as registration: SearchableSelect for single-select fields (specialty, credentials, hospital/clinic) and SearchableMultiSelect for multi-select fields (areas of expertise, languages spoken)
+- Edit Profile feature uses the same searchable dropdown selectors as registration: SearchableSelect for single-select fields (specialty, hospital/clinic) and SearchableMultiSelect for multi-select fields (credentials, areas of expertise, languages spoken); credentials are stored and submitted as a comma-separated string and are split into individual selections when editing
 - Room Number field is always visible in the Professional Information section regardless of selected hospital/clinic; doctors can add or update their room number at any time
 - Email address is read-only (requires separate email-change and verification process)
 - PRC License Number is read-only (requires dedicated license-update process with admin review)
