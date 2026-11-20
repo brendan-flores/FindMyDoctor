@@ -45,7 +45,9 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 2));
     }
 
-    testWidgets('lists payments, statuses, and invoice actions', (tester) async {
+    testWidgets('lists payments, statuses, and invoice actions', (
+      tester,
+    ) async {
       final mockClient = MockClient((request) async {
         if (request.url.path.endsWith('/payments/me')) {
           return http.Response(
@@ -82,45 +84,44 @@ void main() {
       expect(find.text('Pay with GCash'), findsOneWidget);
     });
 
-    testWidgets(
-      'filter chips narrow the list to matching statuses',
-      (tester) async {
-        final mockClient = MockClient((request) async {
-          if (request.url.path.endsWith('/payments/me')) {
-            return http.Response(
-              jsonEncode({
-                'success': true,
-                'data': [
-                  buildPayment({}),
-                  buildPayment({
-                    'id': 'payment-2',
-                    'status': 'PAID',
-                    'amount_paid': '575.00',
-                    'balance': '0.00',
-                    'invoice_id': 'invoice-1',
-                    'invoice_number': 'INV-0001',
-                  }),
-                ],
-              }),
-              200,
-            );
-          }
-          return http.Response('Not found', 404);
-        });
+    testWidgets('filter chips narrow the list to matching statuses', (
+      tester,
+    ) async {
+      final mockClient = MockClient((request) async {
+        if (request.url.path.endsWith('/payments/me')) {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': [
+                buildPayment({}),
+                buildPayment({
+                  'id': 'payment-2',
+                  'status': 'PAID',
+                  'amount_paid': '575.00',
+                  'balance': '0.00',
+                  'invoice_id': 'invoice-1',
+                  'invoice_number': 'INV-0001',
+                }),
+              ],
+            }),
+            200,
+          );
+        }
+        return http.Response('Not found', 404);
+      });
 
-        await pumpPage(tester, ApiService.createWithClient(mockClient));
+      await pumpPage(tester, ApiService.createWithClient(mockClient));
 
-        // Status chip + filter chip both read "Paid".
-        expect(find.text('Paid'), findsNWidgets(2));
+      // Status chip + filter chip both read "Paid".
+      expect(find.text('Paid'), findsNWidgets(2));
 
-        // Tap the filter chip (first occurrence, in the filter bar).
-        await tester.tap(find.text('Unpaid').first);
-        await tester.pumpAndSettle();
+      // Tap the filter chip (first occurrence, in the filter bar).
+      await tester.tap(find.text('Unpaid').first);
+      await tester.pumpAndSettle();
 
-        expect(find.text('View Invoice (INV-0001)'), findsNothing);
-        expect(find.text('Pay with GCash'), findsOneWidget);
-      },
-    );
+      expect(find.text('View Invoice (INV-0001)'), findsNothing);
+      expect(find.text('Pay with GCash'), findsOneWidget);
+    });
 
     testWidgets(
       'shows the GCash account details configured in secretary settings',
@@ -165,12 +166,192 @@ void main() {
       },
     );
 
+    testWidgets('maps PARTIAL to Unpaid and OVERPAID to Paid', (tester) async {
+      final mockClient = MockClient((request) async {
+        if (request.url.path.endsWith('/payments/me')) {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': [
+                buildPayment({'id': 'p1', 'status': 'PARTIAL'}),
+                buildPayment({
+                  'id': 'p2',
+                  'status': 'OVERPAID',
+                  'amount_paid': '600.00',
+                  'balance': '0.00',
+                }),
+              ],
+            }),
+            200,
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      await pumpPage(tester, ApiService.createWithClient(mockClient));
+
+      // Unpaid filter shows PARTIAL
+      await tester.tap(find.text('Unpaid').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Partially Paid'), findsOneWidget);
+      expect(find.text('Overpaid'), findsNothing);
+
+      // Paid filter shows OVERPAID
+      await tester.tap(find.text('Paid').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Overpaid'), findsOneWidget);
+      expect(find.text('Partially Paid'), findsNothing);
+    });
+
+    testWidgets(
+      'maps FOR_REVIEW to Pending, CANCELLED and unknown to All only',
+      (tester) async {
+        final mockClient = MockClient((request) async {
+          if (request.url.path.endsWith('/payments/me')) {
+            return http.Response(
+              jsonEncode({
+                'success': true,
+                'data': [
+                  buildPayment({'id': 'p1', 'status': 'FOR_REVIEW'}),
+                  buildPayment({'id': 'p2', 'status': 'CANCELLED'}),
+                  buildPayment({'id': 'p3', 'status': 'MYSTERY_STATUS'}),
+                ],
+              }),
+              200,
+            );
+          }
+          return http.Response('Not found', 404);
+        });
+
+        await pumpPage(tester, ApiService.createWithClient(mockClient));
+
+        // Default All shows all payments, including Pending and Cancelled.
+        expect(find.text('Dr. Maria Santos'), findsWidgets);
+        expect(find.text('Pending Verification'), findsOneWidget);
+        expect(find.text('Cancelled'), findsOneWidget);
+
+        // Pending filter shows FOR_REVIEW
+        await tester.tap(find.text('Pending').first);
+        await tester.pumpAndSettle();
+        expect(find.text('Pending Verification'), findsOneWidget);
+        expect(find.text('Cancelled'), findsNothing);
+
+        // Rejected filter shows none of these
+        await tester.tap(find.text('Rejected').first);
+        await tester.pumpAndSettle();
+        expect(find.text('Pending Verification'), findsNothing);
+        expect(find.text('Cancelled'), findsNothing);
+
+        // All restores all three
+        await tester.tap(find.text('All').first);
+        await tester.pumpAndSettle();
+        expect(find.text('Dr. Maria Santos'), findsWidgets);
+        expect(find.text('Pending Verification'), findsOneWidget);
+        expect(find.text('Cancelled'), findsOneWidget);
+      },
+    );
+
+    testWidgets('filter chip counts and status categories', (tester) async {
+      final mockClient = MockClient((request) async {
+        if (request.url.path.endsWith('/payments/me')) {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': [
+                buildPayment({'id': 'p-unpaid', 'status': 'UNPAID', 'doctor_last_name': 'UnpaidOne'}),
+                buildPayment({'id': 'p-partial', 'status': 'PARTIAL', 'doctor_last_name': 'PartialOne'}),
+                buildPayment({'id': 'p-pending', 'status': 'PENDING_VERIFICATION', 'doctor_last_name': 'PendingOne'}),
+                buildPayment({'id': 'p-for-review', 'status': 'FOR_REVIEW', 'doctor_last_name': 'ForReviewOne'}),
+                buildPayment({'id': 'p-paid', 'status': 'PAID', 'doctor_last_name': 'PaidOne', 'amount_paid': '575.00', 'balance': '0.00'}),
+                buildPayment({'id': 'p-overpaid', 'status': 'OVERPAID', 'doctor_last_name': 'OverpaidOne', 'amount_paid': '600.00', 'balance': '0.00'}),
+                buildPayment({'id': 'p-rejected', 'status': 'REJECTED', 'doctor_last_name': 'RejectedOne'}),
+                buildPayment({'id': 'p-cancelled', 'status': 'CANCELLED', 'doctor_last_name': 'CancelledOne'}),
+                buildPayment({'id': 'p-unknown', 'status': 'MYSTERY_STATUS', 'doctor_last_name': 'UnknownOne'}),
+              ],
+            }),
+            200,
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      tester.view.physicalSize = const Size(800, 4000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpPage(tester, ApiService.createWithClient(mockClient));
+
+      expect(find.text('9'), findsOneWidget);
+      expect(find.text('Dr. Maria UnpaidOne'), findsOneWidget);
+      expect(find.text('Dr. Maria CancelledOne'), findsOneWidget);
+      expect(find.text('Dr. Maria UnknownOne'), findsOneWidget);
+
+      await tester.tap(find.text('Unpaid').first);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.widgetWithText(InkWell, 'Unpaid'),
+          matching: find.text('2'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Dr. Maria UnpaidOne'), findsOneWidget);
+      expect(find.text('Dr. Maria PartialOne'), findsOneWidget);
+      expect(find.text('Dr. Maria PendingOne'), findsNothing);
+      expect(find.text('Dr. Maria CancelledOne'), findsNothing);
+      expect(find.text('Dr. Maria UnknownOne'), findsNothing);
+
+      await tester.tap(find.text('Pending').first);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.widgetWithText(InkWell, 'Pending'),
+          matching: find.text('2'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Dr. Maria PendingOne'), findsOneWidget);
+      expect(find.text('Dr. Maria ForReviewOne'), findsOneWidget);
+      expect(find.text('Dr. Maria UnpaidOne'), findsNothing);
+      expect(find.text('Dr. Maria CancelledOne'), findsNothing);
+
+      await tester.tap(find.text('Paid').first);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.widgetWithText(InkWell, 'Paid'),
+          matching: find.text('2'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Dr. Maria PaidOne'), findsOneWidget);
+      expect(find.text('Dr. Maria OverpaidOne'), findsOneWidget);
+      expect(find.text('Dr. Maria RejectedOne'), findsNothing);
+      expect(find.text('Dr. Maria CancelledOne'), findsNothing);
+
+      await tester.tap(find.text('Rejected').first);
+      await tester.pumpAndSettle();
+      expect(find.text('1'), findsOneWidget);
+      expect(find.text('Dr. Maria RejectedOne'), findsOneWidget);
+      expect(find.text('Dr. Maria CancelledOne'), findsNothing);
+      expect(find.text('Dr. Maria UnknownOne'), findsNothing);
+
+      await tester.tap(find.text('All').first);
+      await tester.pumpAndSettle();
+      expect(find.text('9'), findsOneWidget);
+      expect(find.text('Dr. Maria CancelledOne'), findsOneWidget);
+      expect(find.text('Dr. Maria UnknownOne'), findsOneWidget);
+    });
+
     testWidgets('shows a retryable error state', (tester) async {
       final mockClient = MockClient((request) async {
         return http.Response(
           jsonEncode({
             'success': false,
-            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to load payments'},
+            'error': {
+              'code': 'SERVER_ERROR',
+              'message': 'Failed to load payments',
+            },
           }),
           500,
         );

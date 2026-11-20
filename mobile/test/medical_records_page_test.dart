@@ -175,6 +175,17 @@ ApiService buildMockApiService({
   return ApiService.createWithClient(mockClient);
 }
 
+/// Converts a local calendar day into an ISO instant that round-trips back to
+/// the same local day in any timezone.
+String localDateToIso(DateTime date) {
+  return DateTime(
+    date.year,
+    date.month,
+    date.day,
+    12,
+  ).toUtc().toIso8601String();
+}
+
 void main() {
   group('Prescription model parsing', () {
     test('parses medication_count delivered as a bigint string', () {
@@ -392,6 +403,265 @@ void main() {
         expect(find.text('Retry'), findsOneWidget);
       },
     );
+  });
+
+  group('Medical records date filtering', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({
+        'access_token': 'test-access-token-12345',
+      });
+    });
+
+    Future<void> pumpPage(
+      WidgetTester tester, {
+      required ApiService apiService,
+    }) async {
+      await apiService.init();
+
+      await tester.pumpWidget(
+        MaterialApp(home: MedicalRecordsPage(apiService: apiService)),
+      );
+      await tester.pumpAndSettle(const Duration(seconds: 2));
+    }
+
+    testWidgets(
+      'Last 7 days includes cutoff and today for visits and prescriptions',
+      (WidgetTester tester) async {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final cutoff = today.subtract(const Duration(days: 6));
+        final older = cutoff.subtract(const Duration(days: 1));
+        final future = today.add(const Duration(days: 1));
+
+        final apiService = buildMockApiService(
+          visits: [
+            buildVisit({
+              'id': 'v-today',
+              'diagnosis': 'Visit today',
+              'visit_date': localDateToIso(today),
+            }),
+            buildVisit({
+              'id': 'v-cutoff',
+              'diagnosis': 'Visit cutoff',
+              'visit_date': localDateToIso(cutoff),
+            }),
+            buildVisit({
+              'id': 'v-older',
+              'diagnosis': 'Visit older',
+              'visit_date': localDateToIso(older),
+            }),
+            buildVisit({
+              'id': 'v-future',
+              'diagnosis': 'Visit future',
+              'visit_date': localDateToIso(future),
+            }),
+            buildVisit({
+              'id': 'v-null',
+              'diagnosis': 'Visit null',
+              'visit_date': null,
+            }),
+          ],
+          prescriptions: [
+            buildPrescription({
+              'id': 'p-today',
+              'doctor_last_name': 'TodayRx',
+              'prescription_date': localDateToIso(today),
+            }),
+            buildPrescription({
+              'id': 'p-cutoff',
+              'doctor_last_name': 'CutoffRx',
+              'prescription_date': localDateToIso(cutoff),
+            }),
+            buildPrescription({
+              'id': 'p-older',
+              'doctor_last_name': 'OlderRx',
+              'prescription_date': localDateToIso(older),
+            }),
+            buildPrescription({
+              'id': 'p-future',
+              'doctor_last_name': 'FutureRx',
+              'prescription_date': localDateToIso(future),
+            }),
+            buildPrescription({
+              'id': 'p-null',
+              'doctor_last_name': 'NullRx',
+              'prescription_date': null,
+            }),
+          ],
+        );
+
+        await pumpPage(tester, apiService: apiService);
+
+        await tester.tap(find.byIcon(Icons.filter_list));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Last 7 days'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Visit today'), findsOneWidget);
+        expect(find.text('Visit cutoff'), findsOneWidget);
+        expect(find.text('Visit older'), findsNothing);
+        expect(find.text('Visit future'), findsNothing);
+        expect(find.text('Visit null'), findsNothing);
+
+        await tester.tap(find.text('Prescriptions'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Juan TodayRx'), findsOneWidget);
+        expect(find.text('Juan CutoffRx'), findsOneWidget);
+        expect(find.text('Juan OlderRx'), findsNothing);
+        expect(find.text('Juan FutureRx'), findsNothing);
+        expect(find.text('Juan NullRx'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Last 30 days includes cutoff and excludes older, future, and null',
+      (WidgetTester tester) async {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final cutoff = today.subtract(const Duration(days: 29));
+        final older = cutoff.subtract(const Duration(days: 1));
+        final future = today.add(const Duration(days: 1));
+
+        final apiService = buildMockApiService(
+          visits: [
+            buildVisit({
+              'id': 'v-today',
+              'diagnosis': 'Visit today',
+              'visit_date': localDateToIso(today),
+            }),
+            buildVisit({
+              'id': 'v-cutoff',
+              'diagnosis': 'Visit cutoff',
+              'visit_date': localDateToIso(cutoff),
+            }),
+            buildVisit({
+              'id': 'v-older',
+              'diagnosis': 'Visit older',
+              'visit_date': localDateToIso(older),
+            }),
+            buildVisit({
+              'id': 'v-future',
+              'diagnosis': 'Visit future',
+              'visit_date': localDateToIso(future),
+            }),
+            buildVisit({
+              'id': 'v-null',
+              'diagnosis': 'Visit null',
+              'visit_date': null,
+            }),
+          ],
+          prescriptions: [
+            buildPrescription({
+              'id': 'p-today',
+              'doctor_last_name': 'TodayRx',
+              'prescription_date': localDateToIso(today),
+            }),
+            buildPrescription({
+              'id': 'p-cutoff',
+              'doctor_last_name': 'CutoffRx',
+              'prescription_date': localDateToIso(cutoff),
+            }),
+            buildPrescription({
+              'id': 'p-older',
+              'doctor_last_name': 'OlderRx',
+              'prescription_date': localDateToIso(older),
+            }),
+            buildPrescription({
+              'id': 'p-future',
+              'doctor_last_name': 'FutureRx',
+              'prescription_date': localDateToIso(future),
+            }),
+            buildPrescription({
+              'id': 'p-null',
+              'doctor_last_name': 'NullRx',
+              'prescription_date': null,
+            }),
+          ],
+        );
+
+        await pumpPage(tester, apiService: apiService);
+
+        await tester.tap(find.byIcon(Icons.filter_list));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Last 30 days'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Visit today'), findsOneWidget);
+        expect(find.text('Visit cutoff'), findsOneWidget);
+        expect(find.text('Visit older'), findsNothing);
+        expect(find.text('Visit future'), findsNothing);
+        expect(find.text('Visit null'), findsNothing);
+
+        await tester.tap(find.text('Prescriptions'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Juan TodayRx'), findsOneWidget);
+        expect(find.text('Juan CutoffRx'), findsOneWidget);
+        expect(find.text('Juan OlderRx'), findsNothing);
+        expect(find.text('Juan FutureRx'), findsNothing);
+        expect(find.text('Juan NullRx'), findsNothing);
+      },
+    );
+
+    testWidgets('All time restores records outside the selected range', (
+      WidgetTester tester,
+    ) async {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final older = today.subtract(const Duration(days: 45));
+
+      final apiService = buildMockApiService(
+        visits: [
+          buildVisit({
+            'id': 'v-recent',
+            'diagnosis': 'Visit recent',
+            'visit_date': localDateToIso(today),
+          }),
+          buildVisit({
+            'id': 'v-older',
+            'diagnosis': 'Visit older',
+            'visit_date': localDateToIso(older),
+          }),
+        ],
+        prescriptions: [
+          buildPrescription({
+            'id': 'p-recent',
+            'doctor_last_name': 'RecentRx',
+            'prescription_date': localDateToIso(today),
+          }),
+          buildPrescription({
+            'id': 'p-older',
+            'doctor_last_name': 'OlderRx',
+            'prescription_date': localDateToIso(older),
+          }),
+        ],
+      );
+
+      await pumpPage(tester, apiService: apiService);
+
+      await tester.tap(find.byIcon(Icons.filter_list));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Last 7 days'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Visit recent'), findsOneWidget);
+      expect(find.text('Visit older'), findsNothing);
+
+      await tester.tap(find.byIcon(Icons.filter_list));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All time'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Visit recent'), findsOneWidget);
+      expect(find.text('Visit older'), findsOneWidget);
+
+      await tester.tap(find.text('Prescriptions'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Juan RecentRx'), findsOneWidget);
+      expect(find.text('Juan OlderRx'), findsOneWidget);
+    });
   });
 
   group('Medical records back navigation', () {
@@ -739,15 +1009,18 @@ void main() {
       requestedUri = null;
     });
 
-    test('saves the server-provided clinic filename without a sharing query', () async {
-      final api = buildDownloadApi('FLORES_Beavz_RX-20261020-ABCDEF12.pdf');
-      await api.init();
+    test(
+      'saves the server-provided clinic filename without a sharing query',
+      () async {
+        final api = buildDownloadApi('FLORES_Beavz_RX-20261020-ABCDEF12.pdf');
+        await api.init();
 
-      final download = await api.downloadPrescriptionPdf('prescription-1');
+        final download = await api.downloadPrescriptionPdf('prescription-1');
 
-      expect(download.fileName, 'FLORES_Beavz_RX-20261020-ABCDEF12.pdf');
-      expect(requestedUri!.queryParameters, isEmpty);
-    });
+        expect(download.fileName, 'FLORES_Beavz_RX-20261020-ABCDEF12.pdf');
+        expect(requestedUri!.queryParameters, isEmpty);
+      },
+    );
 
     test('accepts replacement and superseded names', () async {
       final replacementApi = buildDownloadApi(
@@ -755,7 +1028,8 @@ void main() {
       );
       await replacementApi.init();
       expect(
-        (await replacementApi.downloadPrescriptionPdf('prescription-1')).fileName,
+        (await replacementApi.downloadPrescriptionPdf('prescription-1'))
+            .fileName,
         'FLORES_Beavz_RX-20261020-ABCDEF12_replaces-41A6B551.pdf',
       );
 
@@ -764,7 +1038,8 @@ void main() {
       );
       await supersededApi.init();
       expect(
-        (await supersededApi.downloadPrescriptionPdf('prescription-1')).fileName,
+        (await supersededApi.downloadPrescriptionPdf('prescription-1'))
+            .fileName,
         'FLORES_Beavz_RX-20261020-41A6B551_SUPERSEDED.pdf',
       );
     });
