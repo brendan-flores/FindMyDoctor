@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -19,6 +20,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   late final ApiService _apiService;
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -28,25 +30,38 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Future<void> _loadNotifications() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     try {
       final response = await _apiService.getNotifications();
       if (!mounted) return;
-      final items = <Map<String, dynamic>>[];
+
       if (response['success'] == true && response['data'] is List) {
+        final items = <Map<String, dynamic>>[];
         for (final item in response['data'] as List) {
           if (item is Map) {
             items.add(Map<String, dynamic>.from(item));
           }
         }
+        setState(() {
+          _notifications = items;
+          _isLoading = false;
+          _errorMessage = null;
+        });
+      } else {
+        setState(() {
+          _errorMessage =
+              response['error']?['message'] ?? 'Failed to load notifications';
+          _isLoading = false;
+        });
       }
-      setState(() {
-        _notifications = items;
-        _isLoading = false;
-      });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _notifications = [];
+        _errorMessage = 'Failed to load notifications. Check your connection.';
         _isLoading = false;
       });
     }
@@ -143,10 +158,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
       if (!mounted) return;
 
-      final firstName = doctor?['first_name']?.toString() ??
+      final firstName =
+          doctor?['first_name']?.toString() ??
           waitlist['doctor_first_name']?.toString() ??
           '';
-      final lastName = doctor?['last_name']?.toString() ??
+      final lastName =
+          doctor?['last_name']?.toString() ??
           waitlist['doctor_last_name']?.toString() ??
           '';
       final doctorName = '$firstName $lastName'.trim();
@@ -157,14 +174,16 @@ class _NotificationsPageState extends State<NotificationsPage> {
         arguments: {
           'doctorId': doctorId,
           'doctorName': doctorName.isEmpty ? null : doctorName,
-          'specialty': doctor?['specialty']?.toString() ??
+          'specialty':
+              doctor?['specialty']?.toString() ??
               waitlist['specialty']?.toString(),
-          'clinic': doctor?['practice_name']?.toString() ??
+          'clinic':
+              doctor?['practice_name']?.toString() ??
               waitlist['practice_name']?.toString(),
-          'consultationFee':
-              _formatConsultationFee(doctor?['consultation_fee']),
-          'professionalPhotoUrl':
-              doctor?['professional_photo_url']?.toString(),
+          'consultationFee': _formatConsultationFee(
+            doctor?['consultation_fee'],
+          ),
+          'professionalPhotoUrl': doctor?['professional_photo_url']?.toString(),
           'defaultDate': waitlistDate,
         },
       );
@@ -258,6 +277,36 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     child: CircularProgressIndicator(),
                   ),
                 )
+              else if (_errorMessage != null)
+                SizedBox(
+                  height: MediaQuery.of(context).size.height - 200,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.cloud_off,
+                          size: 64,
+                          color: AppColors.error,
+                        ),
+                        const SizedBox(height: spacing.AppSpacing.gutterMd),
+                        Text(
+                          _errorMessage!,
+                          style: AppTextStyles.bodyMd.copyWith(
+                            color: AppColors.error,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: spacing.AppSpacing.gutterMd),
+                        OutlinedButton.icon(
+                          onPressed: _loadNotifications,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               else if (_notifications.isEmpty)
                 SizedBox(
                   height: MediaQuery.of(context).size.height - 200,
@@ -299,17 +348,28 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         final isRead = notification['is_read'] == true;
                         final message = notification['message'] ?? '';
                         final type = notification['type']?.toString();
-                        final isPaymentNotification = type == 'ADDITIONAL_CHARGE_ADDED' || type == 'PAYMENT_VERIFIED' || type == 'PAYMENT_REJECTED';
-                        final isWaitlistNotification = type == 'WAITLIST_UPDATE';
-                        final isAppointmentNotification = type == 'APPOINTMENT_CANCELLED' ||
+                        final isPaymentNotification =
+                            type == 'ADDITIONAL_CHARGE_ADDED' ||
+                            type == 'PAYMENT_VERIFIED' ||
+                            type == 'PAYMENT_REJECTED';
+                        final isWaitlistNotification =
+                            type == 'WAITLIST_UPDATE';
+                        final isAppointmentNotification =
+                            type == 'APPOINTMENT_CANCELLED' ||
                             type == 'APPOINTMENT_RESCHEDULED' ||
                             type == 'SCHEDULE_CHANGE_NOTICE';
-                        final isPrescriptionNotification = type == 'PRESCRIPTION_AVAILABLE';
-                        final isInvoiceNotification = type == 'INVOICE_AVAILABLE';
+                        final isPrescriptionNotification =
+                            type == 'PRESCRIPTION_AVAILABLE';
+                        final isInvoiceNotification =
+                            type == 'INVOICE_AVAILABLE';
 
                         return Card(
-                          margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
-                          color: isRead ? AppColors.surface : AppColors.surfaceLow,
+                          margin: EdgeInsets.only(
+                            bottom: spacing.AppSpacing.gutterSm,
+                          ),
+                          color: isRead
+                              ? AppColors.surface
+                              : AppColors.surfaceLow,
                           child: InkWell(
                             onTap: () async {
                               if (!isRead) {
@@ -326,8 +386,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
                               // Cancellation / reschedule notifications deep-link
                               // to the related appointment.
                               if (isAppointmentNotification) {
-                                final appointmentId = notification['related_entity_id']?.toString();
-                                if (appointmentId != null && appointmentId.isNotEmpty) {
+                                final appointmentId =
+                                    notification['related_entity_id']
+                                        ?.toString();
+                                if (appointmentId != null &&
+                                    appointmentId.isNotEmpty) {
                                   Navigator.pushNamed(
                                     context,
                                     '/appointment-detail',
@@ -339,12 +402,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
                               // Handle prescription notifications - deep-link to prescription detail
                               if (isPrescriptionNotification) {
-                                final prescriptionId = notification['related_entity_id']?.toString();
-                                if (prescriptionId != null && prescriptionId.isNotEmpty) {
+                                final prescriptionId =
+                                    notification['related_entity_id']
+                                        ?.toString();
+                                if (prescriptionId != null &&
+                                    prescriptionId.isNotEmpty) {
                                   Navigator.pushNamed(
                                     context,
                                     '/prescription-detail',
-                                    arguments: {'prescriptionId': prescriptionId},
+                                    arguments: {
+                                      'prescriptionId': prescriptionId,
+                                    },
                                   );
                                 }
                                 return;
@@ -353,13 +421,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
                               // Handle invoice notifications - open the invoice
                               // preview directly, falling back to the payments hub.
                               if (isInvoiceNotification) {
-                                final invoiceId = notification['related_entity_id']?.toString();
+                                final invoiceId =
+                                    notification['related_entity_id']
+                                        ?.toString();
                                 if (invoiceId != null && invoiceId.isNotEmpty) {
                                   showModalBottomSheet(
                                     context: context,
                                     isScrollControlled: true,
                                     backgroundColor: Colors.transparent,
-                                    builder: (context) => InvoiceBottomSheet(invoiceId: invoiceId),
+                                    builder: (context) => InvoiceBottomSheet(
+                                      invoiceId: invoiceId,
+                                    ),
                                   );
                                 } else {
                                   Navigator.pushNamed(context, '/payments');
@@ -369,13 +441,20 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
                               // Handle payment-related notifications - navigate to payment details
                               if (isPaymentNotification) {
-                                final paymentId = notification['related_entity_id']?.toString();
+                                final paymentId =
+                                    notification['related_entity_id']
+                                        ?.toString();
                                 if (paymentId != null && paymentId.isNotEmpty) {
                                   try {
-                                    final paymentResponse = await _apiService.getPaymentById(paymentId);
-                                    if (paymentResponse['success'] == true && paymentResponse['data'] != null) {
-                                      final paymentData = paymentResponse['data'];
-                                      final appointmentId = paymentData['appointment_id']?.toString();
+                                    final paymentResponse = await _apiService
+                                        .getPaymentById(paymentId);
+                                    if (paymentResponse['success'] == true &&
+                                        paymentResponse['data'] != null) {
+                                      final paymentData =
+                                          paymentResponse['data'];
+                                      final appointmentId =
+                                          paymentData['appointment_id']
+                                              ?.toString();
                                       if (appointmentId != null && mounted) {
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
@@ -393,7 +472,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                               }
                             },
                             child: Padding(
-                              padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+                              padding: EdgeInsets.all(
+                                spacing.AppSpacing.gutterMd,
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -401,10 +482,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     children: [
                                       Expanded(
                                         child: Text(
-                                          notification['title'] ?? 'Notification',
-                                          style: AppTextStyles.bodyMdMedium.copyWith(
-                                            fontWeight: isRead ? FontWeight.w500 : FontWeight.w700,
-                                          ),
+                                          notification['title'] ??
+                                              'Notification',
+                                          style: AppTextStyles.bodyMdMedium
+                                              .copyWith(
+                                                fontWeight: isRead
+                                                    ? FontWeight.w500
+                                                    : FontWeight.w700,
+                                              ),
                                         ),
                                       ),
                                       if (!isRead)
@@ -418,7 +503,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                         ),
                                     ],
                                   ),
-                                  const SizedBox(height: spacing.AppSpacing.gutterXs),
+                                  const SizedBox(
+                                    height: spacing.AppSpacing.gutterXs,
+                                  ),
                                   Text(
                                     message,
                                     style: AppTextStyles.labelSm.copyWith(
@@ -429,7 +516,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                   ),
                                   if (isPaymentNotification)
                                     Padding(
-                                      padding: EdgeInsets.only(top: spacing.AppSpacing.gutterXs),
+                                      padding: EdgeInsets.only(
+                                        top: spacing.AppSpacing.gutterXs,
+                                      ),
                                       child: Text(
                                         'Tap to view details',
                                         style: AppTextStyles.labelSm.copyWith(
@@ -440,31 +529,47 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     ),
                                   if (isWaitlistNotification)
                                     Padding(
-                                      padding: EdgeInsets.only(top: spacing.AppSpacing.gutterXs),
+                                      padding: EdgeInsets.only(
+                                        top: spacing.AppSpacing.gutterXs,
+                                      ),
                                       child: Row(
                                         children: [
                                           Text(
                                             'Tap to book your slot',
-                                            style: AppTextStyles.labelSm.copyWith(
-                                              color: AppColors.primary,
-                                              fontWeight: FontWeight.w600,
-                                            ),
+                                            style: AppTextStyles.labelSm
+                                                .copyWith(
+                                                  color: AppColors.primary,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                           ),
-                                          const SizedBox(width: spacing.AppSpacing.gutterSm),
+                                          const SizedBox(
+                                            width: spacing.AppSpacing.gutterSm,
+                                          ),
                                           Expanded(
                                             child: OutlinedButton(
                                               onPressed: () async {
                                                 if (!isRead) {
-                                                  await _markAsRead(notification['id']);
+                                                  await _markAsRead(
+                                                    notification['id'],
+                                                  );
                                                 }
-                                                await _openWaitlistSlot(notification);
+                                                await _openWaitlistSlot(
+                                                  notification,
+                                                );
                                               },
                                               style: OutlinedButton.styleFrom(
-                                                foregroundColor: AppColors.primary,
-                                                side: BorderSide(color: AppColors.primary),
+                                                foregroundColor:
+                                                    AppColors.primary,
+                                                side: BorderSide(
+                                                  color: AppColors.primary,
+                                                ),
                                                 padding: EdgeInsets.symmetric(
-                                                  horizontal: spacing.AppSpacing.gutterSm,
-                                                  vertical: spacing.AppSpacing.gutterXs,
+                                                  horizontal: spacing
+                                                      .AppSpacing
+                                                      .gutterSm,
+                                                  vertical: spacing
+                                                      .AppSpacing
+                                                      .gutterXs,
                                                 ),
                                               ),
                                               child: const Text('Book Now'),
@@ -475,7 +580,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     ),
                                   if (isInvoiceNotification)
                                     Padding(
-                                      padding: EdgeInsets.only(top: spacing.AppSpacing.gutterXs),
+                                      padding: EdgeInsets.only(
+                                        top: spacing.AppSpacing.gutterXs,
+                                      ),
                                       child: Text(
                                         'Tap to view invoice',
                                         style: AppTextStyles.labelSm.copyWith(
@@ -486,7 +593,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     ),
                                   if (isAppointmentNotification)
                                     Padding(
-                                      padding: EdgeInsets.only(top: spacing.AppSpacing.gutterXs),
+                                      padding: EdgeInsets.only(
+                                        top: spacing.AppSpacing.gutterXs,
+                                      ),
                                       child: Text(
                                         'Tap to view appointment',
                                         style: AppTextStyles.labelSm.copyWith(
@@ -495,9 +604,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                         ),
                                       ),
                                     ),
-                                  const SizedBox(height: spacing.AppSpacing.gutterXs),
+                                  const SizedBox(
+                                    height: spacing.AppSpacing.gutterXs,
+                                  ),
                                   Text(
-                                    _formatTimestamp(notification['created_at']),
+                                    _formatTimestamp(
+                                      notification['created_at'],
+                                    ),
                                     style: AppTextStyles.labelSm.copyWith(
                                       color: AppColors.outline,
                                       fontSize: 11,

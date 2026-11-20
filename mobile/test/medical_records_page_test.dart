@@ -153,8 +153,7 @@ ApiService buildMockApiService({
         jsonEncode({
           'success': true,
           'data': {
-            'signedUrl':
-                'https://example.supabase.co/storage/v1/object/sign/prescriptions/p.pdf?token=abc',
+            'signedUrl': 'https://example.supabase.co/storage/v1/object/sign/prescriptions/p.pdf?token=abc',
           },
           'message': 'Signed URL generated successfully',
         }),
@@ -175,15 +174,17 @@ ApiService buildMockApiService({
 void main() {
   group('Prescription model parsing', () {
     test('parses medication_count delivered as a bigint string', () {
-      final prescription =
-          Prescription.fromJson(buildPrescription({'medication_count': '3'}));
+      final prescription = Prescription.fromJson(
+        buildPrescription({'medication_count': '3'}),
+      );
 
       expect(prescription.medicationCount, 3);
     });
 
     test('parses medication_count delivered as a number', () {
-      final prescription =
-          Prescription.fromJson(buildPrescription({'medication_count': 4}));
+      final prescription = Prescription.fromJson(
+        buildPrescription({'medication_count': 4}),
+      );
 
       expect(prescription.medicationCount, 4);
     });
@@ -205,10 +206,7 @@ void main() {
     test('parses doctor_professional_photo_url', () {
       final visit = Visit.fromJson(buildVisit({}));
 
-      expect(
-        visit.doctorProfessionalPhotoUrl,
-        'https://example.com/juan.png',
-      );
+      expect(visit.doctorProfessionalPhotoUrl, 'https://example.com/juan.png');
     });
 
     test('returns null photo url when missing or empty', () {
@@ -238,42 +236,39 @@ void main() {
       await apiService.init();
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: MedicalRecordsPage(apiService: apiService),
-        ),
+        MaterialApp(home: MedicalRecordsPage(apiService: apiService)),
       );
       await tester.pumpAndSettle(const Duration(seconds: 2));
     }
 
-    testWidgets(
-      'History tab shows "Dr." prefix and the visit doctor photo',
-      (WidgetTester tester) async {
-        final apiService = buildMockApiService(
-          visits: [
-            buildVisit({}),
-            buildVisit({
-              'id': 'visit-2',
-              'doctor_first_name': 'Maria',
-              'doctor_last_name': 'Santos',
-              'doctor_professional_photo_url': null,
-            }),
-          ],
-        );
-        await pumpPage(tester, apiService: apiService);
+    testWidgets('History tab shows "Dr." prefix and the visit doctor photo', (
+      WidgetTester tester,
+    ) async {
+      final apiService = buildMockApiService(
+        visits: [
+          buildVisit({}),
+          buildVisit({
+            'id': 'visit-2',
+            'doctor_first_name': 'Maria',
+            'doctor_last_name': 'Santos',
+            'doctor_professional_photo_url': null,
+          }),
+        ],
+      );
+      await pumpPage(tester, apiService: apiService);
 
-        expect(tester.takeException(), isNull);
-        expect(find.text('Dr. Juan Dela Cruz'), findsOneWidget);
-        expect(find.text('Dr. Maria Santos'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      expect(find.text('Dr. Juan Dela Cruz'), findsOneWidget);
+      expect(find.text('Dr. Maria Santos'), findsOneWidget);
 
-        final images = tester
-            .widgetList<DoctorProfileImage>(find.byType(DoctorProfileImage))
-            .toList();
-        expect(images, hasLength(2));
-        expect(images[0].photoUrl, 'https://example.com/juan.png');
-        // Falls back to the default avatar when the doctor has no photo
-        expect(images[1].photoUrl, isNull);
-      },
-    );
+      final images = tester
+          .widgetList<DoctorProfileImage>(find.byType(DoctorProfileImage))
+          .toList();
+      expect(images, hasLength(2));
+      expect(images[0].photoUrl, 'https://example.com/juan.png');
+      // Falls back to the default avatar when the doctor has no photo
+      expect(images[1].photoUrl, isNull);
+    });
 
     testWidgets(
       'Prescriptions tab renders prescriptions (bigint medication_count)',
@@ -325,6 +320,154 @@ void main() {
     );
   });
 
+  group('Medical records date filtering', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({
+        'access_token': 'test-access-token-12345',
+      });
+    });
+
+    Future<void> pumpPage(WidgetTester tester, ApiService apiService) async {
+      await apiService.init();
+      await tester.pumpWidget(
+        MaterialApp(home: MedicalRecordsPage(apiService: apiService)),
+      );
+      await tester.pumpAndSettle(const Duration(seconds: 2));
+    }
+
+    testWidgets('Last 7 days includes cutoff and today for visits and prescriptions', (tester) async {
+      final now = DateTime.now().toUtc();
+      final cutoff = DateTime.utc(now.year, now.month, now.day).subtract(const Duration(days: 6));
+      final older = cutoff.subtract(const Duration(days: 1));
+      final future = now.add(const Duration(days: 1));
+
+      final apiService = buildMockApiService(
+        visits: [
+          buildVisit({'id': 'v-today', 'diagnosis': 'Visit today', 'visit_date': now.toUtc().toIso8601String()}),
+          buildVisit({'id': 'v-cutoff', 'diagnosis': 'Visit cutoff', 'visit_date': cutoff.toUtc().toIso8601String()}),
+          buildVisit({'id': 'v-older', 'diagnosis': 'Visit older', 'visit_date': older.toUtc().toIso8601String()}),
+          buildVisit({'id': 'v-future', 'diagnosis': 'Visit future', 'visit_date': future.toUtc().toIso8601String()}),
+          buildVisit({'id': 'v-null', 'diagnosis': 'Visit null', 'visit_date': null}),
+        ],
+        prescriptions: [
+          buildPrescription({'id': 'p-today', 'doctor_last_name': 'TodayRx', 'prescription_date': now.toUtc().toIso8601String()}),
+          buildPrescription({'id': 'p-cutoff', 'doctor_last_name': 'CutoffRx', 'prescription_date': cutoff.toUtc().toIso8601String()}),
+          buildPrescription({'id': 'p-older', 'doctor_last_name': 'OlderRx', 'prescription_date': older.toUtc().toIso8601String()}),
+          buildPrescription({'id': 'p-future', 'doctor_last_name': 'FutureRx', 'prescription_date': future.toUtc().toIso8601String()}),
+          buildPrescription({'id': 'p-null', 'doctor_last_name': 'NullRx', 'prescription_date': null}),
+        ],
+      );
+
+      await pumpPage(tester, apiService);
+
+      await tester.tap(find.byIcon(Icons.filter_list));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Last 7 days'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Visit today'), findsOneWidget);
+      expect(find.text('Visit cutoff'), findsOneWidget);
+      expect(find.text('Visit older'), findsNothing);
+      expect(find.text('Visit future'), findsNothing);
+      expect(find.text('Visit null'), findsNothing);
+
+      await tester.tap(find.text('Prescriptions'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Juan TodayRx'), findsOneWidget);
+      expect(find.text('Juan CutoffRx'), findsOneWidget);
+      expect(find.text('Juan OlderRx'), findsNothing);
+      expect(find.text('Juan FutureRx'), findsNothing);
+      expect(find.text('Juan NullRx'), findsNothing);
+    });
+
+    testWidgets('Last 30 days includes cutoff and excludes older, future, and null records', (tester) async {
+      final now = DateTime.now().toUtc();
+      final cutoff = DateTime.utc(now.year, now.month, now.day).subtract(const Duration(days: 29));
+      final older = cutoff.subtract(const Duration(days: 1));
+      final future = now.add(const Duration(days: 1));
+
+      final apiService = buildMockApiService(
+        visits: [
+          buildVisit({'id': 'v-today', 'diagnosis': 'Visit today', 'visit_date': now.toUtc().toIso8601String()}),
+          buildVisit({'id': 'v-cutoff', 'diagnosis': 'Visit cutoff', 'visit_date': cutoff.toUtc().toIso8601String()}),
+          buildVisit({'id': 'v-older', 'diagnosis': 'Visit older', 'visit_date': older.toUtc().toIso8601String()}),
+          buildVisit({'id': 'v-future', 'diagnosis': 'Visit future', 'visit_date': future.toUtc().toIso8601String()}),
+          buildVisit({'id': 'v-null', 'diagnosis': 'Visit null', 'visit_date': null}),
+        ],
+        prescriptions: [
+          buildPrescription({'id': 'p-today', 'doctor_last_name': 'TodayRx', 'prescription_date': now.toUtc().toIso8601String()}),
+          buildPrescription({'id': 'p-cutoff', 'doctor_last_name': 'CutoffRx', 'prescription_date': cutoff.toUtc().toIso8601String()}),
+          buildPrescription({'id': 'p-older', 'doctor_last_name': 'OlderRx', 'prescription_date': older.toUtc().toIso8601String()}),
+          buildPrescription({'id': 'p-future', 'doctor_last_name': 'FutureRx', 'prescription_date': future.toUtc().toIso8601String()}),
+          buildPrescription({'id': 'p-null', 'doctor_last_name': 'NullRx', 'prescription_date': null}),
+        ],
+      );
+
+      await pumpPage(tester, apiService);
+
+      await tester.tap(find.byIcon(Icons.filter_list));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Last 30 days'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Visit today'), findsOneWidget);
+      expect(find.text('Visit cutoff'), findsOneWidget);
+      expect(find.text('Visit older'), findsNothing);
+      expect(find.text('Visit future'), findsNothing);
+      expect(find.text('Visit null'), findsNothing);
+
+      await tester.tap(find.text('Prescriptions'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Juan TodayRx'), findsOneWidget);
+      expect(find.text('Juan CutoffRx'), findsOneWidget);
+      expect(find.text('Juan OlderRx'), findsNothing);
+      expect(find.text('Juan FutureRx'), findsNothing);
+      expect(find.text('Juan NullRx'), findsNothing);
+    });
+
+    testWidgets('All time restores records outside the selected range', (tester) async {
+      final now = DateTime.now().toUtc();
+      final older = now.subtract(const Duration(days: 45));
+
+      final apiService = buildMockApiService(
+        visits: [
+          buildVisit({'id': 'v-recent', 'diagnosis': 'Visit recent', 'visit_date': now.toUtc().toIso8601String()}),
+          buildVisit({'id': 'v-older', 'diagnosis': 'Visit older', 'visit_date': older.toUtc().toIso8601String()}),
+        ],
+        prescriptions: [
+          buildPrescription({'id': 'p-recent', 'doctor_last_name': 'RecentRx', 'prescription_date': now.toUtc().toIso8601String()}),
+          buildPrescription({'id': 'p-older', 'doctor_last_name': 'OlderRx', 'prescription_date': older.toUtc().toIso8601String()}),
+        ],
+      );
+
+      await pumpPage(tester, apiService);
+
+      await tester.tap(find.byIcon(Icons.filter_list));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Last 7 days'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Visit recent'), findsOneWidget);
+      expect(find.text('Visit older'), findsNothing);
+
+      await tester.tap(find.byIcon(Icons.filter_list));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All time'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Visit recent'), findsOneWidget);
+      expect(find.text('Visit older'), findsOneWidget);
+
+      await tester.tap(find.text('Prescriptions'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Juan RecentRx'), findsOneWidget);
+      expect(find.text('Juan OlderRx'), findsOneWidget);
+    });
+  });
+
   group('Medical records back navigation', () {
     setUp(() {
       SharedPreferences.setMockInitialValues({
@@ -341,10 +484,7 @@ void main() {
 
       final navigatorKey = GlobalKey<NavigatorState>();
       await tester.pumpWidget(
-        MaterialApp(
-          navigatorKey: navigatorKey,
-          home: home,
-        ),
+        MaterialApp(navigatorKey: navigatorKey, home: home),
       );
       navigatorKey.currentState!.push(
         MaterialPageRoute(
@@ -357,9 +497,7 @@ void main() {
     testWidgets(
       'Medical Records page back button returns to the previous view',
       (WidgetTester tester) async {
-        final apiService = buildMockApiService(
-          visits: [buildVisit({})],
-        );
+        final apiService = buildMockApiService(visits: [buildVisit({})]);
         await pumpWithNavigator(
           tester,
           apiService: apiService,
@@ -409,73 +547,73 @@ void main() {
       },
     );
 
-    testWidgets(
-      'returning from a prescription keeps the tab and date filter',
-      (WidgetTester tester) async {
-        final recent = DateTime.now().subtract(const Duration(days: 2));
-        final recentIso = recent.toUtc().toIso8601String();
-        final apiService = buildMockApiService(
-          visits: [buildVisit({'visit_date': recentIso})],
-          prescriptions: [buildPrescription({'prescription_date': recentIso})],
-        );
-        await pumpWithNavigator(
-          tester,
-          apiService: apiService,
-          home: const Scaffold(body: Center(child: Text('Dummy Home'))),
-        );
+    testWidgets('returning from a prescription keeps the tab and date filter', (
+      WidgetTester tester,
+    ) async {
+      final recent = DateTime.now().subtract(const Duration(days: 2));
+      final recentIso = recent.toUtc().toIso8601String();
+      final apiService = buildMockApiService(
+        visits: [
+          buildVisit({'visit_date': recentIso}),
+        ],
+        prescriptions: [
+          buildPrescription({'prescription_date': recentIso}),
+        ],
+      );
+      await pumpWithNavigator(
+        tester,
+        apiService: apiService,
+        home: const Scaffold(body: Center(child: Text('Dummy Home'))),
+      );
 
-        expect(tester.takeException(), isNull);
+      expect(tester.takeException(), isNull);
 
-        // Switch to the Prescriptions tab
-        await tester.tap(find.text('Prescriptions'));
-        await tester.pumpAndSettle();
-        expect(find.text('2 medications'), findsOneWidget);
+      // Switch to the Prescriptions tab
+      await tester.tap(find.text('Prescriptions'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 medications'), findsOneWidget);
 
-        // Apply the Last 7 days filter
-        await tester.tap(find.byIcon(Icons.filter_list));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Last 7 days'));
-        await tester.pumpAndSettle();
-        expect(find.text('2 medications'), findsOneWidget);
+      // Apply the Last 7 days filter
+      await tester.tap(find.byIcon(Icons.filter_list));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Last 7 days'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 medications'), findsOneWidget);
 
-        // Open the prescription detail view
-        await tester.tap(find.text('2 medications'));
-        await tester.pumpAndSettle(const Duration(seconds: 2));
-        expect(find.text('Download PDF'), findsOneWidget);
+      // Open the prescription detail view
+      await tester.tap(find.text('2 medications'));
+      await tester.pumpAndSettle(const Duration(seconds: 2));
+      expect(find.text('Download PDF'), findsOneWidget);
 
-        // Go back - tab and filter must still be prescriptions + Last 7 days
-        await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
-        await tester.pumpAndSettle();
+      // Go back - tab and filter must still be prescriptions + Last 7 days
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
+      await tester.pumpAndSettle();
 
-        expect(find.text('Dummy Home'), findsNothing);
-        expect(find.text('2 medications'), findsOneWidget);
-        expect(find.text('Download PDF'), findsNothing);
-      },
-    );
+      expect(find.text('Dummy Home'), findsNothing);
+      expect(find.text('2 medications'), findsOneWidget);
+      expect(find.text('Download PDF'), findsNothing);
+    });
 
-    testWidgets(
-      'back button works on a desktop-sized window',
-      (WidgetTester tester) async {
-        tester.view.physicalSize = const Size(1920, 1080);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
+    testWidgets('back button works on a desktop-sized window', (
+      WidgetTester tester,
+    ) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
 
-        final apiService = buildMockApiService(
-          visits: [buildVisit({})],
-        );
-        await pumpWithNavigator(
-          tester,
-          apiService: apiService,
-          home: const Scaffold(body: Center(child: Text('Dummy Home'))),
-        );
+      final apiService = buildMockApiService(visits: [buildVisit({})]);
+      await pumpWithNavigator(
+        tester,
+        apiService: apiService,
+        home: const Scaffold(body: Center(child: Text('Dummy Home'))),
+      );
 
-        expect(tester.takeException(), isNull);
-        await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
-        await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
+      await tester.pumpAndSettle();
 
-        expect(find.text('Dummy Home'), findsOneWidget);
-      },
-    );
+      expect(find.text('Dummy Home'), findsOneWidget);
+    });
   });
 
   group('PrescriptionDetailPage PDF download', () {
@@ -504,69 +642,66 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 2));
     }
 
-    testWidgets(
-      'opens the signed PDF url in an external application',
-      (WidgetTester tester) async {
-        final apiService = buildMockPdfApiService();
-        Uri? openedUri;
-        await pumpDetailPage(
-          tester,
-          apiService: apiService,
-          openUrl: (uri) async {
-            openedUri = uri;
-            return true;
-          },
-        );
+    testWidgets('opens the signed PDF url in an external application', (
+      WidgetTester tester,
+    ) async {
+      final apiService = buildMockPdfApiService();
+      Uri? openedUri;
+      await pumpDetailPage(
+        tester,
+        apiService: apiService,
+        openUrl: (uri) async {
+          openedUri = uri;
+          return true;
+        },
+      );
 
-        expect(tester.takeException(), isNull);
-        expect(find.text('Download PDF'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      expect(find.text('Download PDF'), findsOneWidget);
 
-        await tester.tap(find.text('Download PDF'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.text('Download PDF'));
+      await tester.pumpAndSettle();
 
-        expect(tester.takeException(), isNull);
-        expect(
-          openedUri?.toString(),
-          'https://example.supabase.co/storage/v1/object/sign/prescriptions/p.pdf?token=abc',
-        );
-        expect(find.text('Could not open PDF'), findsNothing);
-      },
-    );
+      expect(tester.takeException(), isNull);
+      expect(
+        openedUri?.toString(),
+        'https://example.supabase.co/storage/v1/object/sign/prescriptions/p.pdf?token=abc',
+      );
+      expect(find.text('Could not open PDF'), findsNothing);
+    });
 
-    testWidgets(
-      'shows a retryable error when the PDF cannot be opened',
-      (WidgetTester tester) async {
-        final apiService = buildMockPdfApiService();
-        await pumpDetailPage(
-          tester,
-          apiService: apiService,
-          openUrl: (uri) async => false,
-        );
+    testWidgets('shows a retryable error when the PDF cannot be opened', (
+      WidgetTester tester,
+    ) async {
+      final apiService = buildMockPdfApiService();
+      await pumpDetailPage(
+        tester,
+        apiService: apiService,
+        openUrl: (uri) async => false,
+      );
 
-        await tester.tap(find.text('Download PDF'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.text('Download PDF'));
+      await tester.pumpAndSettle();
 
-        expect(find.text('Could not open PDF'), findsOneWidget);
-        // The button stays available so the user can retry
-        expect(find.text('Download PDF'), findsOneWidget);
-      },
-    );
+      expect(find.text('Could not open PDF'), findsOneWidget);
+      // The button stays available so the user can retry
+      expect(find.text('Download PDF'), findsOneWidget);
+    });
 
-    testWidgets(
-      'shows an error when the PDF url cannot be generated',
-      (WidgetTester tester) async {
-        final apiService = buildMockPdfApiService(pdfUrlFails: true);
-        await pumpDetailPage(
-          tester,
-          apiService: apiService,
-          openUrl: (uri) async => true,
-        );
+    testWidgets('shows an error when the PDF url cannot be generated', (
+      WidgetTester tester,
+    ) async {
+      final apiService = buildMockPdfApiService(pdfUrlFails: true);
+      await pumpDetailPage(
+        tester,
+        apiService: apiService,
+        openUrl: (uri) async => true,
+      );
 
-        await tester.tap(find.text('Download PDF'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.text('Download PDF'));
+      await tester.pumpAndSettle();
 
-        expect(find.text('Failed to load PDF'), findsOneWidget);
-      },
-    );
+      expect(find.text('Failed to load PDF'), findsOneWidget);
+    });
   });
 }
