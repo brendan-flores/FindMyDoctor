@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../payments/presentation/payment_screen.dart';
 import '../../payments/presentation/invoice_bottom_sheet.dart';
 
@@ -252,10 +253,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
             children: [
               const SizedBox(height: spacing.AppSpacing.gutterMd),
               if (_isLoading)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(),
+                Expanded(
+                  child: SkeletonListView(
+                    itemCount: 8,
+                    itemSpacing: 0,
+                    itemBuilder: (context, index) =>
+                        const NotificationTileSkeleton(),
                   ),
                 )
               else if (_notifications.isEmpty)

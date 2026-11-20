@@ -8,6 +8,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/utils/json_parsers.dart';
 import 'invoice_bottom_sheet.dart';
@@ -308,9 +309,23 @@ class _PaymentsHubPageState extends State<PaymentsHubPage> {
                     ),
                   ),
                   if (_isLoading)
-                    const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Center(child: CircularProgressIndicator()),
+                    SliverPadding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: spacing.AppSpacing.screenPadding,
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => Padding(
+                            padding: EdgeInsets.only(
+                              bottom: spacing.AppSpacing.gutterMd,
+                            ),
+                            child: const SkeletonScope(
+                              child: PaymentCardSkeleton(),
+                            ),
+                          ),
+                          childCount: 4,
+                        ),
+                      ),
                     )
                   else if (_errorMessage != null)
                     SliverFillRemaining(
@@ -926,7 +941,17 @@ class _GcashQrSectionState extends State<_GcashQrSection> {
     if (_isLoading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: spacing.AppSpacing.gutterMd),
-        child: Center(child: CircularProgressIndicator()),
+        child: SkeletonScope(
+          child: Column(
+            children: [
+              SkeletonBox(width: 180, height: 180, borderRadius: 12),
+              SizedBox(height: spacing.AppSpacing.gutterSm),
+              SkeletonLine(width: 160, height: 12),
+              SizedBox(height: spacing.AppSpacing.gutterXs),
+              SkeletonLine(width: 120, height: 12),
+            ],
+          ),
+        ),
       );
     }
 

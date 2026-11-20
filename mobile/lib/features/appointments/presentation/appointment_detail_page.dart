@@ -6,6 +6,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/utils/json_parsers.dart';
 import '../../payments/presentation/invoice_bottom_sheet.dart';
@@ -240,7 +241,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const AppointmentDetailSkeleton()
             : _errorMessage != null
                 ? _buildErrorView()
                 : _appointment != null

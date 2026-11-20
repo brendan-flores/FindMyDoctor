@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_header.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
@@ -267,7 +268,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
         children: [
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const ChatThreadSkeleton()
                 : _messages.isEmpty
                 ? Center(
                     child: Column(

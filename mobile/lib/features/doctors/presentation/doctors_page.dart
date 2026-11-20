@@ -5,6 +5,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/models/doctor.dart';
 import '../../../core/services/doctor_service.dart';
 
@@ -227,7 +228,18 @@ class _DoctorsPageState extends State<DoctorsPage> {
         _buildFilterChips(),
         Expanded(
           child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? SkeletonListView(
+                  itemCount: 5,
+                  padding: EdgeInsets.only(
+                    left: spacing.AppSpacing.screenPadding,
+                    right: spacing.AppSpacing.screenPadding,
+                    top: spacing.AppSpacing.gutterSm,
+                    bottom: 80,
+                  ),
+                  itemSpacing: spacing.AppSpacing.gutterMd,
+                  itemBuilder: (context, index) =>
+                      const DoctorCardSkeleton(),
+                )
               : _doctors.isEmpty
                   ? _buildEmptyDoctorsState()
                   : RefreshIndicator(
@@ -259,7 +271,18 @@ class _DoctorsPageState extends State<DoctorsPage> {
         _buildSearchBar(),
         Expanded(
           child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? SkeletonListView(
+                  itemCount: 3,
+                  padding: EdgeInsets.only(
+                    left: spacing.AppSpacing.screenPadding,
+                    right: spacing.AppSpacing.screenPadding,
+                    top: spacing.AppSpacing.gutterSm,
+                    bottom: 80,
+                  ),
+                  itemSpacing: spacing.AppSpacing.gutterMd,
+                  itemBuilder: (context, index) =>
+                      const HospitalCardSkeleton(),
+                )
               : _displayHospitals.isEmpty
                   ? _buildEmptyHospitalsState()
                   : RefreshIndicator(
@@ -1106,10 +1129,28 @@ class _DoctorsPageState extends State<DoctorsPage> {
         ),
         const SizedBox(height: spacing.AppSpacing.gutterSm),
         if (_isLoading && verifiedDoctors.isEmpty)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(32.0),
-              child: CircularProgressIndicator(),
+          SizedBox(
+            height: 320,
+            child: SkeletonScope(
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                primary: false,
+                padding: EdgeInsets.symmetric(
+                  horizontal: spacing.AppSpacing.screenPadding,
+                ),
+                itemCount: 3,
+                itemBuilder: (context, index) {
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      right: spacing.AppSpacing.gutterMd,
+                    ),
+                    child: const SizedBox(
+                      width: 288,
+                      child: DoctorCardSkeleton(),
+                    ),
+                  );
+                },
+              ),
             ),
           )
         else if (verifiedDoctors.isEmpty)
@@ -1476,19 +1517,34 @@ class _DoctorsPageState extends State<DoctorsPage> {
         const SizedBox(height: spacing.AppSpacing.gutterSm),
         SizedBox(
           height: 240,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(
-              horizontal: spacing.AppSpacing.screenPadding,
-            ),
-            itemCount: _displayHospitals.isEmpty ? 1 : _displayHospitals.length,
-            itemBuilder: (context, index) {
-              if (_displayHospitals.isEmpty) {
-                return _buildEmptyHospitalCard();
-              }
-              return _buildHospitalCard(_displayHospitals[index]);
-            },
-          ),
+          child: _isLoading
+              ? SkeletonScope(
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: spacing.AppSpacing.screenPadding,
+                    ),
+                    itemCount: 3,
+                    itemBuilder: (context, index) {
+                      return const HospitalCardSkeleton();
+                    },
+                  ),
+                )
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.AppSpacing.screenPadding,
+                  ),
+                  itemCount: _displayHospitals.isEmpty
+                      ? 1
+                      : _displayHospitals.length,
+                  itemBuilder: (context, index) {
+                    if (_displayHospitals.isEmpty) {
+                      return _buildEmptyHospitalCard();
+                    }
+                    return _buildHospitalCard(_displayHospitals[index]);
+                  },
+                ),
         ),
       ],
     );

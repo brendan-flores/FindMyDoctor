@@ -8,6 +8,7 @@ import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../../../app/app.dart' show MyApp;
 import '../../conversations/models/conversation.dart';
@@ -139,9 +140,18 @@ class _SecretaryHomePageState extends State<SecretaryHomePage> {
     if (_isLoading && _conversations.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          SizedBox(height: 160),
-          Center(child: CircularProgressIndicator()),
+        padding: EdgeInsets.fromLTRB(
+          spacing.AppSpacing.screenPadding,
+          spacing.AppSpacing.gutterMd,
+          spacing.AppSpacing.screenPadding,
+          spacing.AppSpacing.gutter3xl,
+        ),
+        children: [
+          SkeletonColumn(
+            itemCount: 6,
+            itemBuilder: (context, index) =>
+                const ConversationTileSkeleton(squareAvatar: true),
+          ),
         ],
       );
     }
