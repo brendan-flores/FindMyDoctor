@@ -88,14 +88,11 @@ void main() {
           ),
         );
 
-<<<<<<< HEAD
-      // Verify loading state is shown initially
-      expect(find.byType(FormFieldsSkeleton), findsOneWidget);
-=======
+        // Verify loading state is shown initially
+        expect(find.byType(FormFieldsSkeleton), findsOneWidget);
         // Verify loading state is shown initially
         expect(find.byType(CircularProgressIndicator), findsOneWidget);
         expect(find.text('Loading your profile...'), findsOneWidget);
->>>>>>> feat/standardized-phone-number-input
 
         // Note: Full email field verification requires API mocking with mockito or similar
         // The patient_details_page.dart code shows email is loaded from API and displayed as disabled

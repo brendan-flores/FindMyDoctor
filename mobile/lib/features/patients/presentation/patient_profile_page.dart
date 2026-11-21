@@ -8,12 +8,9 @@ import '../../../core/services/api_service.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
-<<<<<<< HEAD
 import '../../../core/widgets/skeleton.dart';
-=======
 import '../../../core/utils/phone_input.dart';
 import '../../../core/utils/phone_input_form.dart';
->>>>>>> feat/standardized-phone-number-input
 
 /// Standalone read-only view of the signed-in patient's own profile.
 ///

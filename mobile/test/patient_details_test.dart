@@ -5,13 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/core/services/api_service.dart';
-<<<<<<< HEAD
 import 'package:mobile/core/widgets/skeleton.dart';
-=======
 import 'package:mobile/core/utils/phone_input_form.dart';
 import 'package:mobile/core/widgets/custom_text_field.dart';
 import 'package:mobile/features/patients/presentation/patient_details_page.dart';
->>>>>>> feat/standardized-phone-number-input
 
 void main() {
   group('Patient Details Workflow Tests', () {
