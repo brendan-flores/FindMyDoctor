@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../models/waitlist.dart';
 
@@ -190,11 +191,10 @@ class _WaitlistPageState extends State<WaitlistPage> {
 
   Widget _buildWaitlistList() {
     if (_isLoading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: CircularProgressIndicator(),
-        ),
+      return SkeletonColumn(
+        itemCount: 3,
+        itemSpacing: spacing.AppSpacing.gutterLg,
+        itemBuilder: (context, index) => const WaitlistCardSkeleton(),
       );
     }
 

@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/constants/ai_constants.dart';
 
@@ -30,6 +31,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
   List<Map<String, dynamic>> _messages = [];
   String? _currentConversationId;
   bool _isSending = false;
+  bool _isLoadingMessages = false;
   String? _pendingUserMessage;
   bool _hasShownFirstUseNotice = false;
   String? _limitReachedMessage;
@@ -50,6 +52,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
   }
 
   Future<void> _loadConversation(String conversationId) async {
+    setState(() {
+      _isLoadingMessages = true;
+    });
     try {
       final response = await _apiService.getAiConversationMessages(
         conversationId,
@@ -62,6 +67,12 @@ class _AiConversationPageState extends State<AiConversationPage> {
       }
     } catch (e) {
       // Handle error
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMessages = false;
+        });
+      }
     }
   }
 
@@ -500,7 +511,9 @@ class _AiConversationPageState extends State<AiConversationPage> {
               ),
             ),
           // Active conversation messages (plus the optimistic pending turn)
-          if ((_currentConversationId != null && _messages.isNotEmpty) ||
+          if (_isLoadingMessages)
+            const Expanded(child: ChatThreadSkeleton())
+          else if ((_currentConversationId != null && _messages.isNotEmpty) ||
               _pendingUserMessage != null)
             Expanded(
               child: ListView.builder(

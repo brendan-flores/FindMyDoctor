@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../models/patient_summary.dart';
 
 /// Read-only patient information sheet for the secretary chat.
@@ -121,9 +122,14 @@ class _PatientInfoSheetState extends State<PatientInfoSheet> {
             const Divider(height: 1),
             Flexible(
               child: _isLoading
-                  ? const Padding(
-                      padding: EdgeInsets.all(AppSpacing.gutter3xl),
-                      child: Center(child: CircularProgressIndicator()),
+                  ? const SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(
+                        AppSpacing.screenPadding,
+                        AppSpacing.gutterLg,
+                        AppSpacing.screenPadding,
+                        AppSpacing.gutter3xl,
+                      ),
+                      child: InfoRowsSkeleton(),
                     )
                   : _errorMessage != null
                   ? _buildError()

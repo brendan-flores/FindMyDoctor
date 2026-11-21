@@ -993,9 +993,8 @@ class _ReceiptViewerDialog extends StatelessWidget {
                 fit: BoxFit.contain,
                 loadingBuilder: (context, child, progress) {
                   if (progress == null) return child;
-                  return const Padding(
-                    padding: EdgeInsets.all(48),
-                    child: CircularProgressIndicator(color: Colors.white),
+                  return const SkeletonScope(
+                    child: SkeletonBox(width: 280, height: 280),
                   );
                 },
                 errorBuilder: (context, error, stackTrace) {

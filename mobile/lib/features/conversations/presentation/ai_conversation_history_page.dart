@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/constants/ai_constants.dart';
 
@@ -94,7 +95,12 @@ class _AiConversationHistoryPageState extends State<AiConversationHistoryPage> {
 
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return SkeletonListView(
+        padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+        itemCount: 5,
+        itemSpacing: 0,
+        itemBuilder: (context, index) => const AiConversationTileSkeleton(),
+      );
     }
 
     if (_errorMessage != null) {

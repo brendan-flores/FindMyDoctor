@@ -11,6 +11,7 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/doctor_service.dart';
 import '../../../core/services/api_service.dart';
 
@@ -524,16 +525,21 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                             ),
                           ),
                           const SizedBox(width: spacing.AppSpacing.gutterXs),
-                          Expanded(
-                            child: Text(
-                              _getWorkingHoursText(_selectedDate!),
-                              style: AppTextStyles.labelSm.copyWith(
-                                color: AppColors.secondary,
-                                fontSize: 12,
+                          if (_isLoading)
+                            const SkeletonScope(
+                              child: SkeletonLine(width: 140, height: 11),
+                            )
+                          else
+                            Expanded(
+                              child: Text(
+                                _getWorkingHoursText(_selectedDate!),
+                                style: AppTextStyles.labelSm.copyWith(
+                                  color: AppColors.secondary,
+                                  fontSize: 12,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
                         ],
                       ],
                     ),
@@ -544,7 +550,7 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
           if (_isLoading)
-            const Center(child: CircularProgressIndicator())
+            const WeekCalendarSkeleton()
           else if (_errorMessage != null)
             Center(
               child: Text(
@@ -1202,8 +1208,8 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
                   child: _isLoadingQr
-                      ? const Center(
-                          child: CircularProgressIndicator(),
+                      ? const SkeletonScope(
+                          child: SkeletonBox(width: 200, height: 200),
                         )
                       : _qrUrl != null
                           ? Column(

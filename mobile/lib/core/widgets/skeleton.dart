@@ -952,6 +952,535 @@ class DoctorProfileSkeleton extends StatelessWidget {
   }
 }
 
+/// Matches a waitlist entry card on `waitlist_page.dart`: doctor name +
+/// specialty with a status pill, date/position icon rows, status message,
+/// and action buttons.
+class WaitlistCardSkeleton extends StatelessWidget {
+  const WaitlistCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    SkeletonLine(width: 170, height: 18),
+                    SizedBox(height: spacing.AppSpacing.gutterXs),
+                    SkeletonLine(width: 110, height: 12),
+                  ],
+                ),
+              ),
+              SkeletonBox(
+                width: 90,
+                height: 26,
+                borderRadius: spacing.AppSpacing.radiusFull,
+              ),
+            ],
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          const SkeletonLine(width: 190, height: 13),
+          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          const SkeletonLine(width: double.infinity, height: 12),
+          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          const SkeletonLine(width: 200, height: 12),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          const SkeletonLine(width: 120, height: 11),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          SkeletonBox(
+            height: 44,
+            borderRadius: spacing.AppSpacing.radiusLg,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Matches the queue-details body of `live_queue_card.dart` (rendered inside
+/// the card that already shows the static "Live Queue" header): queue number
+/// tile + status pill/doctor line, three-stat container, room line.
+class LiveQueueBodySkeleton extends StatelessWidget {
+  const LiveQueueBodySkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const SkeletonTile(size: 64, borderRadius: 12),
+            const SizedBox(width: spacing.AppSpacing.gutterMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  SkeletonBox(
+                    width: 110,
+                    height: 24,
+                    borderRadius: spacing.AppSpacing.radiusFull,
+                  ),
+                  SizedBox(height: spacing.AppSpacing.gutterXs),
+                  SkeletonLine(width: 140, height: 13),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: spacing.AppSpacing.gutterMd),
+        Container(
+          padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLow,
+            borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: const [
+              _SkeletonStat(),
+              _SkeletonStatDivider(),
+              _SkeletonStat(),
+              _SkeletonStatDivider(),
+              _SkeletonStat(),
+            ],
+          ),
+        ),
+        const SizedBox(height: spacing.AppSpacing.gutterSm),
+        const SkeletonLine(width: 90, height: 11),
+      ],
+    );
+  }
+}
+
+class _SkeletonStat extends StatelessWidget {
+  const _SkeletonStat();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        SkeletonLine(width: 60, height: 10),
+        SizedBox(height: 4),
+        SkeletonLine(width: 44, height: 14),
+      ],
+    );
+  }
+}
+
+class _SkeletonStatDivider extends StatelessWidget {
+  const _SkeletonStatDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 28,
+      color: AppColors.surfaceContainerHighest,
+    );
+  }
+}
+
+/// Matches the week calendar on `doctor_schedule_page.dart` and
+/// `reschedule_page.dart`: week navigation row, static weekday headers, and
+/// seven day-cell placeholders.
+class WeekCalendarSkeleton extends StatelessWidget {
+  const WeekCalendarSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonScope(
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              SkeletonCircle(size: 40),
+              SkeletonLine(width: 160, height: 14),
+              SkeletonCircle(size: 40),
+            ],
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: const [
+              SkeletonLine(width: 14, height: 10),
+              SkeletonLine(width: 14, height: 10),
+              SkeletonLine(width: 14, height: 10),
+              SkeletonLine(width: 14, height: 10),
+              SkeletonLine(width: 14, height: 10),
+              SkeletonLine(width: 14, height: 10),
+              SkeletonLine(width: 14, height: 10),
+            ],
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          Row(
+            children: List.generate(
+              7,
+              (_) => const Expanded(
+                child: Center(child: SkeletonBox(height: 36, borderRadius: 10)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Just the seven day cells (used inside an already-rendered calendar card,
+/// e.g. `reschedule_page.dart` where only availability is still loading).
+class CalendarDayCellsSkeleton extends StatelessWidget {
+  const CalendarDayCellsSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonScope(
+      child: Row(
+        children: List.generate(
+          7,
+          (_) => const Expanded(
+            child: Center(child: SkeletonBox(height: 52, borderRadius: 10)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Matches the patient profile layout on `patient_profile_page.dart`: summary
+/// tile (avatar + name/email) followed by a card of labelled info rows.
+class PatientProfileSkeleton extends StatelessWidget {
+  const PatientProfileSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonScope(
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+        children: [
+          AppCard(
+            padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+            child: Row(
+              children: [
+                const SkeletonCircle(size: 64),
+                const SizedBox(width: spacing.AppSpacing.gutterMd),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      SkeletonLine(width: 160, height: 16),
+                      SizedBox(height: spacing.AppSpacing.gutterXs),
+                      SkeletonLine(width: 200, height: 12),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterLg),
+          const SkeletonLine(width: 130, height: 11),
+          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          AppCard(
+            padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+            child: Column(
+              children: [
+                for (var i = 0; i < 6; i++) ...[
+                  if (i > 0) const SizedBox(height: spacing.AppSpacing.gutterMd),
+                  const _SkeletonInfoRow(),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkeletonInfoRow extends StatelessWidget {
+  const _SkeletonInfoRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: [
+        SkeletonTile(size: 20, borderRadius: 6),
+        SizedBox(width: spacing.AppSpacing.gutterSm),
+        Expanded(child: SkeletonLine(width: 90, height: 12)),
+        SizedBox(width: spacing.AppSpacing.gutterMd),
+        SkeletonLine(width: 140, height: 13),
+      ],
+    );
+  }
+}
+
+/// Label + rounded input-box pairs matching the patient details form on
+/// `patient_details_page.dart`.
+class FormFieldsSkeleton extends StatelessWidget {
+  const FormFieldsSkeleton({super.key, this.fieldCount = 5});
+
+  final int fieldCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonScope(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppCard(
+            padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                SkeletonLine(width: double.infinity, height: 13),
+                SizedBox(height: spacing.AppSpacing.gutterXs),
+                SkeletonLine(width: 220, height: 11),
+              ],
+            ),
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterLg),
+          for (var i = 0; i < fieldCount; i++) ...[
+            const SkeletonLine(width: 110, height: 11),
+            const SizedBox(height: spacing.AppSpacing.gutterSm),
+            SkeletonBox(
+              height: 52,
+              borderRadius: spacing.AppSpacing.radiusMd,
+            ),
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Matches the rows inside `patient_info_sheet.dart`: section titles with
+/// label/value info rows.
+class InfoRowsSkeleton extends StatelessWidget {
+  const InfoRowsSkeleton({super.key, this.sectionCount = 3});
+
+  final int sectionCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonScope(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var s = 0; s < sectionCount; s++) ...[
+            const SkeletonLine(width: 110, height: 13),
+            const SizedBox(height: spacing.AppSpacing.gutterMd),
+            for (var i = 0; i < 4; i++) ...[
+              const _SkeletonInfoRow(),
+              const SizedBox(height: spacing.AppSpacing.gutterSm),
+            ],
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Matches the AI conversation rows on `ai_conversation_history_page.dart`:
+/// chat icon, title + date lines, trailing overflow icon.
+class AiConversationTileSkeleton extends StatelessWidget {
+  const AiConversationTileSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      margin: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
+      child: Row(
+        children: [
+          const SkeletonTile(size: 24, borderRadius: 6),
+          const SizedBox(width: spacing.AppSpacing.gutterMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                SkeletonLine(width: 180, height: 13),
+                SizedBox(height: spacing.AppSpacing.gutterXs),
+                SkeletonLine(width: 80, height: 11),
+              ],
+            ),
+          ),
+          const SkeletonTile(size: 20, borderRadius: 6),
+        ],
+      ),
+    );
+  }
+}
+
+/// Matches `payment_screen.dart` while payment details load: status card
+/// (icon circle + status lines + amount pill) and the receipt-upload card
+/// header with GCash account lines.
+class PaymentUploadSkeleton extends StatelessWidget {
+  const PaymentUploadSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonScope(
+      child: Column(
+        children: [
+          AppCard(
+            padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
+            child: Row(
+              children: [
+                const SkeletonCircle(size: 48),
+                const SizedBox(width: spacing.AppSpacing.gutterMd),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      SkeletonLine(width: 90, height: 11),
+                      SizedBox(height: spacing.AppSpacing.gutterXs),
+                      SkeletonLine(width: 130, height: 13),
+                    ],
+                  ),
+                ),
+                SkeletonBox(
+                  width: 70,
+                  height: 30,
+                  borderRadius: spacing.AppSpacing.radiusFull,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterLg),
+          AppCard(
+            padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const SkeletonTile(size: 20, borderRadius: 6),
+                    const SizedBox(width: spacing.AppSpacing.gutterSm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          SkeletonLine(width: 150, height: 13),
+                          SizedBox(height: spacing.AppSpacing.gutterXs),
+                          SkeletonLine(width: 220, height: 11),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: spacing.AppSpacing.gutterLg),
+                SkeletonBox(
+                  height: 72,
+                  borderRadius: spacing.AppSpacing.radiusMd,
+                ),
+                const SizedBox(height: spacing.AppSpacing.gutterLg),
+                SkeletonBox(
+                  height: 48,
+                  borderRadius: spacing.AppSpacing.radiusLg,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Matches the invoice document inside `invoice_bottom_sheet.dart`: clinic
+/// header block, invoice number/date lines, charge rows and a total.
+class InvoiceSkeleton extends StatelessWidget {
+  const InvoiceSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonScope(
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+        child: Container(
+          color: Colors.white,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const SkeletonTile(size: 48, borderRadius: 10),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        SkeletonLine(width: 140, height: 15),
+                        SizedBox(height: 4),
+                        SkeletonLine(width: 180, height: 11),
+                        SizedBox(height: 4),
+                        SkeletonLine(width: 140, height: 11),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const SkeletonLine(width: 80, height: 14),
+              const SizedBox(height: 4),
+              const SkeletonLine(width: 120, height: 11),
+              const SizedBox(height: 16),
+              for (var i = 0; i < 4; i++) ...[
+                const _SkeletonInvoiceRow(),
+                const SizedBox(height: spacing.AppSpacing.gutterSm),
+              ],
+              const SizedBox(height: spacing.AppSpacing.gutterMd),
+              Container(
+                padding: const EdgeInsets.only(top: spacing.AppSpacing.gutterSm),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: AppColors.slate200),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    SkeletonLine(width: 60, height: 13),
+                    SkeletonLine(width: 90, height: 14),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SkeletonInvoiceRow extends StatelessWidget {
+  const _SkeletonInvoiceRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: [
+        Expanded(child: SkeletonLine(width: 200, height: 12)),
+        SizedBox(width: spacing.AppSpacing.gutterMd),
+        SkeletonLine(width: 70, height: 12),
+      ],
+    );
+  }
+}
+
 /// Horizontal row of pill placeholders matching the specialty chips.
 class SpecialtyChipsSkeleton extends StatelessWidget {
   const SpecialtyChipsSkeleton({super.key, this.chipCount = 5});

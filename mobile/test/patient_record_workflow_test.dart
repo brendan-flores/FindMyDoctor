@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/widgets/skeleton.dart';
 import 'package:mobile/features/patients/presentation/patient_details_page.dart';
 import 'package:mobile/features/doctors/presentation/doctor_schedule_page.dart';
 import 'package:mobile/features/appointments/presentation/booking_confirmation_page.dart';
@@ -83,8 +84,7 @@ void main() {
       );
 
       // Verify loading state is shown initially
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      expect(find.text('Loading your profile...'), findsOneWidget);
+      expect(find.byType(FormFieldsSkeleton), findsOneWidget);
 
       // Note: Full email field verification requires API mocking with mockito or similar
       // The patient_details_page.dart code shows email is loaded from API and displayed as disabled
@@ -104,7 +104,7 @@ void main() {
       );
 
       // Verify loading state is shown initially
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(FormFieldsSkeleton), findsOneWidget);
 
       // In a real test with mocked API, we would:
       // 1. Mock getCurrentPatient API to return patient data
@@ -127,7 +127,7 @@ void main() {
       );
 
       // Verify loading state is shown initially
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(FormFieldsSkeleton), findsOneWidget);
 
       // In a real test with mocked API, we would:
       // 1. Mock getCurrentPatient API to return patient data
@@ -173,8 +173,7 @@ void main() {
       );
 
       // Verify loading indicator is displayed
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      expect(find.text('Loading your profile...'), findsOneWidget);
+      expect(find.byType(FormFieldsSkeleton), findsOneWidget);
     });
 
     testWidgets('Patient details page has submit protection during submission', (WidgetTester tester) async {

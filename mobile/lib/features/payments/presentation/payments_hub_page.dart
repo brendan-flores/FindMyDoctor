@@ -1004,10 +1004,8 @@ class _GcashQrSectionState extends State<_GcashQrSection> {
                 fit: BoxFit.contain,
                 loadingBuilder: (context, child, progress) {
                   if (progress == null) return child;
-                  return const SizedBox(
-                    width: 180,
-                    height: 180,
-                    child: Center(child: CircularProgressIndicator()),
+                  return const SkeletonScope(
+                    child: SkeletonBox(width: 180, height: 180),
                   );
                 },
                 errorBuilder: (context, error, stackTrace) => Container(
@@ -1108,9 +1106,8 @@ class _ReceiptViewerDialog extends StatelessWidget {
                 fit: BoxFit.contain,
                 loadingBuilder: (context, child, progress) {
                   if (progress == null) return child;
-                  return const Padding(
-                    padding: EdgeInsets.all(48),
-                    child: CircularProgressIndicator(color: Colors.white),
+                  return const SkeletonScope(
+                    child: SkeletonBox(width: 280, height: 280),
                   );
                 },
                 errorBuilder: (context, error, stackTrace) => const Padding(

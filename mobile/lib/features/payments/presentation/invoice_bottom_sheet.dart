@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/file_save_service.dart';
+import '../../../core/widgets/skeleton.dart';
 
 class InvoiceBottomSheet extends StatefulWidget {
   final String? paymentId;
@@ -220,12 +221,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         ),
         clipBehavior: Clip.antiAlias,
         child: _isLoading
-            ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32.0),
-                  child: CircularProgressIndicator(),
-                ),
-              )
+            ? const InvoiceSkeleton()
             : _errorMessage != null
                 ? _buildErrorView()
                 : _invoice != null

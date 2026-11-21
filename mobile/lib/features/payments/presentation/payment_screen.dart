@@ -9,6 +9,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 
 class PaymentScreen extends StatefulWidget {
@@ -347,7 +348,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     _buildHeader(),
                     const SizedBox(height: spacing.AppSpacing.gutterLg),
                     if (_isLoadingPayment)
-                      const Center(child: CircularProgressIndicator())
+                      const PaymentUploadSkeleton()
                     else if (_errorMessage != null)
                       _buildErrorState()
                     else if (_paymentData == null)
@@ -541,7 +542,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
           const SizedBox(height: spacing.AppSpacing.gutterLg),
           // Show GCash account details if available
-          if (!_isLoadingQr && (_accountName != null || _accountNumber != null))
+          if (_isLoadingQr)
+            const SkeletonScope(
+              child: SkeletonBox(
+                height: 72,
+                borderRadius: spacing.AppSpacing.radiusMd,
+              ),
+            )
+          else if (_accountName != null || _accountNumber != null)
             Container(
               width: double.infinity,
               padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
