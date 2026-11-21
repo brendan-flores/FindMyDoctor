@@ -145,28 +145,34 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
     }
 
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = _calendarDay(now.year, now.month, now.day);
     final cutoffDate = _selectedDateFilter == '7days'
-        ? today.subtract(const Duration(days: 6))
-        : today.subtract(const Duration(days: 29));
+        ? _calendarDay(now.year, now.month, now.day - 6)
+        : _calendarDay(now.year, now.month, now.day - 29);
 
     setState(() {
       _visits = _allVisits.where((visit) {
         final date = visit.visitDate;
         if (date == null) return false;
+        // visit_date is a timestamp with time zone, so its calendar day is the
+        // device-local day of that instant.
         final local = date.toLocal();
-        final day = DateTime(local.year, local.month, local.day);
+        final day = _calendarDay(local.year, local.month, local.day);
         return !day.isBefore(cutoffDate) && !day.isAfter(today);
       }).toList();
       _prescriptions = _allPrescriptions.where((prescription) {
         final date = prescription.prescriptionDate;
         if (date == null) return false;
-        final local = date.toLocal();
-        final day = DateTime(local.year, local.month, local.day);
+        // prescription_date is a date-only field (no time zone); use its
+        // calendar day directly instead of shifting it with toLocal().
+        final day = _calendarDay(date.year, date.month, date.day);
         return !day.isBefore(cutoffDate) && !day.isAfter(today);
       }).toList();
     });
   }
+
+  DateTime _calendarDay(int year, int month, int day) =>
+      DateTime.utc(year, month, day);
 
   void _onDateFilterChanged(String filter) {
     setState(() {
@@ -317,7 +323,7 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
     final doctorName = '${visit.doctorFirstName} ${visit.doctorLastName}'
         .trim();
     final visitDate = visit.visitDate != null
-        ? DateFormat('MMM dd, yyyy').format(visit.visitDate!)
+        ? DateFormat('MMM dd, yyyy').format(visit.visitDate!.toLocal())
         : 'Unknown date';
 
     return AppCard(

@@ -429,9 +429,9 @@ void main() {
       (WidgetTester tester) async {
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
-        final cutoff = today.subtract(const Duration(days: 6));
-        final older = cutoff.subtract(const Duration(days: 1));
-        final future = today.add(const Duration(days: 1));
+        final cutoff = DateTime(today.year, today.month, today.day - 6);
+        final older = DateTime(today.year, today.month, today.day - 7);
+        final future = DateTime(today.year, today.month, today.day + 1);
 
         final apiService = buildMockApiService(
           visits: [
@@ -519,9 +519,9 @@ void main() {
       (WidgetTester tester) async {
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
-        final cutoff = today.subtract(const Duration(days: 29));
-        final older = cutoff.subtract(const Duration(days: 1));
-        final future = today.add(const Duration(days: 1));
+        final cutoff = DateTime(today.year, today.month, today.day - 29);
+        final older = DateTime(today.year, today.month, today.day - 30);
+        final future = DateTime(today.year, today.month, today.day + 1);
 
         final apiService = buildMockApiService(
           visits: [
@@ -609,7 +609,7 @@ void main() {
     ) async {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      final older = today.subtract(const Duration(days: 45));
+      final older = DateTime(today.year, today.month, today.day - 45);
 
       final apiService = buildMockApiService(
         visits: [
@@ -745,8 +745,9 @@ void main() {
     testWidgets('returning from a prescription keeps the tab and date filter', (
       WidgetTester tester,
     ) async {
-      final recent = DateTime.now().subtract(const Duration(days: 2));
-      final recentIso = recent.toUtc().toIso8601String();
+      final now = DateTime.now();
+      final recent = DateTime(now.year, now.month, now.day - 2);
+      final recentIso = localDateToIso(recent);
       final apiService = buildMockApiService(
         visits: [
           buildVisit({'visit_date': recentIso}),

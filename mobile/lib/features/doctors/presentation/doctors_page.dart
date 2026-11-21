@@ -13,11 +13,16 @@ class DoctorsPage extends StatefulWidget {
   final Function(int)? onNavigateToTab;
   final VoidCallback? onClearSpecialtyFromHome;
 
+  /// Test seam. Production callers use the real service; tests inject a fake
+  /// without performing network requests.
+  final DoctorService? doctorService;
+
   const DoctorsPage({
     super.key,
     this.specialty,
     this.onNavigateToTab,
     this.onClearSpecialtyFromHome,
+    this.doctorService,
   });
 
   @override
@@ -25,7 +30,7 @@ class DoctorsPage extends StatefulWidget {
 }
 
 class _DoctorsPageState extends State<DoctorsPage> {
-  final DoctorService _doctorService = DoctorService();
+  late final DoctorService _doctorService;
   final TextEditingController _searchController = TextEditingController();
   String _selectedSpecialty = '';
   String _selectedHospital = 'All';
@@ -37,13 +42,22 @@ class _DoctorsPageState extends State<DoctorsPage> {
   List<String> _specialties = [];
   List<String> _hospitals = ['All'];
   bool _isLoading = true;
+  bool _hasLoadError = false;
+  bool _showBrowseView = false; // Flag to return to the browse/picker view
 
   bool get _isFilteredListView =>
+      !_showBrowseView &&
+      (_selectedSpecialty.isNotEmpty ||
+          _verifiedOnlyFilter ||
+          _selectedHospital != 'All' ||
+          _showAllDoctors ||
+          _showAllHospitals ||
+          _searchController.text.isNotEmpty);
+
+  bool get _hasActiveFilters =>
       _selectedSpecialty.isNotEmpty ||
       _verifiedOnlyFilter ||
       _selectedHospital != 'All' ||
-      _showAllDoctors ||
-      _showAllHospitals ||
       _searchController.text.isNotEmpty;
 
   List<String> get _displayHospitals {
@@ -58,6 +72,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
   @override
   void initState() {
     super.initState();
+    _doctorService = widget.doctorService ?? DoctorService();
     // Set the initial specialty if provided from HomePage
     if (widget.specialty != null && widget.specialty!.isNotEmpty) {
       _selectedSpecialty = widget.specialty!;
@@ -70,16 +85,17 @@ class _DoctorsPageState extends State<DoctorsPage> {
     super.didUpdateWidget(oldWidget);
     if (widget.specialty != oldWidget.specialty) {
       if (widget.specialty != null && widget.specialty!.isNotEmpty) {
-        setState(() {
-          _selectedSpecialty = widget.specialty!;
-          _selectedHospital = 'All';
-          _verifiedOnlyFilter = false;
-        });
-        _loadDoctors();
+        // Only the specialty selection changes; other filters are additive
+        // and must stay active.
+        _selectedSpecialty = widget.specialty!;
+        _showBrowseView = false;
+        _applyFilters();
       } else if (oldWidget.specialty != null &&
           oldWidget.specialty!.isNotEmpty &&
           _selectedSpecialty == oldWidget.specialty) {
-        _clearAllFilters();
+        // The home-provided specialty was withdrawn; clear only specialty.
+        _selectedSpecialty = '';
+        _applyFilters();
       }
     }
   }
@@ -87,6 +103,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
   Future<void> _loadDoctors() async {
     setState(() {
       _isLoading = true;
+      _hasLoadError = false;
     });
 
     try {
@@ -110,16 +127,20 @@ class _DoctorsPageState extends State<DoctorsPage> {
           .toList()
         ..sort();
 
+      if (!mounted) return;
       setState(() {
         _allDoctors = allDoctors;
         _specialties = uniqueSpecialties;
         _hospitals = ['All', ...uniqueHospitals];
         _isLoading = false;
+        _hasLoadError = false;
       });
       _applyFilters();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
+        _hasLoadError = true;
       });
     }
   }
@@ -166,20 +187,127 @@ class _DoctorsPageState extends State<DoctorsPage> {
     super.dispose();
   }
 
-  void _clearAllFilters({bool navigateHome = false}) {
+  void _clearAllFilters() {
     setState(() {
       _selectedSpecialty = '';
       _selectedHospital = 'All';
       _verifiedOnlyFilter = false;
       _showAllDoctors = false;
       _showAllHospitals = false;
+      _showBrowseView = false;
     });
     _searchController.clear();
     widget.onClearSpecialtyFromHome?.call();
     _applyFilters();
-    if (navigateHome) {
-      widget.onNavigateToTab?.call(0);
+  }
+
+  /// Clears only the specialty selection; every other active filter and the
+  /// search query stay untouched.
+  void _clearSpecialty() {
+    if (_selectedSpecialty.isEmpty) return;
+    final clearsHomeSpecialty = widget.specialty != null &&
+        widget.specialty!.isNotEmpty &&
+        _selectedSpecialty == widget.specialty;
+    setState(() {
+      _selectedSpecialty = '';
+    });
+    if (clearsHomeSpecialty) {
+      widget.onClearSpecialtyFromHome?.call();
     }
+    _applyFilters();
+    _returnToBrowseIfNoFiltersRemain();
+  }
+
+  /// Clears only the hospital/clinic selection.
+  void _clearHospital() {
+    if (_selectedHospital == 'All') return;
+    setState(() {
+      _selectedHospital = 'All';
+    });
+    _applyFilters();
+    _returnToBrowseIfNoFiltersRemain();
+  }
+
+  /// Clears only the verified-only filter.
+  void _clearVerified() {
+    if (!_verifiedOnlyFilter) return;
+    setState(() {
+      _verifiedOnlyFilter = false;
+    });
+    _applyFilters();
+    _returnToBrowseIfNoFiltersRemain();
+  }
+
+  /// Clears only the search query.
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {});
+    _applyFilters();
+    _returnToBrowseIfNoFiltersRemain();
+  }
+
+  /// When no filter is active any more, fall back to the browse view instead
+  /// of leaving the user on an empty filtered list.
+  void _returnToBrowseIfNoFiltersRemain() {
+    if (_hasActiveFilters || _showAllDoctors || _showAllHospitals) return;
+    _returnToBrowse();
+  }
+
+  /// Leaves the "All Doctors"/"All Hospitals" list mode without clearing any
+  /// of the user's active filters. Active selections are still shown as
+  /// removable chips on the browse view.
+  void _returnToBrowse() {
+    setState(() {
+      _showBrowseView = true;
+      _showAllDoctors = false;
+      _showAllHospitals = false;
+    });
+  }
+
+  void _openSpecialtyList() {
+    setState(() {
+      _showBrowseView = false;
+      _showAllDoctors = true;
+      _showAllHospitals = false;
+    });
+  }
+
+  void _openHospitalsList() {
+    setState(() {
+      _showBrowseView = false;
+      _showAllDoctors = false;
+      _showAllHospitals = true;
+    });
+  }
+
+  /// Selecting a specialty adds it to the active filters. Other filters stay
+  /// active; individual filters are removed through the active filter chips.
+  void _selectSpecialty(String specialty) {
+    if (_selectedSpecialty == specialty && !_showBrowseView) return;
+    setState(() {
+      _selectedSpecialty = specialty;
+      _showBrowseView = false;
+    });
+    _applyFilters();
+  }
+
+  void _toggleHospital(String hospital) {
+    setState(() {
+      _selectedHospital = _selectedHospital == hospital ? 'All' : hospital;
+      _showAllHospitals = false;
+      _showBrowseView = false;
+    });
+    _applyFilters();
+    _returnToBrowseIfNoFiltersRemain();
+  }
+
+  void _toggleVerified() {
+    setState(() {
+      _verifiedOnlyFilter = !_verifiedOnlyFilter;
+      _showBrowseView = false;
+    });
+    _applyFilters();
+    _returnToBrowseIfNoFiltersRemain();
   }
 
   String _formatConsultationFee(Doctor doctor) {
@@ -205,18 +333,21 @@ class _DoctorsPageState extends State<DoctorsPage> {
               ? _buildAllHospitalsView()
               : _isFilteredListView
                   ? _buildFilteredDoctorListView()
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 80),
-                      child: Column(
-                        children: [
-                          _buildSearchBar(),
-                          _buildLocationIndicator(),
-                          _buildSpecializations(),
-                          _buildTopDoctorsSection(),
-                          _buildHospitalsSection(),
-                        ],
-                      ),
-                    ),
+                  : _hasLoadError && _allDoctors.isEmpty
+                      ? _buildLoadErrorState()
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.only(bottom: 80),
+                          child: Column(
+                            children: [
+                              _buildSearchBar(),
+                              _buildActiveFilterChips(),
+                              _buildLocationIndicator(),
+                              _buildSpecializations(),
+                              _buildTopDoctorsSection(),
+                              _buildHospitalsSection(),
+                            ],
+                          ),
+                        ),
         ),
       ],
     );
@@ -233,30 +364,34 @@ class _DoctorsPageState extends State<DoctorsPage> {
     return Column(
       children: [
         _buildSearchBar(),
+        _buildActiveFilterChips(),
         _buildFilterChips(),
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : _doctors.isEmpty
-                  ? _buildEmptyDoctorsState()
-                  : RefreshIndicator(
-                      onRefresh: _loadDoctors,
-                      child: ListView.builder(
-                        padding: EdgeInsets.only(
-                          left: spacing.AppSpacing.screenPadding,
-                          right: spacing.AppSpacing.screenPadding,
-                          top: spacing.AppSpacing.gutterSm,
-                          bottom: 80,
+              : _hasLoadError && _allDoctors.isEmpty
+                  ? _buildLoadErrorState()
+                  : _doctors.isEmpty
+                      ? _buildEmptyDoctorsState()
+                      : RefreshIndicator(
+                          onRefresh: _loadDoctors,
+                          child: ListView.builder(
+                            padding: EdgeInsets.only(
+                              left: spacing.AppSpacing.screenPadding,
+                              right: spacing.AppSpacing.screenPadding,
+                              top: spacing.AppSpacing.gutterSm,
+                              bottom: 80,
+                            ),
+                            itemCount: _doctors.length,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                    bottom: spacing.AppSpacing.gutterMd),
+                                child: _buildDetailedDoctorCard(_doctors[index]),
+                              );
+                            },
+                          ),
                         ),
-                        itemCount: _doctors.length,
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
-                            child: _buildDetailedDoctorCard(_doctors[index]),
-                          );
-                        },
-                      ),
-                    ),
         ),
       ],
     );
@@ -266,31 +401,72 @@ class _DoctorsPageState extends State<DoctorsPage> {
     return Column(
       children: [
         _buildSearchBar(),
+        _buildActiveFilterChips(),
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : _displayHospitals.isEmpty
-                  ? _buildEmptyHospitalsState()
-                  : RefreshIndicator(
-                      onRefresh: _loadDoctors,
-                      child: ListView.builder(
-                        padding: EdgeInsets.only(
-                          left: spacing.AppSpacing.screenPadding,
-                          right: spacing.AppSpacing.screenPadding,
-                          top: spacing.AppSpacing.gutterSm,
-                          bottom: 80,
+              : _hasLoadError && _allDoctors.isEmpty
+                  ? _buildLoadErrorState()
+                  : _displayHospitals.isEmpty
+                      ? _buildEmptyHospitalsState()
+                      : RefreshIndicator(
+                          onRefresh: _loadDoctors,
+                          child: ListView.builder(
+                            padding: EdgeInsets.only(
+                              left: spacing.AppSpacing.screenPadding,
+                              right: spacing.AppSpacing.screenPadding,
+                              top: spacing.AppSpacing.gutterSm,
+                              bottom: 80,
+                            ),
+                            itemCount: _displayHospitals.length,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                    bottom: spacing.AppSpacing.gutterMd),
+                                child:
+                                    _buildHospitalCard(_displayHospitals[index]),
+                              );
+                            },
+                          ),
                         ),
-                        itemCount: _displayHospitals.length,
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
-                            child: _buildHospitalCard(_displayHospitals[index]),
-                          );
-                        },
-                      ),
-                    ),
         ),
       ],
+    );
+  }
+
+  Widget _buildLoadErrorState() {
+    return Padding(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterXl),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.cloud_off_outlined,
+            size: 64,
+            color: AppColors.outline,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Unable to load doctors',
+            style: AppTextStyles.headlineSm.copyWith(
+              color: AppColors.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Please check your connection and try again.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodyMd.copyWith(
+              color: AppColors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton(
+            onPressed: _loadDoctors,
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -362,21 +538,21 @@ class _DoctorsPageState extends State<DoctorsPage> {
 
       String chipLabel;
       IconData chipIcon;
-      if (_showAllDoctors) {
-        chipLabel = 'All Doctors';
-        chipIcon = Icons.medical_services;
-      } else if (_showAllHospitals) {
-        chipLabel = 'All Hospitals';
-        chipIcon = Icons.local_hospital;
-      } else if (_selectedSpecialty.isNotEmpty) {
+      if (_selectedSpecialty.isNotEmpty) {
         chipLabel = _selectedSpecialty;
         chipIcon = _getSpecialtyIcon(_selectedSpecialty);
       } else if (_selectedHospital != 'All') {
         chipLabel = _selectedHospital;
         chipIcon = Icons.local_hospital;
-      } else {
+      } else if (_verifiedOnlyFilter) {
         chipLabel = 'Verified Doctors';
         chipIcon = Icons.verified;
+      } else if (_showAllHospitals) {
+        chipLabel = 'All Hospitals';
+        chipIcon = Icons.local_hospital;
+      } else {
+        chipLabel = 'All Doctors';
+        chipIcon = Icons.medical_services;
       }
 
       return Container(
@@ -400,12 +576,10 @@ class _DoctorsPageState extends State<DoctorsPage> {
               icon: const Icon(Icons.arrow_back),
               onPressed: () {
                 if (fromHomeSpecialty) {
-                  _clearAllFilters(navigateHome: true);
-                } else if (_showAllDoctors || _showAllHospitals) {
-                  _clearAllFilters();
-                } else {
-                  _clearAllFilters();
+                  _clearSpecialty();
+                  widget.onNavigateToTab?.call(0);
                 }
+                _returnToBrowse();
               },
             ),
             const SizedBox(width: spacing.AppSpacing.gutterSm),
@@ -446,7 +620,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
             ),
             const Spacer(),
             TextButton(
-              onPressed: _clearAllFilters,
+              onPressed: _returnToBrowse,
               child: Row(
                 children: [
                   Text(
@@ -649,10 +823,8 @@ class _DoctorsPageState extends State<DoctorsPage> {
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.cancel),
-                          onPressed: () {
-                            _searchController.clear();
-                            _applyFilters();
-                          },
+                          tooltip: 'Clear search',
+                          onPressed: _clearSearch,
                         )
                       : null,
                   border: InputBorder.none,
@@ -662,8 +834,13 @@ class _DoctorsPageState extends State<DoctorsPage> {
                   ),
                 ),
                 onChanged: (value) {
-                  setState(() {});
+                  setState(() {
+                    if (value.isNotEmpty) {
+                      _showBrowseView = false;
+                    }
+                  });
                   _applyFilters();
+                  _returnToBrowseIfNoFiltersRemain();
                 },
               ),
             ),
@@ -729,7 +906,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildFilterChip('All', _selectedHospital == 'All' && !_verifiedOnlyFilter),
+            _buildFilterChip('All', _selectedHospital == 'All'),
             _buildFilterChip('Available Today', false, showDot: true),
             if (_showAllHospitals)
               ..._displayHospitals.map((hospital) =>
@@ -748,7 +925,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
     // Determine actual active state based on current filters
     bool isActuallyActive = isActive;
     if (label == 'All') {
-      isActuallyActive = _selectedHospital == 'All' && !_verifiedOnlyFilter && !_showAllHospitals;
+      isActuallyActive = _selectedHospital == 'All' && !_showAllHospitals;
     } else if (label == 'Top Rated') {
       isActuallyActive = _verifiedOnlyFilter;
     } else if (_displayHospitals.contains(label)) {
@@ -759,24 +936,15 @@ class _DoctorsPageState extends State<DoctorsPage> {
       margin: EdgeInsets.only(right: spacing.AppSpacing.gutterSm),
       child: GestureDetector(
         onTap: () {
-          setState(() {
-            if (label == 'All') {
-              _selectedHospital = 'All';
-              _verifiedOnlyFilter = false;
-              _showAllHospitals = false;
-            } else if (label == 'Available Today') {
-              // Filter for available today (placeholder for now)
-            } else if (label == 'Top Rated') {
-              _verifiedOnlyFilter = true;
-              _selectedHospital = 'All';
-              _showAllHospitals = false;
-            } else if (_displayHospitals.contains(label)) {
-              _selectedHospital = label;
-              _verifiedOnlyFilter = false;
-              _showAllHospitals = false;
-            }
-          });
-          _applyFilters();
+          if (label == 'All') {
+            _clearHospital();
+          } else if (label == 'Available Today') {
+            // Filter for available today (placeholder for now)
+          } else if (label == 'Top Rated') {
+            _toggleVerified();
+          } else if (_displayHospitals.contains(label)) {
+            _toggleHospital(label);
+          }
         },
         child: Container(
           padding: EdgeInsets.symmetric(
@@ -822,6 +990,125 @@ class _DoctorsPageState extends State<DoctorsPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Removable summary of the filters that are currently active, with a
+  /// dedicated Clear All action. Each chip removes only its own filter.
+  Widget _buildActiveFilterChips() {
+    if (!_hasActiveFilters) {
+      return const SizedBox.shrink();
+    }
+
+    final chips = <Widget>[];
+    if (_selectedSpecialty.isNotEmpty) {
+      chips.add(_buildRemovableFilterChip(
+        label: _selectedSpecialty,
+        icon: _getSpecialtyIcon(_selectedSpecialty),
+        onRemove: _clearSpecialty,
+      ));
+    }
+    if (_selectedHospital != 'All') {
+      chips.add(_buildRemovableFilterChip(
+        label: _selectedHospital,
+        icon: Icons.local_hospital,
+        onRemove: _clearHospital,
+      ));
+    }
+    if (_verifiedOnlyFilter) {
+      chips.add(_buildRemovableFilterChip(
+        label: 'Verified only',
+        icon: Icons.verified,
+        onRemove: _clearVerified,
+      ));
+    }
+    if (_searchController.text.isNotEmpty) {
+      chips.add(_buildRemovableFilterChip(
+        label: 'Search: ${_searchController.text}',
+        icon: Icons.search,
+        onRemove: _clearSearch,
+      ));
+    }
+
+    return Container(
+      padding: EdgeInsets.only(
+        left: spacing.AppSpacing.screenPadding,
+        right: spacing.AppSpacing.screenPadding,
+        bottom: spacing.AppSpacing.gutterSm,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: chips),
+            ),
+          ),
+          TextButton(
+            onPressed: _clearAllFilters,
+            child: Text(
+              'Clear All',
+              style: AppTextStyles.labelMd.copyWith(
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemovableFilterChip({
+    required String label,
+    required IconData icon,
+    required VoidCallback onRemove,
+  }) {
+    return Container(
+      margin: EdgeInsets.only(right: spacing.AppSpacing.gutterSm),
+      padding: EdgeInsets.only(
+        left: spacing.AppSpacing.gutterSm,
+        right: spacing.AppSpacing.gutterXs,
+        top: spacing.AppSpacing.gutterXs,
+        bottom: spacing.AppSpacing.gutterXs,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.secondaryContainer,
+        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: AppColors.primary,
+            size: spacing.AppSpacing.iconSm,
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterXs),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 160),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelMd.copyWith(
+                color: AppColors.onSecondaryFixed,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onRemove,
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: EdgeInsets.all(spacing.AppSpacing.gutterXs),
+              child: Icon(
+                Icons.close,
+                size: spacing.AppSpacing.iconSm,
+                color: AppColors.onSecondaryFixed,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -916,15 +1203,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                 ],
               ),
               TextButton(
-                onPressed: () {
-                  setState(() {
-                    _selectedSpecialty = '';
-                    _selectedHospital = 'All';
-                    _verifiedOnlyFilter = false;
-                    _showAllDoctors = true;
-                  });
-                  _applyFilters();
-                },
+                onPressed: _openSpecialtyList,
                 child: Row(
                   children: [
                     Text(
@@ -967,14 +1246,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
   Widget _buildSpecialtyChip(String specialty, int index) {
     final isSelected = _selectedSpecialty == specialty;
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedSpecialty = specialty;
-          _selectedHospital = 'All';
-          _verifiedOnlyFilter = false;
-        });
-        _applyFilters();
-      },
+      onTap: () => _selectSpecialty(specialty),
       child: Container(
         margin: EdgeInsets.only(right: spacing.AppSpacing.gutterSm),
         padding: EdgeInsets.symmetric(
@@ -1044,8 +1316,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
   void _openVerifiedDoctorsList() {
     setState(() {
       _verifiedOnlyFilter = true;
-      _selectedSpecialty = '';
-      _selectedHospital = 'All';
+      _showBrowseView = false;
       _showAllDoctors = false;
       _showAllHospitals = false;
     });
@@ -1056,8 +1327,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
     if (hospitalName == 'All') return;
     setState(() {
       _selectedHospital = hospitalName;
-      _selectedSpecialty = '';
-      _verifiedOnlyFilter = false;
+      _showBrowseView = false;
       _showAllDoctors = false;
       _showAllHospitals = false;
     });
@@ -1452,16 +1722,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                 ),
               ),
               TextButton(
-                onPressed: () {
-                  setState(() {
-                    _selectedSpecialty = '';
-                    _selectedHospital = 'All';
-                    _verifiedOnlyFilter = false;
-                    _showAllDoctors = false;
-                    _showAllHospitals = true;
-                  });
-                  _applyFilters();
-                },
+                onPressed: _openHospitalsList,
                 child: Row(
                   children: [
                     Text(

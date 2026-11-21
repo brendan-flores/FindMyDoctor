@@ -121,47 +121,46 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     }
   }
 
-  void _filterAppointments() {
-    Iterable<dynamic> filtered = _allAppointments;
+  List<dynamic> _appointmentsOnSelectedDate() {
+    if (_selectedDate == null) return _allAppointments;
 
-    switch (_selectedFilter) {
+    final selected = DateTime(
+      _selectedDate!.year,
+      _selectedDate!.month,
+      _selectedDate!.day,
+    );
+    return _allAppointments.where((a) {
+      final raw = a['appointment_date']?.toString();
+      final parsed = raw != null ? DateTime.tryParse(raw)?.toLocal() : null;
+      if (parsed == null) return false;
+      final date = DateTime(parsed.year, parsed.month, parsed.day);
+      return date == selected;
+    }).toList();
+  }
+
+  bool _matchesStatusFilter(dynamic appointment, String filter) {
+    switch (filter) {
       case 'upcoming':
-        filtered = filtered.where(
-          (a) =>
-              a['status'] == 'SCHEDULED' ||
-              a['status'] == 'CONFIRMED' ||
-              a['status'] == 'IN_PROGRESS',
-        );
-        break;
+        return appointment['status'] == 'SCHEDULED' ||
+            appointment['status'] == 'CONFIRMED' ||
+            appointment['status'] == 'IN_PROGRESS';
       case 'completed':
-        filtered = filtered.where((a) => a['status'] == 'COMPLETED');
-        break;
+        return appointment['status'] == 'COMPLETED';
       case 'cancelled':
-        filtered = filtered.where(
-          (a) => a['status'] == 'CANCELLED' || a['status'] == 'NO_SHOW',
-        );
-        break;
+        return appointment['status'] == 'CANCELLED' ||
+            appointment['status'] == 'NO_SHOW';
       case 'all':
       default:
-        break;
+        return true;
     }
+  }
 
-    if (_selectedDate != null) {
-      final selected = DateTime(
-        _selectedDate!.year,
-        _selectedDate!.month,
-        _selectedDate!.day,
-      );
-      filtered = filtered.where((a) {
-        final raw = a['appointment_date']?.toString();
-        final parsed = raw != null ? DateTime.tryParse(raw)?.toLocal() : null;
-        if (parsed == null) return false;
-        final date = DateTime(parsed.year, parsed.month, parsed.day);
-        return date == selected;
-      });
-    }
-
-    _appointments = filtered.toList();
+  void _filterAppointments() {
+    // Counts and the visible list are both derived from the date-filtered
+    // dataset so they stay consistent when a date is selected.
+    _appointments = _appointmentsOnSelectedDate()
+        .where((a) => _matchesStatusFilter(a, _selectedFilter))
+        .toList();
   }
 
   Future<void> _fetchWaitlists() async {
@@ -319,22 +318,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredAppointments = _appointments.where((a) {
-      switch (_selectedFilter) {
-        case 'all':
-          return true;
-        case 'upcoming':
-          return a['status'] == 'SCHEDULED' ||
-              a['status'] == 'CONFIRMED' ||
-              a['status'] == 'IN_PROGRESS';
-        case 'completed':
-          return a['status'] == 'COMPLETED';
-        case 'cancelled':
-          return a['status'] == 'CANCELLED' || a['status'] == 'NO_SHOW';
-        default:
-          return true;
-      }
-    }).toList();
+    final filteredAppointments = _appointments;
 
     final showWaitlistRow =
         _selectedFilter == 'upcoming' &&
@@ -467,7 +451,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                         child: Center(
                           child: Padding(
                             padding: const EdgeInsets.all(32.0),
-                            child: _appointments.isEmpty
+                            child: _allAppointments.isEmpty
                                 ? Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
@@ -504,7 +488,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                                       ),
                                       const SizedBox(height: 16),
                                       Text(
-                                        'No $_selectedFilter appointments',
+                                        'No appointments match your filters.',
                                         style: AppTextStyles.headlineSm
                                             .copyWith(
                                               color: AppColors.onSurface,
@@ -590,22 +574,11 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
 
   Widget _buildFilterTab(String label, String filter) {
     final isSelected = _selectedFilter == filter;
-    final count = _allAppointments.where((a) {
-      switch (filter) {
-        case 'all':
-          return true;
-        case 'upcoming':
-          return a['status'] == 'SCHEDULED' ||
-              a['status'] == 'CONFIRMED' ||
-              a['status'] == 'IN_PROGRESS';
-        case 'completed':
-          return a['status'] == 'COMPLETED';
-        case 'cancelled':
-          return a['status'] == 'CANCELLED' || a['status'] == 'NO_SHOW';
-        default:
-          return false;
-      }
-    }).length;
+    // Counts respect the selected date but ignore the individual status filter
+    // so every tab shows how many appointments match the current date.
+    final count = _appointmentsOnSelectedDate()
+        .where((a) => _matchesStatusFilter(a, filter))
+        .length;
 
     return InkWell(
       onTap: () {

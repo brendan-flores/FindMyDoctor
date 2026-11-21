@@ -324,7 +324,66 @@ void main() {
     expect(find.textContaining('DoctorOne'), findsNothing);
   });
 
-  testWidgets('empty date and status combination shows empty state', (tester) async {
+  testWidgets('tab counts respect the selected date', (tester) async {
+    final mockClient = MockClient((request) async {
+      if (request.url.path.contains('/appointments')) {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': [
+              _apt('a1', 'SCHEDULED', 'CountSchedOne', date: '2026-10-20T00:00:00.000Z'),
+              _apt('a2', 'SCHEDULED', 'CountSchedTwo', date: '2026-10-21T00:00:00.000Z'),
+              _apt('a3', 'COMPLETED', 'CountDone', date: '2026-10-20T00:00:00.000Z'),
+              _apt('a4', 'CANCELLED', 'CountCancelled', date: '2026-10-21T00:00:00.000Z'),
+            ],
+          }),
+          200,
+        );
+      }
+      return http.Response('Not found', 404);
+    });
+
+    await pumpPage(tester, ApiService.createWithClient(mockClient));
+
+    // Counts without a date: All 4, Upcoming 2, Completed 1, Cancelled 1.
+    expect(find.text('4'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('1'), findsNWidgets(2));
+
+    await selectDate(tester, 20);
+
+    // Counts for 2026-10-20: All 2, Upcoming 1, Completed 1, Cancelled 0.
+    expect(find.text('4'), findsNothing);
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('1'), findsNWidgets(2));
+    expect(find.text('0'), findsOneWidget);
+
+    await tester.tap(find.text('All'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('CountSchedOne'), findsOneWidget);
+    expect(find.textContaining('CountDone'), findsOneWidget);
+    expect(find.textContaining('CountSchedTwo'), findsNothing);
+    expect(find.textContaining('CountCancelled'), findsNothing);
+  });
+
+  testWidgets('truly empty dataset shows the true-empty message', (tester) async {
+    final mockClient = MockClient((request) async {
+      if (request.url.path.contains('/appointments')) {
+        return http.Response(
+          jsonEncode({'success': true, 'data': <Map<String, dynamic>>[]}),
+          200,
+        );
+      }
+      return http.Response('Not found', 404);
+    });
+
+    await pumpPage(tester, ApiService.createWithClient(mockClient));
+
+    expect(find.text('No appointments yet'), findsOneWidget);
+    expect(find.text('No appointments match your filters.'), findsNothing);
+  });
+
+  testWidgets('nonempty dataset with no matching filters shows filtered-empty message', (tester) async {
     final mockClient = MockClient((request) async {
       if (request.url.path.contains('/appointments')) {
         return http.Response(
@@ -343,7 +402,38 @@ void main() {
     await pumpPage(tester, ApiService.createWithClient(mockClient));
     await selectDate(tester, 21);
 
-    expect(find.text('No appointments yet'), findsOneWidget);
+    expect(find.text('No appointments match your filters.'), findsOneWidget);
+    expect(find.text('No appointments yet'), findsNothing);
+
+    await tester.tap(find.text('All'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No appointments match your filters.'), findsOneWidget);
+    expect(find.text('No appointments yet'), findsNothing);
+    expect(find.text('No all appointments'), findsNothing);
+  });
+
+  testWidgets('empty date and status combination shows filtered-empty message', (tester) async {
+    final mockClient = MockClient((request) async {
+      if (request.url.path.contains('/appointments')) {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': [
+              _apt('a1', 'COMPLETED', 'DoctorOne', date: '2026-10-20T00:00:00.000Z'),
+            ],
+          }),
+          200,
+        );
+      }
+      return http.Response('Not found', 404);
+    });
+
+    await pumpPage(tester, ApiService.createWithClient(mockClient));
+    await selectDate(tester, 21);
+
+    expect(find.text('No appointments match your filters.'), findsOneWidget);
+    expect(find.text('No appointments yet'), findsNothing);
   });
   });
 }
