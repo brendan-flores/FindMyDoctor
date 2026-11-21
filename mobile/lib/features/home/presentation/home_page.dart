@@ -26,7 +26,21 @@ class HomePage extends StatefulWidget {
   /// process-wide [PushNotificationService.instance] is used.
   final PushNotificationService? pushNotificationService;
 
-  const HomePage({super.key, this.initialTab, this.pushNotificationService});
+  /// Optional injected API service used by widget tests. Production callers
+  /// leave this null and fall back to the shared [ApiService] singleton.
+  final ApiService? apiService;
+
+  /// Test-only override for how long loaded conversations stay fresh.
+  /// Production uses [_HomePageState._conversationFreshness].
+  final Duration? conversationFreshness;
+
+  const HomePage({
+    super.key,
+    this.initialTab,
+    this.pushNotificationService,
+    this.apiService,
+    this.conversationFreshness,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -36,7 +50,7 @@ class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
   String? _selectedSpecialtyFromHome;
   final DoctorService _doctorService = DoctorService();
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   List<String> _specialties = [];
   List<Doctor> _recommendedDoctors = [];
   List<String> _hospitals = [];
@@ -44,6 +58,9 @@ class _HomePageState extends State<HomePage> {
   bool _isLoadingDoctors = true;
   List<Conversation> _conversations = [];
   bool _isLoadingConversations = true;
+  bool _isFetchingConversations = false;
+  bool _pendingForcedConversationRefresh = false;
+  DateTime? _conversationsLoadedAt;
   int _totalUnreadCount = 0;
   int _notificationUnreadCount = 0;
   int _waitlistCount = 0;
@@ -51,6 +68,10 @@ class _HomePageState extends State<HomePage> {
   String? _userEmail;
   bool _accountInfoFailed = false;
   String _chatSegment = 'clinic'; // M1: Segmented control state
+
+  // Conversation data is reused within this window instead of refetched on
+  // every Chat-tab visit. A thread return or pull-to-refresh bypasses it.
+  static const Duration _conversationFreshness = Duration(seconds: 30);
 
   // Profile "About" and "Notifications" section state.
   String? _appVersion;
@@ -62,6 +83,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
     _pushService =
         widget.pushNotificationService ?? PushNotificationService.instance;
     if (widget.initialTab != null) {
@@ -180,7 +202,25 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _loadConversations() async {
+  bool get _isConversationDataStale =>
+      _conversationsLoadedAt == null ||
+      DateTime.now().difference(_conversationsLoadedAt!) >=
+          (widget.conversationFreshness ?? _conversationFreshness);
+
+  Future<void> _loadConversations({bool force = false}) async {
+    // Never stack a second conversation request on top of one in flight. A
+    // forced refresh requested meanwhile is replayed once it settles.
+    if (_isFetchingConversations) {
+      if (force) {
+        _pendingForcedConversationRefresh = true;
+      }
+      return;
+    }
+    // Reuse the in-memory list until it is stale, unless the caller explicitly
+    // invalidated it (thread return or pull-to-refresh).
+    if (!force && !_isConversationDataStale) return;
+
+    _isFetchingConversations = true;
     try {
       final response = await _apiService.getConversations();
       if (response['success'] == true && response['data'] != null) {
@@ -197,6 +237,7 @@ class _HomePageState extends State<HomePage> {
           _conversations = conversations;
           _totalUnreadCount = totalUnread;
           _isLoadingConversations = false;
+          _conversationsLoadedAt = DateTime.now();
         });
       } else {
         if (!mounted) return;
@@ -213,6 +254,13 @@ class _HomePageState extends State<HomePage> {
         _totalUnreadCount = 0;
         _isLoadingConversations = false;
       });
+    } finally {
+      _isFetchingConversations = false;
+    }
+
+    if (mounted && _pendingForcedConversationRefresh) {
+      _pendingForcedConversationRefresh = false;
+      await _loadConversations(force: true);
     }
   }
 
@@ -367,11 +415,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildChatContent() {
-    // Load conversations when this tab is accessed
-    if (_isLoadingConversations) {
-      _loadConversations();
-    }
-
     return Column(
       children: [
         AppHeader(
@@ -425,7 +468,7 @@ class _HomePageState extends State<HomePage> {
                           conversations: _conversations,
                           onRefresh: () {
                             if (mounted) {
-                              _loadConversations();
+                              _loadConversations(force: true);
                             }
                           },
                         ),
@@ -534,9 +577,9 @@ class _HomePageState extends State<HomePage> {
           '/conversation-thread',
           arguments: {'conversationId': conversation.id},
         );
-        // Reload conversations when returning to update unread count
+        // Refresh conversations when returning to update unread count
         if (mounted) {
-          _loadConversations();
+          _loadConversations(force: true);
         }
       },
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
@@ -1821,11 +1864,12 @@ class _HomePageState extends State<HomePage> {
           if (index != 1) {
             _selectedSpecialtyFromHome = null;
           }
-          // Reload conversations when switching to chat tab
-          if (index == 3) {
-            _loadConversations();
-          }
         });
+        // Reuse the in-memory conversation list until it goes stale instead of
+        // refetching on every visit to the Chat tab.
+        if (index == 3) {
+          _loadConversations();
+        }
       },
       child: Container(
         padding: EdgeInsets.symmetric(

@@ -37,7 +37,8 @@ class ConversationThreadPage extends StatefulWidget {
   State<ConversationThreadPage> createState() => _ConversationThreadPageState();
 }
 
-class _ConversationThreadPageState extends State<ConversationThreadPage> {
+class _ConversationThreadPageState extends State<ConversationThreadPage>
+    with WidgetsBindingObserver {
   late final ApiService _apiService;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -45,6 +46,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
   bool _isLoading = true;
   bool _isSending = false;
   Timer? _pollingTimer;
+  bool _isFetchingMessages = false;
   String? _currentUserId;
   String? _doctorName;
   String? _patientName;
@@ -54,6 +56,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
   void initState() {
     super.initState();
     _apiService = widget.apiService ?? ApiService();
+    WidgetsBinding.instance.addObserver(this);
     _loadConversationDetails();
     _loadCurrentUser().then((_) {
       _loadMessages(scrollToLatest: true);
@@ -137,39 +140,94 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _stopPolling();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadMessages({bool scrollToLatest = false}) async {
+  /// Polling only runs while the thread is in the foreground. On resume the
+  /// thread is refreshed immediately so messages that arrived in the
+  /// background appear without waiting for the next 12-second tick.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadMessages();
+      _startPolling();
+    } else {
+      _stopPolling();
+    }
+  }
+
+  /// True when the fetched list differs from what is already displayed.
+  ///
+  /// Only fields that affect rendering are compared: identity, order, content,
+  /// read state, and invoice status. Comparing these keeps the poll from
+  /// rebuilding the list when the server returns the same messages.
+  bool _messagesChanged(List<Message> next) {
+    if (_messages.length != next.length) return true;
+
+    for (var index = 0; index < next.length; index += 1) {
+      final current = _messages[index];
+      final incoming = next[index];
+      if (current.id != incoming.id ||
+          current.senderUserId != incoming.senderUserId ||
+          current.message != incoming.message ||
+          current.sentAt != incoming.sentAt ||
+          current.readAt != incoming.readAt ||
+          current.invoice?.status != incoming.invoice?.status) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  Future<void> _loadMessages({
+    bool scrollToLatest = false,
+    bool isPolling = false,
+  }) async {
+    // A slow response must not stack another poll on top of it.
+    if (isPolling && _isFetchingMessages) return;
+
+    _isFetchingMessages = true;
     try {
       final response = await _apiService.getMessages(widget.conversationId);
+      if (!mounted) return;
       if (response['success'] == true && response['data'] != null) {
         final List<dynamic> data = response['data'];
         final messages = data.map((json) => Message.fromJson(json)).toList();
-        if (!mounted) return;
-        setState(() {
-          _messages = messages;
-          _isLoading = false;
-        });
+        // The first successful load must always clear the loading state, even
+        // when the conversation is empty.
+        if (_isLoading || _messagesChanged(messages)) {
+          setState(() {
+            _messages = messages;
+            _isLoading = false;
+          });
+        }
         if (scrollToLatest) {
           _scrollToBottom();
         }
       } else {
         if (!mounted) return;
+        if (_isLoading || _messages.isNotEmpty) {
+          setState(() {
+            _messages = [];
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      if (_isLoading || _messages.isNotEmpty) {
         setState(() {
           _messages = [];
           _isLoading = false;
         });
       }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _messages = [];
-        _isLoading = false;
-      });
+    } finally {
+      _isFetchingMessages = false;
     }
   }
 
@@ -182,9 +240,16 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
   }
 
   void _startPolling() {
+    // Restart from a clean timer so a resume can never create a second one.
+    _stopPolling();
     _pollingTimer = Timer.periodic(const Duration(seconds: 12), (timer) {
-      _loadMessages();
+      _loadMessages(isPolling: true);
     });
+  }
+
+  void _stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
   }
 
   void _scrollToBottom() {
