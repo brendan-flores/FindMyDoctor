@@ -6,8 +6,13 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
+<<<<<<< HEAD
     "lint": "eslint src",
     "test": "node --test src/lib/api/requestPolicy.test.ts src/lib/api/ttlCache.test.ts src/lib/api/pollingPolicy.test.ts src/lib/api/refreshGate.test.ts"
+=======
+    "lint": "next lint",
+    "test": "node --test src/lib/api/requestPolicy.test.ts src/lib/api/ttlCache.test.ts src/lib/phone.test.ts"
+>>>>>>> feat/standardized-phone-number-input
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

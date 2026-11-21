@@ -6,6 +6,7 @@ import SecretarySidebar from '@/components/layout/SecretarySidebar';
 import SecretaryHeader from '@/components/layout/SecretaryHeader';
 import { apiClient } from '@/lib/api/apiClient';
 import { secretaryApi } from '@/lib/api/secretaryApi';
+import { toStaffContactDomestic } from '@/lib/phone';
 import {
   clearSecretarySession,
   isInvalidSecretarySessionStatus,
@@ -120,7 +121,9 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
                 const firstName = secretary?.first_name?.trim() ?? '';
                 const lastName = secretary?.last_name?.trim() ?? '';
                 const contactNumber = secretary?.contact_number?.trim() ?? '';
-                const isComplete = firstName !== '' && lastName !== '' && contactNumber !== '';
+                const hasValidContact =
+                  contactNumber !== '' && toStaffContactDomestic(contactNumber) !== null;
+                const isComplete = firstName !== '' && lastName !== '' && hasValidContact;
 
                 if (!isComplete) {
                   router.push('/secretary/complete-profile');

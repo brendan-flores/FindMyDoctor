@@ -4,6 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
 import Toast from '@/components/ui/Toast';
+import {
+  formatPhoneFieldInput,
+  phoneFieldValueFromStored,
+  phoneFormatErrorMessage,
+  storedPhoneWarningFor,
+  toStaffContactDomestic,
+} from '@/lib/phone';
 
 interface SecretaryProfile {
   id: string;
@@ -26,6 +33,8 @@ export default function SecretaryProfile() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [contactWarning, setContactWarning] = useState<string | null>(null);
+  const [contactError, setContactError] = useState('');
 
   // Form state
   const [firstName, setFirstName] = useState('');
@@ -45,7 +54,8 @@ export default function SecretaryProfile() {
         setFirstName(data.first_name || '');
         setMiddleName(data.middle_name || '');
         setLastName(data.last_name || '');
-        setContactNumber(data.contact_number || '');
+        setContactNumber(phoneFieldValueFromStored(data.contact_number, { allowLandline: true }));
+        setContactWarning(storedPhoneWarningFor(data.contact_number, { allowLandline: true }));
       } else {
         setError('Failed to load profile');
       }
@@ -76,14 +86,17 @@ export default function SecretaryProfile() {
       setFirstName(profile.first_name || '');
       setMiddleName(profile.middle_name || '');
       setLastName(profile.last_name || '');
-      setContactNumber(profile.contact_number || '');
+      setContactNumber(phoneFieldValueFromStored(profile.contact_number, { allowLandline: true }));
+      setContactWarning(storedPhoneWarningFor(profile.contact_number, { allowLandline: true }));
     } else {
       // If no profile data, reset to empty
       setFirstName('');
       setMiddleName('');
       setLastName('');
       setContactNumber('');
+      setContactWarning(null);
     }
+    setContactError('');
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -123,12 +136,19 @@ export default function SecretaryProfile() {
       return;
     }
 
+    const domesticContact = toStaffContactDomestic(contactNumber);
+    if (!domesticContact) {
+      setContactError('Enter a valid Philippine contact number');
+      setIsSaving(false);
+      return;
+    }
+
     try {
       const response = await apiClient.put('/secretaries/me', {
         firstName: firstName.trim(),
         middleName: middleName.trim() || null,
         lastName: lastName.trim(),
-        contactNumber: contactNumber.trim(),
+        contactNumber: domesticContact,
       });
 
       if (response.success) {
@@ -242,17 +262,26 @@ export default function SecretaryProfile() {
                       <label htmlFor="contactNumber" className="block text-sm font-semibold text-slate-700">
                         Contact Number <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        id="contactNumber"
-                        type="tel"
-                        value={contactNumber}
-                        onChange={(e) => setContactNumber(e.target.value)}
-                        placeholder="09123456789"
-                        required
-                        maxLength={20}
-                        className="w-full h-10 px-4 text-sm border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20 focus:border-[#1b5eb8]"
-                      />
-                      <p className="text-xs text-slate-500">Philippine mobile format: 09123456789</p>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500">+63</span>
+                        <input
+                          id="contactNumber"
+                          type="tel"
+                          value={contactNumber}
+                          onChange={(e) => {
+                            const result = formatPhoneFieldInput(e.target.value, contactNumber, { allowLandline: true });
+                            setContactNumber(result.value);
+                            setContactError(result.error ? phoneFormatErrorMessage(result.error) : '');
+                            if (!result.error) setContactWarning(null);
+                          }}
+                          placeholder="9171234567"
+                          required
+                          className="w-full h-10 pl-12 pr-4 text-sm border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20 focus:border-[#1b5eb8]"
+                        />
+                      </div>
+                      {contactWarning && <p className="text-xs text-amber-600">{contactWarning}</p>}
+                      {contactError && <p className="text-xs text-red-600">{contactError}</p>}
+                      <p className="text-xs text-slate-500">Enter the number without +63 (mobile 10 digits, landline 9 digits).</p>
                     </div>
                   </div>
                 </div>

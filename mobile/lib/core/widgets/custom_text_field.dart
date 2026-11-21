@@ -16,6 +16,7 @@ class CustomTextField extends StatefulWidget {
   final List<TextInputFormatter>? inputFormatters;
   final Iterable<String>? autofillHints;
   final IconData? prefixIcon;
+  final String? prefixText;
   final Widget? suffixIcon;
   final String? Function(String?)? validator;
   final void Function(String)? onChanged;
@@ -45,6 +46,7 @@ class CustomTextField extends StatefulWidget {
     this.inputFormatters,
     this.autofillHints,
     this.prefixIcon,
+    this.prefixText,
     this.suffixIcon,
     this.validator,
     this.onChanged,
@@ -161,6 +163,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
             decoration: InputDecoration(
               hintText: widget.hint,
               hintStyle: AppTextStyles.inputPlaceholder,
+              prefixText: widget.prefixText,
               filled: true,
               fillColor: AppColors.surfaceLowest,
               contentPadding: EdgeInsets.symmetric(

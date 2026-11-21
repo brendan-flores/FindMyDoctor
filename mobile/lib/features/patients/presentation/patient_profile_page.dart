@@ -8,7 +8,12 @@ import '../../../core/services/api_service.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
+<<<<<<< HEAD
 import '../../../core/widgets/skeleton.dart';
+=======
+import '../../../core/utils/phone_input.dart';
+import '../../../core/utils/phone_input_form.dart';
+>>>>>>> feat/standardized-phone-number-input
 
 /// Standalone read-only view of the signed-in patient's own profile.
 ///
@@ -17,29 +22,52 @@ import '../../../core/widgets/skeleton.dart';
 /// booking-related arguments. Patients only ever see their own data; the
 /// backend scopes `GET /api/v1/patients/me` to the authenticated caller.
 class PatientProfilePage extends StatefulWidget {
-  const PatientProfilePage({super.key});
+  /// Optional injected API service (test seam); defaults to the singleton.
+  final ApiService? apiService;
+
+  const PatientProfilePage({super.key, this.apiService});
 
   @override
   State<PatientProfilePage> createState() => _PatientProfilePageState();
 }
 
 class _PatientProfilePageState extends State<PatientProfilePage> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
 
   Map<String, dynamic>? _patient;
   bool _isLoading = true;
   String? _errorMessage;
   bool _isEditing = false;
-  
+
   // Edit form controllers
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   String? _formError;
+  String? _phoneInputError;
+  late final PhilippineMobileInputFormatter _phoneFormatter;
 
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
+    _phoneFormatter = PhilippineMobileInputFormatter(
+      onRejected: _handlePhoneRejected,
+    );
     _loadProfile();
+  }
+
+  void _handlePhoneRejected(PhoneFormatError error) {
+    if (!mounted) return;
+    setState(() {
+      _phoneInputError = phoneFormatErrorMessage(error);
+    });
+  }
+
+  void _handlePhoneChanged(String value) {
+    if (_phoneInputError == null) return;
+    setState(() {
+      _phoneInputError = null;
+    });
   }
 
   @override
@@ -63,7 +91,9 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
         final patientData = Map<String, dynamic>.from(response['data'] as Map);
         setState(() {
           _patient = patientData;
-          _phoneController.text = (patientData['phone'] ?? '').toString();
+          final storedPhone = patientData['phone']?.toString();
+          _phoneController.text = phoneFieldValueFromStored(storedPhone);
+          _phoneInputError = storedMobileWarningFor(storedPhone);
           _addressController.text = (patientData['address'] ?? '').toString();
           _isLoading = false;
         });
@@ -78,8 +108,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage =
-            'Cannot reach the server. Please check your connection and try again.';
+        _errorMessage = 'Cannot reach the server. Please check your connection and try again.';
         _isLoading = false;
       });
     }
@@ -88,11 +117,16 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   Future<void> _saveProfile() async {
     if (_patient == null) return;
 
-    final phone = _phoneController.text.trim();
+    final phone = canonicalMobileE164(_phoneController.text);
     final address = _addressController.text.trim();
 
-    if (phone.isEmpty) {
-      setState(() => _formError = 'Mobile number is required');
+    if (phone == null) {
+      setState(() {
+        _formError = null;
+        _phoneInputError =
+            validatePhilippineMobile(_phoneController.text) ??
+            'Enter a valid Philippine mobile number.';
+      });
       return;
     }
 
@@ -117,7 +151,8 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
           'sex': _patient!['sex'],
           'phone': phone,
           'address': address,
-          if (_patient!['middle_name'] != null) 'middleName': _patient!['middle_name'],
+          if (_patient!['middle_name'] != null)
+            'middleName': _patient!['middle_name'],
         },
       );
 
@@ -134,7 +169,8 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
       } else {
         if (!mounted) return;
         setState(() {
-          _formError = response['error']?['message'] ?? 'Failed to update profile';
+          _formError =
+              response['error']?['message'] ?? 'Failed to update profile';
           _isLoading = false;
         });
       }
@@ -151,7 +187,9 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     setState(() {
       if (_isEditing) {
         // Cancel edit - reset controllers
-        _phoneController.text = (_patient!['phone'] ?? '').toString();
+        final storedPhone = _patient!['phone']?.toString();
+        _phoneController.text = phoneFieldValueFromStored(storedPhone);
+        _phoneInputError = storedMobileWarningFor(storedPhone);
         _addressController.text = (_patient!['address'] ?? '').toString();
         _formError = null;
       }
@@ -214,9 +252,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                     ),
                   ],
           ),
-          Expanded(
-            child: _buildBody(),
-          ),
+          Expanded(child: _buildBody()),
         ],
       ),
     );
@@ -282,7 +318,9 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                     Expanded(
                       child: Text(
                         _formError!,
-                        style: AppTextStyles.bodySm.copyWith(color: AppColors.error),
+                        style: AppTextStyles.bodySm.copyWith(
+                          color: AppColors.error,
+                        ),
                       ),
                     ),
                   ],
@@ -482,8 +520,11 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                   TextField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
+                    inputFormatters: [_phoneFormatter],
+                    onChanged: _handlePhoneChanged,
                     decoration: InputDecoration(
-                      hintText: 'Enter mobile number',
+                      hintText: '9XX XXX XXXX',
+                      prefixText: phMobilePrefixText,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -496,6 +537,15 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                       color: AppColors.onSurface,
                     ),
                   ),
+                  if (_phoneInputError != null) ...[
+                    const SizedBox(height: spacing.AppSpacing.gutterXs),
+                    Text(
+                      _phoneInputError!,
+                      style: AppTextStyles.bodySm.copyWith(
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

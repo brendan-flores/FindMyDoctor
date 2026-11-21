@@ -5,6 +5,13 @@ import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
 import { doctorApi, DoctorProfile, UpdateProfileRequest } from '@/lib/api/doctorApi';
 import { validateSignatureFile, shouldRefreshSignaturePreview } from '@/lib/doctorSignature';
+import {
+  formatPhoneFieldInput,
+  phoneFieldValueFromStored,
+  phoneFormatErrorMessage,
+  storedPhoneWarningFor,
+  toStaffContactDomestic,
+} from '@/lib/phone';
 import { CEBU_FACILITIES } from '@/data/cebuFacilities';
 import { MEDICAL_SPECIALTIES } from '@/data/medicalSpecialties';
 import { MEDICAL_CREDENTIALS } from '@/data/medicalCredentials';
@@ -43,6 +50,8 @@ export default function DoctorProfilePage() {
   const [editForm, setEditForm] = useState<UpdateProfileRequest & { email?: string }>({});
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [contactWarning, setContactWarning] = useState<string | null>(null);
+  const [contactError, setContactError] = useState('');
 
   // Signature management state
   const [hasSignature, setHasSignature] = useState(false);
@@ -129,7 +138,7 @@ export default function DoctorProfilePage() {
             first_name: response.data.first_name || undefined,
             middle_name: response.data.middle_name || undefined,
             last_name: response.data.last_name || undefined,
-            contact_number: response.data.contact_number || undefined,
+            contact_number: phoneFieldValueFromStored(response.data.contact_number, { allowLandline: true }) || undefined,
             email: response.data.email || undefined,
             specialty: response.data.specialty || undefined,
             credentials: response.data.credentials || undefined,
@@ -142,6 +151,8 @@ export default function DoctorProfilePage() {
             languages_spoken: response.data.languages_spoken || undefined,
             room_number: response.data.room_number || undefined,
           });
+          setContactWarning(storedPhoneWarningFor(response.data.contact_number, { allowLandline: true }));
+          setContactError('');
           if (response.data.professional_photo_url) {
             setPhotoPreview(
               response.data.professional_photo_url.startsWith('http')
@@ -179,7 +190,7 @@ export default function DoctorProfilePage() {
         first_name: profile.first_name || undefined,
         middle_name: profile.middle_name || undefined,
         last_name: profile.last_name || undefined,
-        contact_number: profile.contact_number || undefined,
+        contact_number: phoneFieldValueFromStored(profile.contact_number, { allowLandline: true }) || undefined,
         email: profile.email || undefined,
         specialty: profile.specialty || undefined,
         credentials: profile.credentials || undefined,
@@ -192,10 +203,23 @@ export default function DoctorProfilePage() {
         languages_spoken: profile.languages_spoken || undefined,
         room_number: profile.room_number || undefined,
       });
+      setContactWarning(storedPhoneWarningFor(profile.contact_number, { allowLandline: true }));
+      setContactError('');
     }
   };
 
   const handleSave = async () => {
+    const rawContact = (editForm.contact_number ?? '').trim();
+    let contactNumber = editForm.contact_number;
+    if (rawContact.length > 0) {
+      const domestic = toStaffContactDomestic(rawContact);
+      if (domestic === null) {
+        setContactError('Enter a valid Philippine contact number.');
+        return;
+      }
+      contactNumber = domestic;
+    }
+
     setIsSaving(true);
     setError('');
     setSuccessMessage('');
@@ -205,6 +229,7 @@ export default function DoctorProfilePage() {
       // Email is in users table and should not be updated
       // PRC license requires dedicated process
       const { email, prc_license_number, ...profileUpdateData } = editForm;
+      profileUpdateData.contact_number = contactNumber;
 
       const response = await doctorApi.updateProfile(profileUpdateData);
       if (response.success && response.data) {
@@ -213,7 +238,7 @@ export default function DoctorProfilePage() {
           first_name: response.data.first_name || undefined,
           middle_name: response.data.middle_name || undefined,
           last_name: response.data.last_name || undefined,
-          contact_number: response.data.contact_number || undefined,
+          contact_number: phoneFieldValueFromStored(response.data.contact_number, { allowLandline: true }) || undefined,
           email: response.data.email || undefined,
           specialty: response.data.specialty || undefined,
           credentials: response.data.credentials || undefined,
@@ -226,6 +251,8 @@ export default function DoctorProfilePage() {
           languages_spoken: response.data.languages_spoken || undefined,
           room_number: response.data.room_number || undefined,
         });
+        setContactWarning(storedPhoneWarningFor(response.data.contact_number, { allowLandline: true }));
+        setContactError('');
         setIsEditing(false);
         setSuccessMessage('Profile updated successfully');
         setTimeout(() => setSuccessMessage(''), 3000);
@@ -530,13 +557,25 @@ export default function DoctorProfilePage() {
             />
             <Detail label="Contact Number" value={profile.contact_number}>
               {isEditing && (
-                <input
-                  type="tel"
-                  value={editForm.contact_number || ''}
-                  onChange={(e) => setEditForm({ ...editForm, contact_number: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 transition-all"
-                  placeholder="Enter contact number"
-                />
+                <>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">+63</span>
+                    <input
+                      type="tel"
+                      value={editForm.contact_number || ''}
+                      onChange={(e) => {
+                        const result = formatPhoneFieldInput(e.target.value, editForm.contact_number || '', { allowLandline: true });
+                        setEditForm({ ...editForm, contact_number: result.value });
+                        setContactError(result.error ? phoneFormatErrorMessage(result.error) : '');
+                        if (!result.error) setContactWarning(null);
+                      }}
+                      className="w-full pl-14 pr-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 transition-all"
+                      placeholder="9171234567"
+                    />
+                  </div>
+                  {contactWarning && <p className="mt-2 text-sm text-amber-600">{contactWarning}</p>}
+                  {contactError && <p className="mt-2 text-sm text-rose-600">{contactError}</p>}
+                </>
               )}
             </Detail>
           </dl>

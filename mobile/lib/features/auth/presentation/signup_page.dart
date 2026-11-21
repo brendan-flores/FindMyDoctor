@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -10,6 +9,8 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/utils/phone_input.dart';
+import '../../../core/utils/phone_input_form.dart';
 import 'otp_verification_page.dart';
 
 class SignUpPage extends StatefulWidget {
@@ -42,6 +43,8 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _isLoading = false;
   bool _agreeToTerms = false;
   String? _errorMessage;
+  String? _phoneInputError;
+  late final PhilippineMobileInputFormatter _phoneFormatter;
 
   // Sex selection (backend values)
   String? _selectedSex;
@@ -73,7 +76,24 @@ class _SignUpPageState extends State<SignUpPage> {
   void initState() {
     super.initState();
     _apiService = widget.apiService ?? ApiService();
+    _phoneFormatter = PhilippineMobileInputFormatter(
+      onRejected: _handlePhoneRejected,
+    );
     _sexFocusNode.addListener(_handleSexFocusChange);
+  }
+
+  void _handlePhoneRejected(PhoneFormatError error) {
+    if (!mounted) return;
+    setState(() {
+      _phoneInputError = phoneFormatErrorMessage(error);
+    });
+  }
+
+  void _handlePhoneChanged(String value) {
+    if (_phoneInputError == null) return;
+    setState(() {
+      _phoneInputError = null;
+    });
   }
 
   void _handleSexFocusChange() {
@@ -111,8 +131,9 @@ class _SignUpPageState extends State<SignUpPage> {
   Future<void> _selectDateOfBirth() async {
     FocusScope.of(context).unfocus();
 
-    final DateTime initialDate =
-        DateTime.now().subtract(const Duration(days: 365 * 18));
+    final DateTime initialDate = DateTime.now().subtract(
+      const Duration(days: 365 * 18),
+    );
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
@@ -144,7 +165,9 @@ class _SignUpPageState extends State<SignUpPage> {
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please agree to the Terms of Service and Privacy Policy'),
+          content: Text(
+            'Please agree to the Terms of Service and Privacy Policy',
+          ),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ),
@@ -176,8 +199,18 @@ class _SignUpPageState extends State<SignUpPage> {
       final password = _passwordController.text;
       final confirmPassword = _confirmPasswordController.text;
       final dateOfBirth = _dateOfBirthController.text.trim();
-      final phone = _phoneController.text.trim();
+      final phone = canonicalMobileE164(_phoneController.text);
       final address = _addressController.text.trim();
+
+      if (phone == null) {
+        setState(() {
+          _isLoading = false;
+          _phoneInputError =
+              validatePhilippineMobile(_phoneController.text) ??
+              'Enter a valid Philippine mobile number.';
+        });
+        return;
+      }
 
       // Call the backend API to stage the sign-up and send the OTP
       final response = await _apiService.sendPatientOtp(
@@ -236,8 +269,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
         if (errorString.contains('Connection refused') ||
             errorString.contains('Failed host lookup')) {
-          errorMessage =
-              'Cannot connect to server. Please ensure backend is running at http://10.0.2.2:3000';
+          errorMessage = 'Cannot connect to server. Please ensure backend is running at http://10.0.2.2:3000';
         } else if (errorString.contains('timeout')) {
           errorMessage = 'Request timed out. Please check your connection.';
         } else if (e is ApiException && e.statusCode == 409) {
@@ -373,9 +405,7 @@ class _SignUpPageState extends State<SignUpPage> {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color, color.withValues(alpha: 0.0)],
-        ),
+        gradient: RadialGradient(colors: [color, color.withValues(alpha: 0.0)]),
       ),
     );
   }
@@ -397,9 +427,7 @@ class _SignUpPageState extends State<SignUpPage> {
         decoration: BoxDecoration(
           color: AppColors.surfaceLowest,
           shape: BoxShape.circle,
-          border: Border.all(
-            color: AppColors.slate200.withValues(alpha: 0.8),
-          ),
+          border: Border.all(color: AppColors.slate200.withValues(alpha: 0.8)),
           boxShadow: [
             BoxShadow(
               color: AppColors.brandNavy.withValues(alpha: 0.06),
@@ -470,9 +498,7 @@ class _SignUpPageState extends State<SignUpPage> {
       decoration: BoxDecoration(
         color: AppColors.surfaceLowest,
         borderRadius: BorderRadius.circular(AppSpacing.radius2xl),
-        border: Border.all(
-          color: AppColors.slate200.withValues(alpha: 0.7),
-        ),
+        border: Border.all(color: AppColors.slate200.withValues(alpha: 0.7)),
         boxShadow: [
           BoxShadow(
             color: AppColors.brandNavy.withValues(alpha: 0.07),
@@ -569,9 +595,7 @@ class _SignUpPageState extends State<SignUpPage> {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: AppTextStyles.bodySm.copyWith(
-                  color: AppColors.slate500,
-                ),
+                style: AppTextStyles.bodySm.copyWith(color: AppColors.slate500),
               ),
             ],
           ),
@@ -695,10 +719,7 @@ class _SignUpPageState extends State<SignUpPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Sex',
-          style: AppTextStyles.inputLabel,
-        ),
+        Text('Sex', style: AppTextStyles.inputLabel),
         const SizedBox(height: AppSpacing.gutterXs),
         AnimatedContainer(
           duration: const Duration(milliseconds: 180),
@@ -742,10 +763,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
               ),
               iconSize: 22,
-              hint: Text(
-                'Select sex',
-                style: AppTextStyles.inputPlaceholder,
-              ),
+              hint: Text('Select sex', style: AppTextStyles.inputPlaceholder),
               style: AppTextStyles.inputText,
               decoration: InputDecoration(
                 filled: true,
@@ -824,9 +842,7 @@ class _SignUpPageState extends State<SignUpPage> {
             : Colors.transparent,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd + 2),
         border: isSelected
-            ? Border.all(
-                color: AppColors.brandPrimary.withValues(alpha: 0.22),
-              )
+            ? Border.all(color: AppColors.brandPrimary.withValues(alpha: 0.22))
             : null,
       ),
       child: Row(
@@ -866,31 +882,32 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   Widget _buildMobileField() {
-    return CustomTextField(
-      label: 'Mobile Number',
-      hint: '09XX XXX XXXX',
-      controller: _phoneController,
-      keyboardType: TextInputType.phone,
-      textInputAction: TextInputAction.next,
-      prefixIcon: Icons.phone_outlined,
-      enabled: !_isLoading,
-      maxLength: 20,
-      borderRadius: AppSpacing.radiusXl,
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'[\d\s\-\+\(\)]')),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CustomTextField(
+          label: 'Mobile Number',
+          hint: '9XX XXX XXXX',
+          controller: _phoneController,
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.next,
+          prefixIcon: Icons.phone_outlined,
+          prefixText: phMobilePrefixText,
+          enabled: !_isLoading,
+          borderRadius: AppSpacing.radiusXl,
+          inputFormatters: [_phoneFormatter],
+          onChanged: _handlePhoneChanged,
+          validator: validatePhilippineMobile,
+        ),
+        if (_phoneInputError != null) ...[
+          const SizedBox(height: AppSpacing.gutterXs),
+          Text(
+            _phoneInputError!,
+            style: AppTextStyles.bodySm.copyWith(color: AppColors.error),
+          ),
+        ],
       ],
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'Mobile number is required';
-        }
-        if (value.trim().length > 20) {
-          return 'Mobile number must be 1-20 characters';
-        }
-        if (!RegExp(r'^[\d\s\-\+\(\)]+$').hasMatch(value.trim())) {
-          return 'Enter a valid mobile number';
-        }
-        return null;
-      },
     );
   }
 
@@ -1092,7 +1109,9 @@ class _SignUpPageState extends State<SignUpPage> {
                     });
                   },
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.gutterMd),
+              padding: const EdgeInsets.symmetric(
+                vertical: AppSpacing.gutterMd,
+              ),
               child: Text(
                 'I agree to FindMyDoctor\'s Terms of Service and Privacy Policy, including Philippine Data Privacy Act compliance.',
                 style: AppTextStyles.bodySm.copyWith(
@@ -1217,11 +1236,7 @@ class _SignUpPageState extends State<SignUpPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(
-          Icons.lock_outline,
-          size: 14,
-          color: AppColors.slate400,
-        ),
+        const Icon(Icons.lock_outline, size: 14, color: AppColors.slate400),
         const SizedBox(width: AppSpacing.gutterSm),
         Flexible(
           child: Text(

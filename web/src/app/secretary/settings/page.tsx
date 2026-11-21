@@ -555,7 +555,8 @@ export default function SecretarySettings() {
                       Account Number
                     </label>
                     <input
-                      type="text"
+                      type="tel"
+                      inputMode="tel"
                       id="accountNumber"
                       value={gcashAccountForm.accountNumber}
                       onChange={(e) => {

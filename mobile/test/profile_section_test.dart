@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:mobile/app/app.dart';
 import 'package:mobile/core/services/api_service.dart';
 import 'package:mobile/core/services/push_notification_service.dart';
+import 'package:mobile/core/utils/phone_input_form.dart';
 import 'package:mobile/features/auth/presentation/change_password_page.dart';
 import 'package:mobile/features/auth/presentation/login_page.dart';
 import 'package:mobile/features/home/presentation/home_page.dart';
@@ -53,9 +58,8 @@ class FakeApiService implements ApiService {
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) => throw StateError(
-        'Unexpected ApiService call: ${invocation.memberName}',
-      );
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected ApiService call: ${invocation.memberName}');
 }
 
 /// Replaces the permission_handler platform interface so tests do not need
@@ -89,9 +93,7 @@ PushNotificationService _pushServiceFor(FakeApiService apiService) {
 
 Future<void> _pumpProfileTab(
   WidgetTester tester, {
-  Map<String, Object> prefs = const {
-    'access_token': 'test-token',
-  },
+  Map<String, Object> prefs = const {'access_token': 'test-token'},
   FakeApiService? apiService,
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
@@ -107,16 +109,17 @@ Future<void> _pumpProfileTab(
   // MyApp, leave the startup splash on screen forever.
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMethodCallHandler(
-    PushNotificationService.channel,
-    (call) async => null,
-  );
+        PushNotificationService.channel,
+        (call) async => null,
+      );
 
   await tester.pumpWidget(
     MaterialApp(
       home: HomePage(
         initialTab: 4,
-        pushNotificationService:
-            apiService == null ? null : _pushServiceFor(apiService),
+        pushNotificationService: apiService == null
+            ? null
+            : _pushServiceFor(apiService),
       ),
       routes: {
         '/patient-profile': (context) => const PatientProfilePage(),
@@ -158,8 +161,9 @@ void main() {
     (tester) async {
       final apiService = FakeApiService();
       final originalPermissions = PermissionHandlerPlatform.instance;
-      PermissionHandlerPlatform.instance =
-          FakePermissionHandler(PermissionStatus.granted);
+      PermissionHandlerPlatform.instance = FakePermissionHandler(
+        PermissionStatus.granted,
+      );
       addTearDown(() {
         PermissionHandlerPlatform.instance = originalPermissions;
       });
@@ -185,174 +189,396 @@ void main() {
       // The existing register endpoint was called with the (cached) token.
       expect(apiService.registerCalls, 1);
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString(PushNotificationService.deviceTokenIdKey),
-          'device-token-1');
+      expect(
+        prefs.getString(PushNotificationService.deviceTokenIdKey),
+        'device-token-1',
+      );
       expect(prefs.getBool(PushNotificationService.pushEnabledKey), isTrue);
       expect(tester.widget<Switch>(switchFinder).value, isTrue);
     },
   );
 
-  testWidgets(
-    'push switch removes this device token when turned off',
-    (tester) async {
-      final apiService = FakeApiService();
-      final originalPermissions = PermissionHandlerPlatform.instance;
-      PermissionHandlerPlatform.instance =
-          FakePermissionHandler(PermissionStatus.granted);
-      addTearDown(() {
-        PermissionHandlerPlatform.instance = originalPermissions;
+  testWidgets('push switch removes this device token when turned off', (
+    tester,
+  ) async {
+    final apiService = FakeApiService();
+    final originalPermissions = PermissionHandlerPlatform.instance;
+    PermissionHandlerPlatform.instance = FakePermissionHandler(
+      PermissionStatus.granted,
+    );
+    addTearDown(() {
+      PermissionHandlerPlatform.instance = originalPermissions;
+    });
+
+    await _pumpProfileTab(
+      tester,
+      // No stored registration: disable must succeed locally without
+      // touching the network.
+      apiService: apiService,
+    );
+
+    final switchFinder = find.byKey(const ValueKey('profile_push_switch'));
+    expect(switchFinder, findsOneWidget);
+    expect(tester.widget<Switch>(switchFinder).value, isTrue);
+
+    await tester.tap(switchFinder);
+    await _flushAfterToggle(tester);
+
+    expect(apiService.registerCalls, 0);
+    expect(tester.widget<Switch>(switchFinder).value, isFalse);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(PushNotificationService.pushEnabledKey), isFalse);
+    expect(prefs.getString(PushNotificationService.deviceTokenIdKey), isNull);
+  });
+
+  testWidgets('permission-denied hint appears and registration is skipped', (
+    tester,
+  ) async {
+    final apiService = FakeApiService();
+    final originalPermissions = PermissionHandlerPlatform.instance;
+    PermissionHandlerPlatform.instance = FakePermissionHandler(
+      PermissionStatus.denied,
+    );
+    addTearDown(() {
+      PermissionHandlerPlatform.instance = originalPermissions;
+    });
+
+    await _pumpProfileTab(
+      tester,
+      prefs: const {
+        'access_token': 'test-token',
+        'push_notifications_enabled': false,
+        'device_token': 'cached-fcm-token',
+      },
+      apiService: apiService,
+    );
+
+    final switchFinder = find.byKey(const ValueKey('profile_push_switch'));
+    await tester.tap(switchFinder);
+    await _flushAfterToggle(tester);
+
+    // The OS dialog result is denied, so a hint with an "Open Settings"
+    // action appears and no registration call happens.
+    expect(find.text('Open Settings'), findsOneWidget);
+    expect(apiService.registerCalls, 0);
+    expect(tester.widget<Switch>(switchFinder).value, isFalse);
+  });
+
+  testWidgets('Profile row opens the standalone patient profile screen', (
+    tester,
+  ) async {
+    await _pumpProfileTab(tester);
+
+    await tester.tap(find.byKey(const ValueKey('profile_view_details')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byType(PatientProfilePage), findsOneWidget);
+  });
+
+  testWidgets('Privacy notice row opens the privacy notice screen', (
+    tester,
+  ) async {
+    await _pumpProfileTab(tester);
+
+    // The About section sits below the fold in the default test viewport.
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('profile_privacy_notice')),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('profile_privacy_notice')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.byType(PrivacyNoticePage), findsOneWidget);
+  });
+
+  testWidgets('Change password row opens the change password screen', (
+    tester,
+  ) async {
+    await _pumpProfileTab(tester);
+
+    await tester.tap(find.byKey(const ValueKey('profile_change_password')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.byType(ChangePasswordPage), findsOneWidget);
+  });
+
+  testWidgets('About section shows the pubspec app version', (tester) async {
+    await _pumpProfileTab(tester);
+
+    expect(find.text('App version'), findsOneWidget);
+    expect(find.text('9.9.9'), findsOneWidget);
+  });
+
+  testWidgets('unauthenticated user cannot reach /patient-profile', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(const {});
+    PackageInfo.setMockInitialValues(
+      appName: 'FindMyDoctor',
+      packageName: 'com.example.mobile',
+      version: '9.9.9',
+      buildNumber: '42',
+      buildSignature: 'test-signature',
+    );
+    // Same fake-async channel caveat as in _pumpProfileTab: without the
+    // mock handler MyApp never leaves the startup splash in tests.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          PushNotificationService.channel,
+          (call) async => null,
+        );
+
+    await tester.pumpWidget(const MyApp());
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    // Guarded route: the unauthenticated request is bounced to login.
+    final navigator = tester.state<NavigatorState>(
+      find.byType(Navigator).first,
+    );
+    // Do NOT await: pushNamed only settles once the pushed route is popped.
+    navigator.pushNamed('/patient-profile');
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.byType(PatientProfilePage), findsNothing);
+  });
+
+  group('Patient profile mobile number integration', () {
+    String patientResponse(String phone) => jsonEncode({
+      'success': true,
+      'data': {
+        'email': 'patient@example.com',
+        'first_name': 'Juan',
+        'middle_name': null,
+        'last_name': 'Dela Cruz',
+        'date_of_birth': '1990-01-15',
+        'sex': 'MALE',
+        'phone': phone,
+        'address': 'Manila',
+      },
+    });
+
+    MockClient buildClient({
+      required String storedPhone,
+      required List<Map<String, dynamic>> updates,
+    }) {
+      return MockClient((request) async {
+        if (request.method == 'GET') {
+          return http.Response(
+            patientResponse(storedPhone),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'PUT') {
+          updates.add(jsonDecode(request.body) as Map<String, dynamic>);
+          return http.Response(
+            patientResponse('+639171234567'),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('{}', 404);
       });
+    }
 
-      await _pumpProfileTab(
+    Future<void> pumpProfile(WidgetTester tester, MockClient client) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PatientProfilePage(
+            apiService: ApiService.createWithClient(client),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> startEditing(WidgetTester tester) async {
+      await tester.tap(find.byIcon(Icons.edit));
+      await tester.pumpAndSettle();
+    }
+
+    TextField phoneField(WidgetTester tester) =>
+        tester.widget<TextField>(find.byType(TextField).first);
+
+    Future<void> save(WidgetTester tester) async {
+      final button = find.text('Save Changes');
+      await tester.ensureVisible(button);
+      await tester.pumpAndSettle();
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+    }
+
+    for (final stored in const ['+639171234567', '09171234567', '9171234567']) {
+      testWidgets('loads the stored $stored value as a 10-digit field value', (
         tester,
-        // No stored registration: disable must succeed locally without
-        // touching the network.
-        apiService: apiService,
-      );
+      ) async {
+        final updates = <Map<String, dynamic>>[];
+        await pumpProfile(
+          tester,
+          buildClient(storedPhone: stored, updates: updates),
+        );
+        await startEditing(tester);
 
-      final switchFinder = find.byKey(const ValueKey('profile_push_switch'));
-      expect(switchFinder, findsOneWidget);
-      expect(tester.widget<Switch>(switchFinder).value, isTrue);
-
-      await tester.tap(switchFinder);
-      await _flushAfterToggle(tester);
-
-      expect(apiService.registerCalls, 0);
-      expect(tester.widget<Switch>(switchFinder).value, isFalse);
-      final prefs = await SharedPreferences.getInstance();
-      expect(
-        prefs.getBool(PushNotificationService.pushEnabledKey),
-        isFalse,
-      );
-      expect(
-        prefs.getString(PushNotificationService.deviceTokenIdKey),
-        isNull,
-      );
-    },
-  );
-
-  testWidgets(
-    'permission-denied hint appears and registration is skipped',
-    (tester) async {
-      final apiService = FakeApiService();
-      final originalPermissions = PermissionHandlerPlatform.instance;
-      PermissionHandlerPlatform.instance =
-          FakePermissionHandler(PermissionStatus.denied);
-      addTearDown(() {
-        PermissionHandlerPlatform.instance = originalPermissions;
+        expect(phoneField(tester).controller?.text, '9171234567');
+        expect(find.text('+63 '), findsOneWidget);
       });
+    }
 
-      await _pumpProfileTab(
+    for (final (stored, canonical) in const [
+      ('09171234567', '+639171234567'),
+      ('08171234567', '+638171234567'),
+    ]) {
+      testWidgets('submits $stored as the canonical $canonical value', (
         tester,
-        prefs: const {
-          'access_token': 'test-token',
-          'push_notifications_enabled': false,
-          'device_token': 'cached-fcm-token',
-        },
-        apiService: apiService,
+      ) async {
+        final updates = <Map<String, dynamic>>[];
+        await pumpProfile(
+          tester,
+          buildClient(storedPhone: stored, updates: updates),
+        );
+        await startEditing(tester);
+        await save(tester);
+
+        expect(updates, hasLength(1));
+        expect(updates.single['phone'], canonical);
+        expect(updates.single['phone'], matches(RegExp(r'^\+63\d{10}$')));
+        expect(updates.single['address'], 'Manila');
+
+        await tester.pump(const Duration(seconds: 5));
+      });
+    }
+
+    testWidgets('resets the phone field from the stored value on cancel', (
+      tester,
+    ) async {
+      final updates = <Map<String, dynamic>>[];
+      await pumpProfile(
+        tester,
+        buildClient(storedPhone: '09171234567', updates: updates),
       );
+      await startEditing(tester);
 
-      final switchFinder = find.byKey(const ValueKey('profile_push_switch'));
-      await tester.tap(switchFinder);
-      await _flushAfterToggle(tester);
+      await tester.enterText(find.byType(TextField).first, '08171234567');
+      await tester.pumpAndSettle();
+      expect(phoneField(tester).controller?.text, '8171234567');
 
-      // The OS dialog result is denied, so a hint with an "Open Settings"
-      // action appears and no registration call happens.
-      expect(find.text('Open Settings'), findsOneWidget);
-      expect(apiService.registerCalls, 0);
-      expect(tester.widget<Switch>(switchFinder).value, isFalse);
-    },
-  );
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
 
-  testWidgets(
-    'Profile row opens the standalone patient profile screen',
-    (tester) async {
-      await _pumpProfileTab(tester);
+      await startEditing(tester);
+      expect(phoneField(tester).controller?.text, '9171234567');
+    });
 
-      await tester.tap(find.byKey(const ValueKey('profile_view_details')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 250));
-      await tester.pump(const Duration(seconds: 1));
+    testWidgets(
+      'preserves a corrupted stored value, warns, and blocks saving',
+      (tester) async {
+        const corrupted = '9.17123E+10';
+        final updates = <Map<String, dynamic>>[];
+        await pumpProfile(
+          tester,
+          buildClient(storedPhone: corrupted, updates: updates),
+        );
+        await startEditing(tester);
 
-      expect(find.byType(PatientProfilePage), findsOneWidget);
-    },
-  );
+        expect(phoneField(tester).controller?.text, corrupted);
+        expect(find.text(storedMobileWarning), findsOneWidget);
 
-  testWidgets(
-    'Privacy notice row opens the privacy notice screen',
-    (tester) async {
-      await _pumpProfileTab(tester);
+        await save(tester);
 
-      // The About section sits below the fold in the default test viewport.
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('profile_privacy_notice')),
+        expect(updates, isEmpty);
+        expect(
+          find.text(
+            'This phone number could not be understood. Please re-enter it.',
+          ),
+          findsWidgets,
+        );
+
+        await tester.enterText(find.byType(TextField).first, '09171234567');
+        await tester.pumpAndSettle();
+        await save(tester);
+
+        expect(updates, hasLength(1));
+        expect(updates.single['phone'], '+639171234567');
+
+        await tester.pump(const Duration(seconds: 5));
+      },
+    );
+
+    testWidgets('surfaces malformed plus signs and overlong input', (
+      tester,
+    ) async {
+      final updates = <Map<String, dynamic>>[];
+      await pumpProfile(
+        tester,
+        buildClient(storedPhone: '+639171234567', updates: updates),
       );
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('profile_privacy_notice')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 250));
+      await startEditing(tester);
 
-      expect(find.byType(PrivacyNoticePage), findsOneWidget);
-    },
-  );
+      await tester.enterText(find.byType(TextField).first, '++639171234567');
+      await tester.pumpAndSettle();
 
-  testWidgets(
-    'Change password row opens the change password screen',
-    (tester) async {
-      await _pumpProfileTab(tester);
-
-      await tester.tap(find.byKey(const ValueKey('profile_change_password')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 250));
-
-      expect(find.byType(ChangePasswordPage), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'About section shows the pubspec app version',
-    (tester) async {
-      await _pumpProfileTab(tester);
-
-      expect(find.text('App version'), findsOneWidget);
-      expect(find.text('9.9.9'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'unauthenticated user cannot reach /patient-profile',
-    (tester) async {
-      SharedPreferences.setMockInitialValues(const {});
-      PackageInfo.setMockInitialValues(
-        appName: 'FindMyDoctor',
-        packageName: 'com.example.mobile',
-        version: '9.9.9',
-        buildNumber: '42',
-        buildSignature: 'test-signature',
+      expect(
+        find.text('Remove the extra plus sign and enter digits only.'),
+        findsOneWidget,
       );
-      // Same fake-async channel caveat as in _pumpProfileTab: without the
-      // mock handler MyApp never leaves the startup splash in tests.
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-        PushNotificationService.channel,
-        (call) async => null,
+      expect(phoneField(tester).controller?.text, '9171234567');
+
+      await tester.enterText(find.byType(TextField).first, '917123456789');
+      await tester.pumpAndSettle();
+
+      expect(find.text('This mobile number is too long.'), findsOneWidget);
+      expect(phoneField(tester).controller?.text, '9171234567');
+    });
+
+    testWidgets('rejects unallocated 08 prefixes and landlines', (
+      tester,
+    ) async {
+      final updates = <Map<String, dynamic>>[];
+      await pumpProfile(
+        tester,
+        buildClient(storedPhone: '+639171234567', updates: updates),
       );
+      await startEditing(tester);
 
-      await tester.pumpWidget(const MyApp());
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
+      await tester.enterText(find.byType(TextField).first, '08121234567');
+      await tester.pumpAndSettle();
 
-      // Guarded route: the unauthenticated request is bounced to login.
-      final navigator = tester.state<NavigatorState>(
-        find.byType(Navigator).first,
+      expect(
+        find.text('Enter a valid Philippine mobile number.'),
+        findsOneWidget,
       );
-      // Do NOT await: pushNamed only settles once the pushed route is popped.
-      navigator.pushNamed('/patient-profile');
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
+      expect(phoneField(tester).controller?.text, '9171234567');
 
-      expect(find.byType(LoginPage), findsOneWidget);
-      expect(find.byType(PatientProfilePage), findsNothing);
-    },
-  );
+      // A landline prefix is tolerated while the user is still typing...
+      await tester.enterText(find.byType(TextField).first, '028');
+      await tester.pumpAndSettle();
+      expect(phoneField(tester).controller?.text, '028');
+
+      // ...but the completed landline is refused, so the field keeps the
+      // incomplete prefix and the mobile number cannot be saved.
+      await tester.enterText(find.byType(TextField).first, '0281234567');
+      await tester.pumpAndSettle();
+      expect(phoneField(tester).controller?.text, '028');
+
+      await save(tester);
+
+      expect(updates, isEmpty);
+      expect(
+        find.text('Enter a valid Philippine mobile number.'),
+        findsOneWidget,
+      );
+    });
+  });
 }
