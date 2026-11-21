@@ -218,12 +218,36 @@ function truncateToWidth(
 }
 
 /**
+ * `json_agg` normally arrives as a JavaScript array, but a JSON string is also
+ * accepted so the renderer never iterates a non-list value. Missing or
+ * malformed values become an empty list, matching the old "no rows" behavior.
+ */
+function normalizePrescriptionItems(value: unknown): any[] {
+  if (Array.isArray(value)) return value;
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+/**
  * Render, upload and persist the PDF for an issued prescription.
  * The caller is expected to have already ensured the prescription belongs to
  * the requesting doctor. Returns a short-lived signed URL on success.
  */
 export async function generatePrescriptionPdfFile(prescriptionId: string): Promise<PdfResult> {
   try {
+    // A single statement loads the prescription, its patient/doctor/visit
+    // context, the replacement metadata, and the medication items. Keeping the
+    // joins and the item aggregation together removes sequential round trips
+    // without changing what the PDF renderer receives.
     const prescriptionResult = await query(
     `SELECT p.*,
             pat.first_name AS patient_first_name, pat.middle_name AS patient_middle_name,
@@ -235,15 +259,23 @@ export async function generatePrescriptionPdfFile(prescriptionId: string): Promi
             d.room_number, d.specialty, d.prc_license_number, d.signature_url,
             v.visit_date, v.reason_for_visit, v.diagnosis,
             a.appointment_date,
+            orig.id AS replaces_original_id,
+            orig.prescription_date AS replaces_original_date,
             EXISTS (
               SELECT 1 FROM prescriptions replacement
               WHERE replacement.replaces_prescription_id = p.id
-            ) AS is_superseded
+            ) AS is_superseded,
+            COALESCE((
+              SELECT json_agg(i ORDER BY i.created_at ASC)
+              FROM prescription_items i
+              WHERE i.prescription_id = p.id
+            ), '[]'::json) AS items
      FROM prescriptions p
      JOIN patients pat ON p.patient_id = pat.id
      JOIN doctors d ON p.doctor_id = d.id
      JOIN visits v ON p.visit_id = v.id
      LEFT JOIN appointments a ON v.appointment_id = a.id
+     LEFT JOIN prescriptions orig ON orig.id = p.replaces_prescription_id
      WHERE p.id = $1`,
     [prescriptionId]
   );
@@ -253,22 +285,17 @@ export async function generatePrescriptionPdfFile(prescriptionId: string): Promi
   }
 
   const prescription = prescriptionResult.rows[0];
-
-  const itemsResult = await query(
-    'SELECT * FROM prescription_items WHERE prescription_id = $1 ORDER BY created_at ASC',
-    [prescriptionId]
-  );
-  const items = itemsResult.rows;
+  const items = normalizePrescriptionItems(prescription.items);
 
   // Replacement prescriptions reference the original prescription number.
-  let replacedPrescription: any = null;
-  if (prescription.replaces_prescription_id) {
-    const replacedResult = await query(
-      'SELECT id, prescription_date FROM prescriptions WHERE id = $1',
-      [prescription.replaces_prescription_id]
-    );
-    replacedPrescription = replacedResult.rows[0] || null;
-  }
+  // `orig.id` is null when the row is missing, matching the previous behavior
+  // of returning no original-prescription object in that case.
+  const replacedPrescription = prescription.replaces_original_id
+    ? {
+        id: prescription.replaces_original_id,
+        prescription_date: prescription.replaces_original_date ?? null,
+      }
+    : null;
 
   // The signature is mandatory when the doctor has one stored. If the object
   // cannot be retrieved, generation fails instead of silently printing a PDF
