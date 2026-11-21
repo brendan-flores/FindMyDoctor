@@ -24,6 +24,11 @@ interface GcashQrData {
   gcashAccountNumber: string | null;
 }
 
+interface GcashAccountUpdateResponse {
+  gcashAccountName: string | null;
+  gcashAccountNumber: string | null;
+}
+
 function formatQrDate(value: string | null): string | null {
   if (!value) return null;
   const date = new Date(value);
@@ -130,9 +135,9 @@ export default function SecretarySettings() {
     setIsQrLoading(true);
     setQrError('');
     try {
-      const response = await apiClient.get(`/gcash-qr/doctor/${assignedDoctorId}`);
+      const response = await apiClient.get<GcashQrData>(`/gcash-qr/doctor/${assignedDoctorId}`);
       if (response.success && response.data) {
-        setGcashQr(response.data as GcashQrData);
+        setGcashQr(response.data);
         // Pre-populate account form with existing values
         setGcashAccountForm({
           accountName: response.data.gcashAccountName || '',
@@ -210,12 +215,12 @@ export default function SecretarySettings() {
     setSuccess('');
 
     try {
-      const response = await apiClient.post(`/gcash-qr/doctor/${doctorId}`, {
+      const response = await apiClient.post<GcashAccountUpdateResponse>(`/gcash-qr/doctor/${doctorId}`, {
         gcashAccountName: gcashAccountForm.accountName || null,
         gcashAccountNumber: gcashAccountForm.accountNumber || null,
       });
 
-      if (response.success && response.data) {
+      if (response.success && response.data && gcashQr) {
         setGcashQr({
           ...gcashQr,
           gcashAccountName: response.data.gcashAccountName,

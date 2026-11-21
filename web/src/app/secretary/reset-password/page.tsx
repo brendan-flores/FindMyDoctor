@@ -80,8 +80,8 @@ export default function SecretaryResetPassword() {
     }
   };
 
-  const handleVerifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleVerifyCode = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     setError('');
 
     if (otp.length !== 6) {
@@ -217,7 +217,9 @@ export default function SecretaryResetPassword() {
             <OtpInput
               value={otp}
               onChange={setOtp}
-              onComplete={handleVerifyCode}
+              onComplete={() => {
+                void handleVerifyCode();
+              }}
               disabled={isVerifying}
               error={!!error}
             />

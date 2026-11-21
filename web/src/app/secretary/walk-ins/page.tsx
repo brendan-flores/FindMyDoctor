@@ -84,13 +84,10 @@ export default function SecretaryWalkIns() {
         setRegistrationResult(response.data);
         setStep('success');
       } else {
-        // Parse error message to identify field-level errors
+        // Handle the error message from the normalized API response. The API
+        // client flattens `{ error: { code, message } }` into `error`/`errorCode`.
         let errorMessage = 'Failed to register walk-in';
-        
-        // Handle nested error object format: { error: { code, message } }
-        if (typeof response.error === 'object' && response.error !== null) {
-          errorMessage = response.error.message || response.error.code || errorMessage;
-        } else if (typeof response.error === 'string') {
+        if (typeof response.error === 'string' && response.error) {
           errorMessage = response.error;
         } else if (response.errorCode) {
           errorMessage = response.errorCode;

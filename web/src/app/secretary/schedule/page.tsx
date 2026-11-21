@@ -691,7 +691,7 @@ export default function SecretarySchedule() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Schedule Management</h1>
-        <p className="text-slate-600 mt-1">Manage your assigned doctor's schedule, exceptions, and capacity</p>
+        <p className="text-slate-600 mt-1">Manage your assigned doctor&apos;s schedule, exceptions, and capacity</p>
       </div>
 
       {/* Tabs */}
