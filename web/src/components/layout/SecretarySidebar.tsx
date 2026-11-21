@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { secretaryApi } from '@/lib/api/secretaryApi';
+import { computePollingDelayMs } from '@/lib/api/pollingPolicy';
 
 interface SecretarySidebarProps {
   userName?: string;
@@ -20,26 +21,60 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
   const [totalUnread, setTotalUnread] = useState(0);
 
   useEffect(() => {
-    // Poll unread conversation badges without changing the sidebar layout
-    const fetchUnread = async () => {
+    // Poll unread conversation badges without changing the sidebar layout.
+    // Healthy polls keep the fixed 30-second cadence; consecutive failures back
+    // off exponentially. The loop is owned by this effect only, so navigation
+    // neither restarts it nor starts a second one.
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let consecutiveFailures = 0;
+    let requestInFlight = false;
+
+    function scheduleNext(delayMs: number) {
+      if (cancelled) return;
+      timer = setTimeout(poll, delayMs);
+    }
+
+    async function poll() {
+      // Only one request may be in flight at a time.
+      if (cancelled || requestInFlight) return;
+      requestInFlight = true;
+
       try {
         const response = await secretaryApi.getConversations();
+        if (cancelled) return;
+
         if (response.success && response.data) {
           const total = response.data.reduce((sum, conversation) => {
             const unreadCount = Number(conversation.unread_count);
             return sum + (Number.isFinite(unreadCount) ? unreadCount : 0);
           }, 0);
           setTotalUnread(total);
+          // A successful request clears the backoff.
+          consecutiveFailures = 0;
+        } else {
+          consecutiveFailures += 1;
         }
       } catch {
-        // Badge is best-effort; keep the previous value on failure
+        // Badge is best-effort; keep the previous value and back off.
+        consecutiveFailures += 1;
+      } finally {
+        requestInFlight = false;
+        if (!cancelled) {
+          scheduleNext(computePollingDelayMs(consecutiveFailures));
+        }
+      }
+    }
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timer !== null) {
+        clearTimeout(timer);
       }
     };
-
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 30000);
-    return () => clearInterval(interval);
-  }, [pathname]);
+  }, []);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'grid_view' },
