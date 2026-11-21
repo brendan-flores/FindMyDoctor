@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
 import { doctorApi, DoctorProfile } from '@/lib/api/doctorApi';
-import { useEffect, useState } from 'react';
+import { createRefreshGate } from '@/lib/api/refreshGate';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import SetupProgressCard from '@/components/ui/SetupProgressCard';
 
 interface DoctorSidebarProps {
@@ -16,48 +17,68 @@ export default function DoctorSidebar({ userName = 'Dr. Smith', userRole = 'Doct
   const pathname = usePathname();
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
   const [schedules, setSchedules] = useState<any[]>([]);
+  const hasLoadedRef = useRef(false);
 
-  // Load profile and schedules for setup progress. A forced refresh bypasses
-  // the short GET cache so saved changes appear immediately.
-  const refreshProfile = (force = false) => {
-    const token = apiClient.getStoredToken();
-    if (!token) return;
+  // Load profile and schedules for setup progress. A forced refresh (save
+  // events) bypasses the short GET cache so saved changes appear immediately.
+  // The gate coalesces overlapping triggers, so a save event that arrives
+  // during the initial load cannot issue a duplicate simultaneous pair.
+  const refreshProfile = useMemo(
+    () =>
+      createRefreshGate(async (force: boolean) => {
+        const token = apiClient.getStoredToken();
+        if (!token) return;
 
-    apiClient.setToken(token);
+        apiClient.setToken(token);
 
-    // Load profile
-    doctorApi.getProfile({ skipCache: force }).then(response => {
-      if (response.success && response.data) {
-        setProfile(response.data);
-      }
-    }).catch(err => {
-      console.error('Error loading profile:', err);
-    });
+        await Promise.all([
+          // Load profile
+          doctorApi
+            .getProfile({ skipCache: force })
+            .then((response) => {
+              if (response.success && response.data) {
+                setProfile(response.data);
+              }
+            })
+            .catch((err) => {
+              console.error('Error loading profile:', err);
+            }),
+          // Load schedules
+          doctorApi
+            .getSchedules({ skipCache: force })
+            .then((response) => {
+              if (response.success && response.data) {
+                setSchedules(response.data);
+              }
+            })
+            .catch((err) => {
+              console.error('Error loading schedules:', err);
+            }),
+        ]);
+      }).run,
+    []
+  );
 
-    // Load schedules
-    doctorApi.getSchedules({ skipCache: force }).then(response => {
-      if (response.success && response.data) {
-        setSchedules(response.data);
-      }
-    }).catch(err => {
-      console.error('Error loading schedules:', err);
-    });
-  };
-
+  // Fetch once on mount. The ref prevents a duplicate pair of requests from
+  // React's development double-mount.
   useEffect(() => {
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
     refreshProfile();
-  }, [pathname]);
+  }, [refreshProfile]);
 
   // Listen for profile/schedule save events to refresh the setup progress card immediately
   useEffect(() => {
-    const handleUpdate = () => refreshProfile(true);
+    const handleUpdate = () => {
+      refreshProfile(true);
+    };
     window.addEventListener('profileUpdated', handleUpdate);
     window.addEventListener('schedulesUpdated', handleUpdate);
     return () => {
       window.removeEventListener('profileUpdated', handleUpdate);
       window.removeEventListener('schedulesUpdated', handleUpdate);
     };
-  }, []);
+  }, [refreshProfile]);
 
   const activeTab = pathname === '/doctor'
     ? 'dashboard'
