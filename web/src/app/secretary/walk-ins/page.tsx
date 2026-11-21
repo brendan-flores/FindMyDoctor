@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { secretaryApi, SecretaryProfile, DirectWalkInRegistrationRequest } from '@/lib/api/secretaryApi';
+import { formatPhoneFieldInput, phoneFormatErrorMessage, toPatientMobileE164 } from '@/lib/phone';
 import DatePicker from '@/components/DatePicker';
 import Select from '@/components/ui/Select';
 
@@ -69,16 +70,16 @@ export default function SecretaryWalkIns() {
     }
 
     // Validate Philippine mobile number format
-    const phoneDigits = formData.phone.replace(/\D/g, '');
-    if (phoneDigits.length !== 10) {
-      setFieldErrors({ phone: 'Mobile number must be 10 digits (excluding +63)' });
+    const canonicalPhone = toPatientMobileE164(formData.phone);
+    if (!canonicalPhone) {
+      setFieldErrors({ phone: 'Enter a valid Philippine mobile number' });
       return;
     }
 
     setIsRegistering(true);
 
     try {
-      const response = await secretaryApi.directRegisterWalkIn(formData);
+      const response = await secretaryApi.directRegisterWalkIn({ ...formData, phone: canonicalPhone });
 
       if (response.success && response.data) {
         setRegistrationResult(response.data);
@@ -151,18 +152,15 @@ export default function SecretaryWalkIns() {
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value;
-    
-    // Remove all non-digit characters
-    value = value.replace(/\D/g, '');
-    
-    // Limit to 10 digits (Philippine mobile number after +63)
-    if (value.length > 10) {
-      value = value.slice(0, 10);
-    }
-    
-    setFormData(prev => ({ ...prev, phone: value }));
-    if (fieldErrors.phone) {
+    const result = formatPhoneFieldInput(e.target.value, formData.phone, { allowLandline: false });
+    const formatted = result.value;
+    const phoneError = result.error;
+
+    setFormData(prev => ({ ...prev, phone: formatted }));
+
+    if (phoneError) {
+      setFieldErrors(prev => ({ ...prev, phone: phoneFormatErrorMessage(phoneError) }));
+    } else if (fieldErrors.phone) {
       setFieldErrors(prev => ({ ...prev, phone: '' }));
     }
   };
@@ -363,7 +361,6 @@ export default function SecretaryWalkIns() {
                   value={formData.phone}
                   onChange={handlePhoneChange}
                   placeholder="9123456789"
-                  maxLength={10}
                   className={`w-full pl-14 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                     fieldErrors.phone
                       ? 'border-red-500 focus:ring-red-500'

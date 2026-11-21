@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -9,6 +9,8 @@ import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/utils/phone_input.dart';
+import '../../../core/utils/phone_input_form.dart';
 
 class PatientDetailsPage extends StatefulWidget {
   final String doctorId;
@@ -20,6 +22,9 @@ class PatientDetailsPage extends StatefulWidget {
   final String? paymentMethod;
   final String? professionalPhotoUrl;
 
+  /// Optional injected API service (test seam); defaults to the singleton.
+  final ApiService? apiService;
+
   const PatientDetailsPage({
     super.key,
     required this.doctorId,
@@ -30,6 +35,7 @@ class PatientDetailsPage extends StatefulWidget {
     this.selectedDate,
     this.paymentMethod,
     this.professionalPhotoUrl,
+    this.apiService,
   });
 
   @override
@@ -37,7 +43,7 @@ class PatientDetailsPage extends StatefulWidget {
 }
 
 class _PatientDetailsPageState extends State<PatientDetailsPage> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   final _formKey = GlobalKey<FormState>();
 
   final _firstNameController = TextEditingController();
@@ -52,13 +58,33 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
   bool _isLoading = true;
   bool _isSubmitting = false;
   String? _errorMessage;
+  String? _phoneInputError;
+  late final PhilippineMobileInputFormatter _phoneFormatter;
 
   final List<String> _sexOptions = ['MALE', 'FEMALE', 'OTHER', 'NOT_SPECIFIED'];
 
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
+    _phoneFormatter = PhilippineMobileInputFormatter(
+      onRejected: _handlePhoneRejected,
+    );
     _loadPatientProfile();
+  }
+
+  void _handlePhoneRejected(PhoneFormatError error) {
+    if (!mounted) return;
+    setState(() {
+      _phoneInputError = phoneFormatErrorMessage(error);
+    });
+  }
+
+  void _handlePhoneChanged(String value) {
+    if (_phoneInputError == null) return;
+    setState(() {
+      _phoneInputError = null;
+    });
   }
 
   @override
@@ -95,13 +121,16 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
           }
 
           _selectedSex = patientData['sex'] ?? 'NOT_SPECIFIED';
-          _phoneController.text = patientData['phone'] ?? '';
+          final storedPhone = patientData['phone']?.toString();
+          _phoneController.text = phoneFieldValueFromStored(storedPhone);
+          _phoneInputError = storedMobileWarningFor(storedPhone);
           _addressController.text = patientData['address'] ?? '';
           _isLoading = false;
         });
       } else {
         setState(() {
-          _errorMessage = response['error']?['message'] ?? 'Failed to load patient profile';
+          _errorMessage =
+              response['error']?['message'] ?? 'Failed to load patient profile';
           _isLoading = false;
         });
       }
@@ -115,6 +144,16 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
 
   Future<void> _submitDetails() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final phone = canonicalMobileE164(_phoneController.text);
+    if (phone == null) {
+      setState(() {
+        _phoneInputError =
+            validatePhilippineMobile(_phoneController.text) ??
+            'Enter a valid Philippine mobile number.';
+      });
       return;
     }
 
@@ -133,7 +172,7 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
         lastName: _lastNameController.text.trim(),
         dateOfBirth: _dateOfBirthController.text.trim(),
         sex: _selectedSex,
-        phone: _phoneController.text.trim(),
+        phone: phone,
         address: _addressController.text.trim(),
       );
 
@@ -156,7 +195,8 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
         }
       } else {
         setState(() {
-          _errorMessage = response['error']?['message'] ?? 'Failed to submit details';
+          _errorMessage =
+              response['error']?['message'] ?? 'Failed to submit details';
           _isSubmitting = false;
         });
       }
@@ -241,17 +281,11 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
         padding: EdgeInsets.all(32.0),
         child: Column(
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: AppColors.error,
-            ),
+            Icon(Icons.error_outline, size: 64, color: AppColors.error),
             const SizedBox(height: 16),
             Text(
               _errorMessage!,
-              style: AppTextStyles.bodyMd.copyWith(
-                color: AppColors.error,
-              ),
+              style: AppTextStyles.bodyMd.copyWith(color: AppColors.error),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -336,7 +370,9 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
             textCapitalization: TextCapitalization.words,
             prefixIcon: Icons.person_outline,
             validator: (value) {
-              if (value != null && value.trim().isNotEmpty && value.trim().length > 100) {
+              if (value != null &&
+                  value.trim().isNotEmpty &&
+                  value.trim().length > 100) {
                 return 'Middle name must be maximum 100 characters';
               }
               return null;
@@ -395,10 +431,7 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Sex *',
-                style: AppTextStyles.inputLabel,
-              ),
+              Text('Sex *', style: AppTextStyles.inputLabel),
               const SizedBox(height: spacing.AppSpacing.gutterXs),
               DropdownButtonFormField<String>(
                 decoration: InputDecoration(
@@ -409,23 +442,26 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
                     vertical: spacing.AppSpacing.gutterMd,
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                    borderRadius: BorderRadius.circular(
+                      spacing.AppSpacing.radiusLg,
+                    ),
                     borderSide: BorderSide(color: AppColors.slate300),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                    borderRadius: BorderRadius.circular(
+                      spacing.AppSpacing.radiusLg,
+                    ),
                     borderSide: BorderSide(color: AppColors.slate300),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                    borderRadius: BorderRadius.circular(
+                      spacing.AppSpacing.radiusLg,
+                    ),
                     borderSide: BorderSide(color: AppColors.primary, width: 2),
                   ),
                 ),
                 items: _sexOptions.map((String sex) {
-                  return DropdownMenuItem<String>(
-                    value: sex,
-                    child: Text(sex),
-                  );
+                  return DropdownMenuItem<String>(value: sex, child: Text(sex));
                 }).toList(),
                 onChanged: (String? newValue) {
                   setState(() {
@@ -444,24 +480,29 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
           const SizedBox(height: spacing.AppSpacing.gutterMd),
 
           // Mobile Number
-          CustomTextField(
-            label: 'Mobile Number *',
-            hint: '09XX XXX XXXX',
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[\d\s\-\+\(\)]')),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CustomTextField(
+                label: 'Mobile Number *',
+                hint: '9XX XXX XXXX',
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [_phoneFormatter],
+                prefixIcon: Icons.phone,
+                prefixText: phMobilePrefixText,
+                onChanged: _handlePhoneChanged,
+                validator: validatePhilippineMobile,
+              ),
+              if (_phoneInputError != null) ...[
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
+                Text(
+                  _phoneInputError!,
+                  style: AppTextStyles.bodySm.copyWith(color: AppColors.error),
+                ),
+              ],
             ],
-            prefixIcon: Icons.phone,
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Mobile number is required';
-              }
-              if (value.trim().length > 20) {
-                return 'Mobile number must be 1-20 characters';
-              }
-              return null;
-            },
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
 
@@ -488,7 +529,9 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
               padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
               decoration: BoxDecoration(
                 color: AppColors.errorContainer,
-                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+                borderRadius: BorderRadius.circular(
+                  spacing.AppSpacing.radiusLg,
+                ),
               ),
               child: Row(
                 children: [

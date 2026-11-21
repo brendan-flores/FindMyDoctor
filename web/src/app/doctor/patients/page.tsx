@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { doctorApi, Patient, AssociatePatientRequest } from '@/lib/api/doctorApi';
+import { formatPhoneFieldInput, phoneFormatErrorMessage, toPatientMobileE164 } from '@/lib/phone';
 import Select from '@/components/ui/Select';
 
 export default function DoctorPatients() {
@@ -16,6 +17,7 @@ export default function DoctorPatients() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [addPhoneError, setAddPhoneError] = useState('');
   const [addFormData, setAddFormData] = useState<AssociatePatientRequest>({
     email: '',
     firstName: '',
@@ -161,7 +163,7 @@ export default function DoctorPatients() {
       {/* Add Patient Button */}
       <div className="flex justify-end">
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => { setAddPhoneError(''); setShowAddModal(true); }}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
         >
           <span className="material-symbols-outlined">add</span>
@@ -280,6 +282,7 @@ export default function DoctorPatients() {
                   onClick={() => {
                     setShowAddModal(false);
                     setAddError(null);
+                    setAddPhoneError('');
                     setAddFormData({
                       email: '',
                       firstName: '',
@@ -382,13 +385,23 @@ export default function DoctorPatients() {
 
               <div>
                 <label className="block text-sm text-slate-500 mb-1">Phone *</label>
-                <input
-                  type="text"
-                  value={addFormData.phone}
-                  onChange={(e) => setAddFormData({ ...addFormData, phone: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="09123456789"
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">+63</span>
+                  <input
+                    type="text"
+                    value={addFormData.phone}
+                    onChange={(e) => {
+                      const result = formatPhoneFieldInput(e.target.value, addFormData.phone, { allowLandline: false });
+                      setAddFormData({ ...addFormData, phone: result.value });
+                      setAddPhoneError(result.error ? phoneFormatErrorMessage(result.error) : '');
+                    }}
+                    className={`w-full pl-12 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      addPhoneError ? 'border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500'
+                    }`}
+                    placeholder="9171234567"
+                  />
+                </div>
+                {addPhoneError && <p className="text-xs text-red-600 mt-1">{addPhoneError}</p>}
               </div>
 
               <div>
@@ -458,6 +471,7 @@ export default function DoctorPatients() {
                 onClick={() => {
                   setShowAddModal(false);
                   setAddError(null);
+                  setAddPhoneError('');
                   setAddFormData({
                     email: '',
                     firstName: '',
@@ -502,6 +516,11 @@ export default function DoctorPatients() {
                     setAddError('Phone is required');
                     return;
                   }
+                  const canonicalPhone = toPatientMobileE164(addFormData.phone);
+                  if (!canonicalPhone) {
+                    setAddPhoneError('Enter a valid Philippine mobile number');
+                    return;
+                  }
                   if (!addFormData.address.trim()) {
                     setAddError('Address is required');
                     return;
@@ -511,11 +530,12 @@ export default function DoctorPatients() {
                   setAddError(null);
 
                   try {
-                    const response = await doctorApi.associatePatient(addFormData);
+                    const response = await doctorApi.associatePatient({ ...addFormData, phone: canonicalPhone });
 
                     if (response.success && response.data) {
                       setShowAddModal(false);
                       setAddError(null);
+                      setAddPhoneError('');
                       setAddFormData({
                         email: '',
                         firstName: '',

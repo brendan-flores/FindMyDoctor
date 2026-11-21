@@ -11,6 +11,7 @@ import { MEDICAL_CREDENTIALS } from '@/data/medicalCredentials';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import SearchableMultiSelect from '@/components/ui/SearchableMultiSelect';
 import Toast from '@/components/ui/Toast';
+import { formatPhoneFieldInput, phoneFormatErrorMessage, toStaffContactDomestic } from '@/lib/phone';
 
 type Step = 'signup' | 'otp';
 type FormStatus = 'idle' | 'loading';
@@ -39,6 +40,7 @@ export default function DoctorSignupOtp() {
   const [resendDisabled, setResendDisabled] = useState(false);
 
   const [formError, setFormError] = useState('');
+  const [contactNumberError, setContactNumberError] = useState('');
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -305,6 +307,12 @@ export default function DoctorSignupOtp() {
       return;
     }
 
+    const contactNumber = toStaffContactDomestic(formData.contactNumber);
+    if (!contactNumber) {
+      setContactNumberError('Enter a valid Philippine contact number.');
+      return;
+    }
+
     setEmailStatus('loading');
 
     try {
@@ -313,7 +321,7 @@ export default function DoctorSignupOtp() {
         firstName: formData.firstName.trim(),
         middleName: formData.middleName.trim(),
         lastName: formData.lastName.trim(),
-        contactNumber: formData.contactNumber.trim(),
+        contactNumber,
         password: formData.password,
         confirmPassword: formData.confirmPassword,
       });
@@ -749,22 +757,39 @@ export default function DoctorSignupOtp() {
                   Contact Number
                 </label>
 
-                <input
-                  id="contactNumber"
-                  type="tel"
-                  value={formData.contactNumber}
-                  onChange={(event) => {
-                    setFormData({
-                      ...formData,
-                      contactNumber: event.target.value,
-                    });
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] font-medium text-[#94A3B8]">
+                    +63
+                  </span>
 
-                    setFormError('');
-                  }}
-                  placeholder="09XXXXXXXXX"
-                  autoComplete="tel"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
-                />
+                  <input
+                    id="contactNumber"
+                    type="tel"
+                    value={formData.contactNumber}
+                    onChange={(event) => {
+                      const result = formatPhoneFieldInput(event.target.value, formData.contactNumber, {
+                        allowLandline: true,
+                      });
+
+                      setFormData({
+                        ...formData,
+                        contactNumber: result.value,
+                      });
+
+                      setContactNumberError(
+                        result.error ? phoneFormatErrorMessage(result.error) : ''
+                      );
+                      setFormError('');
+                    }}
+                    placeholder="9171234567"
+                    autoComplete="tel"
+                    className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-14 pr-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  />
+                </div>
+
+                {contactNumberError && (
+                  <p className="mt-1 text-[12px] text-red-600">{contactNumberError}</p>
+                )}
               </div>
 
               {/* Password */}

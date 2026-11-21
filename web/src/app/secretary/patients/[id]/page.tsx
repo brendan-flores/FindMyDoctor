@@ -3,6 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { secretaryApi, Patient, UpdatePatientRequest } from '@/lib/api/secretaryApi';
+import {
+  formatPhoneFieldInput,
+  phoneFieldValueFromStored,
+  phoneFormatErrorMessage,
+  storedPhoneWarningFor,
+  toPatientMobileE164,
+} from '@/lib/phone';
 import Select from '@/components/ui/Select';
 
 export default function SecretaryPatientDetail() {
@@ -16,6 +23,8 @@ export default function SecretaryPatientDetail() {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [phoneWarning, setPhoneWarning] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState('');
 
   // Form state
   const [formData, setFormData] = useState<UpdatePatientRequest>({
@@ -53,7 +62,7 @@ export default function SecretaryPatientDetail() {
           lastName: response.data.last_name || '',
           dateOfBirth: response.data.date_of_birth || '',
           sex: response.data.sex || 'MALE',
-          phone: response.data.phone || '',
+          phone: phoneFieldValueFromStored(response.data.phone, { allowLandline: false }),
           address: response.data.address || '',
           middleName: response.data.middle_name || '',
           emergencyContactName: response.data.emergency_contact_name || '',
@@ -62,6 +71,7 @@ export default function SecretaryPatientDetail() {
           allergies: response.data.allergies || '',
           currentMedications: response.data.current_medications || '',
         });
+        setPhoneWarning(storedPhoneWarningFor(response.data.phone, { allowLandline: false }));
       } else {
         setError(response.error || 'Failed to fetch patient details');
       }
@@ -75,6 +85,21 @@ export default function SecretaryPatientDetail() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePhoneInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const result = formatPhoneFieldInput(e.target.value, formData.phone, { allowLandline: false });
+    const formatted = result.value;
+    const phoneErr = result.error;
+
+    setFormData(prev => ({ ...prev, phone: formatted }));
+
+    if (phoneErr) {
+      setPhoneError(phoneFormatErrorMessage(phoneErr));
+    } else {
+      setPhoneError('');
+      setPhoneWarning(null);
+    }
   };
 
   const handleSave = async () => {
@@ -100,11 +125,17 @@ export default function SecretaryPatientDetail() {
       return;
     }
 
+    const canonicalPhone = toPatientMobileE164(formData.phone);
+    if (!canonicalPhone) {
+      setPhoneError('Enter a valid Philippine mobile number');
+      return;
+    }
+
     setIsSaving(true);
     setSaveError(null);
 
     try {
-      const response = await secretaryApi.updatePatient(patientId, formData);
+      const response = await secretaryApi.updatePatient(patientId, { ...formData, phone: canonicalPhone });
 
       if (response.success && response.data) {
         setPatient(response.data);
@@ -127,7 +158,7 @@ export default function SecretaryPatientDetail() {
         lastName: patient.last_name || '',
         dateOfBirth: patient.date_of_birth || '',
         sex: patient.sex || 'MALE',
-        phone: patient.phone || '',
+        phone: phoneFieldValueFromStored(patient.phone, { allowLandline: false }),
         address: patient.address || '',
         middleName: patient.middle_name || '',
         emergencyContactName: patient.emergency_contact_name || '',
@@ -136,9 +167,11 @@ export default function SecretaryPatientDetail() {
         allergies: patient.allergies || '',
         currentMedications: patient.current_medications || '',
       });
+      setPhoneWarning(storedPhoneWarningFor(patient.phone, { allowLandline: false }));
     }
     setIsEditMode(false);
     setSaveError(null);
+    setPhoneError('');
   };
 
   const formatDate = (dateString?: string) => {
@@ -340,13 +373,21 @@ export default function SecretaryPatientDetail() {
               </div>
               <div>
                 <label className="block text-sm text-slate-500 mb-1">Phone *</label>
-                <input
-                  type="text"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">+63</span>
+                  <input
+                    type="text"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handlePhoneInputChange}
+                    className={`w-full pl-14 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      phoneError ? 'border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-emerald-500'
+                    }`}
+                    placeholder="9171234567"
+                  />
+                </div>
+                {phoneWarning && <p className="text-xs text-amber-600 mt-1">{phoneWarning}</p>}
+                {phoneError && <p className="text-xs text-red-600 mt-1">{phoneError}</p>}
               </div>
             </>
           ) : (
