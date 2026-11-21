@@ -837,3 +837,36 @@ Current System State (November 2026):
 - `GET /api/v1/queue/:date/patient/:patientId` enforces authorization: PATIENT/DOCTOR/SECRETARY only with role scoping (patients may read only their own entry, doctors only entries for their own doctor, secretaries only for their assigned doctor); ADMIN/SUPERADMIN receive 403. Invalid dates return 400 and missing entries 404
 - Mobile: new `/reschedule` route and page (availability calendar, appointment summary, confirmation dialog, fully-booked waitlist option), `LiveQueueCard` with manual refresh and 30-second polling (paused when the app backgrounds, stopped when the visit ends), today's queue summary on the Appointments tab, reschedule actions on scheduled appointments and the detail screen, and `/appointment-detail` deep links from cancellation/reschedule notifications
 - No database migration was required: `notifications.type` is unconstrained `varchar(50)` and all queue/appointment columns already existed; `backend/database/consolidated_schema.sql` is unchanged
+
+## Mobile Application Filters
+The mobile filter screens (Doctor List, Appointments, Medical Records, and Notifications) were hardened as a follow-up so filtering, counts, empty states, and timezone handling behave consistently.
+
+### Doctor List Filters (`mobile/lib/features/doctors/presentation/doctors_page.dart`)
+- Specialty, hospital/clinic, verified-only, and search filters combine using AND logic: every active filter is applied together, so results match all selected criteria at once.
+- All filtering is client-side over the already-loaded doctor list; search filters the in-memory list by doctor name, specialty, and practice name and never issues an additional API request.
+- Active filters are shown as individually removable chips (specialty, hospital/clinic, "Verified only", and the current search term). Removing a chip clears only that one filter; the other filters and the search term stay active.
+- A dedicated Clear All action resets every filter (specialty, hospital/clinic, verified-only) and clears the search query.
+- Selecting a specialty, hospital, or verified-only no longer resets the other active filters, and a specialty provided from the Home screen is additive rather than replacing the current filters.
+- When the doctor list fails to load and no doctors are cached, the page shows a dedicated "Unable to load doctors" error state with a Retry action instead of an empty list; active filters are preserved while retrying.
+- Documented limitations:
+  - Verified filtering uses the existing doctor approval flag (`isApproved` / `approval_status`); there is no separate verification workflow behind it.
+  - "Top Rated" is not a rating-based sort; it maps to the verified-only filter.
+  - Backend pagination is not implemented; the page loads the full doctor list once and filters it client-side.
+
+### Appointments Filters (`mobile/lib/features/appointments/presentation/appointments_page.dart`)
+- Tab counts respect the selected date: each tab shows how many appointments match the currently selected date, so the counts and the visible list are derived from the same date-filtered dataset.
+- Status-to-tab mappings are preserved: Upcoming = `SCHEDULED`, `CONFIRMED`, `IN_PROGRESS`; Completed = `COMPLETED`; Cancelled = `CANCELLED`, `NO_SHOW`.
+- The empty state distinguishes a genuine empty list (the patient has no appointments at all) from a filtered-empty result ("No appointments match your filters.").
+- Clear All resets the selected tab to Upcoming and removes the date filter.
+
+### Medical Records Date Filters (`mobile/lib/features/medical-records/presentation/medical_records_page.dart`)
+- Last 7 days and Last 30 days are inclusive calendar-date windows: Last 7 days covers today and the previous six calendar days, and Last 30 days covers today and the previous twenty-nine calendar days.
+- Visit filtering uses the device-local calendar day of the `visit_date` timestamp value (`visit_date` is a timezone-aware timestamp, so its calendar day is the device-local day of that instant).
+- Prescription filtering uses the calendar date of the date-only `prescription_date` field directly, without timezone shifting.
+- Records with future dates or null dates are excluded from the constrained (7-day/30-day) filters.
+- Selecting All time restores the full unfiltered records for both tabs.
+
+### Notification Read Handling (`mobile/lib/features/notifications/presentation/notifications_page.dart`)
+- Marking a notification read is ownership-validated on the backend: `PATCH /api/v1/notifications/:id/read` updates only a notification whose `user_id` matches the authenticated user and returns HTTP 404 when the notification is missing or owned by another user.
+- The mobile notifications screen treats an HTTP 200 response that carries `success: false` as an error rather than a genuine empty result, so a failed load is surfaced instead of showing an empty list.
+- Existing notification behavior and API details are otherwise unchanged (list, unread count, mark-all-read, device tokens, and notification deep-link handling).

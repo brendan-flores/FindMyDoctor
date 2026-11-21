@@ -2,9 +2,9 @@
 
 This document tracks the current state of the FindMyDoctor application, including key features, workflows, and system configurations.
 
-**Current Version:** 01.44
+**Current Version:** 01.45
 
-**Last Updated:** November 19, 2026
+**Last Updated:** November 21, 2026
 
 ---
 
@@ -289,6 +289,20 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 
 ---
 
+## Mobile Application Filters
+
+Follow-up hardening of the four mobile filter screens. See `docs/SYSTEM_STATE.md` for full detail.
+
+**Doctor List filters:** specialty, hospital/clinic, verified-only, and search combine with AND logic, are applied client-side (no extra API request), and are individually removable through active-filter chips. Clear All resets every filter and the search term, and load failures show a dedicated error state with Retry. Limitations: verified filtering uses the existing approval flag, "Top Rated" is not a rating-based sort (it maps to verified-only), and backend pagination is not implemented.
+
+**Appointments filters:** tab counts respect the selected date; mappings are Upcoming = `SCHEDULED`/`CONFIRMED`/`IN_PROGRESS`, Completed = `COMPLETED`, Cancelled = `CANCELLED`/`NO_SHOW`. The empty state distinguishes genuinely empty appointments from filtered-empty results, and Clear All resets to Upcoming and clears the date filter.
+
+**Medical Records filters:** Last 7 days and Last 30 days are inclusive calendar-date windows. Visits use the device-local calendar day of the `visit_date` timestamp, and prescriptions use the date-only `prescription_date` calendar date without timezone shifting. Future and null dates are excluded from constrained filters, and All time restores the unfiltered records.
+
+**Notifications:** marking a notification read is ownership-validated (`PATCH /api/v1/notifications/:id/read` matches the authenticated user; non-owned notifications return 404), and the mobile screen treats HTTP 200 with `success: false` as an error rather than a genuine empty result. Other notification functions (listing, unread count, mark-all-read, device tokens, and deep links) remain unchanged.
+
+---
+
 ## Database Schema Key Points
 
 **Required Tables:**
@@ -339,6 +353,7 @@ The secretary dashboard at `/secretary/dashboard` includes a "Payments Needing A
 See `docs/VERSION_HISTORY.md` for complete version history.
 
 **Recent Versions:**
+- 01.45: Mobile application filters follow-up — Doctor List AND-combined, individually removable client-side filters with Clear All and a Retry error state; date-aware Appointments tab counts and corrected empty states; Medical Records inclusive 7/30-day calendar-date filtering with visit/prescription timezone hardening; notification read ownership validation (404 for non-owned) and `success: false` handling on the mobile notifications screen
 - 01.44: Doctor signature upload (private `doctor-signatures` bucket) and professional prescription PDF redesign with embedded signature; mobile prescription detail redesign; migration 049 (`doctors.signature_url`)
 - 01.41: Week 8 authorization hardening — ADMIN/SUPERADMIN denied clinic-operation access to queue, doctor capacity, payment detail, invoice detail/PDF/by-payment, and consultation record read endpoints; expanded backend/mobile verification coverage for role-based workflows, waitlist, billing, and security controls
 - 01.39: Patient Payments Hub — centralized `/payments` page with status filters, GCash QR/account details, receipt upload entry points, invoice view/download; new patient-scoped `GET /api/v1/payments/me` and `GET /api/v1/invoices/me`; INVOICE_AVAILABLE notifications deep-link to the invoice/payments hub

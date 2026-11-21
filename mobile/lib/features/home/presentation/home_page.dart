@@ -363,8 +363,6 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: spacing.AppSpacing.gutterLg),
-                    _buildSearchBar(),
-                    const SizedBox(height: spacing.AppSpacing.gutterLg),
                     _buildSpecialties(),
                     const SizedBox(height: spacing.AppSpacing.gutterLg),
                     _buildQuickActions(),

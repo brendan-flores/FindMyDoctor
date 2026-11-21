@@ -4,7 +4,41 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
-<<<<<<< HEAD
+### 01.45 (November 21, 2026)
+
+**Purpose:** Complete the mobile application filters follow-up across the Doctor List, Appointments, Medical Records, and Notifications screens, and align the documentation with the delivered behavior.
+
+**Significant Features:**
+- Doctor List filters: specialty, hospital/clinic, verified-only, and search now combine using AND logic, are applied client-side, and are individually removable through active-filter chips. A dedicated Clear All action resets every filter and the search query. Selecting a specialty, hospital, or verified-only no longer clears the other active filters, and the Home-provided specialty is additive instead of replacing the current filters.
+- Doctor List loading errors now show a dedicated error state with a Retry action instead of an empty list; the page keeps its active filters while retrying.
+- Appointments tab counts now respect the selected date, and each tab count reflects the number of appointments matching the current date (the individual status filter is ignored for the count so every tab shows how many appointments fall on that date).
+- Appointments empty state now distinguishes genuine empty appointments (no records at all) from filtered-empty results ("No appointments match your filters."). Clear All resets the tab to Upcoming and clears the date filter.
+- Medical Records date filtering is now calendar-date based and inclusive: Last 7 days covers today and the previous six calendar days, and Last 30 days covers today and the previous twenty-nine calendar days.
+- Medical Records visits use the device-local calendar day of their `visit_date` timestamp, and prescriptions use the calendar date of the date-only `prescription_date` field without timezone shifting. Future-dated and null-dated records are excluded from the constrained filters, and All time restores the full unfiltered records.
+- Notifications: marking a notification read now validates ownership so only the authenticated user's own notification can be updated; non-owned notifications return HTTP 404. The mobile notifications screen treats an HTTP 200 response carrying `success: false` as an error instead of a genuine empty result.
+
+**Improvements:**
+- Filters on the Doctor List are easier to reason about and to undo, since every active filter is shown as a removable chip and the counts and lists are always derived from the same filtered dataset.
+- Appointment tab counts stay consistent with the visible list when a date is selected, and the empty states now explain whether there are no appointments or no appointments matching the current filters.
+- Medical Records date windows are predictable across timezones and off-by-one boundary days, avoiding both timezone-shifted and future-dated records appearing in constrained filters.
+- Notification reads are scoped to the owning user, and notification load failures are surfaced as errors instead of an empty list.
+
+**Bug Fixes:**
+- Doctor List no longer clears unrelated filters when a specialty or hospital is selected, and no longer shows an empty list (instead of an error) when loading fails.
+- Appointment tab counts previously ignored the selected date; they now match the date-filtered dataset.
+- Medical Records filtered out records with timezone-shifted or boundary dates incorrectly; calendar-date comparison now keeps the correct inclusive windows and excludes future/null dates.
+- Notifications no longer silently accept a `success: false` HTTP 200 response as an empty list, and notification ownership is enforced when marking read.
+
+**Removed/Modified Functionality:**
+- Doctor List filter behavior changed so filters are additive (AND) and individually removable rather than mutually exclusive.
+- Appointment empty-state wording changed to distinguish genuine empty lists from filtered-empty results.
+
+**Breaking Changes:** No breaking API or schema changes. The existing notification mark-as-read endpoint (`PATCH /api/v1/notifications/:id/read`) now enforces authenticated-user ownership and returns HTTP 404 for non-owned notifications.
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.45, added this entry to `VERSION_HISTORY.md`, and extended `SYSTEM_STATE.md` (root and `docs/SYSTEM_STATE.md`) with the Mobile Application Filters sections covering the Doctor List, Appointments, Medical Records, and Notifications behavior. No PRD, architecture, or database changes were required.
+
+---
+
 ### 01.44 (November 19, 2026)
 
 **Purpose:** Let doctors upload a signature that is embedded in professional prescription PDFs, and redesign the prescription PDF and mobile prescription detail view for clinical use.
@@ -64,7 +98,11 @@ This document contains the complete version history for the FindMyDoctor applica
 **Breaking Changes:** None
 
 **Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.43, added this version entry to `VERSION_HISTORY.md`, and synchronized `docs/SYSTEM_STATE.md` with the new chat UX. No PRD, architecture, API, or database changes were required.
-=======
+
+---
+
+> **Note:** The version number `01.43` was claimed by two separate releases shipped in parallel on November 19, 2026 — the MediGuide AI typing indicator and Markdown release (dev) and the Portal-wide UI/UX consistency and header dropdowns release (`feature/portal-ui-consistency-and-header-dropdowns`). Both releases are retained as shipped; each is documented below as its own entry.
+
 ### 01.43 (November 19, 2026)
 
 **Purpose:** Portal-wide UI/UX consistency across Doctor, Secretary, and Admin web portals, with header dropdowns for account actions and restored Users navigation for ADMIN users.
@@ -90,7 +128,6 @@ This document contains the complete version history for the FindMyDoctor applica
 **Breaking Changes:** None (UI/UX alignment only; no functional changes to routes, authentication, or authorization).
 
 **Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.43, added this version entry to `VERSION_HISTORY.md`.
->>>>>>> feature/portal-ui-consistency-and-header-dropdowns
 
 ---
 

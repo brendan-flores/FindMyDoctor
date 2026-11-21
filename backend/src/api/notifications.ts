@@ -76,15 +76,20 @@ router.get('/unread-count', authenticate, async (req: AuthRequest, res: Response
   }
 });
 
-// Mark notification as read
+// Mark notification as read (only the owning user may update it)
 router.patch('/:id/read', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const userId = req.user!.id;
 
-    await query(
-      'UPDATE notifications SET is_read = true WHERE id = $1',
-      [id]
+    const result = await query(
+      'UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2 RETURNING id',
+      [id, userId]
     );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Notification not found'));
+    }
 
     res.json(success(null, 'Notification marked as read'));
   } catch (err: any) {
