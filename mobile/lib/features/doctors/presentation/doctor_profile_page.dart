@@ -11,6 +11,7 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/skeleton.dart';
 
 /// Patient-only public doctor profile.
 ///
@@ -175,16 +176,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
   }
 
   Widget _buildLoadingState() {
-    return const Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(height: spacing.AppSpacing.gutterMd),
-          Text('Loading profile...'),
-        ],
-      ),
-    );
+    return const DoctorProfileSkeleton();
   }
 
   Widget _buildErrorState() {

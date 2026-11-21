@@ -7,6 +7,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/utils/json_parsers.dart';
 import 'appointment_detail_page.dart';
@@ -408,11 +409,22 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                           child: _buildWaitlistRow(),
                         ),
                       ),
-                    if (_isLoading)
-                      const SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: Center(child: CircularProgressIndicator()),
-                      )
+                    if (_isLoading) ...[
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: spacing.AppSpacing.screenPadding,
+                            ).copyWith(bottom: spacing.AppSpacing.gutterLg),
+                            child: const SkeletonScope(
+                              child: AppointmentCardSkeleton(),
+                            ),
+                          ),
+                          childCount: 4,
+                        ),
+                      ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 112)),
+                    ]
                     else if (_errorMessage != null)
                       SliverFillRemaining(
                         hasScrollBody: false,

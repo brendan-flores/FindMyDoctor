@@ -7,6 +7,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../models/visit.dart';
 import '../models/prescription.dart';
@@ -226,7 +227,17 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
     return RefreshIndicator(
       onRefresh: _loadVisits,
       child: _isLoadingVisits
-          ? const Center(child: CircularProgressIndicator())
+          ? SkeletonListView(
+              itemCount: 4,
+              itemSpacing: 0,
+              padding: EdgeInsets.only(
+                left: spacing.AppSpacing.screenPadding,
+                right: spacing.AppSpacing.screenPadding,
+                top: spacing.AppSpacing.screenPadding,
+                bottom: spacing.AppSpacing.screenPadding + MediaQuery.of(context).padding.bottom,
+              ),
+              itemBuilder: (context, index) => const VisitCardSkeleton(),
+            )
           : _visitsError != null
           ? LayoutBuilder(
               builder: (context, constraints) => SingleChildScrollView(
@@ -273,7 +284,17 @@ class _MedicalRecordsPageState extends State<MedicalRecordsPage>
     return RefreshIndicator(
       onRefresh: _loadPrescriptions,
       child: _isLoadingPrescriptions
-          ? const Center(child: CircularProgressIndicator())
+          ? SkeletonListView(
+              itemCount: 4,
+              itemSpacing: 0,
+              padding: EdgeInsets.only(
+                left: spacing.AppSpacing.screenPadding,
+                right: spacing.AppSpacing.screenPadding,
+                top: spacing.AppSpacing.screenPadding,
+                bottom: spacing.AppSpacing.screenPadding + MediaQuery.of(context).padding.bottom,
+              ),
+              itemBuilder: (context, index) => const PrescriptionCardSkeleton(),
+            )
           : _prescriptionsError != null
           ? LayoutBuilder(
               builder: (context, constraints) => SingleChildScrollView(

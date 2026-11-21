@@ -9,6 +9,7 @@ import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/json_parsers.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/skeleton.dart';
 
 /// Live queue card for a single appointment.
 ///
@@ -221,8 +222,8 @@ class _LiveQueueCardState extends State<LiveQueueCard>
           const SizedBox(height: spacing.AppSpacing.gutterSm),
           if (_isLoading)
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: SkeletonScope(child: LiveQueueBodySkeleton()),
             )
           else if (_errorMessage != null)
             _buildMessage(_errorMessage!, AppColors.error, Icons.error_outline)

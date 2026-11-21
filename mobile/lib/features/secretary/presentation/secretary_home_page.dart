@@ -8,6 +8,7 @@ import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../../../app/app.dart' show MyApp;
 import '../../conversations/models/conversation.dart';
@@ -139,9 +140,18 @@ class _SecretaryHomePageState extends State<SecretaryHomePage> {
     if (_isLoading && _conversations.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          SizedBox(height: 160),
-          Center(child: CircularProgressIndicator()),
+        padding: EdgeInsets.fromLTRB(
+          spacing.AppSpacing.screenPadding,
+          spacing.AppSpacing.gutterMd,
+          spacing.AppSpacing.screenPadding,
+          spacing.AppSpacing.gutter3xl,
+        ),
+        children: [
+          SkeletonColumn(
+            itemCount: 6,
+            itemBuilder: (context, index) =>
+                const ConversationTileSkeleton(squareAvatar: true),
+          ),
         ],
       );
     }
@@ -490,7 +500,18 @@ class _SecretaryHomePageState extends State<SecretaryHomePage> {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const SizedBox(
                 height: 80,
-                child: Center(child: CircularProgressIndicator()),
+                child: SkeletonScope(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SkeletonLine(width: 140, height: 13),
+                      SizedBox(height: 8),
+                      SkeletonLine(width: 200, height: 12),
+                      SizedBox(height: 8),
+                      SkeletonLine(width: 180, height: 12),
+                    ],
+                  ),
+                ),
               );
             }
 
@@ -697,6 +718,28 @@ class _NotificationsSheet extends StatefulWidget {
 }
 
 class _NotificationsSheetState extends State<_NotificationsSheet> {
+  static Widget _notificationTileSkeleton(BuildContext context, int index) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          SkeletonTile(size: 24, borderRadius: 6),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonLine(width: 160, height: 13),
+                SizedBox(height: 4),
+                SkeletonLine(width: 220, height: 11),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
 
@@ -747,9 +790,10 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
             Text('Notifications', style: AppTextStyles.headlineSm),
             const SizedBox(height: spacing.AppSpacing.gutterMd),
             if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.all(spacing.AppSpacing.gutterXl),
-                child: Center(child: CircularProgressIndicator()),
+              const SkeletonColumn(
+                itemCount: 3,
+                itemSpacing: 0,
+                itemBuilder: _notificationTileSkeleton,
               )
             else if (_notifications.isEmpty)
               Padding(

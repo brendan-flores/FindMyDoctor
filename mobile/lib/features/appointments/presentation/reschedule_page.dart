@@ -9,6 +9,7 @@ import '../../../core/utils/json_parsers.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/skeleton.dart';
 
 /// Patient-side rescheduling screen.
 ///
@@ -384,7 +385,39 @@ class _ReschedulePageState extends State<ReschedulePage> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return SkeletonScope(
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.all(spacing.AppSpacing.screenPadding),
+          child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: spacing.AppSpacing.gutterMd),
+            const SkeletonLine(width: 220, height: 22),
+            const SizedBox(height: spacing.AppSpacing.gutterXs),
+            const SkeletonLine(width: 280, height: 12),
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
+            AppCard(
+              padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  SkeletonLine(width: 100, height: 11),
+                  SizedBox(height: spacing.AppSpacing.gutterSm),
+                  SkeletonLine(width: 160, height: 13),
+                  SizedBox(height: spacing.AppSpacing.gutterXs),
+                  SkeletonLine(width: 200, height: 11),
+                ],
+              ),
+            ),
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
+            const WeekCalendarSkeleton(),
+            const SizedBox(height: spacing.AppSpacing.gutterLg),
+            const SkeletonLine(width: double.infinity, height: 60),
+          ],
+          ),
+        ),
+      );
     }
 
     if (_errorMessage != null) {
@@ -527,10 +560,7 @@ class _ReschedulePageState extends State<ReschedulePage> {
           ),
           const SizedBox(height: spacing.AppSpacing.gutterSm),
           if (_isLoadingAvailability)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: CircularProgressIndicator(),
-            )
+            const CalendarDayCellsSkeleton()
           else
             Row(
               children: days.map((date) {

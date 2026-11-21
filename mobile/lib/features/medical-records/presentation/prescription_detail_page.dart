@@ -8,6 +8,7 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/file_save_service.dart';
 import '../models/prescription.dart';
@@ -127,7 +128,7 @@ class _PrescriptionDetailPageState extends State<PrescriptionDetailPage> {
     return Scaffold(
       appBar: AppHeader(title: 'Prescription', showBackButton: true),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const PrescriptionDetailSkeleton()
           : _errorMessage != null
           ? _buildErrorState(_errorMessage!, _loadPrescription)
           : _buildPrescriptionContent(),

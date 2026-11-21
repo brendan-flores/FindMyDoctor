@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../lib/core/widgets/skeleton.dart';
 import '../lib/features/conversations/presentation/ai_conversation_history_page.dart';
 
 void main() {
@@ -38,7 +39,7 @@ void main() {
           home: AiConversationHistoryPage(),
         ),
       );
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(AiConversationTileSkeleton), findsWidgets);
     });
 
     testWidgets('tapping back returns conversation ID', (tester) async {

@@ -9,6 +9,7 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/doctor_service.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/push_notification_service.dart';
@@ -67,6 +68,7 @@ class _HomePageState extends State<HomePage> {
   String? _userName;
   String? _userEmail;
   bool _accountInfoFailed = false;
+  bool _isLoadingAccountInfo = true;
   String _chatSegment = 'clinic'; // M1: Segmented control state
 
   // Conversation data is reused within this window instead of refetched on
@@ -113,11 +115,13 @@ class _HomePageState extends State<HomePage> {
               : response['data']['email'];
           _userEmail = response['data']['email'];
           _accountInfoFailed = false;
+          _isLoadingAccountInfo = false;
         });
       } else {
         if (!mounted) return;
         setState(() {
           _accountInfoFailed = true;
+          _isLoadingAccountInfo = false;
         });
       }
     } catch (e) {
@@ -125,6 +129,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
       setState(() {
         _accountInfoFailed = true;
+        _isLoadingAccountInfo = false;
       });
     }
   }
@@ -847,11 +852,22 @@ class _HomePageState extends State<HomePage> {
           Expanded(
             child: _accountInfoFailed
                 ? _buildAccountErrorContent()
+                : _isLoadingAccountInfo
+                ? const SkeletonScope(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SkeletonLine(width: 160, height: 16),
+                        SizedBox(height: spacing.AppSpacing.gutterXs),
+                        SkeletonLine(width: 200, height: 12),
+                      ],
+                    ),
+                  )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _userName ?? 'Loading…',
+                        _userName ?? 'Patient',
                         style: AppTextStyles.headlineSm.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -1338,16 +1354,7 @@ class _HomePageState extends State<HomePage> {
         _buildSpecialtyChip('All Doctors', Icons.medical_services, true, null),
         const SizedBox(height: spacing.AppSpacing.gutterXs),
         if (_isLoadingSpecialties)
-          const SizedBox(
-            height: 40,
-            child: Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          )
+          const SpecialtyChipsSkeleton()
         else if (_specialties.isEmpty)
           const SizedBox(
             height: 40,
@@ -1583,11 +1590,9 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: spacing.AppSpacing.gutterMd),
         if (_isLoadingDoctors)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(32.0),
-              child: CircularProgressIndicator(),
-            ),
+          SkeletonColumn(
+            itemCount: 3,
+            itemBuilder: (context, index) => const HomeDoctorCardSkeleton(),
           )
         else if (_recommendedDoctors.isEmpty)
           Padding(
@@ -1708,11 +1713,9 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: spacing.AppSpacing.gutterMd),
         if (_isLoadingDoctors)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(32.0),
-              child: CircularProgressIndicator(),
-            ),
+          SkeletonColumn(
+            itemCount: 3,
+            itemBuilder: (context, index) => const ClinicCardSkeleton(),
           )
         else if (_hospitals.isEmpty)
           Padding(
@@ -1988,11 +1991,9 @@ class ChatTabContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: CircularProgressIndicator(),
-        ),
+      return SkeletonColumn(
+        itemCount: 4,
+        itemBuilder: (context, index) => const ConversationTileSkeleton(),
       );
     }
 

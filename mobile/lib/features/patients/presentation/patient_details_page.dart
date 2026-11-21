@@ -8,6 +8,7 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 
 class PatientDetailsPage extends StatefulWidget {
@@ -221,18 +222,7 @@ class _PatientDetailsPageState extends State<PatientDetailsPage> {
   }
 
   Widget _buildLoadingState() {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32.0),
-        child: Column(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading your profile...'),
-          ],
-        ),
-      ),
-    );
+    return const FormFieldsSkeleton(fieldCount: 6);
   }
 
   Widget _buildErrorState() {

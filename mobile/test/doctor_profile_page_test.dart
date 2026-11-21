@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/models/doctor_profile.dart';
+import 'package:mobile/core/widgets/skeleton.dart';
 import 'package:mobile/features/doctors/presentation/doctor_profile_page.dart';
 
 const _doctorId = '11111111-1111-4111-8111-111111111111';
@@ -336,8 +337,7 @@ void main() {
         await tester.pumpWidget(_app(loader: (_) => completer.future));
         await tester.pump();
 
-        expect(find.text('Loading profile...'), findsOneWidget);
-        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+        expect(find.byType(DoctorProfileSkeleton), findsOneWidget);
 
         completer.complete(_profile());
         await tester.pumpAndSettle();

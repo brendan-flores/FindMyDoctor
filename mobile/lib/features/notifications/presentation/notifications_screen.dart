@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../models/notification.dart' as notif_model;
 
@@ -161,11 +162,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                     const SizedBox(height: spacing.AppSpacing.gutterLg),
                     if (_isLoading)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32.0),
-                          child: CircularProgressIndicator(),
-                        ),
+                      SkeletonColumn(
+                        itemCount: 5,
+                        itemSpacing: 0,
+                        itemBuilder: (context, index) =>
+                            const NotificationTileSkeleton(),
                       )
                     else if (_notifications.isEmpty)
                       SizedBox(

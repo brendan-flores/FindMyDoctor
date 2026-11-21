@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mobile/core/widgets/skeleton.dart';
 import 'package:mobile/features/conversations/models/conversation.dart';
 import 'package:mobile/features/home/presentation/home_page.dart';
 
@@ -70,10 +71,10 @@ void main() {
     );
   });
 
-  testWidgets('renders a loading spinner while loading', (tester) async {
+  testWidgets('renders skeleton placeholders while loading', (tester) async {
     await tester.pumpWidget(_host(isLoading: true, conversations: const []));
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(ConversationTileSkeleton), findsWidgets);
     expect(find.text('No conversations yet'), findsNothing);
   });
 

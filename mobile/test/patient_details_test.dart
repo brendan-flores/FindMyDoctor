@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/patients/presentation/patient_details_page.dart';
 import 'package:mobile/core/services/api_service.dart';
+import 'package:mobile/core/widgets/skeleton.dart';
 
 void main() {
   group('Patient Details Workflow Tests', () {
@@ -44,7 +45,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Loading your profile...'), findsOneWidget);
+      expect(find.byType(FormFieldsSkeleton), findsOneWidget);
     });
 
     testWidgets('Submit button is present', (WidgetTester tester) async {

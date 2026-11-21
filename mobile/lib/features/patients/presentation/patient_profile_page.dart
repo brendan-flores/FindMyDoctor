@@ -8,6 +8,7 @@ import '../../../core/services/api_service.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/skeleton.dart';
 
 /// Standalone read-only view of the signed-in patient's own profile.
 ///
@@ -223,19 +224,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: spacing.AppSpacing.gutterMd),
-            Text(
-              'Loading your profile…',
-              style: AppTextStyles.bodyMd.copyWith(color: AppColors.secondary),
-            ),
-          ],
-        ),
-      );
+      return const PatientProfileSkeleton();
     }
 
     if (_errorMessage != null) {
