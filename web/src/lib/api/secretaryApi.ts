@@ -222,7 +222,7 @@ export const secretaryApi = {
   },
 
   // Walk-in: direct registration (consolidated endpoint)
-  directRegisterWalkIn: async (payload: DirectWalkInRegistrationRequest): Promise<{ success: boolean; data?: DirectWalkInRegistrationResponse; error?: string }> => {
+  directRegisterWalkIn: async (payload: DirectWalkInRegistrationRequest): Promise<{ success: boolean; data?: DirectWalkInRegistrationResponse; error?: string; errorCode?: string }> => {
     return apiClient.post<DirectWalkInRegistrationResponse>('/walk-ins/direct-register', payload);
   },
 
