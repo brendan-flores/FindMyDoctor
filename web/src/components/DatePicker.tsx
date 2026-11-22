@@ -6,9 +6,10 @@ interface DatePickerProps {
   value: string;
   onChange: (date: string) => void;
   maxDate?: string;
+  minDate?: string;
 }
 
-export default function DatePicker({ value, onChange, maxDate }: DatePickerProps) {
+export default function DatePicker({ value, onChange, maxDate, minDate }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(value ? new Date(value) : null);
@@ -87,7 +88,12 @@ export default function DatePicker({ value, onChange, maxDate }: DatePickerProps
 
   const isDisabled = (day: number) => {
     const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    return date > maxDateObj;
+    if (date > maxDateObj) return true;
+    if (minDate) {
+      const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      if (dateStr < minDate) return true;
+    }
+    return false;
   };
 
   return (
@@ -106,7 +112,7 @@ export default function DatePicker({ value, onChange, maxDate }: DatePickerProps
       </button>
 
       {isOpen && (
-        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl p-4">
+        <div className="fmd-animate-in absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl p-4">
           {/* Calendar Header */}
           <div className="flex items-center justify-between mb-4">
             <button
@@ -157,7 +163,7 @@ export default function DatePicker({ value, onChange, maxDate }: DatePickerProps
 
           {/* Month Selector Dropdown */}
           {showMonthSelector && (
-            <div className="absolute top-16 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl p-2 z-30 max-h-60 overflow-y-auto">
+            <div className="fmd-animate-in absolute top-16 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl p-2 z-30 max-h-60 overflow-y-auto">
               <div className="grid grid-cols-3 gap-1">
                 {monthNames.map((month, index) => (
                   <button
@@ -179,7 +185,7 @@ export default function DatePicker({ value, onChange, maxDate }: DatePickerProps
 
           {/* Year Selector Dropdown */}
           {showYearSelector && (
-            <div className="absolute top-16 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl p-2 z-30 max-h-60 overflow-y-auto">
+            <div className="fmd-animate-in absolute top-16 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl p-2 z-30 max-h-60 overflow-y-auto">
               <div className="grid grid-cols-4 gap-1">
                 {years.map((year) => (
                   <button

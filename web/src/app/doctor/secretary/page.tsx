@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api/apiClient';
 import Toast from '@/components/ui/Toast';
+import { usePresence } from '@/hooks/usePresence';
 
 interface SecretarySummary {
   id: string;
@@ -21,6 +22,7 @@ interface SecretarySummary {
 export default function DoctorSecretary() {
   const [secretaries, setSecretaries] = useState<SecretarySummary[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const addModalPresent = usePresence(showAddModal);
   const [secretaryForm, setSecretaryForm] = useState({
     email: '',
     password: '',
@@ -144,9 +146,15 @@ export default function DoctorSecretary() {
       </div>
 
       {/* Add Secretary Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+      {addModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
+          data-state={showAddModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100"
+            data-state={showAddModal ? 'open' : 'closed'}
+          >
             <h3 className="text-2xl font-bold text-slate-800 mb-6">Add Secretary</h3>
             <div className="space-y-4">
               {error && (

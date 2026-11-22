@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
 import { notificationApi, Notification } from '@/lib/api/secretaryApi';
+import { usePresence } from '@/hooks/usePresence';
 
 interface SecretaryHeaderProps {
   userName?: string;
@@ -13,6 +14,8 @@ interface SecretaryHeaderProps {
 export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Secretary' }: SecretaryHeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const dropdownPresent = usePresence(isDropdownOpen);
+  const notificationPresent = usePresence(isNotificationOpen);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -215,8 +218,11 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
           </button>
 
           {/* Notification Dropdown */}
-          {isNotificationOpen && (
-            <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg border border-slate-200 shadow-lg py-2 z-50 max-h-96 overflow-y-auto">
+          {notificationPresent && (
+            <div
+              data-state={isNotificationOpen ? 'open' : 'closed'}
+              className="fmd-dropdown absolute right-0 top-full mt-2 w-80 bg-white rounded-lg border border-slate-200 shadow-lg py-2 z-50 max-h-96 overflow-y-auto"
+            >
               {notifications.length === 0 ? (
                 <div className="px-4 py-8 text-center text-slate-500 text-sm">
                   <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">notifications_none</span>
@@ -271,8 +277,11 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
           </button>
 
           {/* Dropdown Menu */}
-          {isDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg border border-slate-200 shadow-lg py-1 z-50">
+          {dropdownPresent && (
+            <div
+              data-state={isDropdownOpen ? 'open' : 'closed'}
+              className="fmd-dropdown absolute right-0 top-full mt-2 w-48 bg-white rounded-lg border border-slate-200 shadow-lg py-1 z-50"
+            >
               <button
                 onClick={handleViewProfile}
                 className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"

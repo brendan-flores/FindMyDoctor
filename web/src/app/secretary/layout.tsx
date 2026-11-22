@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import SecretarySidebar from '@/components/layout/SecretarySidebar';
 import SecretaryHeader from '@/components/layout/SecretaryHeader';
+import PageTransition from '@/components/PageTransition';
 import { apiClient } from '@/lib/api/apiClient';
 import { secretaryApi } from '@/lib/api/secretaryApi';
 import { toStaffContactDomestic } from '@/lib/phone';
@@ -184,7 +185,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
   }
 
   if (isPublicPage) {
-    return <>{children}</>;
+    return <PageTransition>{children}</PageTransition>;
   }
 
   return (
@@ -193,7 +194,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
       <SecretaryHeader userName={userName} userRole={userRole} />
       <main className="ml-64 pt-20 bg-[#f8f9ff] p-6">
         <div className="max-w-[1600px] mx-auto">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </div>
       </main>
     </div>

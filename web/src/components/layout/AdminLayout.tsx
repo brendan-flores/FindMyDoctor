@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import AdminSidebar from './AdminSidebar';
 import AdminHeader from './AdminHeader';
+import PageTransition from '@/components/PageTransition';
 import { apiClient } from '@/lib/api/apiClient';
 
 interface AdminLayoutProps {
@@ -87,7 +88,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       <AdminHeader userName={userName} userRole={userRole} />
       <main className="ml-64 pt-20 bg-[#f8f9ff] p-6">
         <div className="max-w-[1600px] mx-auto">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </div>
       </main>
     </div>

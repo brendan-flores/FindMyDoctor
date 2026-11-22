@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { adminApi, Doctor, DoctorSchedule } from '@/lib/api/adminApi';
 import Select from '@/components/ui/Select';
+import { usePresence } from '@/hooks/usePresence';
 
 export default function DoctorManagement() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -19,6 +20,14 @@ export default function DoctorManagement() {
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+
+  const detailModalOpen = showDetailModal && !!selectedDoctor;
+  const deactivateModalOpen = showDeactivateModal && !!selectedDoctor;
+  const photoModalOpen = showPhotoModal && !!selectedDoctor?.professionalPhotoUrl;
+  const detailModalPresent = usePresence(detailModalOpen);
+  const rejectModalPresent = usePresence(showRejectModal);
+  const deactivateModalPresent = usePresence(deactivateModalOpen);
+  const photoModalPresent = usePresence(photoModalOpen);
 
   useEffect(() => {
     loadDoctors();
@@ -126,7 +135,6 @@ export default function DoctorManagement() {
         loadDoctors();
         setShowDetailModal(false);
         setShowDeactivateModal(false);
-        setSelectedDoctor(null);
         setDoctorSchedules([]);
       }
     } catch (error) {
@@ -414,9 +422,15 @@ export default function DoctorManagement() {
       </div>
 
       {/* Doctor Detail Modal */}
-      {showDetailModal && selectedDoctor && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
+      {detailModalPresent && selectedDoctor && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          data-state={detailModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-xl"
+            data-state={detailModalOpen ? 'open' : 'closed'}
+          >
             <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
               <div className="flex items-center justify-between">
                 <div>
@@ -666,9 +680,15 @@ export default function DoctorManagement() {
       )}
 
       {/* Rejection Reason Modal */}
-      {showRejectModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-xl">
+      {rejectModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          data-state={showRejectModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl max-w-md w-full shadow-xl"
+            data-state={showRejectModal ? 'open' : 'closed'}
+          >
             <div className="p-6 border-b border-slate-200">
               <h2 className="text-lg font-bold text-slate-900">Reject Doctor Application</h2>
               <p className="text-sm text-slate-500 mt-1">Please provide a reason for rejection</p>
@@ -701,9 +721,15 @@ export default function DoctorManagement() {
       )}
 
       {/* Deactivate Confirmation Modal */}
-      {showDeactivateModal && selectedDoctor && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-xl">
+      {deactivateModalPresent && selectedDoctor && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          data-state={deactivateModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl max-w-md w-full shadow-xl"
+            data-state={deactivateModalOpen ? 'open' : 'closed'}
+          >
             <div className="p-6 border-b border-slate-200">
               <h2 className="text-lg font-bold text-slate-900">Deactivate Doctor Account</h2>
               <p className="text-sm text-slate-500 mt-1">Are you sure you want to deactivate this doctor?</p>
@@ -723,7 +749,6 @@ export default function DoctorManagement() {
               <button
                 onClick={() => {
                   setShowDeactivateModal(false);
-                  setSelectedDoctor(null);
                 }}
                 className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors"
               >
@@ -741,9 +766,16 @@ export default function DoctorManagement() {
       )}
 
       {/* Photo Modal */}
-      {showPhotoModal && selectedDoctor?.professionalPhotoUrl && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowPhotoModal(false)}>
-          <div className="relative max-w-4xl max-h-[90vh]">
+      {photoModalPresent && selectedDoctor?.professionalPhotoUrl && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          data-state={photoModalOpen ? 'open' : 'closed'}
+          onClick={() => setShowPhotoModal(false)}
+        >
+          <div
+            className="fmd-modal-panel relative max-w-4xl max-h-[90vh]"
+            data-state={photoModalOpen ? 'open' : 'closed'}
+          >
             <button
               onClick={() => setShowPhotoModal(false)}
               className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"

@@ -101,3 +101,151 @@ input[type="time"]::-webkit-datetime-edit-minute-field:focus {
   border-color: #3b82f6;
   outline: none;
 }
+
+/* ------------------------------------------------------------------ */
+/* Transitions: page navigation, dialogs, dropdowns, expandable areas  */
+/* ------------------------------------------------------------------ */
+
+/* Let clicks pass through the view-transition snapshot overlay so the
+   animation never blocks interaction. */
+::view-transition {
+  pointer-events: none;
+}
+
+/* Page navigation crossfade (PageTransition component). */
+::view-transition-old(.page-fade) {
+  animation: fmd-page-out 140ms ease-in both;
+}
+
+::view-transition-new(.page-fade) {
+  animation: fmd-page-in 200ms ease-out both;
+}
+
+@keyframes fmd-page-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes fmd-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Modal / dialog overlays and panels. Pair with usePresence() so the
+   element stays mounted long enough for the exit transition to play. */
+.fmd-modal-overlay {
+  transition: opacity 180ms ease-out;
+}
+
+.fmd-modal-overlay[data-state='open'] {
+  opacity: 1;
+}
+
+.fmd-modal-overlay[data-state='closed'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fmd-modal-panel {
+  transition:
+    opacity 180ms ease-out,
+    transform 180ms ease-out;
+}
+
+.fmd-modal-panel[data-state='open'] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.fmd-modal-panel[data-state='closed'] {
+  opacity: 0;
+  transform: translateY(8px) scale(0.97);
+  pointer-events: none;
+}
+
+/* Dropdown / popover entrance (mount animation; pair with usePresence()
+   when a closing animation is needed). */
+@keyframes fmd-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.fmd-animate-in {
+  animation: fmd-pop-in 150ms ease-out both;
+}
+
+/* Dropdown / popover panels with enter+exit transitions. Pair with
+   usePresence() so the element stays mounted for the exit animation. */
+.fmd-dropdown {
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms ease-out;
+}
+
+.fmd-dropdown[data-state='open'] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.fmd-dropdown[data-state='closed'] {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+  pointer-events: none;
+}
+
+/* Expandable sections (height + fade). */
+.fmd-expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 200ms ease-out,
+    opacity 200ms ease-out;
+}
+
+.fmd-expand[data-open='true'] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.fmd-expand > * {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Respect users who prefer reduced motion: collapse every transition and
+   view-transition animation to an instant change. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+
+  .fmd-modal-overlay,
+  .fmd-modal-panel,
+  .fmd-dropdown,
+  .fmd-expand,
+  .fmd-animate-in {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+  }
+}

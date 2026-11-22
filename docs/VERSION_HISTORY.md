@@ -4,6 +4,33 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.46 (November 22, 2026)
+
+**Purpose:** Improve web dashboard interaction quality — consistent subtle transitions across navigation, dialogs, and dropdowns — and eliminate perceived lag in schedule mutations, plus enforce future-only dates when creating exceptions.
+
+**Significant Features:**
+- Web UI motion is standardized and subtle (~150-200ms): route changes crossfade via a shared `PageTransition` wrapper (React `<ViewTransition>` keyed on pathname, mounted in the Doctor/Secretary/Admin layouts and auth layouts); dialogs/modals use `.fmd-modal-overlay`/`.fmd-modal-panel` with `usePresence`/`usePresenceValue` hooks (`web/src/hooks/usePresence.ts`) for deferred unmount so exit animations play; dropdowns/popovers use `.fmd-dropdown` and mount-in `.fmd-animate-in`; expandable sections use `.fmd-expand`; all motion collapses to instant under `prefers-reduced-motion`.
+- Schedule mutations on Doctor `/doctor/schedule`, Doctor `/doctor-profile`, and Secretary `/schedule` now show immediate pending state ("Saving..."/"Deleting..." buttons) and reconcile local state from the mutation response instead of issuing a second full refetch; refetches remain only for pending schedule-change-request (HTTP 202) responses and initial loads.
+- Exception creation modals enforce future-only dates: past dates are disabled in the date picker (`minDate` prop added to the shared `DatePicker` and the inline schedule-page pickers) and submit handlers reject past dates with an inline error. Edit-mode modals are exempt.
+
+**Improvements:**
+- Schedule add/edit/delete operations feel responsive: one API round-trip instead of two, no full-list "Loading schedules..." flash after mutations, and instant button feedback during saves.
+- Doctor schedule tab badges (Exceptions, Break Periods) now count only active records dated today or later, matching the lists which hide past-dated records; lists and empty states share one filtered dataset.
+
+**Bug Fixes:**
+- Doctor `/doctor/schedule` tab badges previously counted past-dated exceptions/breaks that the lists never display, leaving a stale count (e.g., "Exception 1") after deletions; badges now match visible records.
+- Exception/break-period lists showed a blank area instead of the "No exceptions configured"/"No break periods configured" empty state when only past-dated records existed.
+
+**Removed/Modified Functionality:**
+- Post-mutation full refetches on schedule pages replaced by local state reconciliation from mutation responses; pending schedule-change-request (202) flows unchanged.
+- `@types/react` upgraded to 19.3.0 to type React `<ViewTransition>` (runtime was already React 19.3).
+
+**Breaking Changes:** None.
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.46, added this entry to `VERSION_HISTORY.md`, and extended `SYSTEM_STATE.md`, `architecture.md`, and `prd.md` with the web transition system, schedule mutation reconciliation, and future-only exception-date rules.
+
+---
+
 ### 01.45 (November 21, 2026)
 
 **Purpose:** Complete the mobile application filters follow-up across the Doctor List, Appointments, Medical Records, and Notifications screens, and align the documentation with the delivered behavior.

@@ -9,6 +9,7 @@ import {
   BillingStatus,
 } from '@/lib/api/secretaryApi';
 import Select from '@/components/ui/Select';
+import { usePresence, usePresenceValue } from '@/hooks/usePresence';
 
 interface BillingPanelProps {
   isOpen: boolean;
@@ -131,6 +132,15 @@ export default function BillingPanel({
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentTransaction | null>(null);
   const [receiptImageUrl, setReceiptImageUrl] = useState<string | null>(null);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
+
+  const panelPresent = usePresence(isOpen);
+  const deleteModal = usePresenceValue(deleteTarget);
+  const voidModal = usePresenceValue(voidTarget);
+  const rejectModalPresent = usePresence(!!selectedTransaction);
+  const correctInvoiceActive = correctInvoiceOpen ? (paymentData?.activeInvoice ?? null) : null;
+  const correctModal = usePresenceValue(correctInvoiceActive);
+  const receiptImageActive = selectedReceipt && receiptImageUrl ? receiptImageUrl : null;
+  const receiptModal = usePresenceValue(receiptImageActive);
 
   useEffect(() => {
     if (isOpen && (paymentId || appointmentId)) {
@@ -434,7 +444,7 @@ export default function BillingPanel({
     }
   };
 
-  if (!isOpen) return null;
+  if (!panelPresent) return null;
 
   const billingStatus: BillingStatus = (paymentData?.billingSummary?.billingStatus as BillingStatus) || 'UNPAID';
   const balance = money(paymentData?.billingSummary?.balance);
@@ -478,8 +488,14 @@ export default function BillingPanel({
   const chargeLineTotal = (parseFloat(chargeQuantity) || 0) * (parseFloat(chargeUnitPrice) || 0);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div
+      className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+      data-state={isOpen ? 'open' : 'closed'}
+    >
+      <div
+        className="fmd-modal-panel bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+        data-state={isOpen ? 'open' : 'closed'}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
@@ -989,12 +1005,18 @@ export default function BillingPanel({
         )}
 
         {/* Remove Charge Modal */}
-        {deleteTarget && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        {deleteModal.present && deleteModal.value && (
+          <div
+            className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4"
+            data-state={deleteTarget ? 'open' : 'closed'}
+          >
+            <div
+              className="fmd-modal-panel bg-white rounded-lg p-6 max-w-md w-full"
+              data-state={deleteTarget ? 'open' : 'closed'}
+            >
               <h3 className="text-lg font-bold mb-2">Remove charge?</h3>
               <p className="text-sm text-gray-700">
-                Remove <span className="font-medium">{deleteTarget.description}</span> ({formatMoney(deleteTarget.amount)}) from this bill?
+                Remove <span className="font-medium">{deleteModal.value.description}</span> ({formatMoney(deleteModal.value.amount)}) from this bill?
               </p>
               {deleteOverpayment > 0 && (
                 <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
@@ -1027,9 +1049,15 @@ export default function BillingPanel({
         )}
 
         {/* Reject Receipt Modal */}
-        {selectedTransaction && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        {rejectModalPresent && (
+          <div
+            className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4"
+            data-state={selectedTransaction ? 'open' : 'closed'}
+          >
+            <div
+              className="fmd-modal-panel bg-white rounded-lg p-6 max-w-md w-full"
+              data-state={selectedTransaction ? 'open' : 'closed'}
+            >
               <h3 className="text-lg font-bold mb-4">Reject Receipt</h3>
               <div className="space-y-4">
                 <div>
@@ -1076,12 +1104,18 @@ export default function BillingPanel({
         )}
 
         {/* Void Transaction Modal */}
-        {voidTarget && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        {voidModal.present && voidModal.value && (
+          <div
+            className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4"
+            data-state={voidTarget ? 'open' : 'closed'}
+          >
+            <div
+              className="fmd-modal-panel bg-white rounded-lg p-6 max-w-md w-full"
+              data-state={voidTarget ? 'open' : 'closed'}
+            >
               <h3 className="text-lg font-bold mb-4">Void Payment</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Voiding {formatMoney(voidTarget.amount)} ({formatMethod(voidTarget.method)}).
+                Voiding {formatMoney(voidModal.value.amount)} ({formatMethod(voidModal.value.method)}).
                 {hasActiveInvoice ? ' The active invoice will also be voided.' : ''}
               </p>
               <div className="space-y-4">
@@ -1124,12 +1158,18 @@ export default function BillingPanel({
         )}
 
         {/* Edit Bill Modal */}
-        {correctInvoiceOpen && paymentData?.activeInvoice && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        {correctModal.present && correctModal.value && (
+          <div
+            className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4"
+            data-state={correctInvoiceActive ? 'open' : 'closed'}
+          >
+            <div
+              className="fmd-modal-panel bg-white rounded-lg p-6 max-w-md w-full"
+              data-state={correctInvoiceActive ? 'open' : 'closed'}
+            >
               <h3 className="text-lg font-bold mb-2">Edit bill</h3>
               <p className="text-sm font-semibold text-amber-800 mb-4">
-                This will void {paymentData.activeInvoice.invoice_number} and unlock the bill.
+                This will void {correctModal.value.invoice_number} and unlock the bill.
               </p>
               <p className="text-sm text-gray-600 mb-4">
                 After voiding, you can change charges and issue a replacement invoice.
@@ -1179,9 +1219,15 @@ export default function BillingPanel({
         )}
 
         {/* Receipt Viewer Modal */}
-        {selectedReceipt && receiptImageUrl && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        {receiptModal.present && receiptModal.value && (
+          <div
+            className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-75 z-[60] flex items-center justify-center p-4"
+            data-state={receiptImageActive ? 'open' : 'closed'}
+          >
+            <div
+              className="fmd-modal-panel bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+              data-state={receiptImageActive ? 'open' : 'closed'}
+            >
               <div className="flex items-center justify-between p-4 border-b">
                 <h3 className="text-lg font-semibold text-gray-900">Receipt</h3>
                 <button
@@ -1196,7 +1242,7 @@ export default function BillingPanel({
               </div>
               <div className="flex-1 overflow-auto p-4 bg-gray-50">
                 <img
-                  src={receiptImageUrl}
+                  src={receiptModal.value}
                   alt="Payment receipt"
                   className="max-w-full h-auto mx-auto"
                 />

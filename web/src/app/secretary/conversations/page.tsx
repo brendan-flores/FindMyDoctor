@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { usePresence } from '@/hooks/usePresence';
 import {
   secretaryApi,
   Conversation,
@@ -34,6 +35,7 @@ export default function SecretaryConversations() {
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [showInvoicePicker, setShowInvoicePicker] = useState(false);
+  const invoicePickerPresent = usePresence(showInvoicePicker);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
 
@@ -633,9 +635,15 @@ export default function SecretaryConversations() {
       </div>
 
       {/* Invoice Picker Modal */}
-      {showInvoicePicker && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
+      {invoicePickerPresent && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fmd-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          data-state={showInvoicePicker ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col"
+            data-state={showInvoicePicker ? 'open' : 'closed'}
+          >
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900">Send Invoice to Patient</h3>
               <button

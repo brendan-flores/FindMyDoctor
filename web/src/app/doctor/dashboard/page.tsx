@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api/apiClient';
 import { doctorApi, DoctorProfile, type DoctorDashboard } from '@/lib/api/doctorApi';
 import Toast from '@/components/ui/Toast';
 import TwoFactorBanner from '@/components/settings/TwoFactorBanner';
+import { usePresence } from '@/hooks/usePresence';
 
 export default function DoctorDashboard() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function DoctorDashboard() {
 
   // Add Secretary modal state
   const [showAddSecretaryModal, setShowAddSecretaryModal] = useState(false);
+  const addSecretaryModalPresent = usePresence(showAddSecretaryModal);
   const [secretaryForm, setSecretaryForm] = useState({
     email: '',
     password: '',
@@ -557,9 +559,15 @@ export default function DoctorDashboard() {
       </div>
 
       {/* Add Secretary Modal */}
-      {showAddSecretaryModal && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+      {addSecretaryModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
+          data-state={showAddSecretaryModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100"
+            data-state={showAddSecretaryModal ? 'open' : 'closed'}
+          >
             <h3 className="text-2xl font-bold text-slate-800 mb-6">Add Secretary</h3>
             <div className="space-y-4">
               {secretaryError && (

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { usePresence } from '@/hooks/usePresence';
 
 export interface SelectOption {
   value: string;
@@ -32,6 +33,7 @@ export default function Select({
   id,
 }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownPresent = usePresence(isOpen);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
@@ -77,8 +79,12 @@ export default function Select({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {isOpen && (
-        <div data-dropdown-content className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+      {dropdownPresent && (
+        <div
+          data-dropdown-content
+          data-state={isOpen ? 'open' : 'closed'}
+          className="fmd-dropdown absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+        >
           {options.map((opt) => (
             <button
               key={opt.value}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { doctorApi, Patient, AssociatePatientRequest } from '@/lib/api/doctorApi';
 import { formatPhoneFieldInput, phoneFormatErrorMessage, toPatientMobileE164 } from '@/lib/phone';
 import Select from '@/components/ui/Select';
+import { usePresence } from '@/hooks/usePresence';
 
 export default function DoctorPatients() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function DoctorPatients() {
   const [searchTerm, setSearchTerm] = useState('');
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const addModalPresent = usePresence(showAddModal);
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [addPhoneError, setAddPhoneError] = useState('');
@@ -272,9 +274,15 @@ export default function DoctorPatients() {
       </div>
 
       {/* Add Patient Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      {addModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          data-state={showAddModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            data-state={showAddModal ? 'open' : 'closed'}
+          >
             <div className="p-6 border-b border-slate-100">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-slate-800">Add Patient</h2>

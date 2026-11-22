@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
+import { usePresence } from '@/hooks/usePresence';
 
 interface Admin {
   id: string;
@@ -20,6 +21,7 @@ export default function AdminManagement() {
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [userRole, setUserRole] = useState<string>('');
+  const createModalPresent = usePresence(showCreateModal);
 
   useEffect(() => {
     // Check authentication and role - use admin-scoped keys
@@ -230,9 +232,15 @@ export default function AdminManagement() {
       </div>
 
       {/* Create Admin Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+      {createModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          data-state={showCreateModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-lg p-6 w-full max-w-md"
+            data-state={showCreateModal ? 'open' : 'closed'}
+          >
             <h2 className="text-xl font-bold mb-4">Create New Admin</h2>
             <form onSubmit={handleCreateAdmin} className="space-y-4">
               <div>

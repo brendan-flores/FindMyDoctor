@@ -5,6 +5,7 @@ import { secretaryApi, QueueEntry, SecretaryProfile } from '@/lib/api/secretaryA
 import Toast from '@/components/ui/Toast';
 import BillingPanel from '@/components/BillingPanel';
 import Select from '@/components/ui/Select';
+import { usePresence } from '@/hooks/usePresence';
 
 
 
@@ -62,6 +63,7 @@ export default function SecretaryQueue() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerPresent = usePresence(showDatePicker);
   const [showBillingPanel, setShowBillingPanel] = useState(false);
   const [billingPanelData, setBillingPanelData] = useState<{
     paymentId: string;
@@ -332,8 +334,11 @@ export default function SecretaryQueue() {
           <span className="material-symbols-outlined text-[18px] text-slate-400">expand_more</span>
         </button>
 
-        {showDatePicker && (
-          <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-lg shadow-lg p-4 z-50 w-72">
+        {datePickerPresent && (
+          <div
+            data-state={showDatePicker ? 'open' : 'closed'}
+            className="fmd-dropdown absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-lg shadow-lg p-4 z-50 w-72"
+          >
             <div className="flex items-center justify-between mb-4">
               <button onClick={previousMonth} className="p-1 hover:bg-slate-100 rounded">
                 <span className="material-symbols-outlined text-[20px] text-slate-600">chevron_left</span>

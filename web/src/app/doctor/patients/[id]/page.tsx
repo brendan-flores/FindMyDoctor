@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { doctorApi, Patient, Visit, Prescription } from '@/lib/api/doctorApi';
+import { usePresence } from '@/hooks/usePresence';
 
 export default function PatientDetails() {
   const router = useRouter();
@@ -16,6 +17,8 @@ export default function PatientDetails() {
   const [error, setError] = useState<string | null>(null);
   const [showEditVisitModal, setShowEditVisitModal] = useState(false);
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
+  const editVisitModalOpen = showEditVisitModal && !!selectedVisit;
+  const editVisitModalPresent = usePresence(editVisitModalOpen);
   const [isEditingVisit, setIsEditingVisit] = useState(false);
   const [editVisitError, setEditVisitError] = useState<string | null>(null);
   const [showPatientNotified, setShowPatientNotified] = useState(false);
@@ -114,7 +117,6 @@ export default function PatientDetails() {
 
       if (response.success) {
         setShowEditVisitModal(false);
-        setSelectedVisit(null);
         setVisitFormData({
           reasonForVisit: '',
           diagnosis: '',
@@ -438,9 +440,15 @@ export default function PatientDetails() {
       </div>
 
       {/* Edit Visit Modal */}
-      {showEditVisitModal && selectedVisit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      {editVisitModalPresent && selectedVisit && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          data-state={editVisitModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            data-state={editVisitModalOpen ? 'open' : 'closed'}
+          >
             <div className="p-6 border-b border-slate-100">
               <div className="flex items-center justify-between">
                 <div>
@@ -452,7 +460,6 @@ export default function PatientDetails() {
                 <button
                   onClick={() => {
                     setShowEditVisitModal(false);
-                    setSelectedVisit(null);
                     setEditVisitError(null);
                   }}
                   className="text-slate-400 hover:text-slate-600"
@@ -550,7 +557,6 @@ export default function PatientDetails() {
               <button
                 onClick={() => {
                   setShowEditVisitModal(false);
-                  setSelectedVisit(null);
                   setEditVisitError(null);
                 }}
                 className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { adminApi, Secretary } from '@/lib/api/adminApi';
 import Select from '@/components/ui/Select';
+import { usePresence } from '@/hooks/usePresence';
 
 export default function SecretaryManagement() {
   const [secretaries, setSecretaries] = useState<Secretary[]>([]);
@@ -14,6 +15,12 @@ export default function SecretaryManagement() {
   const [selectedSecretary, setSelectedSecretary] = useState<Secretary | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordResult, setPasswordResult] = useState<{ email: string; temporaryPassword: string } | null>(null);
+
+  const deactivateModalOpen = showDeactivateModal && !!selectedSecretary;
+  const passwordModalOpen = showPasswordModal && !!passwordResult;
+  const createModalPresent = usePresence(showCreateModal);
+  const deactivateModalPresent = usePresence(deactivateModalOpen);
+  const passwordModalPresent = usePresence(passwordModalOpen);
 
   useEffect(() => {
     loadSecretaries();
@@ -73,7 +80,6 @@ export default function SecretaryManagement() {
       if (response.success) {
         loadSecretaries();
         setShowDeactivateModal(false);
-        setSelectedSecretary(null);
       }
     } catch (error) {
       console.error('Failed to deactivate secretary:', error);
@@ -297,9 +303,15 @@ export default function SecretaryManagement() {
       </div>
 
       {/* Create Secretary Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      {createModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          data-state={showCreateModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            data-state={showCreateModal ? 'open' : 'closed'}
+          >
             <div className="p-6 border-b border-slate-200">
               <h2 className="text-lg font-bold text-slate-900">Add New Secretary</h2>
               <p className="text-sm text-slate-500 mt-1">Create a new secretary account and associate with a doctor</p>
@@ -324,9 +336,15 @@ export default function SecretaryManagement() {
       )}
 
       {/* Deactivate Confirmation Modal */}
-      {showDeactivateModal && selectedSecretary && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-xl">
+      {deactivateModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          data-state={deactivateModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl max-w-md w-full shadow-xl"
+            data-state={deactivateModalOpen ? 'open' : 'closed'}
+          >
             <div className="p-6 border-b border-slate-200">
               <h2 className="text-lg font-bold text-slate-900">Deactivate Secretary Account</h2>
               <p className="text-sm text-slate-500 mt-1">Are you sure you want to deactivate this secretary?</p>
@@ -346,7 +364,6 @@ export default function SecretaryManagement() {
               <button
                 onClick={() => {
                   setShowDeactivateModal(false);
-                  setSelectedSecretary(null);
                 }}
                 className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors"
               >
@@ -364,9 +381,15 @@ export default function SecretaryManagement() {
       )}
 
       {/* Password Reset Result Modal */}
-      {showPasswordModal && passwordResult && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-xl">
+      {passwordModalPresent && passwordResult && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          data-state={passwordModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl max-w-md w-full shadow-xl"
+            data-state={passwordModalOpen ? 'open' : 'closed'}
+          >
             <div className="p-6 border-b border-slate-200">
               <h2 className="text-lg font-bold text-slate-900">Temporary Credentials Generated</h2>
               <p className="text-sm text-slate-500 mt-1">New password for the secretary account</p>
@@ -388,8 +411,6 @@ export default function SecretaryManagement() {
               <button
                 onClick={() => {
                   setShowPasswordModal(false);
-                  setPasswordResult(null);
-                  setSelectedSecretary(null);
                 }}
                 className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors"
               >

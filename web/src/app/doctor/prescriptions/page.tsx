@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { doctorApi, Prescription, Patient } from '@/lib/api/doctorApi';
+import { usePresence } from '@/hooks/usePresence';
 
 export default function DoctorPrescriptions() {
   const router = useRouter();
@@ -12,6 +13,8 @@ export default function DoctorPrescriptions() {
   const [error, setError] = useState<string | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
+  const viewModalOpen = showViewModal && !!selectedPrescription;
+  const viewModalPresent = usePresence(viewModalOpen);
 
   useEffect(() => {
     fetchDoctorProfile();
@@ -265,9 +268,15 @@ export default function DoctorPrescriptions() {
       </div>
 
       {/* View Prescription Modal */}
-      {showViewModal && selectedPrescription && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      {viewModalPresent && selectedPrescription && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          data-state={viewModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+            data-state={viewModalOpen ? 'open' : 'closed'}
+          >
             <div className="p-6 border-b border-slate-100">
               <div className="flex items-center justify-between">
                 <div>
@@ -279,7 +288,6 @@ export default function DoctorPrescriptions() {
                 <button
                   onClick={() => {
                     setShowViewModal(false);
-                    setSelectedPrescription(null);
                   }}
                   className="text-slate-400 hover:text-slate-600"
                 >

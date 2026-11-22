@@ -945,6 +945,8 @@ The schedule module manages:
 
 Doctors may create, edit, and delete weekly working hours. Authorized secretaries may view, but not create, edit, or delete, their assigned doctor's weekly working hours; they may add, edit, and delete the assigned doctor's exceptions and break periods. Schedule writes are restricted to the authenticated doctor's own records or the secretary's assigned doctor (`secretaries.doctor_id`); unauthorized access returns 404. Validate start <= end, require breaks to fall within working hours, and prevent overlapping breaks.
 
+Date selection in schedule modals follows a future-only creation rule: when creating a new record (e.g., Add Exception on the Doctor `/doctor/schedule` or Secretary `/secretary/schedule` pages), dates before today are disabled in the date picker and form submission is rejected with an inline validation error if a past date is submitted. Edit-mode modals are exempt: past or current dates remain valid and submittable for existing records. The capacity date selector and non-schedule pickers (e.g., patient date of birth) are unaffected.
+
 Before saving an exception or break-period change that affects dates with active appointments, warn the doctor or secretary with the number of affected appointments and require explicit confirmation. After confirmation, save the change and notify affected patients through the notification module. Do not automatically cancel affected appointments; the secretary handles them through the existing cancellation and rescheduling flows.
 
 The default consultation duration is:

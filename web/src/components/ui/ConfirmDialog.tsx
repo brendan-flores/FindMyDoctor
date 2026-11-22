@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { usePresence } from '@/hooks/usePresence';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -31,6 +32,7 @@ export default function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const present = usePresence(open);
 
   useEffect(() => {
     if (!open) return;
@@ -47,16 +49,18 @@ export default function ConfirmDialog({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, busy, onCancel]);
 
-  if (!open) return null;
+  if (!present) return null;
 
   const confirmClasses =
     confirmVariant === 'danger'
       ? 'bg-rose-600 text-white hover:bg-rose-700'
       : 'bg-[#1A62CD] text-white hover:bg-[#1550A8]';
+  const state = open ? 'open' : 'closed';
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fmd-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      data-state={state}
       role="presentation"
     >
       <div
@@ -64,7 +68,8 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-message"
-        className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
+        className="fmd-modal-panel bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
+        data-state={state}
       >
         <h3 id="confirm-dialog-title" className="text-lg font-bold text-slate-800">
           {title}

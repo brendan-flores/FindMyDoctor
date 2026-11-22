@@ -336,6 +336,8 @@ Doctors may create, edit, and delete weekly working hours, exceptions, and break
 
 Schedule changes must follow the doctor schedule validation rules: start <= end, breaks must fall within working hours, and breaks must not overlap. Before saving an exception or break-period change that affects dates with active appointments, the system must show the secretary or doctor the number of affected appointments and require explicit confirmation. After confirmation, the change is saved and affected patients are notified through the notification module. Appointments are not automatically cancelled; the secretary handles them through the existing cancel and reschedule flows.
 
+When creating a new exception or break period, the date picker must not allow past dates and submission must be rejected with a validation error if a past date is somehow submitted. This restriction applies only to creation; editing an existing record may use past or current dates. Exception and break-period lists and tab counters show only records dated today or later.
+
 ---
 
 # 9. Appointment and Reservation Rules
