@@ -9,6 +9,7 @@ import {
   isInvalidSecretarySessionStatus,
 } from '@/lib/auth/secretarySession';
 import Toast from '@/components/ui/Toast';
+import { usePresence } from '@/hooks/usePresence';
 import {
   formatPhoneFieldInput,
   phoneFieldValueFromStored,
@@ -27,6 +28,7 @@ export default function SecretaryCompleteProfile() {
   const [contactWarning, setContactWarning] = useState<string | null>(null);
   const [contactError, setContactError] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const successModalPresent = usePresence(showSuccessModal);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const router = useRouter();
 
@@ -283,9 +285,15 @@ export default function SecretaryCompleteProfile() {
       </div>
 
       {/* Success Modal */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 text-center">
+      {successModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          data-state={showSuccessModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl max-w-md w-full p-6 text-center"
+            data-state={showSuccessModal ? 'open' : 'closed'}
+          >
             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>

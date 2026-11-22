@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import DoctorSidebar from '@/components/layout/DoctorSidebar';
 import DoctorHeader from '@/components/layout/DoctorHeader';
+import PageTransition from '@/components/PageTransition';
 import { apiClient } from '@/lib/api/apiClient';
 
 interface DoctorLayoutProps {
@@ -85,7 +86,7 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
   }
 
   if (isPublicPage) {
-    return <>{children}</>;
+    return <PageTransition>{children}</PageTransition>;
   }
 
   return (
@@ -94,7 +95,7 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
       <DoctorHeader userName={userName} userRole={userRole} />
       <main className="ml-64 pt-20 bg-[#f8f9ff] p-6">
         <div className="max-w-[1600px] mx-auto">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </div>
       </main>
     </div>

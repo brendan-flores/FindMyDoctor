@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Toast from '@/components/ui/Toast';
 import Select from '@/components/ui/Select';
 import { consultationApi, type ConsultationContext, type ConsultationPrescription, type MedicationInput } from '@/lib/api/consultationApi';
+import { usePresence } from '@/hooks/usePresence';
 
 interface ConsultationWorkspaceProps {
   appointmentId: string;
@@ -175,6 +176,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
   const [isSavingVisit, setIsSavingVisit] = useState(false);
 
   const [voidTarget, setVoidTarget] = useState<ConsultationPrescription | null>(null);
+  const voidModalPresent = usePresence(!!voidTarget);
   const [voidReason, setVoidReason] = useState('');
   const [isVoiding, setIsVoiding] = useState(false);
 
@@ -1580,9 +1582,15 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
       )}
 
       {/* Void modal */}
-      {voidTarget && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+      {voidModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4"
+          data-state={voidTarget ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4"
+            data-state={voidTarget ? 'open' : 'closed'}
+          >
             <div>
               <h3 className="text-lg font-semibold text-slate-900">Void this prescription?</h3>
               <p className="text-sm text-slate-500 mt-1">

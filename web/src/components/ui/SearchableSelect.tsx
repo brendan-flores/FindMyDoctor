@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useId, useMemo } from 'react';
+import { usePresence } from '@/hooks/usePresence';
 
 export interface SelectOption {
   value: string;
@@ -44,6 +45,7 @@ export default function SearchableSelect({
   }, [options]);
 
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownPresent = usePresence(isOpen);
   const [searchQuery, setSearchQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
 
@@ -237,13 +239,14 @@ export default function SearchableSelect({
         </div>
       </div>
 
-      {isOpen && (
+      {dropdownPresent && (
         <ul
           id={`${id}-listbox`}
           ref={listRef}
           role="listbox"
           tabIndex={-1}
-          className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg bg-white shadow-xl border border-slate-200 focus:outline-none"
+          data-state={isOpen ? 'open' : 'closed'}
+          className="fmd-dropdown absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg bg-white shadow-xl border border-slate-200 focus:outline-none"
         >
           {filteredOptions.length === 0 ? (
             <li className="px-4 py-3 text-center text-sm text-slate-400">

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
+import { usePresence } from '@/hooks/usePresence';
 
 interface DoctorHeaderProps {
   userName?: string;
@@ -11,6 +12,7 @@ interface DoctorHeaderProps {
 
 export default function DoctorHeader({ userName = 'Dr. Smith', userRole = 'Doctor' }: DoctorHeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownPresent = usePresence(isDropdownOpen);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -124,8 +126,11 @@ export default function DoctorHeader({ userName = 'Dr. Smith', userRole = 'Docto
           </button>
 
           {/* Dropdown Menu */}
-          {isDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg border border-slate-200 shadow-lg py-1 z-50">
+          {dropdownPresent && (
+            <div
+              data-state={isDropdownOpen ? 'open' : 'closed'}
+              className="fmd-dropdown absolute right-0 top-full mt-2 w-48 bg-white rounded-lg border border-slate-200 shadow-lg py-1 z-50"
+            >
               <button
                 onClick={handleViewProfile}
                 className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"

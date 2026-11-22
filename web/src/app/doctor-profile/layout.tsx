@@ -1,7 +1,9 @@
+import PageTransition from '@/components/PageTransition';
+
 export default function DoctorProfileLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return <PageTransition>{children}</PageTransition>;
 }

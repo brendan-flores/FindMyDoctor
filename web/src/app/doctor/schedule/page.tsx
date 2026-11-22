@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api/apiClient';
 import Toast from '@/components/ui/Toast';
 import { scheduleChangesApi, isPendingResponse, pendingRequestDateLabel, pendingSummaryText, type ScheduleChangeRequest } from '@/lib/api/scheduleChangesApi';
+import { usePresence } from '@/hooks/usePresence';
 
 const DAYS_OF_WEEK = [
   { value: 0, label: 'Sunday' },
@@ -88,6 +89,11 @@ export default function DoctorSchedule() {
   const [unavailability, setUnavailability] = useState<DoctorUnavailability[]>([]);
   const [breakPeriods, setBreakPeriods] = useState<DoctorBreakPeriod[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const todayDateString = (() => {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  })();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<DoctorSchedule | null>(null);
@@ -145,6 +151,22 @@ export default function DoctorSchedule() {
   const [showExceptionStartDatePicker, setShowExceptionStartDatePicker] = useState(false);
   const [showExceptionEditStartDatePicker, setShowExceptionEditStartDatePicker] = useState(false);
 
+  const editModalOpen = showEditModal && !!editingSchedule;
+  const deleteModalOpen = showDeleteModal && !!deletingSchedule;
+  const exceptionEditModalOpen = showExceptionEditModal && !!editingException;
+  const exceptionDeleteModalOpen = showExceptionDeleteModal && !!deletingException;
+  const breakEditModalOpen = showBreakEditModal && !!editingBreak;
+  const breakDeleteModalOpen = showBreakDeleteModal && !!deletingBreak;
+  const addModalPresent = usePresence(showAddModal);
+  const editModalPresent = usePresence(editModalOpen);
+  const deleteModalPresent = usePresence(deleteModalOpen);
+  const exceptionAddModalPresent = usePresence(showExceptionAddModal);
+  const exceptionEditModalPresent = usePresence(exceptionEditModalOpen);
+  const exceptionDeleteModalPresent = usePresence(exceptionDeleteModalOpen);
+  const breakAddModalPresent = usePresence(showBreakAddModal);
+  const breakEditModalPresent = usePresence(breakEditModalOpen);
+  const breakDeleteModalPresent = usePresence(breakDeleteModalOpen);
+
   // Pending schedule-change requests (awaiting secretary confirmation)
   const [pendingRequests, setPendingRequests] = useState<ScheduleChangeRequest[]>([]);
 
@@ -192,6 +214,17 @@ export default function DoctorSchedule() {
   const pendingBreakCreates = pendingRequests.filter(r => r.changeType === 'BREAK' && r.operation === 'CREATE');
   const pendingTargetFor = (targetId: string) =>
     pendingRequests.find(r => r.targetId === targetId && (r.operation === 'UPDATE' || r.operation === 'DELETE')) ?? null;
+
+  // Lists show records dated today or later (active and inactive); badges count active ones only.
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+  const visibleExceptions = unavailability.filter((u) => {
+    const [y, m, d] = u.start_date.split('T')[0].split('-').map(Number);
+    return new Date(y, m - 1, d) >= todayMidnight;
+  });
+  const visibleBreaks = breakPeriods.filter((b) => new Date(b.break_date) >= todayMidnight);
+  const activeVisibleExceptionCount = visibleExceptions.filter((u) => u.is_active).length;
+  const activeVisibleBreakCount = visibleBreaks.filter((b) => b.is_active).length;
 
   const fetchSchedules = async () => {
     setLoading(true);
@@ -251,15 +284,18 @@ export default function DoctorSchedule() {
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
+    setSaving(true);
     setError(null);
     setSuccess(null);
 
     const response = await apiClient.post<DoctorSchedule>('/doctors/me/schedules', formData);
+    setSaving(false);
     if (response.success && response.data) {
       setSuccess('Schedule created successfully');
       setShowAddModal(false);
       setFormData({ dayOfWeek: 1, startTime: '08:00', endTime: '17:00', consultationDurationMinutes: 30 });
-      fetchSchedules();
+      setSchedules((prev) => [...prev, response.data as DoctorSchedule]);
       // Notify sidebar to refresh the setup progress card
       window.dispatchEvent(new CustomEvent('schedulesUpdated'));
     } else {
@@ -272,31 +308,35 @@ export default function DoctorSchedule() {
     setError(null);
     setSuccess(null);
 
-    if (!editingSchedule) return;
+    if (!editingSchedule || saving) return;
+    setSaving(true);
 
     const response = await apiClient.put<DoctorSchedule>(`/doctors/me/schedules/${editingSchedule.id}`, formData);
+    setSaving(false);
     if (response.success && response.data) {
       setSuccess('Schedule updated successfully');
       setShowEditModal(false);
       setEditingSchedule(null);
-      fetchSchedules();
+      setSchedules((prev) => prev.map((s) => (s.id === editingSchedule.id ? (response.data as DoctorSchedule) : s)));
     } else {
       setError(response.error || 'Failed to update schedule');
     }
   };
 
   const handleDeleteSchedule = async () => {
-    if (!deletingSchedule) return;
+    if (!deletingSchedule || saving) return;
+    setSaving(true);
 
     setError(null);
     setSuccess(null);
 
     const response = await apiClient.delete<DoctorSchedule>(`/doctors/me/schedules/${deletingSchedule.id}`);
+    setSaving(false);
     if (response.success && response.data) {
       setSuccess('Schedule deleted successfully');
       setShowDeleteModal(false);
       setDeletingSchedule(null);
-      fetchSchedules();
+      setSchedules((prev) => prev.filter((s) => s.id !== deletingSchedule.id));
       // Notify sidebar to refresh the setup progress card
       window.dispatchEvent(new CustomEvent('schedulesUpdated'));
     } else {
@@ -323,6 +363,16 @@ export default function DoctorSchedule() {
   // Exception handlers
   const handleExceptionAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
+    if (!exceptionFormData.date) {
+      setError('Please select a date for the exception.');
+      return;
+    }
+    if (exceptionFormData.date < todayDateString) {
+      setError('Exceptions cannot be scheduled for a past date.');
+      return;
+    }
+    setSaving(true);
     setError(null);
     setSuccess(null);
 
@@ -340,15 +390,16 @@ export default function DoctorSchedule() {
         setShowExceptionAddModal(false);
         setExceptionFormData({ date: '', reason: '' });
         fetchPendingRequests();
-        return;
+      } else {
+        setSuccess('Exception created successfully');
+        setShowExceptionAddModal(false);
+        setExceptionFormData({ date: '', reason: '' });
+        setUnavailability((prev) => [...prev, response.data as DoctorUnavailability]);
       }
-      setSuccess('Exception created successfully');
-      setShowExceptionAddModal(false);
-      setExceptionFormData({ date: '', reason: '' });
-      fetchUnavailability();
     } else {
       setError(response.error || 'Failed to create exception');
     }
+    setSaving(false);
   };
 
   const handleExceptionEditSubmit = async (e: React.FormEvent) => {
@@ -356,7 +407,8 @@ export default function DoctorSchedule() {
     setError(null);
     setSuccess(null);
 
-    if (!editingException) return;
+    if (!editingException || saving) return;
+    setSaving(true);
 
     // Use the same date for both start and end (single-day exception)
     const payload = {
@@ -372,19 +424,21 @@ export default function DoctorSchedule() {
         setShowExceptionEditModal(false);
         setEditingException(null);
         fetchPendingRequests();
-        return;
+      } else {
+        setSuccess('Exception updated successfully');
+        setShowExceptionEditModal(false);
+        setEditingException(null);
+        setUnavailability((prev) => prev.map((u) => (u.id === editingException.id ? (response.data as DoctorUnavailability) : u)));
       }
-      setSuccess('Exception updated successfully');
-      setShowExceptionEditModal(false);
-      setEditingException(null);
-      fetchUnavailability();
     } else {
       setError(response.error || 'Failed to update exception');
     }
+    setSaving(false);
   };
 
   const handleExceptionDelete = async () => {
-    if (!deletingException) return;
+    if (!deletingException || saving) return;
+    setSaving(true);
 
     setError(null);
     setSuccess(null);
@@ -396,15 +450,16 @@ export default function DoctorSchedule() {
         setShowExceptionDeleteModal(false);
         setDeletingException(null);
         fetchPendingRequests();
-        return;
+      } else {
+        setSuccess('Exception deleted successfully');
+        setShowExceptionDeleteModal(false);
+        setDeletingException(null);
+        setUnavailability((prev) => prev.filter((u) => u.id !== deletingException.id));
       }
-      setSuccess('Exception deleted successfully');
-      setShowExceptionDeleteModal(false);
-      setDeletingException(null);
-      fetchUnavailability();
     } else {
       setError(response.error || 'Failed to delete exception');
     }
+    setSaving(false);
   };
 
   const openExceptionEditModal = (exception: DoctorUnavailability) => {
@@ -424,6 +479,8 @@ export default function DoctorSchedule() {
   // Break period handlers
   const handleBreakAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
+    setSaving(true);
     setError(null);
     setSuccess(null);
 
@@ -450,15 +507,16 @@ export default function DoctorSchedule() {
         setShowBreakAddModal(false);
         setBreakFormData({ breakDate: '', dayOfWeek: 1, startTime: '12:00', endTime: '13:00', reason: '' });
         fetchPendingRequests();
-        return;
+      } else {
+        setSuccess('Break period created successfully');
+        setShowBreakAddModal(false);
+        setBreakFormData({ breakDate: '', dayOfWeek: 1, startTime: '12:00', endTime: '13:00', reason: '' });
+        setBreakPeriods((prev) => [...prev, response.data as DoctorBreakPeriod]);
       }
-      setSuccess('Break period created successfully');
-      setShowBreakAddModal(false);
-      setBreakFormData({ breakDate: '', dayOfWeek: 1, startTime: '12:00', endTime: '13:00', reason: '' });
-      fetchBreakPeriods();
     } else {
       setError(response.error || 'Failed to create break period');
     }
+    setSaving(false);
   };
 
   const handleBreakEditSubmit = async (e: React.FormEvent) => {
@@ -466,7 +524,8 @@ export default function DoctorSchedule() {
     setError(null);
     setSuccess(null);
 
-    if (!editingBreak) return;
+    if (!editingBreak || saving) return;
+    setSaving(true);
 
     // Convert dayOfWeek to a date
     const today = new Date();
@@ -491,19 +550,21 @@ export default function DoctorSchedule() {
         setShowBreakEditModal(false);
         setEditingBreak(null);
         fetchPendingRequests();
-        return;
+      } else {
+        setSuccess('Break period updated successfully');
+        setShowBreakEditModal(false);
+        setEditingBreak(null);
+        setBreakPeriods((prev) => prev.map((b) => (b.id === editingBreak.id ? (response.data as DoctorBreakPeriod) : b)));
       }
-      setSuccess('Break period updated successfully');
-      setShowBreakEditModal(false);
-      setEditingBreak(null);
-      fetchBreakPeriods();
     } else {
       setError(response.error || 'Failed to update break period');
     }
+    setSaving(false);
   };
 
   const handleBreakDelete = async () => {
-    if (!deletingBreak) return;
+    if (!deletingBreak || saving) return;
+    setSaving(true);
 
     setError(null);
     setSuccess(null);
@@ -515,15 +576,16 @@ export default function DoctorSchedule() {
         setShowBreakDeleteModal(false);
         setDeletingBreak(null);
         fetchPendingRequests();
-        return;
+      } else {
+        setSuccess('Break period deleted successfully');
+        setShowBreakDeleteModal(false);
+        setDeletingBreak(null);
+        setBreakPeriods((prev) => prev.filter((b) => b.id !== deletingBreak.id));
       }
-      setSuccess('Break period deleted successfully');
-      setShowBreakDeleteModal(false);
-      setDeletingBreak(null);
-      fetchBreakPeriods();
     } else {
       setError(response.error || 'Failed to delete break period');
     }
+    setSaving(false);
   };
 
   const openBreakEditModal = (breakPeriod: DoctorBreakPeriod) => {
@@ -626,7 +688,8 @@ export default function DoctorSchedule() {
     return new Date(year, month, 1).getDay();
   };
 
-  const DatePicker = ({ value, onChange, showPicker, setShowPicker, disabledDates }: { value: string, onChange: (date: string) => void, showPicker: boolean, setShowPicker: (show: boolean) => void, disabledDates?: string[] }) => {
+  const DatePicker = ({ value, onChange, showPicker, setShowPicker, disabledDates, minDate }: { value: string, onChange: (date: string) => void, showPicker: boolean, setShowPicker: (show: boolean) => void, disabledDates?: string[], minDate?: string }) => {
+    const pickerPresent = usePresence(showPicker);
     const currentDate = value ? (() => {
       const [year, month, day] = value.split('-').map(Number);
       return new Date(year, month - 1, day);
@@ -646,7 +709,7 @@ export default function DoctorSchedule() {
 
     const isDateDisabled = (day: number) => {
       const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      return disabledDates?.includes(dateStr);
+      return (minDate !== undefined && dateStr < minDate) || !!disabledDates?.includes(dateStr);
     };
 
     const handlePreviousMonth = () => {
@@ -691,8 +754,11 @@ export default function DoctorSchedule() {
           <span>{formatDate(value)}</span>
           <span className="material-symbols-outlined text-blue-600 absolute right-6 text-[20px]">calendar_today</span>
         </div>
-        {showPicker && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-200 p-4 z-10">
+        {pickerPresent && (
+          <div
+            data-state={showPicker ? 'open' : 'closed'}
+            className="fmd-dropdown absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-200 p-4 z-10"
+          >
             <div className="flex items-center justify-between mb-4">
               <button
                 type="button"
@@ -851,7 +917,7 @@ export default function DoctorSchedule() {
               <span className="material-symbols-outlined text-[20px]">event_busy</span>
               Exceptions
               <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-semibold">
-                {unavailability.filter(u => u.is_active).length}
+                {activeVisibleExceptionCount}
               </span>
             </span>
           </button>
@@ -867,7 +933,7 @@ export default function DoctorSchedule() {
               <span className="material-symbols-outlined text-[20px]">free_breakfast</span>
               Break Periods
               <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-xs font-semibold">
-                {breakPeriods.filter(b => b.is_active).length}
+                {activeVisibleBreakCount}
               </span>
             </span>
           </button>
@@ -1054,17 +1120,10 @@ export default function DoctorSchedule() {
         )}
 
         <div className="divide-y divide-slate-200">
-          {unavailability.length === 0 ? (
+          {visibleExceptions.length === 0 ? (
             <div className="p-8 text-center text-slate-500">No exceptions configured</div>
           ) : (
-            unavailability
-              .filter((exception) => {
-                const [year, month, day] = exception.start_date.split('T')[0].split('-').map(Number);
-                const exceptionDate = new Date(year, month - 1, day);
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                return exceptionDate >= today;
-              })
+            visibleExceptions
               .map((exception) => {
               const [year, month, day] = exception.start_date.split('T')[0].split('-').map(Number);
               const date = new Date(year, month - 1, day);
@@ -1179,16 +1238,10 @@ export default function DoctorSchedule() {
         )}
 
         <div className="divide-y divide-slate-200">
-          {breakPeriods.length === 0 ? (
+          {visibleBreaks.length === 0 ? (
             <div className="p-8 text-center text-slate-500">No break periods configured</div>
           ) : (
-            breakPeriods
-              .filter((breakPeriod) => {
-                const breakDate = new Date(breakPeriod.break_date);
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                return breakDate >= today;
-              })
+            visibleBreaks
               .map((breakPeriod) => {
               const breakDate = new Date(breakPeriod.break_date);
               const dayName = breakDate.toLocaleDateString('en-US', { weekday: 'long' });
@@ -1424,9 +1477,15 @@ export default function DoctorSchedule() {
       )}
 
       {/* Add Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+      {addModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
+          data-state={showAddModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100"
+            data-state={showAddModal ? 'open' : 'closed'}
+          >
             <h3 className="text-2xl font-bold text-slate-800 mb-6">Add Working Hours</h3>
             <form onSubmit={handleAddSubmit} className="space-y-4">
               <div>
@@ -1587,9 +1646,10 @@ export default function DoctorSchedule() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
+                  disabled={saving}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
                 >
-                  Add Schedule
+                  {saving ? 'Saving...' : 'Add Schedule'}
                 </button>
               </div>
             </form>
@@ -1598,9 +1658,15 @@ export default function DoctorSchedule() {
       )}
 
       {/* Edit Modal */}
-      {showEditModal && editingSchedule && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+      {editModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
+          data-state={editModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100"
+            data-state={editModalOpen ? 'open' : 'closed'}
+          >
             <h3 className="text-2xl font-bold text-slate-800 mb-6">Edit Working Hours</h3>
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
@@ -1726,9 +1792,10 @@ export default function DoctorSchedule() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
+                  disabled={saving}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
                 >
-                  Update Schedule
+                  {saving ? 'Saving...' : 'Update Schedule'}
                 </button>
               </div>
             </form>
@@ -1737,9 +1804,15 @@ export default function DoctorSchedule() {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && deletingSchedule && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+      {deleteModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
+          data-state={deleteModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100"
+            data-state={deleteModalOpen ? 'open' : 'closed'}
+          >
             <h3 className="text-2xl font-bold text-slate-800 mb-3">Delete Schedule</h3>
             <p className="text-slate-600 mb-8 text-base">
               Are you sure you want to delete this schedule? It will be permanently removed.
@@ -1756,9 +1829,10 @@ export default function DoctorSchedule() {
               </button>
               <button
                 onClick={handleDeleteSchedule}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
+                disabled={saving}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
               >
-                Delete
+                {saving ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
@@ -1766,9 +1840,15 @@ export default function DoctorSchedule() {
       )}
 
       {/* Exception Add Modal */}
-      {showExceptionAddModal && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+      {exceptionAddModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
+          data-state={showExceptionAddModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100"
+            data-state={showExceptionAddModal ? 'open' : 'closed'}
+          >
             <h3 className="text-2xl font-bold text-slate-800 mb-6">Add Exception</h3>
             <form onSubmit={handleExceptionAddSubmit} className="space-y-4">
               <div>
@@ -1779,6 +1859,7 @@ export default function DoctorSchedule() {
                   showPicker={showExceptionStartDatePicker}
                   setShowPicker={setShowExceptionStartDatePicker}
                   disabledDates={unavailability.filter(u => u.is_active).map(u => u.start_date.split('T')[0])}
+                  minDate={todayDateString}
                 />
               </div>
               <div>
@@ -1801,9 +1882,10 @@ export default function DoctorSchedule() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
+                  disabled={saving}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
                 >
-                  Add Exception
+                  {saving ? 'Saving...' : 'Add Exception'}
                 </button>
               </div>
             </form>
@@ -1812,9 +1894,15 @@ export default function DoctorSchedule() {
       )}
 
       {/* Exception Edit Modal */}
-      {showExceptionEditModal && editingException && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+      {exceptionEditModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
+          data-state={exceptionEditModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100"
+            data-state={exceptionEditModalOpen ? 'open' : 'closed'}
+          >
             <h3 className="text-2xl font-bold text-slate-800 mb-6">Edit Exception</h3>
             <form onSubmit={handleExceptionEditSubmit} className="space-y-4">
               <div>
@@ -1850,9 +1938,10 @@ export default function DoctorSchedule() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
+                  disabled={saving}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
                 >
-                  Update Exception
+                  {saving ? 'Saving...' : 'Update Exception'}
                 </button>
               </div>
             </form>
@@ -1861,9 +1950,15 @@ export default function DoctorSchedule() {
       )}
 
       {/* Exception Delete Confirmation Modal */}
-      {showExceptionDeleteModal && deletingException && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+      {exceptionDeleteModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
+          data-state={exceptionDeleteModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100"
+            data-state={exceptionDeleteModalOpen ? 'open' : 'closed'}
+          >
             <h3 className="text-2xl font-bold text-slate-800 mb-3">Delete Exception</h3>
             <p className="text-slate-600 mb-8 text-base">
               Are you sure you want to delete this exception? This action cannot be undone.
@@ -1880,9 +1975,10 @@ export default function DoctorSchedule() {
               </button>
               <button
                 onClick={handleExceptionDelete}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
+                disabled={saving}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
               >
-                Delete
+                {saving ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
@@ -1890,9 +1986,15 @@ export default function DoctorSchedule() {
       )}
 
       {/* Break Period Add Modal */}
-      {showBreakAddModal && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+      {breakAddModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
+          data-state={showBreakAddModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100"
+            data-state={showBreakAddModal ? 'open' : 'closed'}
+          >
             <h3 className="text-2xl font-bold text-slate-800 mb-6">Add Break Period</h3>
             <form onSubmit={handleBreakAddSubmit} className="space-y-4">
               <div>
@@ -2051,9 +2153,10 @@ export default function DoctorSchedule() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
+                  disabled={saving}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
                 >
-                  Add Break
+                  {saving ? 'Saving...' : 'Add Break'}
                 </button>
               </div>
             </form>
@@ -2062,9 +2165,15 @@ export default function DoctorSchedule() {
       )}
 
       {/* Break Period Edit Modal */}
-      {showBreakEditModal && editingBreak && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+      {breakEditModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
+          data-state={breakEditModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100"
+            data-state={breakEditModalOpen ? 'open' : 'closed'}
+          >
             <h3 className="text-2xl font-bold text-slate-800 mb-6">Edit Break Period</h3>
             <form onSubmit={handleBreakEditSubmit} className="space-y-4">
               <div>
@@ -2226,9 +2335,10 @@ export default function DoctorSchedule() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
+                  disabled={saving}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
                 >
-                  Update Break
+                  {saving ? 'Saving...' : 'Update Break'}
                 </button>
               </div>
             </form>
@@ -2237,9 +2347,15 @@ export default function DoctorSchedule() {
       )}
 
       {/* Break Period Delete Confirmation Modal */}
-      {showBreakDeleteModal && deletingBreak && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+      {breakDeleteModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
+          data-state={breakDeleteModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100"
+            data-state={breakDeleteModalOpen ? 'open' : 'closed'}
+          >
             <h3 className="text-2xl font-bold text-slate-800 mb-3">Delete Break Period</h3>
             <p className="text-slate-600 mb-8 text-base">
               Are you sure you want to delete this break period? This action cannot be undone.
@@ -2256,9 +2372,10 @@ export default function DoctorSchedule() {
               </button>
               <button
                 onClick={handleBreakDelete}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
+                disabled={saving}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
               >
-                Delete
+                {saving ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
