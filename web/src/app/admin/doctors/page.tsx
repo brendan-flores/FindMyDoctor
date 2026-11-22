@@ -316,21 +316,18 @@ export default function DoctorManagement() {
       {/* Doctors Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-center border-collapse">
             <colgroup>
-              <col className="w-[22%]" />
-              <col className="w-[16%]" />
-              <col className="w-[16%]" />
-              <col className="w-[22%]" />
-              <col className="w-[12%]" />
-              <col className="w-[12%]" />
+              <col className="w-[25%]" />
+              <col className="w-[25%]" />
+              <col className="w-[25%]" />
             </colgroup>
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Doctor</th>
                 <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Specialty</th>
                 <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">PRC License</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Practice</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap"></th>
                 <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Status</th>
                 <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Actions</th>
               </tr>
@@ -338,7 +335,7 @@ export default function DoctorManagement() {
             <tbody>
               {filteredDoctors.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-slate-500 text-sm">
+                  <td colSpan={5} className="px-5 py-10 text-center text-slate-500 text-sm">
                     No doctors found matching your criteria.
                   </td>
                 </tr>
@@ -358,7 +355,7 @@ export default function DoctorManagement() {
                       </div>
                     </td>
                     <td className="px-5 py-4 align-middle">
-                      <span className="block text-sm text-slate-700 truncate max-w-[180px]" title={doctor.specialty || undefined}>
+                      <span className="block text-sm text-slate-700 whitespace-nowrap" title={doctor.specialty || undefined}>
                         {doctor.specialty || 'N/A'}
                       </span>
                     </td>
@@ -368,19 +365,9 @@ export default function DoctorManagement() {
                       </span>
                     </td>
                     <td className="px-5 py-4 align-middle">
-                      <div className="min-w-0">
-                        <div className="text-sm text-slate-700 truncate max-w-[220px]" title={doctor.practiceName || undefined}>
-                          {doctor.practiceName || 'Not set'}
-                        </div>
-                        {doctor.practiceAddress && (
-                          <div className="text-xs text-slate-500 truncate max-w-[220px]" title={doctor.practiceAddress}>
-                            {doctor.practiceAddress}
-                          </div>
-                        )}
-                      </div>
                     </td>
-                    <td className="px-5 py-4 align-middle">
-                      <div className="flex items-center">
+                  <td className="px-5 py-4 align-middle">
+                    <div className="flex items-center">
                         {doctor.approvalStatus === 'ACTIVE' ? (
                           doctor.isActive === false ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 h-7 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
