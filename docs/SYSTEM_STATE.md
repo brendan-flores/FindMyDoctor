@@ -117,6 +117,21 @@ Current System State (November 2026):
 - Admin Doctor rejection endpoint `PATCH /api/v1/admin/doctors/:id/reject` requires a rejection reason (cannot be empty or null)
 - Backend Admin API endpoints `GET /api/v1/admin/doctors` and `GET /api/v1/admin/doctors/:id` return complete doctor profile fields including all professional information, middle name, contact number, profile completion status, and submission timestamp
 
+## Admin Audit Log
+- Admin Audit Log page at `/admin/audit-log` displays audit trail entries with filters for action type, actor, and date range
+- Audit log table uses `<colgroup>` for consistent column alignment with defined widths (Timestamp 18%, Actor 22%, Action 18%, Target 22%, Reason 20%)
+- Table headers and cells use consistent padding (`px-5 py-3.5` for headers, `px-5 py-4` for cells) with `align-middle` for vertical alignment
+- Action badges use `whitespace-nowrap` and fixed height `h-7` to prevent wrapping (e.g., "Approved Doctor" stays on one line)
+- Long email addresses and reasons use `truncate` with `title` tooltips for hover-to-view full text in the table
+- Date range filters use the shared DatePicker component (from feature 0055) with placeholder customization ("Start date", "End date") and width control via className prop (w-40)
+- Filter controls standardized to match Doctors and Secretaries pages with identical styling and layout
+- Each audit row is clickable with hover state and opens an Audit Details modal
+- Audit Details modal shows complete record: actor identity and role (email, role, user ID), target identity and role/type (email, role, type, user ID - or "—" if missing), action with badge and raw value, timestamp (formatted Asia/Manila + raw ISO), reason (full text or "Not provided"), and available metadata (JSON-formatted)
+- Modal preserves all filters, pagination, and audit records when closed
+- Missing data (target, reason) displays "—" or "Not provided" in both table and modal
+- Empty filtered result shows "No audit log entries found matching your criteria."
+- Network errors are logged to console without UI changes
+
 ## Patient Registration & Authentication
 - Patient registration uses email OTP verification via Supabase for account creation
 - Mobile patient sign-up collects separate first name, middle name (optional), last name, date of birth, sex, mobile number, address, email, username, and password
