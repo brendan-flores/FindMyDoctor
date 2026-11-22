@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/app_navigator.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 import 'app_spacing.dart';
@@ -34,6 +35,12 @@ class AppTheme {
         outlineVariant: AppColors.outlineVariant,
       ),
       scaffoldBackgroundColor: AppColors.background,
+      pageTransitionsTheme: PageTransitionsTheme(
+        builders: {
+          for (final platform in TargetPlatform.values)
+            platform: const AppPageTransitionsBuilder(),
+        },
+      ),
       fontFamily: AppTextStyles.fontFamily,
       textTheme: TextTheme(
         displayLarge: AppTextStyles.headlineLg,

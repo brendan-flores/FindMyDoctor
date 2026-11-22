@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/navigation/app_navigator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -428,7 +429,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     notification['related_entity_id']
                                         ?.toString();
                                 if (invoiceId != null && invoiceId.isNotEmpty) {
-                                  showModalBottomSheet(
+                                  AppNavigator.showAppModalBottomSheet(
                                     context: context,
                                     isScrollControlled: true,
                                     backgroundColor: Colors.transparent,

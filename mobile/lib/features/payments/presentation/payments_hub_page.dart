@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/navigation/app_navigator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -233,7 +234,7 @@ class _PaymentsHubPageState extends State<PaymentsHubPage> {
         return;
       }
 
-      showDialog(
+      AppNavigator.showAppDialog(
         context: context,
         builder: (_) => _ReceiptViewerDialog(imageUrl: signedUrl),
       );
@@ -258,7 +259,7 @@ class _PaymentsHubPageState extends State<PaymentsHubPage> {
       return;
     }
 
-    showModalBottomSheet(
+    AppNavigator.showAppModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

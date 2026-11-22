@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/navigation/app_navigator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -228,7 +229,7 @@ class _ReschedulePageState extends State<ReschedulePage> {
     final selected = _selectedDate;
     if (selected == null) return;
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await AppNavigator.showAppDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Reschedule appointment?'),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/navigation/app_navigator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -217,7 +218,7 @@ class _AiConversationHistoryPageState extends State<AiConversationHistoryPage> {
   }
 
   Future<void> _showActionSheet(Map<String, dynamic> conversation) async {
-    await showModalBottomSheet(
+    await AppNavigator.showAppModalBottomSheet(
       context: context,
       builder: (context) => Container(
         padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
@@ -248,7 +249,7 @@ class _AiConversationHistoryPageState extends State<AiConversationHistoryPage> {
 
   Future<void> _showRenameDialog(String conversationId, String currentTitle) async {
     final controller = TextEditingController(text: currentTitle);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await AppNavigator.showAppDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Rename conversation'),
@@ -324,7 +325,7 @@ class _AiConversationHistoryPageState extends State<AiConversationHistoryPage> {
   }
 
   Future<void> _showDeleteConfirmation(String conversationId) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await AppNavigator.showAppDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete conversation'),
