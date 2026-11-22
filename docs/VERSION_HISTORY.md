@@ -24,8 +24,15 @@ This document contains the complete version history for the FindMyDoctor applica
 - Table readability improved with consistent column widths and alignment.
 - Filter section layout matches the Doctors and Secretaries pages for portal consistency.
 - Audit records are now fully accessible through the details modal, showing complete metadata and reason text.
+- Shared DatePicker component enhanced with className prop for width control and placeholder customization.
+- DatePicker timezone handling fixed to use string-based YYYY-MM-DD comparison, preventing incorrect date disabling due to timezone offsets.
+- DatePicker calendar styling fixed with px-1 padding on day buttons to prevent date overlap and w-72 fixed width for dropdown.
 
-**Bug Fixes:** None
+**Bug Fixes:**
+- DatePicker maxDate comparison was incorrectly disabling valid dates (e.g., dates 22-28 greyed out on Nov 22, 2026) due to timezone offset issues; fixed by using string comparison instead of Date object comparison.
+- DatePicker calendar day buttons were overlapping for two-digit dates (22-30); fixed by adding px-1 horizontal padding.
+- DatePicker dropdown was not properly positioned; fixed with z-50 and left-0 positioning.
+- Audit log date picker labels ("From:" and "To:") were overlapping with date picker buttons; fixed by using className prop with w-40 width and whitespace-nowrap on labels.
 
 **Removed/Modified Functionality:** None
 
