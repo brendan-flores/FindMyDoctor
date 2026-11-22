@@ -3,12 +3,34 @@
 import { useEffect, useState } from 'react';
 import { adminApi, User } from '@/lib/api/adminApi';
 import Select from '@/components/ui/Select';
+import { usePresenceValue } from '@/hooks/usePresence';
+
+function userDisplayName(user: User): string {
+  const fullName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
+  return fullName.length > 0 ? fullName : user.email.split('@')[0];
+}
+
+function userInitials(user: User): string {
+  const name = userDisplayName(user);
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0][0]?.toUpperCase() ?? '?';
+  return `${parts[0][0] ?? ''}${parts[parts.length - 1][0] ?? ''}`.toUpperCase();
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString();
+}
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const { present: detailsPresent, value: detailsUser } = usePresenceValue(selectedUser);
 
   useEffect(() => {
     loadUsers();
@@ -28,7 +50,10 @@ export default function UserManagement() {
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      user.email.toLowerCase().includes(term) ||
+      userDisplayName(user).toLowerCase().includes(term);
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     return matchesSearch && matchesRole;
   });
@@ -163,7 +188,6 @@ export default function UserManagement() {
                 <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">User</th>
                 <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Email</th>
                 <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Role</th>
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">User ID</th>
                 <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Created</th>
                 <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Actions</th>
               </tr>
@@ -171,7 +195,7 @@ export default function UserManagement() {
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-slate-500 text-sm">
+                  <td colSpan={5} className="px-5 py-8 text-center text-slate-500 text-sm">
                     No users found matching your criteria.
                   </td>
                 </tr>
@@ -181,17 +205,17 @@ export default function UserManagement() {
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-sm">
-                          {user.email[0].toUpperCase()}
+                          {userInitials(user)}
                         </div>
                         <div>
                           <div className="text-sm font-semibold text-slate-900">
-                            {user.email.split('@')[0]}
+                            {userDisplayName(user)}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      <span className="text-sm text-slate-700">{user.email}</span>
+                      <span className="text-sm text-slate-700 break-all">{user.email}</span>
                     </td>
                     <td className="px-5 py-4">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
@@ -204,16 +228,16 @@ export default function UserManagement() {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <span className="text-sm font-mono text-slate-600">{user.id.slice(0, 8)}...</span>
-                    </td>
-                    <td className="px-5 py-4">
                       <span className="text-sm text-slate-600">
-                        {new Date(user.createdAt).toLocaleDateString()}
+                        {formatDate(user.createdAt)}
                       </span>
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        <button className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors">
+                        <button
+                          onClick={() => setSelectedUser(user)}
+                          className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+                        >
                           View
                         </button>
                       </div>
@@ -225,6 +249,97 @@ export default function UserManagement() {
           </table>
         </div>
       </div>
+
+      {/* User Details Modal */}
+      {detailsPresent && detailsUser && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          data-state={selectedUser ? 'open' : 'closed'}
+          onClick={() => setSelectedUser(null)}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl max-w-md w-full shadow-xl"
+            data-state={selectedUser ? 'open' : 'closed'}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-slate-200 flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold">
+                  {userInitials(detailsUser)}
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">{userDisplayName(detailsUser)}</h2>
+                  <p className="text-sm text-slate-500 break-all">{detailsUser.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+                aria-label="Close"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Role</label>
+                  <div className="mt-1">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                      detailsUser.role === 'PATIENT' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                      detailsUser.role === 'DOCTOR' ? 'bg-blue-50 text-[#1b5eb8] border border-blue-100' :
+                      detailsUser.role === 'SECRETARY' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                      'bg-slate-50 text-slate-700 border border-slate-200'
+                    }`}>
+                      {detailsUser.role}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Account Status</label>
+                  <div className="mt-1">
+                    {detailsUser.isActive === false ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                        Inactive
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        Active
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Password Change Required</label>
+                  <p className="text-sm font-medium text-slate-900 mt-1">
+                    {detailsUser.mustChangePassword ? 'Yes' : 'No'}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Registered</label>
+                  <p className="text-sm font-medium text-slate-900 mt-1">{formatDate(detailsUser.createdAt)}</p>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">User ID</label>
+                <div className="mt-1 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="text-sm font-mono text-slate-900 break-all">{detailsUser.id}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

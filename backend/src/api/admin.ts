@@ -13,10 +13,29 @@ const router = Router();
 router.get('/users', authenticate, authorize('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
     const result = await query(
-      'SELECT id, email, role, is_active, must_change_password, created_at FROM users ORDER BY created_at DESC'
+      `SELECT u.id, u.email, u.role, u.is_active, u.must_change_password, u.created_at,
+              p.first_name AS patient_first_name, p.last_name AS patient_last_name,
+              d.first_name AS doctor_first_name, d.last_name AS doctor_last_name,
+              s.first_name AS secretary_first_name, s.last_name AS secretary_last_name
+       FROM users u
+       LEFT JOIN patients p ON p.user_id = u.id
+       LEFT JOIN doctors d ON d.user_id = u.id
+       LEFT JOIN secretaries s ON s.user_id = u.id
+       ORDER BY u.created_at DESC`
     );
 
-    res.json(success(result.rows));
+    res.json(success(result.rows.map((row: any) => ({
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      isActive: row.is_active,
+      mustChangePassword: row.must_change_password,
+      createdAt: row.created_at,
+      firstName:
+        row.patient_first_name ?? row.doctor_first_name ?? row.secretary_first_name ?? null,
+      lastName:
+        row.patient_last_name ?? row.doctor_last_name ?? row.secretary_last_name ?? null,
+    }))));
   } catch (err: any) {
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch users'));
   }

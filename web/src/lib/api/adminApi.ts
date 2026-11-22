@@ -4,7 +4,11 @@ export interface User {
   id: string;
   email: string;
   role: 'PATIENT' | 'DOCTOR' | 'SECRETARY' | 'ADMIN';
-  createdAt: string;
+  isActive?: boolean;
+  mustChangePassword?: boolean;
+  firstName?: string | null;
+  lastName?: string | null;
+  createdAt?: string;
 }
 
 export interface Doctor {
