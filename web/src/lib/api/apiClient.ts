@@ -152,9 +152,13 @@ class ApiClient {
 
   private defaultSessionMetadata(): SessionMetadata {
     const now = Date.now();
+    // Admin and staff sessions are persistent to survive page refreshes,
+    // but still respect the 8-hour max session limit from the backend.
+    // Patient sessions remain non-persistent for security.
+    const isAdminOrStaff = this.role !== 'patient';
     return {
-      rememberMe: false,
-      persistent: false,
+      rememberMe: isAdminOrStaff,
+      persistent: isAdminOrStaff,
       idleTimeoutMinutes: IDLE_FALLBACK_MINUTES[this.role || ''] || 8 * 60,
       maxSessionMinutes: MAX_FALLBACK_MINUTES[this.role || ''] ?? null,
       startedAt: now,
@@ -298,9 +302,13 @@ class ApiClient {
         ? this.session.startedAt
         : now;
 
+    // Admin and staff sessions are always persistent to survive page refreshes,
+    // but still respect the 8-hour max session limit from the backend.
+    // Patient sessions remain non-persistent for security.
+    const isAdminOrStaff = this.role !== 'patient';
     this.session = {
-      rememberMe: session.rememberMe === true,
-      persistent: session.persistent === true,
+      rememberMe: isAdminOrStaff || session.rememberMe === true,
+      persistent: isAdminOrStaff || session.persistent === true,
       idleTimeoutMinutes: session.idleTimeoutMinutes,
       maxSessionMinutes: session.maxSessionMinutes,
       startedAt,
