@@ -317,88 +317,107 @@ export default function DoctorManagement() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
+            <colgroup>
+              <col className="w-[22%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[22%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+            </colgroup>
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/50">
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Doctor</th>
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Specialty</th>
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">PRC License</th>
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Practice</th>
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Status</th>
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Actions</th>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Doctor</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Specialty</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">PRC License</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Practice</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Status</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredDoctors.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-slate-500 text-sm">
+                  <td colSpan={6} className="px-5 py-10 text-center text-slate-500 text-sm">
                     No doctors found matching your criteria.
                   </td>
                 </tr>
               ) : (
                 filteredDoctors.map((doctor) => (
-                  <tr key={doctor.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                    <td className="px-5 py-4">
+                  <tr key={doctor.id} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60 transition-colors">
+                    <td className="px-5 py-4 align-middle">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-sm">
+                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-sm flex-shrink-0">
                           {(doctor.firstName || 'D')[0]}{(doctor.lastName || '')[0]}
                         </div>
-                        <div>
-                          <div className="text-sm font-semibold text-slate-900">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-slate-900 whitespace-nowrap">
                             {doctor.firstName || 'Unknown'} {doctor.lastName || 'Doctor'}
                           </div>
-                          <div className="text-xs text-slate-500">ID: {doctor.id?.slice(0, 8) || 'N/A'}...</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
-                      <span className="text-sm text-slate-700">{doctor.specialty}</span>
+                    <td className="px-5 py-4 align-middle">
+                      <span className="block text-sm text-slate-700 truncate max-w-[180px]" title={doctor.specialty || undefined}>
+                        {doctor.specialty || 'N/A'}
+                      </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <span className="text-sm font-mono text-slate-600">{doctor.prcLicenseNumber || 'N/A'}</span>
+                    <td className="px-5 py-4 align-middle">
+                      <span className="inline-block text-sm font-mono text-slate-600 whitespace-nowrap">
+                        {doctor.prcLicenseNumber || 'N/A'}
+                      </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="text-sm text-slate-700">{doctor.practiceName || 'Not set'}</div>
-                      {doctor.practiceAddress && (
-                        <div className="text-xs text-slate-500 truncate max-w-[200px]">{doctor.practiceAddress}</div>
-                      )}
+                    <td className="px-5 py-4 align-middle">
+                      <div className="min-w-0">
+                        <div className="text-sm text-slate-700 truncate max-w-[220px]" title={doctor.practiceName || undefined}>
+                          {doctor.practiceName || 'Not set'}
+                        </div>
+                        {doctor.practiceAddress && (
+                          <div className="text-xs text-slate-500 truncate max-w-[220px]" title={doctor.practiceAddress}>
+                            {doctor.practiceAddress}
+                          </div>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-5 py-4">
-                      {doctor.approvalStatus === 'ACTIVE' ? (
-                        doctor.isActive === false ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
-                            <span className="material-symbols-outlined text-[14px]">block</span>
-                            Inactive
+                    <td className="px-5 py-4 align-middle">
+                      <div className="flex items-center">
+                        {doctor.approvalStatus === 'ACTIVE' ? (
+                          doctor.isActive === false ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 h-7 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
+                              <span className="material-symbols-outlined text-[14px]">block</span>
+                              Inactive
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 h-7 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                              Active
+                            </span>
+                          )
+                        ) : doctor.approvalStatus === 'PENDING' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 h-7 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                            <span className="material-symbols-outlined text-[14px]">schedule</span>
+                            Pending
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            Active
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 h-7 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
+                            <span className="material-symbols-outlined text-[14px]">cancel</span>
+                            Rejected
                           </span>
-                        )
-                      ) : doctor.approvalStatus === 'PENDING' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                          <span className="material-symbols-outlined text-[14px]">schedule</span>
-                          Pending
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
-                          <span className="material-symbols-outlined text-[14px]">cancel</span>
-                          Rejected
-                        </span>
-                      )}
+                        )}
+                      </div>
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2">
+                    <td className="px-5 py-4 align-middle">
+                      <div className="flex items-center gap-2 whitespace-nowrap">
                         <button
                           onClick={() => handleViewDoctor(doctor.id)}
-                          className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+                          className="px-3 h-8 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
                         >
                           View
                         </button>
                         {doctor.approvalStatus === 'ACTIVE' && doctor.isActive !== false && (
                           <button
                             onClick={() => handleDeactivateDoctor(doctor)}
-                            className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                            className="px-3 h-8 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
                           >
                             Deactivate
                           </button>
@@ -406,7 +425,7 @@ export default function DoctorManagement() {
                         {doctor.approvalStatus === 'ACTIVE' && doctor.isActive === false && (
                           <button
                             onClick={() => handleReactivateDoctor(doctor.id)}
-                            className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
+                            className="px-3 h-8 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
                           >
                             Reactivate
                           </button>
