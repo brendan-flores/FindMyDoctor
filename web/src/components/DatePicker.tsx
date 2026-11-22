@@ -7,16 +7,16 @@ interface DatePickerProps {
   onChange: (date: string) => void;
   maxDate?: string;
   minDate?: string;
+  placeholder?: string;
+  className?: string;
 }
 
-export default function DatePicker({ value, onChange, maxDate, minDate }: DatePickerProps) {
+export default function DatePicker({ value, onChange, maxDate, minDate, placeholder = 'Select date of birth', className = '' }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(value ? new Date(value) : null);
   const [showYearSelector, setShowYearSelector] = useState(false);
   const [showMonthSelector, setShowMonthSelector] = useState(false);
-
-  const maxDateObj = maxDate ? new Date(maxDate) : new Date();
 
   useEffect(() => {
     if (value) {
@@ -38,15 +38,17 @@ export default function DatePicker({ value, onChange, maxDate, minDate }: DatePi
   };
 
   const goToNextMonth = () => {
-    if (currentMonth.getMonth() === maxDateObj.getMonth() && currentMonth.getFullYear() === maxDateObj.getFullYear()) {
+    const nextMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+    const nextMonthStr = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
+    if (maxDate && nextMonthStr > maxDate.substring(0, 7)) {
       return;
     }
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+    setCurrentMonth(nextMonth);
   };
 
   const handleDateClick = (day: number) => {
     const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    const formattedDate = newDate.toISOString().split('T')[0];
+    const formattedDate = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
     onChange(formattedDate);
     setSelectedDate(newDate);
     setIsOpen(false);
@@ -82,17 +84,15 @@ export default function DatePicker({ value, onChange, maxDate, minDate }: DatePi
   };
 
   const isPastMonth = () => {
-    return currentMonth.getFullYear() < maxDateObj.getFullYear() ||
-           (currentMonth.getFullYear() === maxDateObj.getFullYear() && currentMonth.getMonth() < maxDateObj.getMonth());
+    const currentMonthStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+    const maxMonthStr = maxDate ? maxDate.substring(0, 7) : '';
+    return maxDate && currentMonthStr >= maxMonthStr;
   };
 
   const isDisabled = (day: number) => {
-    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    if (date > maxDateObj) return true;
-    if (minDate) {
-      const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      if (dateStr < minDate) return true;
-    }
+    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    if (maxDate && dateStr > maxDate) return true;
+    if (minDate && dateStr < minDate) return true;
     return false;
   };
 
@@ -101,10 +101,10 @@ export default function DatePicker({ value, onChange, maxDate, minDate }: DatePi
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-left flex items-center justify-between bg-white hover:border-emerald-300 transition-colors"
+        className={`w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-left flex items-center justify-between bg-white hover:border-emerald-300 transition-colors ${className}`}
       >
         <span className={value ? 'text-slate-900' : 'text-slate-400'}>
-          {value ? formatDate(selectedDate) : 'Select date of birth'}
+          {value ? formatDate(selectedDate) : placeholder}
         </span>
         <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -112,7 +112,7 @@ export default function DatePicker({ value, onChange, maxDate, minDate }: DatePi
       </button>
 
       {isOpen && (
-        <div className="fmd-animate-in absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl p-4">
+        <div className="fmd-animate-in absolute z-50 left-0 mt-1 w-72 bg-white border border-slate-200 rounded-lg shadow-xl p-4">
           {/* Calendar Header */}
           <div className="flex items-center justify-between mb-4">
             <button
@@ -235,7 +235,7 @@ export default function DatePicker({ value, onChange, maxDate, minDate }: DatePi
                   onClick={() => !disabled && handleDateClick(day)}
                   disabled={disabled}
                   className={`
-                    py-2 text-sm rounded-lg transition-all duration-150
+                    py-2 px-1 text-sm rounded-lg transition-all duration-150
                     ${selected 
                       ? 'bg-[#1b5eb8] text-white font-medium' 
                       : disabled

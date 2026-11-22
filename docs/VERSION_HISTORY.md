@@ -4,6 +4,44 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.47 (In Progress)
+
+**Purpose:** Improve alignment, column spacing, readability, and filter presentation on the Admin Audit Log page, and add an audit details modal for viewing complete records.
+
+**Significant Features:**
+- Audit log table now uses `<colgroup>` with defined column widths for consistent alignment across headers and content.
+- All table cells use `align-middle` for vertical alignment and consistent padding (`px-5 py-3.5` for headers, `px-5 py-4` for cells).
+- Action badges use `whitespace-nowrap` and fixed height `h-7` to prevent wrapping (e.g., "Approved Doctor" stays on one line).
+- Long email addresses and reasons use `truncate` with `title` tooltips for hover-to-view full text in the table.
+- Date range filters replaced with the shared DatePicker component (from feature 0055) for consistent UX across the application.
+- Filter controls standardized to match Doctors and Secretaries pages with identical styling and layout.
+- Each audit row is now clickable with hover state and opens an Audit Details modal.
+- Audit Details modal shows complete record: actor identity and role, target identity and role/type, action with badge, timestamp, reason, and available metadata.
+- Missing data (target, reason) displays "—" or "Not provided" in both table and modal.
+- Modal preserves all filters, pagination, and audit records when closed.
+
+**Improvements:**
+- Table readability improved with consistent column widths and alignment.
+- Filter section layout matches the Doctors and Secretaries pages for portal consistency.
+- Audit records are now fully accessible through the details modal, showing complete metadata and reason text.
+- Shared DatePicker component enhanced with className prop for width control and placeholder customization.
+- DatePicker timezone handling fixed to use string-based YYYY-MM-DD comparison, preventing incorrect date disabling due to timezone offsets.
+- DatePicker calendar styling fixed with px-1 padding on day buttons to prevent date overlap and w-72 fixed width for dropdown.
+
+**Bug Fixes:**
+- DatePicker maxDate comparison was incorrectly disabling valid dates (e.g., dates 22-28 greyed out on Nov 22, 2026) due to timezone offset issues; fixed by using string comparison instead of Date object comparison.
+- DatePicker calendar day buttons were overlapping for two-digit dates (22-30); fixed by adding px-1 horizontal padding.
+- DatePicker dropdown was not properly positioned; fixed with z-50 and left-0 positioning.
+- Audit log date picker labels ("From:" and "To:") were overlapping with date picker buttons; fixed by using className prop with w-40 width and whitespace-nowrap on labels.
+
+**Removed/Modified Functionality:** None
+
+**Breaking Changes:** None
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.47 and added this entry to `VERSION_HISTORY.md`.
+
+---
+
 ### 01.46 (November 22, 2026)
 
 **Purpose:** Improve web dashboard interaction quality — consistent subtle transitions across navigation, dialogs, and dropdowns — and eliminate perceived lag in schedule mutations, plus enforce future-only dates when creating exceptions.
