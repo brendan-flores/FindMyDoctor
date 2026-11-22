@@ -68,15 +68,19 @@ export default function AuditLogPage() {
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
-    return date.toLocaleString('en-US', {
+    // Format date: "Nov 19, 2026"
+    const datePart = date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      timeZone: 'Asia/Manila'
+      year: 'numeric'
     });
+    // Format time: "10:55 PM"
+    const timePart = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    return { datePart, timePart };
   };
 
   const getActionLabel = (action: string) => {
@@ -193,11 +197,11 @@ export default function AuditLogPage() {
             </colgroup>
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Timestamp</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Actor</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Action</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Target</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Reason</th>
+                <th className="min-w-[160px] whitespace-nowrap px-4 py-3 text-left">Timestamp</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap text-center">Actor</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap text-center">Action</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap text-center">Target</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap text-center">Reason</th>
               </tr>
             </thead>
             <tbody>
@@ -214,8 +218,13 @@ export default function AuditLogPage() {
                     onClick={() => handleRowClick(entry)}
                     className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60 cursor-pointer transition-colors"
                   >
-                    <td className="px-5 py-4 align-middle">
-                      <span className="text-sm text-slate-600">{formatTimestamp(entry.timestamp)}</span>
+                    <td className="min-w-[160px] whitespace-nowrap px-4 py-4">
+                      <div className="text-sm font-medium text-gray-900 whitespace-nowrap">
+                        {formatTimestamp(entry.timestamp).datePart}
+                      </div>
+                      <div className="text-xs text-gray-500 whitespace-nowrap">
+                        {formatTimestamp(entry.timestamp).timePart}
+                      </div>
                     </td>
                     <td className="px-5 py-4 align-middle">
                       <div className="min-w-0">
@@ -373,7 +382,7 @@ export default function AuditLogPage() {
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Timestamp</h3>
                 <div className="bg-slate-50 rounded-lg p-4">
-                  <p className="text-sm font-medium text-slate-900">{formatTimestamp(selectedEntry.timestamp)}</p>
+                  <p className="text-xs font-medium text-slate-900">{formatTimestamp(selectedEntry.timestamp)}</p>
                   <p className="text-xs text-slate-500 font-mono mt-1">{selectedEntry.timestamp}</p>
                 </div>
               </div>
