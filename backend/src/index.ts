@@ -109,6 +109,18 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// E2E-only database identity verification. Never enabled in production.
+if (process.env.E2E_TEST_MODE === 'true' && process.env.NODE_ENV !== 'production') {
+  app.get('/health/e2e-db', async (_req, res) => {
+    try {
+      const result = await pool.query('SELECT current_database() AS database_name');
+      res.json({ status: 'ok', database: result.rows[0].database_name });
+    } catch (error) {
+      res.status(500).json({ status: 'error', message: 'Database verification failed' });
+    }
+  });
+}
+
 // API routes
 app.use(`/api/${apiVersion}/auth`, authRouter);
 app.use(`/api/${apiVersion}/auth/otp`, otpRouter);

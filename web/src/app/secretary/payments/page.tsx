@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { secretaryApi, Payment, BillingStatus } from '@/lib/api/secretaryApi';
 import Toast from '@/components/ui/Toast';
 import BillingPanel from '@/components/BillingPanel';
+import DatePicker from '@/components/DatePicker';
 
 type TabType = 'review' | 'collect' | 'paid' | 'attention';
 
@@ -208,21 +209,15 @@ export default function SecretaryPayments() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <div className="flex gap-2">
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                aria-label="From date"
-              />
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                aria-label="To date"
-              />
+            <div className="flex gap-4 items-center">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-500 whitespace-nowrap">From</label>
+                <DatePicker value={dateFrom} onChange={setDateFrom} />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-500 whitespace-nowrap">To</label>
+                <DatePicker value={dateTo} onChange={setDateTo} popupPosition="left" />
+              </div>
             </div>
           </div>
         </div>

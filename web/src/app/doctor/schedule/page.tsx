@@ -5,6 +5,7 @@ import { apiClient } from '@/lib/api/apiClient';
 import Toast from '@/components/ui/Toast';
 import { scheduleChangesApi, isPendingResponse, pendingRequestDateLabel, pendingSummaryText, type ScheduleChangeRequest } from '@/lib/api/scheduleChangesApi';
 import { usePresence } from '@/hooks/usePresence';
+import DatePicker from '@/components/DatePicker';
 
 const DAYS_OF_WEEK = [
   { value: 0, label: 'Sunday' },
@@ -144,12 +145,9 @@ export default function DoctorSchedule() {
   const [capacityData, setCapacityData] = useState<DoctorCapacity | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [configuredCapacity, setConfiguredCapacity] = useState<number | ''>('');
-  const [showCapacityDatePicker, setShowCapacityDatePicker] = useState(false);
   const [capacityLoading, setCapacityLoading] = useState(false);
 
   // Date picker states
-  const [showExceptionStartDatePicker, setShowExceptionStartDatePicker] = useState(false);
-  const [showExceptionEditStartDatePicker, setShowExceptionEditStartDatePicker] = useState(false);
 
   const editModalOpen = showEditModal && !!editingSchedule;
   const deleteModalOpen = showDeleteModal && !!deletingSchedule;
@@ -197,9 +195,6 @@ export default function DoctorSchedule() {
     setShowBreakEndPicker(false);
     setShowBreakDayPicker(false);
     setShowBreakEditDayPicker(false);
-    setShowExceptionStartDatePicker(false);
-    setShowExceptionEditStartDatePicker(false);
-    setShowCapacityDatePicker(false);
   };
 
   const fetchPendingRequests = async () => {
@@ -680,163 +675,6 @@ export default function DoctorSchedule() {
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const getDaysInMonth = (year: number, month: number) => {
-    return new Date(year, month + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (year: number, month: number) => {
-    return new Date(year, month, 1).getDay();
-  };
-
-  const DatePicker = ({ value, onChange, showPicker, setShowPicker, disabledDates, minDate }: { value: string, onChange: (date: string) => void, showPicker: boolean, setShowPicker: (show: boolean) => void, disabledDates?: string[], minDate?: string }) => {
-    const pickerPresent = usePresence(showPicker);
-    const currentDate = value ? (() => {
-      const [year, month, day] = value.split('-').map(Number);
-      return new Date(year, month - 1, day);
-    })() : new Date();
-    const [viewMonth, setViewMonth] = useState(currentDate.getMonth());
-    const [viewYear, setViewYear] = useState(currentDate.getFullYear());
-
-    const daysInMonth = getDaysInMonth(viewYear, viewMonth);
-    const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-    const handleDateClick = (day: number) => {
-      const formattedDate = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      onChange(formattedDate);
-      setShowPicker(false);
-    };
-
-    const isDateDisabled = (day: number) => {
-      const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      return (minDate !== undefined && dateStr < minDate) || !!disabledDates?.includes(dateStr);
-    };
-
-    const handlePreviousMonth = () => {
-      if (viewMonth === 0) {
-        setViewMonth(11);
-        setViewYear(viewYear - 1);
-      } else {
-        setViewMonth(viewMonth - 1);
-      }
-    };
-
-    const handleNextMonth = () => {
-      if (viewMonth === 11) {
-        setViewMonth(0);
-        setViewYear(viewYear + 1);
-      } else {
-        setViewMonth(viewMonth + 1);
-      }
-    };
-
-    const handleToday = () => {
-      const today = new Date();
-      const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-      onChange(formattedDate);
-      setShowPicker(false);
-    };
-
-    const handleClear = () => {
-      onChange('');
-      setShowPicker(false);
-    };
-
-    return (
-      <div className="relative dropdown-container">
-        <div
-          onClick={() => {
-            closeAllDropdowns();
-            setShowPicker(!showPicker);
-          }}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-400 bg-gradient-to-r from-white to-slate-50 hover:border-blue-300 transition-all cursor-pointer relative"
-        >
-          <span>{formatDate(value)}</span>
-          <span className="material-symbols-outlined text-blue-600 absolute right-6 text-[20px]">calendar_today</span>
-        </div>
-        {pickerPresent && (
-          <div
-            data-state={showPicker ? 'open' : 'closed'}
-            className="fmd-dropdown absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-200 p-4 z-10"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <button
-                type="button"
-                onClick={handlePreviousMonth}
-                className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
-              >
-                <span className="material-symbols-outlined text-slate-600">chevron_left</span>
-              </button>
-              <span className="font-semibold text-slate-800">{monthNames[viewMonth]} {viewYear}</span>
-              <button
-                type="button"
-                onClick={handleNextMonth}
-                className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
-              >
-                <span className="material-symbols-outlined text-slate-600">chevron_right</span>
-              </button>
-            </div>
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
-                <div key={day} className="text-center text-xs font-semibold text-slate-500 py-1">
-                  {day}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: firstDay }).map((_, i) => (
-                <div key={`empty-${i}`} className="p-2"></div>
-              ))}
-              {Array.from({ length: daysInMonth }).map((_, i) => {
-                const day = i + 1;
-                const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const isSelected = value === dateStr;
-                const today = new Date();
-                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                const isToday = todayStr === dateStr;
-                const disabled = isDateDisabled(day);
-                return (
-                  <button
-                    key={day}
-                    type="button"
-                    onClick={() => !disabled && handleDateClick(day)}
-                    disabled={disabled}
-                    className={`p-2 rounded-lg text-sm font-medium transition-all ${
-                      isSelected
-                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md'
-                        : isToday
-                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                        : disabled
-                        ? 'text-slate-300 cursor-not-allowed'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
-              <button
-                type="button"
-                onClick={handleClear}
-                className="flex-1 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                onClick={handleToday}
-                className="flex-1 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              >
-                Today
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-6">
@@ -1349,8 +1187,9 @@ export default function DoctorSchedule() {
             <DatePicker
               value={selectedDate}
               onChange={handleDateChange}
-              showPicker={showCapacityDatePicker}
-              setShowPicker={setShowCapacityDatePicker}
+              showClear
+              showToday
+              onOpen={closeAllDropdowns}
             />
           </div>
 
@@ -1856,10 +1695,10 @@ export default function DoctorSchedule() {
                 <DatePicker
                   value={exceptionFormData.date}
                   onChange={(date) => setExceptionFormData({ ...exceptionFormData, date: date })}
-                  showPicker={showExceptionStartDatePicker}
-                  setShowPicker={setShowExceptionStartDatePicker}
                   disabledDates={unavailability.filter(u => u.is_active).map(u => u.start_date.split('T')[0])}
-                  minDate={todayDateString}
+                  showClear
+                  showToday
+                onOpen={closeAllDropdowns}
                 />
               </div>
               <div>
@@ -1910,9 +1749,10 @@ export default function DoctorSchedule() {
                 <DatePicker
                   value={exceptionFormData.date}
                   onChange={(date) => setExceptionFormData({ ...exceptionFormData, date: date })}
-                  showPicker={showExceptionEditStartDatePicker}
-                  setShowPicker={setShowExceptionEditStartDatePicker}
                   disabledDates={unavailability.filter(u => u.is_active && u.id !== editingException?.id).map(u => u.start_date.split('T')[0])}
+                  showClear
+                  showToday
+                onOpen={closeAllDropdowns}
                 />
               </div>
               <div>

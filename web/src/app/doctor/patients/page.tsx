@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { doctorApi, Patient, AssociatePatientRequest } from '@/lib/api/doctorApi';
 import { formatPhoneFieldInput, phoneFormatErrorMessage, toPatientMobileE164 } from '@/lib/phone';
 import Select from '@/components/ui/Select';
+import DatePicker from '@/components/DatePicker';
 import { usePresence } from '@/hooks/usePresence';
 
 export default function DoctorPatients() {
@@ -369,11 +370,10 @@ export default function DoctorPatients() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-slate-500 mb-1">Date of Birth *</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={addFormData.dateOfBirth}
-                    onChange={(e) => setAddFormData({ ...addFormData, dateOfBirth: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(date) => setAddFormData({ ...addFormData, dateOfBirth: date })}
+                    maxDate={new Date().toLocaleDateString('en-CA')}
                   />
                 </div>
                 <div>
