@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/core/services/api_service.dart';
+import 'package:mobile/core/widgets/skeleton.dart';
 import 'package:mobile/features/notifications/presentation/notifications_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -55,14 +56,14 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(NotificationTileSkeleton), findsWidgets);
 
     completer.complete(
       http.Response(jsonEncode({'success': true, 'data': []}), 200),
     );
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(NotificationTileSkeleton), findsNothing);
     expect(find.text('No notifications'), findsOneWidget);
   });
 
