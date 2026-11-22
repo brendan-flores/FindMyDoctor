@@ -209,86 +209,96 @@ export default function SecretaryManagement() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
+            <colgroup>
+              <col className="w-[24%]" />
+              <col className="w-[20%]" />
+              <col className="w-[24%]" />
+              <col className="w-[12%]" />
+              <col className="w-[20%]" />
+            </colgroup>
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/50">
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Secretary</th>
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Email</th>
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Associated Doctor</th>
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Status</th>
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Actions</th>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Secretary</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Email</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Associated Doctor</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Status</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredSecretaries.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-slate-500 text-sm">
+                  <td colSpan={5} className="px-5 py-10 text-center text-slate-500 text-sm">
                     No secretaries found matching your criteria.
                   </td>
                 </tr>
               ) : (
                 filteredSecretaries.map((secretary) => (
-                  <tr key={secretary.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                    <td className="px-5 py-4">
+                  <tr key={secretary.id} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60 transition-colors">
+                    <td className="px-5 py-4 align-middle">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-sm">
+                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-sm flex-shrink-0">
                           {(secretary.firstName || 'S')[0]}{(secretary.lastName || '')[0]}
                         </div>
-                        <div>
-                          <div className="text-sm font-semibold text-slate-900">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-slate-900 whitespace-nowrap">
                             {secretary.firstName || 'N/A'} {secretary.lastName || 'N/A'}
                           </div>
-                          <div className="text-xs text-slate-500">ID: {secretary.id.slice(0, 8)}...</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
-                      <span className="text-sm text-slate-700">{secretary.email}</span>
+                    <td className="px-5 py-4 align-middle">
+                      <span className="block text-sm text-slate-700 truncate" title={secretary.email}>
+                        {secretary.email}
+                      </span>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 align-middle">
                       {secretary.doctorId ? (
-                        <div>
-                          <div className="text-sm text-slate-700">
+                        <div className="min-w-0">
+                          <div className="text-sm text-slate-700 truncate" title={`Dr. ${secretary.doctorFirstName} ${secretary.doctorLastName}`}>
                             Dr. {secretary.doctorFirstName} {secretary.doctorLastName}
                           </div>
-                          <div className="text-xs text-slate-500">{secretary.doctorSpecialty}</div>
+                          <div className="text-xs text-slate-500 truncate" title={secretary.doctorSpecialty}>
+                            {secretary.doctorSpecialty}
+                          </div>
                         </div>
                       ) : (
                         <span className="text-sm text-amber-600 font-medium">Unassigned</span>
                       )}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 align-middle">
                       {secretary.isActive ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 h-7 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                           Active
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 h-7 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
                           <span className="material-symbols-outlined text-[14px]">block</span>
                           Inactive
                         </span>
                       )}
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2">
+                    <td className="px-5 py-4 align-middle">
+                      <div className="flex items-center gap-2 whitespace-nowrap">
                         {secretary.isActive ? (
                           <button
                             onClick={() => handleDeactivateSecretary(secretary)}
-                            className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                            className="px-3 h-8 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
                           >
                             Deactivate
                           </button>
                         ) : (
                           <button
                             onClick={() => handleReactivateSecretary(secretary.id)}
-                            className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
+                            className="px-3 h-8 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
                           >
                             Reactivate
                           </button>
                         )}
                         <button
                           onClick={() => handleResetPassword(secretary)}
-                          className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+                          className="px-3 h-8 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
                         >
                           Reset Password
                         </button>
