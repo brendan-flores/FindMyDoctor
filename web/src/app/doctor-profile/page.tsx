@@ -14,6 +14,7 @@ import { LANGUAGES } from '@/data/languages';
 import Select from '@/components/ui/Select';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import SearchableMultiSelect from '@/components/ui/SearchableMultiSelect';
+import { usePresence } from '@/hooks/usePresence';
 
 const PRC_LICENSE_PATTERN = /^\d{7}$/;
 const apiOrigin = new URL(apiClient.getBaseUrl()).origin;
@@ -48,6 +49,9 @@ export default function DoctorProfile() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const submissionModalPresent = usePresence(showSubmissionModal);
+  const photoModalOpen = showPhotoModal && !!photoPreview;
+  const photoModalPresent = usePresence(photoModalOpen);
 
   // Schedule management state
   const [schedules, setSchedules] = useState<any[]>([]);
@@ -57,6 +61,7 @@ export default function DoctorProfile() {
     start_time: '',
     end_time: '',
   });
+  const [isScheduleSaving, setIsScheduleSaving] = useState(false);
 
   const dayOptions = [
     { value: '0', label: 'Sunday' },
@@ -210,6 +215,8 @@ export default function DoctorProfile() {
   };
 
   const handleAddSchedule = async () => {
+    if (isScheduleSaving) return;
+    setIsScheduleSaving(true);
     try {
       const payload = {
         day_of_week: parseInt(scheduleForm.day_of_week),
@@ -226,27 +233,37 @@ export default function DoctorProfile() {
           end_time: '',
         });
         setShowScheduleForm(false);
-        await loadSchedules();
+        if (response.data) {
+          setSchedules((prev) => [...prev, response.data]);
+        } else {
+          loadSchedules();
+        }
       } else {
         setError(response.error || 'Failed to add schedule');
       }
     } catch (err) {
       console.error('Add schedule error:', err);
       setError('An error occurred while adding schedule');
+    } finally {
+      setIsScheduleSaving(false);
     }
   };
 
   const handleDeleteSchedule = async (id: string) => {
+    if (isScheduleSaving) return;
+    setIsScheduleSaving(true);
     try {
       const response = await doctorApi.deleteSchedule(id);
       if (response.success) {
-        await loadSchedules();
+        setSchedules((prev) => prev.filter((s) => s.id !== id));
       } else {
         setError(response.error || 'Failed to delete schedule');
       }
     } catch (err) {
       console.error('Delete schedule error:', err);
       setError('An error occurred while deleting schedule');
+    } finally {
+      setIsScheduleSaving(false);
     }
   };
 
@@ -825,8 +842,8 @@ export default function DoctorProfile() {
                 </div>
 
                 {/* Schedule Form */}
-                {showScheduleForm && (
-                  <div className="bg-gray-50 rounded-xl p-4 mb-4 space-y-3">
+                <div className={`fmd-expand ${showScheduleForm ? 'mb-4' : ''}`} data-open={showScheduleForm}>
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Day of Week</label>
                       <Select
@@ -859,13 +876,13 @@ export default function DoctorProfile() {
                     <button
                       type="button"
                       onClick={handleAddSchedule}
-                      disabled={!scheduleForm.day_of_week || !scheduleForm.start_time || !scheduleForm.end_time}
+                      disabled={isScheduleSaving || !scheduleForm.day_of_week || !scheduleForm.start_time || !scheduleForm.end_time}
                       className="w-full py-2 px-4 rounded-lg text-sm font-semibold text-white bg-[#1A62CD] hover:bg-[#0D3B75] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      Add Schedule
+                      {isScheduleSaving ? 'Saving...' : 'Add Schedule'}
                     </button>
                   </div>
-                )}
+                </div>
 
                 {/* Schedule List */}
                 {schedules.length > 0 ? (
@@ -881,10 +898,10 @@ export default function DoctorProfile() {
                         <button
                           type="button"
                           onClick={() => handleDeleteSchedule(schedule.id)}
-                          disabled={!canEdit}
+                          disabled={!canEdit || isScheduleSaving}
                           className="text-red-600 hover:text-red-800 disabled:text-gray-400 disabled:cursor-not-allowed text-sm font-medium"
                         >
-                          Remove
+                          {isScheduleSaving ? 'Removing...' : 'Remove'}
                         </button>
                       </div>
                     ))}
@@ -927,9 +944,15 @@ export default function DoctorProfile() {
       </div>
 
       {/* Submission Confirmation Modal */}
-      {showSubmissionModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8 max-w-md w-full">
+      {submissionModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          data-state={showSubmissionModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8 max-w-md w-full"
+            data-state={showSubmissionModal ? 'open' : 'closed'}
+          >
             <div className="text-center">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -956,9 +979,16 @@ export default function DoctorProfile() {
       )}
 
       {/* Photo Modal */}
-      {showPhotoModal && photoPreview && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowPhotoModal(false)}>
-          <div className="relative max-w-4xl max-h-[90vh]">
+      {photoModalPresent && photoPreview && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          data-state={photoModalOpen ? 'open' : 'closed'}
+          onClick={() => setShowPhotoModal(false)}
+        >
+          <div
+            className="fmd-modal-panel relative max-w-4xl max-h-[90vh]"
+            data-state={photoModalOpen ? 'open' : 'closed'}
+          >
             <button
               onClick={() => setShowPhotoModal(false)}
               className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"

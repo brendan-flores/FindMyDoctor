@@ -5,6 +5,7 @@ import { apiClient } from '@/lib/api/apiClient';
 import Toast from '@/components/ui/Toast';
 import Select from '@/components/ui/Select';
 import { scheduleChangesApi, isPendingResponse, pendingRequestDateLabel, pendingSummaryText, type ScheduleChangeRequest } from '@/lib/api/scheduleChangesApi';
+import { usePresence } from '@/hooks/usePresence';
 
 const DAYS_OF_WEEK = [
   { value: 0, label: 'Sunday' },
@@ -82,6 +83,11 @@ export default function SecretarySchedule() {
   const [unavailability, setUnavailability] = useState<DoctorUnavailability[]>([]);
   const [breakPeriods, setBreakPeriods] = useState<DoctorBreakPeriod[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const todayDateString = (() => {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  })();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -115,6 +121,17 @@ export default function SecretarySchedule() {
   const [showBreakEndPicker, setShowBreakEndPicker] = useState(false);
   const [showBreakDayPicker, setShowBreakDayPicker] = useState(false);
   const [showBreakEditDayPicker, setShowBreakEditDayPicker] = useState(false);
+
+  const exceptionEditModalOpen = showExceptionEditModal && !!editingException;
+  const exceptionDeleteModalOpen = showExceptionDeleteModal && !!deletingException;
+  const breakEditModalOpen = showBreakEditModal && !!editingBreak;
+  const breakDeleteModalOpen = showBreakDeleteModal && !!deletingBreak;
+  const exceptionAddModalPresent = usePresence(showExceptionAddModal);
+  const exceptionEditModalPresent = usePresence(exceptionEditModalOpen);
+  const exceptionDeleteModalPresent = usePresence(exceptionDeleteModalOpen);
+  const breakAddModalPresent = usePresence(showBreakAddModal);
+  const breakEditModalPresent = usePresence(breakEditModalOpen);
+  const breakDeleteModalPresent = usePresence(breakDeleteModalOpen);
 
   // Pending schedule-change requests (awaiting secretary confirmation)
   const [pendingRequests, setPendingRequests] = useState<ScheduleChangeRequest[]>([]);
@@ -227,6 +244,16 @@ export default function SecretarySchedule() {
   // Exception handlers
   const handleExceptionAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
+    if (!exceptionFormData.date) {
+      setError('Please select a date for the exception.');
+      return;
+    }
+    if (exceptionFormData.date < todayDateString) {
+      setError('Exceptions cannot be scheduled for a past date.');
+      return;
+    }
+    setSaving(true);
     setError(null);
     setSuccess(null);
 
@@ -243,15 +270,16 @@ export default function SecretarySchedule() {
         setShowExceptionAddModal(false);
         setExceptionFormData({ date: '', reason: '' });
         fetchPendingRequests();
-        return;
+      } else {
+        setSuccess('Exception created successfully');
+        setShowExceptionAddModal(false);
+        setExceptionFormData({ date: '', reason: '' });
+        setUnavailability((prev) => [...prev, response.data as DoctorUnavailability]);
       }
-      setSuccess('Exception created successfully');
-      setShowExceptionAddModal(false);
-      setExceptionFormData({ date: '', reason: '' });
-      fetchUnavailability();
     } else {
       setError(response.error || 'Failed to create exception');
     }
+    setSaving(false);
   };
 
   const handleExceptionEditSubmit = async (e: React.FormEvent) => {
@@ -259,7 +287,8 @@ export default function SecretarySchedule() {
     setError(null);
     setSuccess(null);
 
-    if (!editingException) return;
+    if (!editingException || saving) return;
+    setSaving(true);
 
     const payload = {
       startDate: exceptionFormData.date,
@@ -274,19 +303,21 @@ export default function SecretarySchedule() {
         setShowExceptionEditModal(false);
         setEditingException(null);
         fetchPendingRequests();
-        return;
+      } else {
+        setSuccess('Exception updated successfully');
+        setShowExceptionEditModal(false);
+        setEditingException(null);
+        setUnavailability((prev) => prev.map((u) => (u.id === editingException.id ? (response.data as DoctorUnavailability) : u)));
       }
-      setSuccess('Exception updated successfully');
-      setShowExceptionEditModal(false);
-      setEditingException(null);
-      fetchUnavailability();
     } else {
       setError(response.error || 'Failed to update exception');
     }
+    setSaving(false);
   };
 
   const handleExceptionDelete = async () => {
-    if (!deletingException) return;
+    if (!deletingException || saving) return;
+    setSaving(true);
 
     setError(null);
     setSuccess(null);
@@ -298,15 +329,16 @@ export default function SecretarySchedule() {
         setShowExceptionDeleteModal(false);
         setDeletingException(null);
         fetchPendingRequests();
-        return;
+      } else {
+        setSuccess('Exception deleted successfully');
+        setShowExceptionDeleteModal(false);
+        setDeletingException(null);
+        setUnavailability((prev) => prev.filter((u) => u.id !== deletingException.id));
       }
-      setSuccess('Exception deleted successfully');
-      setShowExceptionDeleteModal(false);
-      setDeletingException(null);
-      fetchUnavailability();
     } else {
       setError(response.error || 'Failed to delete exception');
     }
+    setSaving(false);
   };
 
   const openExceptionEditModal = (exception: DoctorUnavailability) => {
@@ -326,6 +358,8 @@ export default function SecretarySchedule() {
   // Break period handlers
   const handleBreakAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
+    setSaving(true);
     setError(null);
     setSuccess(null);
 
@@ -351,15 +385,16 @@ export default function SecretarySchedule() {
         setShowBreakAddModal(false);
         setBreakFormData({ breakDate: '', dayOfWeek: 1, startTime: '12:00', endTime: '13:00', reason: '' });
         fetchPendingRequests();
-        return;
+      } else {
+        setSuccess('Break period created successfully');
+        setShowBreakAddModal(false);
+        setBreakFormData({ breakDate: '', dayOfWeek: 1, startTime: '12:00', endTime: '13:00', reason: '' });
+        setBreakPeriods((prev) => [...prev, response.data as DoctorBreakPeriod]);
       }
-      setSuccess('Break period created successfully');
-      setShowBreakAddModal(false);
-      setBreakFormData({ breakDate: '', dayOfWeek: 1, startTime: '12:00', endTime: '13:00', reason: '' });
-      fetchBreakPeriods();
     } else {
       setError(response.error || 'Failed to create break period');
     }
+    setSaving(false);
   };
 
   const handleBreakEditSubmit = async (e: React.FormEvent) => {
@@ -367,7 +402,8 @@ export default function SecretarySchedule() {
     setError(null);
     setSuccess(null);
 
-    if (!editingBreak) return;
+    if (!editingBreak || saving) return;
+    setSaving(true);
 
     const today = new Date();
     const currentDay = today.getDay();
@@ -391,19 +427,21 @@ export default function SecretarySchedule() {
         setShowBreakEditModal(false);
         setEditingBreak(null);
         fetchPendingRequests();
-        return;
+      } else {
+        setSuccess('Break period updated successfully');
+        setShowBreakEditModal(false);
+        setEditingBreak(null);
+        setBreakPeriods((prev) => prev.map((b) => (b.id === editingBreak.id ? (response.data as DoctorBreakPeriod) : b)));
       }
-      setSuccess('Break period updated successfully');
-      setShowBreakEditModal(false);
-      setEditingBreak(null);
-      fetchBreakPeriods();
     } else {
       setError(response.error || 'Failed to update break period');
     }
+    setSaving(false);
   };
 
   const handleBreakDelete = async () => {
-    if (!deletingBreak) return;
+    if (!deletingBreak || saving) return;
+    setSaving(true);
 
     setError(null);
     setSuccess(null);
@@ -415,15 +453,16 @@ export default function SecretarySchedule() {
         setShowBreakDeleteModal(false);
         setDeletingBreak(null);
         fetchPendingRequests();
-        return;
+      } else {
+        setSuccess('Break period deleted successfully');
+        setShowBreakDeleteModal(false);
+        setDeletingBreak(null);
+        setBreakPeriods((prev) => prev.filter((b) => b.id !== deletingBreak.id));
       }
-      setSuccess('Break period deleted successfully');
-      setShowBreakDeleteModal(false);
-      setDeletingBreak(null);
-      fetchBreakPeriods();
     } else {
       setError(response.error || 'Failed to delete break period');
     }
+    setSaving(false);
   };
 
   const openBreakEditModal = (breakPeriod: DoctorBreakPeriod) => {
@@ -526,7 +565,8 @@ export default function SecretarySchedule() {
     return new Date(year, month, 1).getDay();
   };
 
-  const DatePicker = ({ value, onChange, showPicker, setShowPicker, disabledDates }: { value: string, onChange: (date: string) => void, showPicker: boolean, setShowPicker: (show: boolean) => void, disabledDates?: string[] }) => {
+  const DatePicker = ({ value, onChange, showPicker, setShowPicker, disabledDates, minDate }: { value: string, onChange: (date: string) => void, showPicker: boolean, setShowPicker: (show: boolean) => void, disabledDates?: string[], minDate?: string }) => {
+    const pickerPresent = usePresence(showPicker);
     const currentDate = value ? (() => {
       const [year, month, day] = value.split('-').map(Number);
       return new Date(year, month - 1, day);
@@ -546,7 +586,7 @@ export default function SecretarySchedule() {
 
     const isDateDisabled = (day: number) => {
       const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      return disabledDates?.includes(dateStr);
+      return (minDate !== undefined && dateStr < minDate) || !!disabledDates?.includes(dateStr);
     };
 
     const handlePreviousMonth = () => {
@@ -591,8 +631,11 @@ export default function SecretarySchedule() {
           <span>{formatDate(value)}</span>
           <span className="material-symbols-outlined text-blue-600 absolute right-6 text-[20px]">calendar_today</span>
         </div>
-        {showPicker && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-10">
+        {pickerPresent && (
+          <div
+            data-state={showPicker ? 'open' : 'closed'}
+            className="fmd-dropdown absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-10"
+          >
             <div className="flex items-center justify-between mb-4">
               <button
                 type="button"
@@ -1183,9 +1226,15 @@ export default function SecretarySchedule() {
       )}
 
       {/* Exception Add Modal */}
-      {showExceptionAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      {exceptionAddModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          data-state={showExceptionAddModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            data-state={showExceptionAddModal ? 'open' : 'closed'}
+          >
             <h3 className="text-xl font-bold text-slate-900 mb-6">Add Exception</h3>
             <form onSubmit={handleExceptionAddSubmit}>
               <div className="mb-5">
@@ -1195,6 +1244,7 @@ export default function SecretarySchedule() {
                   onChange={(date) => setExceptionFormData({ ...exceptionFormData, date })}
                   showPicker={showExceptionStartDatePicker}
                   setShowPicker={setShowExceptionStartDatePicker}
+                  minDate={todayDateString}
                 />
               </div>
               <div className="mb-5">
@@ -1216,9 +1266,10 @@ export default function SecretarySchedule() {
                 </button>
                 <button
                   type="submit"
-                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
+                  disabled={saving}
+                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
                 >
-                  Add
+                  {saving ? 'Saving...' : 'Add'}
                 </button>
               </div>
             </form>
@@ -1227,9 +1278,15 @@ export default function SecretarySchedule() {
       )}
 
       {/* Exception Edit Modal */}
-      {showExceptionEditModal && editingException && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      {exceptionEditModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          data-state={exceptionEditModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            data-state={exceptionEditModalOpen ? 'open' : 'closed'}
+          >
             <h3 className="text-xl font-bold text-slate-900 mb-6">Edit Exception</h3>
             <form onSubmit={handleExceptionEditSubmit}>
               <div className="mb-5">
@@ -1260,9 +1317,10 @@ export default function SecretarySchedule() {
                 </button>
                 <button
                   type="submit"
-                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
+                  disabled={saving}
+                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
                 >
-                  Save
+                  {saving ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </form>
@@ -1271,9 +1329,15 @@ export default function SecretarySchedule() {
       )}
 
       {/* Exception Delete Modal */}
-      {showExceptionDeleteModal && deletingException && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      {exceptionDeleteModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          data-state={exceptionDeleteModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            data-state={exceptionDeleteModalOpen ? 'open' : 'closed'}
+          >
             <h3 className="text-xl font-bold text-slate-900 mb-4">Delete Exception</h3>
             <p className="text-slate-600 mb-6">Are you sure you want to delete this exception?</p>
             <div className="flex justify-end gap-3">
@@ -1285,9 +1349,10 @@ export default function SecretarySchedule() {
               </button>
               <button
                 onClick={handleExceptionDelete}
-                className="h-10 px-6 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
+                disabled={saving}
+                className="h-10 px-6 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
               >
-                Delete
+                {saving ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
@@ -1295,9 +1360,15 @@ export default function SecretarySchedule() {
       )}
 
       {/* Break Add Modal */}
-      {showBreakAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      {breakAddModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          data-state={showBreakAddModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            data-state={showBreakAddModal ? 'open' : 'closed'}
+          >
             <h3 className="text-xl font-bold text-slate-900 mb-6">Add Break Period</h3>
             <form onSubmit={handleBreakAddSubmit}>
               <div className="mb-5">
@@ -1347,9 +1418,10 @@ export default function SecretarySchedule() {
                 </button>
                 <button
                   type="submit"
-                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
+                  disabled={saving}
+                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
                 >
-                  Add
+                  {saving ? 'Saving...' : 'Add'}
                 </button>
               </div>
             </form>
@@ -1358,9 +1430,15 @@ export default function SecretarySchedule() {
       )}
 
       {/* Break Edit Modal */}
-      {showBreakEditModal && editingBreak && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      {breakEditModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          data-state={breakEditModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            data-state={breakEditModalOpen ? 'open' : 'closed'}
+          >
             <h3 className="text-xl font-bold text-slate-900 mb-6">Edit Break Period</h3>
             <form onSubmit={handleBreakEditSubmit}>
               <div className="mb-5">
@@ -1410,9 +1488,10 @@ export default function SecretarySchedule() {
                 </button>
                 <button
                   type="submit"
-                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
+                  disabled={saving}
+                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
                 >
-                  Save
+                  {saving ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </form>
@@ -1421,9 +1500,15 @@ export default function SecretarySchedule() {
       )}
 
       {/* Break Delete Modal */}
-      {showBreakDeleteModal && deletingBreak && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      {breakDeleteModalPresent && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          data-state={breakDeleteModalOpen ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            data-state={breakDeleteModalOpen ? 'open' : 'closed'}
+          >
             <h3 className="text-xl font-bold text-slate-900 mb-4">Delete Break Period</h3>
             <p className="text-slate-600 mb-6">Are you sure you want to delete this break period?</p>
             <div className="flex justify-end gap-3">
@@ -1435,9 +1520,10 @@ export default function SecretarySchedule() {
               </button>
               <button
                 onClick={handleBreakDelete}
-                className="h-10 px-6 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
+                disabled={saving}
+                className="h-10 px-6 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
               >
-                Delete
+                {saving ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
