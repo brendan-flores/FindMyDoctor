@@ -209,15 +209,15 @@ export default function SecretaryPayments() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <div className="flex gap-2">
-              <DatePicker
-                value={dateFrom}
-                onChange={setDateFrom}
-              />
-              <DatePicker
-                value={dateTo}
-                onChange={setDateTo}
-              />
+            <div className="flex gap-4 items-center">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-500 whitespace-nowrap">From</label>
+                <DatePicker value={dateFrom} onChange={setDateFrom} />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-500 whitespace-nowrap">To</label>
+                <DatePicker value={dateTo} onChange={setDateTo} popupPosition="left" />
+              </div>
             </div>
           </div>
         </div>

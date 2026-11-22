@@ -9,9 +9,11 @@ interface DatePickerProps {
   minDate?: string;
   disabledDates?: string[];
   placeholder?: string;
+  label?: string;
   showClear?: boolean;
   showToday?: boolean;
   onOpen?: () => void;
+  popupPosition?: 'left' | 'right';
 }
 
 const toLocalDateStr = (d: Date) =>
@@ -31,9 +33,11 @@ export default function DatePicker({
   minDate,
   disabledDates,
   placeholder = 'Select date',
+  label,
   showClear = false,
   showToday = false,
   onOpen,
+  popupPosition,
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const maxDateObj = parseDate(maxDate);
@@ -166,6 +170,9 @@ export default function DatePicker({
 
   return (
     <div className="relative dropdown-container">
+      {label && (
+        <label className="block text-xs font-medium text-slate-500 mb-1.5">{label}</label>
+      )}
       <button
         type="button"
         onClick={() => {
@@ -183,7 +190,11 @@ export default function DatePicker({
       </button>
 
       {isOpen && (
-        <div className="fmd-animate-in absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl p-4">
+        <div
+          className={`fmd-animate-in absolute z-[9999] mt-1 min-w-[360px] max-w-[calc(100vw-32px)] bg-white border border-slate-200 rounded-lg shadow-2xl p-4 ${
+            popupPosition === 'left' ? 'right-0 left-auto' : 'left-0 right-auto'
+          }`}
+        >
           <div className="flex items-center justify-between mb-4">
             <button
               type="button"
@@ -280,15 +291,15 @@ export default function DatePicker({
             </div>
           )}
 
-          <div className="grid grid-cols-7 gap-1 mb-2">
+          <div className="grid grid-cols-7 gap-1 mb-1 px-2">
             {weekDays.map((day) => (
-              <div key={day} className="text-center text-xs font-medium text-slate-500 py-1">{day}</div>
+              <div key={day} className="text-center text-xs font-medium text-slate-500 py-1 whitespace-nowrap">{day}</div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-1 px-2">
             {Array.from({ length: firstDayOfMonth }).map((_, i) => (
-              <div key={`empty-${i}`} className="py-2" />
+              <div key={`empty-${i}`} className="px-1 py-2" />
             ))}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
@@ -301,7 +312,7 @@ export default function DatePicker({
                   type="button"
                   onClick={() => !disabled && handleDateClick(day)}
                   disabled={disabled}
-                  className={`py-2 text-sm rounded-lg transition-all duration-150
+                  className={`w-[40px] h-[40px] flex items-center justify-center px-1 py-2 text-sm rounded-lg transition-all duration-150
                     ${selected ? 'bg-[#1b5eb8] text-white font-medium' : disabled ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-100'}
                     ${today && !selected ? 'border-2 border-[#1b5eb8]' : ''}
                   `}
@@ -331,7 +342,7 @@ export default function DatePicker({
 
       {isOpen && (
         <div
-          className="fixed inset-0 z-10"
+          className="fixed inset-0 z-[9998]"
           onClick={() => {
             setIsOpen(false);
             setShowYearSelector(false);
