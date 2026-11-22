@@ -1114,46 +1114,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
             const SizedBox(height: spacing.AppSpacing.gutterMd),
             // Action buttons
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryContainer,
-                      borderRadius: BorderRadius.circular(
-                        spacing.AppSpacing.radiusLg,
-                      ),
-                    ),
-                    child: ElevatedButton(
-                      onPressed: () => _navigateToDetail(appointmentId),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryContainer,
-                        foregroundColor: AppColors.onPrimary,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            spacing.AppSpacing.radiusLg,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.confirmation_number,
-                            size: spacing.AppSpacing.iconMd,
-                          ),
-                          const SizedBox(width: spacing.AppSpacing.gutterSm),
-                          Text(
-                            'View Queue Pass',
-                            style: AppTextStyles.bodyLgMedium,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: spacing.AppSpacing.gutterSm),
                 Container(
                   height: 48,
                   padding: EdgeInsets.symmetric(
