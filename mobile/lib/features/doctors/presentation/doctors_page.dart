@@ -9,6 +9,7 @@ import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/models/doctor.dart';
 import '../../../core/services/doctor_service.dart';
+import 'specializations_page.dart';
 
 class DoctorsPage extends StatefulWidget {
   final String? specialty;
@@ -283,11 +284,17 @@ class _DoctorsPageState extends State<DoctorsPage> {
   }
 
   void _openSpecialtyList() {
-    setState(() {
-      _showBrowseView = false;
-      _showAllDoctors = true;
-      _showAllHospitals = false;
-    });
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => SpecializationsPage(
+          specialties: _specialties,
+          selectedSpecialty: _selectedSpecialty,
+          onSpecialtySelected: (specialty) {
+            _selectSpecialty(specialty);
+          },
+        ),
+      ),
+    );
   }
 
   void _openHospitalsList() {
@@ -361,7 +368,6 @@ class _DoctorsPageState extends State<DoctorsPage> {
                     children: [
                       _buildSearchBar(),
                       _buildActiveFilterChips(),
-                      _buildLocationIndicator(),
                       _buildSpecializations(),
                       _buildTopDoctorsSection(),
                       _buildHospitalsSection(),
@@ -1154,60 +1160,6 @@ class _DoctorsPageState extends State<DoctorsPage> {
     );
   }
 
-  Widget _buildLocationIndicator() {
-    if (_isFilteredListView) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: spacing.AppSpacing.screenPadding,
-        vertical: spacing.AppSpacing.gutterMd,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: spacing.AppSpacing.gutterSm,
-              vertical: spacing.AppSpacing.gutterXs,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLow,
-              borderRadius: BorderRadius.circular(
-                spacing.AppSpacing.radiusFull,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.near_me,
-                  color: AppColors.tertiary,
-                  size: spacing.AppSpacing.iconSm,
-                ),
-                const SizedBox(width: spacing.AppSpacing.gutterXs),
-                Text(
-                  'Metro Manila • Near me (5km)',
-                  style: AppTextStyles.bodyMdMedium.copyWith(
-                    color: AppColors.onSurface,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            '${_allDoctors.length} Active Now',
-            style: AppTextStyles.bodyMdMedium.copyWith(
-              color: AppColors.tertiary,
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSpecializations() {
     return Column(
       children: [
@@ -1312,6 +1264,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
           ],
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 32,
@@ -1333,37 +1286,23 @@ class _DoctorsPageState extends State<DoctorsPage> {
               ),
             ),
             const SizedBox(width: spacing.AppSpacing.gutterSm),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  specialty,
-                  style: AppTextStyles.labelMd.copyWith(
-                    color: isSelected
-                        ? AppColors.onPrimary
-                        : AppColors.onSurface,
-                    fontWeight: FontWeight.normal,
-                  ),
+            Flexible(
+              child: Text(
+                specialty,
+                style: AppTextStyles.labelMd.copyWith(
+                  color: isSelected
+                      ? AppColors.onPrimary
+                      : AppColors.onSurface,
+                  fontWeight: FontWeight.normal,
                 ),
-                Text(
-                  '${_getDoctorCountForSpecialty(specialty)} Docs',
-                  style: AppTextStyles.labelSm.copyWith(
-                    color: isSelected
-                        ? AppColors.onPrimary.withValues(alpha: 0.8)
-                        : AppColors.onSurfaceVariant,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  int _getDoctorCountForSpecialty(String specialty) {
-    return _allDoctors.where((d) => d.specialty == specialty).length;
   }
 
   void _openVerifiedDoctorsList() {

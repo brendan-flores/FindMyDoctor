@@ -12,9 +12,11 @@ import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/signup_page.dart';
 import '../features/auth/presentation/change_password_page.dart';
 import '../features/home/presentation/home_page.dart';
+import '../features/home/presentation/recent_updates_page.dart';
 import '../features/doctors/presentation/doctor_schedule_page.dart';
 import '../features/doctors/presentation/doctors_page.dart';
 import '../features/doctors/presentation/doctor_profile_page.dart';
+import '../features/doctors/presentation/specializations_page.dart';
 import '../features/appointments/presentation/booking_confirmation_page.dart';
 import '../features/appointments/presentation/appointment_detail_page.dart';
 import '../features/appointments/presentation/reschedule_page.dart';
@@ -181,6 +183,24 @@ class MyAppState extends State<MyApp> {
           case '/doctors':
           case '/doctor-profile':
           case '/doctor-schedule':
+            final args = settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (context) => DoctorSchedulePage(
+                doctorId: args?['doctorId'] ?? '',
+                doctorName: args?['doctorName'],
+                specialty: args?['specialty'],
+                clinic: args?['clinic'],
+                consultationFee: args?['consultationFee'],
+                professionalPhotoUrl: args?['professionalPhotoUrl'],
+                defaultDate: args?['defaultDate'],
+              ),
+            );
+          case '/specializations':
+            return MaterialPageRoute(
+              builder: (context) => const SpecializationsPage(
+                specialties: [],
+              ),
+            );
           case '/booking-confirmation':
           case '/patient-details':
           case '/patient-profile':
@@ -191,6 +211,10 @@ class MyAppState extends State<MyApp> {
           case '/conversation-thread':
           case '/ai-conversation':
           case '/ai-conversation-history':
+          case '/recent-updates':
+            return MaterialPageRoute(
+              builder: (context) => const RecentUpdatesPage(),
+            );
           case '/waitlist':
           case '/reschedule':
           case '/appointment-detail':
@@ -330,7 +354,11 @@ class MyAppState extends State<MyApp> {
                 return MaterialPageRoute(
                   builder: (context) => const NotificationsPage(),
                 );
-              case '/waitlist':
+              case '/recent-updates':
+            return MaterialPageRoute(
+              builder: (context) => const RecentUpdatesPage(),
+            );
+          case '/waitlist':
                 return MaterialPageRoute(
                   builder: (context) => const WaitlistPage(),
                 );
