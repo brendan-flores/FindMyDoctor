@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -10,10 +11,10 @@ import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/widgets/skeleton.dart';
-import '../../../core/services/doctor_service.dart';
+
 import '../../../core/services/api_service.dart';
 import '../../../core/services/push_notification_service.dart';
-import '../../../core/models/doctor.dart';
+
 import '../../../features/auth/presentation/change_password_page.dart';
 import '../../appointments/presentation/appointments_page.dart';
 import '../../doctors/presentation/doctors_page.dart';
@@ -50,13 +51,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
   String? _selectedSpecialtyFromHome;
-  final DoctorService _doctorService = DoctorService();
   late final ApiService _apiService;
-  List<String> _specialties = [];
-  List<Doctor> _recommendedDoctors = [];
-  List<String> _hospitals = [];
-  bool _isLoadingSpecialties = true;
-  bool _isLoadingDoctors = true;
   List<Conversation> _conversations = [];
   bool _isLoadingConversations = true;
   bool _isFetchingConversations = false;
@@ -70,6 +65,17 @@ class _HomePageState extends State<HomePage> {
   bool _accountInfoFailed = false;
   bool _isLoadingAccountInfo = true;
   String _chatSegment = 'clinic'; // M1: Segmented control state
+
+  // Upcoming appointment state
+  List<dynamic> _upcomingAppointments = [];
+  Map<String, dynamic>? _nextAppointment;
+  bool _isLoadingUpcomingAppointment = true;
+  bool _upcomingAppointmentError = false;
+
+  // Recent updates state
+  List<dynamic> _recentUpdates = [];
+  bool _isLoadingRecentUpdates = true;
+  bool _recentUpdatesError = false;
 
   // Conversation data is reused within this window instead of refetched on
   // every Chat-tab visit. A thread return or pull-to-refresh bypasses it.
@@ -100,6 +106,10 @@ class _HomePageState extends State<HomePage> {
     _loadNotificationUnreadCount();
     // Load waitlist count
     _loadWaitlistCount();
+    // Load upcoming appointment
+    _loadUpcomingAppointment();
+    // Load recent updates
+    _loadRecentUpdates();
   }
 
   Future<void> _loadUserInfo() async {
@@ -161,48 +171,23 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadData() async {
     try {
-      print('📱 HomePage: Starting to load doctors data...');
-      final allDoctors = await _doctorService.getDoctors();
-      print('📱 HomePage: Loaded ${allDoctors.length} doctors');
+      print('📱 HomePage: Starting to load home data...');
 
-      // Extract unique specialties
-      final uniqueSpecialties =
-          allDoctors
-              .map((d) => d.specialty)
-              .where((s) => s.isNotEmpty)
-              .toSet()
-              .toList()
-            ..sort();
+      // Load upcoming appointments and recent updates in parallel
+      await Future.wait([
+        _loadUpcomingAppointment(),
+        _loadRecentUpdates(),
+      ]);
 
-      // Extract unique hospitals/clinics
-      final uniqueHospitals =
-          allDoctors
-              .map((d) => d.practiceName)
-              .whereType<String>()
-              .where((h) => h.isNotEmpty && h != 'Private Practice')
-              .toSet()
-              .toList()
-            ..sort();
-
-      // Take first 2 doctors as recommended
-      final recommended = allDoctors.take(2).toList();
-
-      print('📱 HomePage: Extracted ${uniqueSpecialties.length} specialties, ${uniqueHospitals.length} hospitals');
-
-      if (!mounted) return;
-      setState(() {
-        _specialties = uniqueSpecialties;
-        _hospitals = uniqueHospitals;
-        _recommendedDoctors = recommended;
-        _isLoadingSpecialties = false;
-        _isLoadingDoctors = false;
-      });
+      print('📱 HomePage: Home data loaded');
     } catch (e) {
       print('🔴 HomePage: Error loading data: $e');
       if (!mounted) return;
       setState(() {
-        _isLoadingSpecialties = false;
-        _isLoadingDoctors = false;
+        _upcomingAppointmentError = true;
+        _isLoadingUpcomingAppointment = false;
+        _recentUpdatesError = true;
+        _isLoadingRecentUpdates = false;
       });
     }
   }
@@ -299,6 +284,125 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  
+  /// Loads upcoming appointments and selects the nearest eligible one.
+  /// Only SCHEDULED, CONFIRMED, or IN_PROGRESS appointments with a future
+  /// date are considered "upcoming."
+  Future<void> _loadUpcomingAppointment() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingUpcomingAppointment = true;
+      _upcomingAppointmentError = false;
+    });
+
+    try {
+      final response = await _apiService.getAppointments(status: null);
+      if (response['success'] == true && response['data'] != null) {
+        final appointments = response['data'] as List;
+        final now = DateTime.now();
+
+        final upcoming = appointments.where((a) {
+          final status = a['status'] as String?;
+          if (status != 'SCHEDULED' && status != 'CONFIRMED' && status != 'IN_PROGRESS') {
+            return false;
+          }
+          final dateStr = a['appointment_date']?.toString();
+          if (dateStr == null) return false;
+          final date = DateTime.tryParse(dateStr)?.toLocal();
+          if (date == null) return false;
+          return date.isAfter(now);
+        }).toList();
+
+        // Sort by appointment date (nearest first)
+        upcoming.sort((a, b) {
+          final dateA = DateTime.tryParse(a['appointment_date']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+          final dateB = DateTime.tryParse(b['appointment_date']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+          return dateA.compareTo(dateB);
+        });
+
+        if (!mounted) return;
+        setState(() {
+          _upcomingAppointments = upcoming;
+          _nextAppointment = upcoming.isNotEmpty ? upcoming.first : null;
+          _isLoadingUpcomingAppointment = false;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _upcomingAppointmentError = true;
+          _isLoadingUpcomingAppointment = false;
+        });
+      }
+    } catch (e) {
+      print('🔴 HomePage: Error loading upcoming appointment: ');
+      if (!mounted) return;
+      setState(() {
+        _upcomingAppointmentError = true;
+        _isLoadingUpcomingAppointment = false;
+      });
+    }
+  }
+
+  /// Loads recent updates from notifications, filtered to appointment,
+  /// prescription, and payment-related types.
+  Future<void> _loadRecentUpdates() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingRecentUpdates = true;
+      _recentUpdatesError = false;
+    });
+
+    try {
+      final response = await _apiService.getNotifications();
+      if (response['success'] == true && response['data'] != null) {
+        final notifications = response['data'] as List;
+
+        // Filter to supported update categories
+        final updates = notifications.where((n) {
+          final type = n['type'] as String?;
+          return type == 'APPOINTMENT_CREATED' ||
+              type == 'APPOINTMENT_UPDATED' ||
+              type == 'APPOINTMENT_CANCELLED' ||
+              type == 'APPOINTMENT_REMINDER' ||
+              type == 'PRESCRIPTION_READY' ||
+              type == 'PRESCRIPTION_UPDATED' ||
+              type == 'PAYMENT_VERIFIED' ||
+              type == 'PAYMENT_REJECTED' ||
+              type == 'PAYMENT_PENDING';
+        }).toList();
+
+        // Sort by created_at descending (newest first)
+        updates.sort((a, b) {
+          final dateA = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime.now();
+          final dateB = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime.now();
+          return dateB.compareTo(dateA);
+        });
+
+        // Limit to 5 most recent updates
+        final limitedUpdates = updates.take(5).toList();
+
+        if (!mounted) return;
+        setState(() {
+          _recentUpdates = limitedUpdates;
+          _isLoadingRecentUpdates = false;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _recentUpdatesError = true;
+          _isLoadingRecentUpdates = false;
+        });
+      }
+    } catch (e) {
+      print('🔴 HomePage: Error loading recent updates: ');
+      if (!mounted) return;
+      setState(() {
+        _recentUpdatesError = true;
+        _isLoadingRecentUpdates = false;
+      });
+    }
+  }
+
   Future<void> _logout() async {
     await _apiService.logout();
     Navigator.of(context).pushReplacementNamed('/login');
@@ -322,6 +426,7 @@ class _HomePageState extends State<HomePage> {
       // M2: Floating "Ask MediGuide" shortcut in patient shell
       // HomePage is only shown to patients (secretaries get SecretaryHomePage)
       // Hide on Chat tab (index 3) and Profile/Settings tab (index 4)
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: _currentIndex == 3 || _currentIndex == 4
           ? null
           : FloatingActionButton(
@@ -333,10 +438,12 @@ class _HomePageState extends State<HomePage> {
                 });
               },
               backgroundColor: Colors.transparent,
+              foregroundColor: AppColors.onPrimary,
               elevation: 0,
+              shape: const CircleBorder(),
               child: SizedBox(
-                width: 100,
-                height: 100,
+                width: 72,
+                height: 72,
                 child: Image.asset(
                   'assets/images/mediguide_badge.png',
                   fit: BoxFit.contain,
@@ -367,15 +474,13 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: spacing.AppSpacing.gutterLg),
-                    _buildSpecialties(),
-                    const SizedBox(height: spacing.AppSpacing.gutterLg),
+                    const SizedBox(height: spacing.AppSpacing.gutterXs),
                     _buildQuickActions(),
                     const SizedBox(height: spacing.AppSpacing.gutterLg),
-                    _buildRecommendedDoctors(),
+                    _buildUpcomingAppointment(),
                     const SizedBox(height: spacing.AppSpacing.gutterLg),
-                    _buildNearbyClinics(),
-                    const SizedBox(height: spacing.AppSpacing.gutter3xl),
+                    _buildRecentUpdates(),
+                    const SizedBox(height: spacing.AppSpacing.gutter2xl),
                   ],
                 ),
               ),
@@ -568,126 +673,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           Icon(Icons.chevron_right, color: AppColors.outline),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildConversationCard(Conversation conversation) {
-    return AppCard(
-      onTap: () async {
-        await Navigator.of(context).pushNamed(
-          '/conversation-thread',
-          arguments: {'conversationId': conversation.id},
-        );
-        // Refresh conversations when returning to update unread count
-        if (mounted) {
-          _loadConversations(force: true);
-        }
-      },
-      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainer,
-              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-            ),
-            child: Icon(
-              Icons.person,
-              color: AppColors.outline,
-              size: spacing.AppSpacing.iconLg,
-            ),
-          ),
-          const SizedBox(width: spacing.AppSpacing.gutterMd),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      conversation.secretaryName,
-                      style: AppTextStyles.bodyMdMedium.copyWith(
-                        fontWeight: conversation.unreadCount > 0
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
-                    if (conversation.practiceName != null) ...[
-                      const SizedBox(width: spacing.AppSpacing.gutterXs),
-                      Text(
-                        '•',
-                        style: AppTextStyles.labelSm.copyWith(
-                          color: AppColors.outline,
-                        ),
-                      ),
-                      const SizedBox(width: spacing.AppSpacing.gutterXs),
-                      Expanded(
-                        child: Text(
-                          conversation.practiceName!,
-                          style: AppTextStyles.labelSm,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: spacing.AppSpacing.gutterXs),
-                Text(
-                  conversation.lastMessagePreview ?? 'No messages yet',
-                  style: AppTextStyles.labelSm.copyWith(
-                    color: AppColors.secondary,
-                    fontWeight: conversation.unreadCount > 0
-                        ? FontWeight.w700
-                        : FontWeight.w400,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: spacing.AppSpacing.gutterSm),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (conversation.lastMessageSentAt != null)
-                Text(
-                  _formatTimestamp(conversation.lastMessageSentAt!),
-                  style: AppTextStyles.labelSm.copyWith(
-                    color: AppColors.outline,
-                  ),
-                ),
-              if (conversation.unreadCount > 0) ...[
-                const SizedBox(height: spacing.AppSpacing.gutterXs),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: spacing.AppSpacing.gutterSm,
-                    vertical: spacing.AppSpacing.gutterXs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.error,
-                    borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
-                  ),
-                  constraints: const BoxConstraints(
-                    minWidth: 20,
-                    minHeight: 20,
-                  ),
-                  child: Text(
-                    conversation.unreadCount > 99 ? '99+' : conversation.unreadCount.toString(),
-                    style: AppTextStyles.labelSm.copyWith(
-                      color: AppColors.onError,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ],
-          ),
         ],
       ),
     );
@@ -1290,200 +1275,58 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSearchBar() {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: spacing.AppSpacing.gutterXs,
-        vertical: spacing.AppSpacing.gutterXs,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLowest,
-        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.slate800.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.search,
-            color: AppColors.outline,
-            size: spacing.AppSpacing.iconLg,
-          ),
-          const SizedBox(width: spacing.AppSpacing.gutterSm),
-          Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search doctor, specialty, St. Luke\'s...',
-                hintStyle: AppTextStyles.bodyMd.copyWith(
-                  color: AppColors.outline,
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  vertical: spacing.AppSpacing.gutterXs,
-                ),
-              ),
-            ),
-          ),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLow,
-              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-            ),
-            child: Icon(
-              Icons.tune,
-              color: AppColors.primary,
-              size: spacing.AppSpacing.iconMd,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSpecialties() {
+  Widget _buildQuickActions() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSpecialtyChip('All Doctors', Icons.medical_services, true, null),
-        const SizedBox(height: spacing.AppSpacing.gutterXs),
-        if (_isLoadingSpecialties)
-          const SpecialtyChipsSkeleton()
-        else if (_specialties.isEmpty)
-          const SizedBox(
-            height: 40,
-            child: Center(
-              child: Text(
-                'No specialties available',
-                style: TextStyle(fontSize: 12, color: AppColors.slate500),
-              ),
-            ),
-          )
-        else
-          SizedBox(
-            height: 40,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: _specialties.length,
-              itemBuilder: (context, index) {
-                final specialty = _specialties[index];
-                return Padding(
-                  padding: EdgeInsets.only(right: spacing.AppSpacing.gutterSm),
-                  child: _buildSpecialtyChip(
-                    specialty,
-                    _getSpecialtyIcon(specialty),
-                    false,
-                    specialty,
-                  ),
-                );
-              },
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildSpecialtyChip(
-    String label,
-    IconData icon,
-    bool isSelected,
-    String? specialty,
-  ) {
-    return GestureDetector(
-      onTap: specialty != null
-          ? () {
-              setState(() {
-                _selectedSpecialtyFromHome = specialty;
-                _currentIndex = 1;
-              });
-            }
-          : null,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: spacing.AppSpacing.gutterMd,
-          vertical: spacing.AppSpacing.gutterXs,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surfaceLowest,
-          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.slate800.withValues(alpha: 0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        Row(
           children: [
-            Icon(
-              icon,
-              size: spacing.AppSpacing.iconMd,
-              color: isSelected ? AppColors.onPrimary : AppColors.tertiary,
-            ),
-            const SizedBox(width: spacing.AppSpacing.gutterXs),
             Text(
-              label,
-              style: AppTextStyles.labelMd.copyWith(
-                color: isSelected ? AppColors.onPrimary : AppColors.secondary,
+              'Quick Access',
+              style: AppTextStyles.headlineSm.copyWith(
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildQuickActions() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: spacing.AppSpacing.gutterMd,
-      crossAxisSpacing: spacing.AppSpacing.gutterMd,
-      childAspectRatio: 2.5,
-      children: [
-        _buildQuickActionCard(
-          'Find a Doctor',
-          'By specialty',
-          Icons.local_hospital,
-          AppColors.primaryFixed,
-          AppColors.primary,
-        ),
-        _buildQuickActionCard(
-          'My Appointments',
-          'Schedules',
-          Icons.calendar_month,
-          AppColors.secondaryContainer,
-          AppColors.secondary,
-        ),
-        _buildQuickActionCard(
-          'Medical Records',
-          'History & Prescriptions',
-          Icons.folder_open,
-          AppColors.tertiary.withValues(alpha: 0.1),
-          AppColors.tertiary,
-        ),
-        _buildQuickActionCard(
-          'Payments',
-          'Bills & Invoices',
-          Icons.receipt_long,
-          AppColors.secondaryContainer,
-          AppColors.secondary,
-        ),
-        _buildQuickActionCard(
-          'My Profile',
-          'Settings',
-          Icons.person,
-          AppColors.primaryContainer.withValues(alpha: 0.15),
-          AppColors.primaryContainer,
+        const SizedBox(height: spacing.AppSpacing.gutterXs),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: spacing.AppSpacing.gutterMd,
+          crossAxisSpacing: spacing.AppSpacing.gutterMd,
+          childAspectRatio: 2.2,
+          children: [
+            _buildQuickActionCard(
+              'Find a Doctor',
+              'By specialty',
+              Icons.local_hospital,
+              AppColors.primaryFixed,
+              AppColors.primary,
+            ),
+            _buildQuickActionCard(
+              'Appointments',
+              'Schedules',
+              Icons.calendar_month,
+              AppColors.secondaryContainer,
+              AppColors.secondary,
+            ),
+            _buildQuickActionCard(
+              'Medical Records',
+              'History & Prescriptions',
+              Icons.folder_open,
+              AppColors.tertiary.withValues(alpha: 0.1),
+              AppColors.tertiary,
+            ),
+            _buildQuickActionCard(
+              'Payments',
+              'Bills & Invoices',
+              Icons.receipt_long,
+              AppColors.secondaryContainer,
+              AppColors.secondary,
+            ),
+          ],
         ),
       ],
     );
@@ -1503,7 +1346,7 @@ class _HomePageState extends State<HomePage> {
             _selectedSpecialtyFromHome = null;
             _currentIndex = 1;
           });
-        } else if (title == 'My Appointments') {
+        } else if (title == 'Appointments') {
           setState(() {
             _currentIndex = 2;
           });
@@ -1511,21 +1354,17 @@ class _HomePageState extends State<HomePage> {
           Navigator.of(context).pushNamed('/medical-records');
         } else if (title == 'Payments') {
           Navigator.of(context).pushNamed('/payments');
-        } else if (title == 'My Profile') {
-          setState(() {
-            _currentIndex = 4;
-          });
         }
       },
       padding: EdgeInsets.symmetric(
-        horizontal: spacing.AppSpacing.gutterSm,
-        vertical: spacing.AppSpacing.gutterSm,
+        horizontal: spacing.AppSpacing.gutterXs,
+        vertical: spacing.AppSpacing.gutterXs,
       ),
       child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: iconBgColor,
               borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
@@ -1533,27 +1372,33 @@ class _HomePageState extends State<HomePage> {
             child: Icon(
               icon,
               color: iconColor,
-              size: spacing.AppSpacing.iconSm,
+              size: spacing.AppSpacing.iconMd,
             ),
           ),
           const SizedBox(width: spacing.AppSpacing.gutterSm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   title,
-                  style: AppTextStyles.labelMd.copyWith(fontSize: 12),
+                  style: AppTextStyles.bodyMdMedium.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.clip,
                 ),
-                const SizedBox(height: 1),
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
                 Text(
                   subtitle,
-                  style: AppTextStyles.labelSm.copyWith(fontSize: 10),
+                  style: AppTextStyles.bodySm.copyWith(
+                    color: AppColors.secondary,
+                    fontSize: 10,
+                  ),
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.clip,
                 ),
               ],
             ),
@@ -1563,285 +1408,505 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildRecommendedDoctors() {
+  Widget _buildUpcomingAppointment() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Recommended Doctors', style: AppTextStyles.headlineSm),
-                Text('Family health specialists', style: AppTextStyles.labelSm),
-              ],
+            Text(
+              'Upcoming Appointment',
+              style: AppTextStyles.headlineSm.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             TextButton(
               onPressed: () {
                 setState(() {
-                  _selectedSpecialtyFromHome = null;
-                  _currentIndex = 1;
+                  _currentIndex = 2;
                 });
               },
-              child: Text('See all', style: AppTextStyles.labelMd),
+              child: const Text('See all'),
             ),
           ],
         ),
         const SizedBox(height: spacing.AppSpacing.gutterMd),
-        if (_isLoadingDoctors)
-          SkeletonColumn(
-            itemCount: 3,
-            itemBuilder: (context, index) => const HomeDoctorCardSkeleton(),
+        if (_isLoadingUpcomingAppointment)
+          const SizedBox(
+            height: 200,
+            child: Center(child: CircularProgressIndicator()),
           )
-        else if (_recommendedDoctors.isEmpty)
-          Padding(
-            padding: EdgeInsets.all(spacing.AppSpacing.gutterXl),
-            child: Column(
-              children: [
-                Icon(Icons.person_search, size: 64, color: AppColors.outline),
-                const SizedBox(height: 16),
-                Text(
-                  'No Doctors Found',
-                  style: AppTextStyles.headlineSm.copyWith(
-                    color: AppColors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Register doctors to see them here',
-                  style: AppTextStyles.bodyMd.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+        else if (_upcomingAppointmentError)
+          const SizedBox(
+            height: 100,
+            child: Center(child: Text('Error loading appointment')),
+          )
+        else if (_nextAppointment == null)
+          const SizedBox(
+            height: 100,
+            child: Center(child: Text('No upcoming appointments')),
           )
         else
-          for (var doctor in _recommendedDoctors)
-            Padding(
-              padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
-              child: _buildDoctorCard(doctor),
-            ),
+          _buildUpcomingAppointmentCard(_nextAppointment!),
       ],
     );
   }
 
-  Widget _buildDoctorCard(Doctor doctor) {
+  Widget _buildUpcomingAppointmentCard(Map<String, dynamic> appointment) {
+    final doctorFirstName = appointment['doctor_first_name'] ?? '';
+    final doctorLastName = appointment['doctor_last_name'] ?? '';
+    final specialty = appointment['specialty'] ?? '';
+    final practiceName = appointment['practice_name'] ?? 'Private Practice';
+    final professionalPhotoUrl = appointment['professional_photo_url']?.toString();
+    final appointmentDateStr = appointment['appointment_date']?.toString();
+    final appointmentDate = appointmentDateStr != null
+        ? DateTime.tryParse(appointmentDateStr)?.toLocal()
+        : null;
+    final status = appointment['status'] as String?;
+    final appointmentId = appointment['id']?.toString() ?? '';
+
     return AppCard(
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-      child: Row(
+      onTap: appointmentId.isNotEmpty
+          ? () {
+              Navigator.of(context).pushNamed(
+                '/appointment-detail',
+                arguments: {'appointmentId': appointmentId},
+              );
+            }
+          : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DoctorProfileImage(
-            photoUrl: doctor.professionalPhotoUrl,
-            size: 48,
-            showVerifiedBadge: doctor.isApproved,
-          ),
-          const SizedBox(width: spacing.AppSpacing.gutterMd),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(doctor.fullName, style: AppTextStyles.bodyMdMedium),
-                Text(
-                  '${doctor.specialty} • ${doctor.practiceName ?? 'Private Practice'}',
-                  style: AppTextStyles.labelSm,
-                ),
-                const SizedBox(height: spacing.AppSpacing.gutterXs),
-                Text(
-                  '₱${doctor.consultationFeeText ?? '1,000'}',
-                  style: AppTextStyles.labelSm.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: 60,
-            child: ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _selectedSpecialtyFromHome = null;
-                  _currentIndex = 1;
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.onPrimary,
-                padding: EdgeInsets.symmetric(
-                  horizontal: spacing.AppSpacing.gutterSm,
-                  vertical: spacing.AppSpacing.gutterXs,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    spacing.AppSpacing.radiusMd,
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DoctorProfileImage(
+                photoUrl: professionalPhotoUrl,
+                size: 56,
+                showVerifiedBadge: true,
+              ),
+              const SizedBox(width: spacing.AppSpacing.gutterMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Dr. $doctorFirstName $doctorLastName',
+                      style: AppTextStyles.bodyMdMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: spacing.AppSpacing.gutterXs),
+                    Text(
+                      specialty,
+                      style: AppTextStyles.bodySm.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-              child: Text('Book', style: AppTextStyles.labelSm),
-            ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNearbyClinics() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Accredited Nearby', style: AppTextStyles.headlineSm),
-                Text(
-                  'Walk-ins & queue updates available',
-                  style: AppTextStyles.labelSm,
-                ),
-              ],
-            ),
-            Icon(
-              Icons.near_me,
-              color: AppColors.primary,
-              size: spacing.AppSpacing.iconMd,
-            ),
-          ],
-        ),
-        const SizedBox(height: spacing.AppSpacing.gutterMd),
-        if (_isLoadingDoctors)
-          SkeletonColumn(
-            itemCount: 3,
-            itemBuilder: (context, index) => const ClinicCardSkeleton(),
-          )
-        else if (_hospitals.isEmpty)
-          Padding(
-            padding: EdgeInsets.all(spacing.AppSpacing.gutterXl),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.local_hospital_outlined,
-                  size: 64,
-                  color: AppColors.outline,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No Clinics Yet',
-                  style: AppTextStyles.headlineSm.copyWith(
-                    color: AppColors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Register doctors to see clinics',
-                  style: AppTextStyles.bodyMd.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          for (var hospital in _hospitals)
-            Padding(
-              padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
-              child: _buildClinicCard(hospital),
-            ),
-      ],
-    );
-  }
-
-  Widget _buildClinicCard(String hospitalName) {
-    final doctorCount = _recommendedDoctors
-        .where((d) => d.practiceName == hospitalName)
-        .length;
-
-    return AppCard(
-      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainer,
-              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
-            ),
-            child: Icon(
-              Icons.local_hospital,
-              color: AppColors.primary,
-              size: spacing.AppSpacing.iconMd,
-            ),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          Divider(
+            height: 1,
+            color: AppColors.slate200,
           ),
-          const SizedBox(width: spacing.AppSpacing.gutterMd),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(hospitalName, style: AppTextStyles.bodyMdMedium),
-                Text(
-                  '$doctorCount Doctor${doctorCount != 1 ? 's' : ''}',
-                  style: AppTextStyles.labelSm,
-                ),
-              ],
-            ),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          _buildDetailRow(
+            icon: Icons.event,
+            label: 'Date',
+            value: appointmentDate != null
+                ? DateFormat('EEEE, MMM d, yyyy').format(appointmentDate)
+                : 'Date not available',
           ),
+          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          _buildDetailRow(
+            icon: Icons.access_time,
+            label: 'Time',
+            value: appointmentDate != null
+                ? DateFormat('hh:mm a').format(appointmentDate)
+                : 'Time not available',
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          _buildDetailRow(
+            icon: Icons.location_on,
+            label: 'Clinic',
+            value: practiceName,
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
           Container(
             padding: EdgeInsets.symmetric(
               horizontal: spacing.AppSpacing.gutterSm,
               vertical: spacing.AppSpacing.gutterXs,
             ),
             decoration: BoxDecoration(
-              color: AppColors.secondaryContainer,
-              borderRadius: BorderRadius.circular(
-                spacing.AppSpacing.radiusFull,
+              color: _getStatusColor(status).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+              border: Border.all(
+                color: _getStatusColor(status).withValues(alpha: 0.3),
               ),
             ),
-            child: Text(
-              '$doctorCount',
-              style: AppTextStyles.labelSm.copyWith(
-                color: AppColors.onSecondaryFixed,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _getStatusIcon(status),
+                  color: _getStatusColor(status),
+                  size: spacing.AppSpacing.iconSm,
+                ),
+                const SizedBox(width: spacing.AppSpacing.gutterXs),
+                Text(
+                  _getStatusLabel(status),
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: _getStatusColor(status),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          PrimaryButton(
+            text: 'View Appointment Details',
+            onPressed: appointmentId.isNotEmpty
+                ? () {
+                    Navigator.of(context).pushNamed(
+                      '/appointment-detail',
+                      arguments: {'appointmentId': appointmentId},
+                    );
+                  }
+                : null,
+            height: 44,
+            isFullWidth: true,
           ),
         ],
       ),
     );
   }
 
+  Widget _buildDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLow,
+            borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+          ),
+          child: Icon(
+            icon,
+            color: AppColors.primary,
+            size: spacing.AppSpacing.iconMd,
+          ),
+        ),
+        const SizedBox(width: spacing.AppSpacing.gutterSm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label.toUpperCase(),
+                style: AppTextStyles.labelSm.copyWith(
+                  color: AppColors.secondary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.4,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: AppTextStyles.bodyMd.copyWith(
+                  color: AppColors.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status) {
+      case 'SCHEDULED':
+      case 'CONFIRMED':
+      case 'IN_PROGRESS':
+        return AppColors.tertiary;
+      case 'COMPLETED':
+        return AppColors.secondary;
+      case 'CANCELLED':
+      case 'NO_SHOW':
+        return AppColors.error;
+      default:
+        return AppColors.onSurfaceVariant;
+    }
+  }
+
+  IconData _getStatusIcon(String? status) {
+    switch (status) {
+      case 'SCHEDULED':
+      case 'CONFIRMED':
+      case 'IN_PROGRESS':
+        return Icons.event_available;
+      case 'COMPLETED':
+        return Icons.check_circle;
+      case 'CANCELLED':
+      case 'NO_SHOW':
+        return Icons.event_busy;
+      default:
+        return Icons.info_outline;
+    }
+  }
+
+  String _getStatusLabel(String? status) {
+    switch (status) {
+      case 'SCHEDULED':
+        return 'Confirmed';
+      case 'CONFIRMED':
+        return 'Confirmed';
+      case 'IN_PROGRESS':
+        return 'In Progress';
+      case 'COMPLETED':
+        return 'Completed';
+      case 'CANCELLED':
+        return 'Cancelled';
+      case 'NO_SHOW':
+        return 'No Show';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  Widget _buildRecentUpdates() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Recent Updates',
+              style: AppTextStyles.headlineSm.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (_recentUpdates.isNotEmpty)
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pushNamed('/recent-updates');
+                },
+                child: const Text('See all'),
+              ),
+          ],
+        ),
+        const SizedBox(height: spacing.AppSpacing.gutterMd),
+        if (_isLoadingRecentUpdates)
+          Column(
+            children: List.generate(3, (index) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: index < 2 ? spacing.AppSpacing.gutterMd : 0,
+                ),
+                child: const SizedBox(
+                  height: 80,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              );
+            }),
+          )
+        else if (_recentUpdatesError)
+          const SizedBox(
+            height: 100,
+            child: Center(child: Text('Error loading updates')),
+          )
+        else if (_recentUpdates.isEmpty)
+          const SizedBox(
+            height: 100,
+            child: Center(child: Text('No recent updates')),
+          )
+        else
+          ..._recentUpdates.map((update) => _buildRecentUpdateItem(update)),
+      ],
+    );
+  }
+
+  Widget _buildRecentUpdateItem(dynamic update) {
+    final type = update['type'] as String?;
+    final title = update['title'] as String? ?? 'Update';
+    final message = update['message'] as String? ?? '';
+    final createdAtStr = update['created_at']?.toString();
+    final createdAt = createdAtStr != null
+        ? DateTime.tryParse(createdAtStr)?.toLocal()
+        : null;
+
+    final iconData = _getUpdateIcon(type);
+    final iconColor = _getUpdateColor(type);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
+      child: AppCard(
+        padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+              ),
+              child: Icon(
+                iconData,
+                color: iconColor,
+                size: spacing.AppSpacing.iconMd,
+              ),
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: AppTextStyles.bodyMdMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (message.isNotEmpty) ...[
+                    const SizedBox(height: spacing.AppSpacing.gutterXs),
+                    Text(
+                      message,
+                      style: AppTextStyles.bodySm.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (createdAt != null) ...[
+                    const SizedBox(height: spacing.AppSpacing.gutterXs),
+                    Text(
+                      _formatTimestamp(createdAt),
+                      style: AppTextStyles.labelSm.copyWith(
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.outline,
+              size: spacing.AppSpacing.iconSm,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getUpdateIcon(String? type) {
+    switch (type) {
+      case 'APPOINTMENT_CREATED':
+      case 'APPOINTMENT_UPDATED':
+      case 'APPOINTMENT_CANCELLED':
+      case 'APPOINTMENT_REMINDER':
+        return Icons.event;
+      case 'PRESCRIPTION_READY':
+      case 'PRESCRIPTION_UPDATED':
+        return Icons.medication;
+      case 'PAYMENT_VERIFIED':
+      case 'PAYMENT_REJECTED':
+      case 'PAYMENT_PENDING':
+        return Icons.payment;
+      default:
+        return Icons.notifications_outlined;
+    }
+  }
+
+  Color _getUpdateColor(String? type) {
+    switch (type) {
+      case 'APPOINTMENT_CREATED':
+      case 'APPOINTMENT_UPDATED':
+      case 'APPOINTMENT_CANCELLED':
+      case 'APPOINTMENT_REMINDER':
+        return AppColors.primary;
+      case 'PRESCRIPTION_READY':
+      case 'PRESCRIPTION_UPDATED':
+        return AppColors.tertiary;
+      case 'PAYMENT_VERIFIED':
+      case 'PAYMENT_REJECTED':
+      case 'PAYMENT_PENDING':
+        return AppColors.secondary;
+      default:
+        return AppColors.onSurfaceVariant;
+    }
+  }
+
   Widget _buildBottomNavigation() {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceLowest.withValues(alpha: 0.95),
+        color: AppColors.surfaceLowest,
         border: Border(
-          top: BorderSide(color: AppColors.slate200.withValues(alpha: 0.5)),
+          top: BorderSide(color: AppColors.slate200),
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.slate800.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
+            color: AppColors.slate800.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
       child: SafeArea(
         top: false,
+        bottom: true,
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: spacing.AppSpacing.gutterMd,
-            vertical: spacing.AppSpacing.gutterSm,
+            vertical: spacing.AppSpacing.gutterXs,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(Icons.home, 'Home', 0),
               _buildNavItem(Icons.local_hospital, 'Doctors', 1),
-              _buildNavItem(Icons.calendar_month, 'Appointments', 2, unreadCount: _waitlistCount),
-              _buildNavItem(Icons.chat_bubble, 'Chat', 3, unreadCount: _totalUnreadCount),
+              _buildNavItem(
+                Icons.calendar_month,
+                'Appointments',
+                2,
+                unreadCount: _waitlistCount,
+              ),
+              _buildNavItem(
+                Icons.chat_bubble,
+                'Chat',
+                3,
+                unreadCount: _totalUnreadCount,
+              ),
               _buildNavItem(Icons.account_circle, 'Profile', 4),
             ],
           ),
@@ -1861,13 +1926,10 @@ class _HomePageState extends State<HomePage> {
       onTap: () {
         setState(() {
           _currentIndex = index;
-          // Clear specialty when switching tabs
           if (index != 1) {
             _selectedSpecialtyFromHome = null;
           }
         });
-        // Reuse the in-memory conversation list until it goes stale instead of
-        // refetching on every visit to the Chat tab.
         if (index == 3) {
           _loadConversations();
         }
@@ -1875,7 +1937,7 @@ class _HomePageState extends State<HomePage> {
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: spacing.AppSpacing.gutterSm,
-          vertical: spacing.AppSpacing.gutterSm,
+          vertical: spacing.AppSpacing.gutterXs,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1886,8 +1948,8 @@ class _HomePageState extends State<HomePage> {
                 Icon(
                   icon,
                   color: isActive
-                      ? AppColors.primaryContainer
-                      : AppColors.secondary,
+                      ? AppColors.primary
+                      : AppColors.onSurfaceVariant,
                   size: spacing.AppSpacing.iconLg,
                 ),
                 if (unreadCount != null && unreadCount > 0)
@@ -1927,9 +1989,10 @@ class _HomePageState extends State<HomePage> {
               label,
               style: AppTextStyles.labelSm.copyWith(
                 color: isActive
-                    ? AppColors.primaryContainer
-                    : AppColors.secondary,
+                    ? AppColors.primary
+                    : AppColors.onSurfaceVariant,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                fontSize: 11,
               ),
             ),
           ],
@@ -1938,42 +2001,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  IconData _getSpecialtyIcon(String specialty) {
-    switch (specialty.toLowerCase()) {
-      case 'cardiology':
-        return Icons.favorite;
-      case 'pediatrics':
-        return Icons.child_care;
-      case 'dermatology':
-        return Icons.face;
-      case 'dentistry':
-        return Icons.mood;
-      case 'orthopedics':
-        return Icons.accessibility;
-      case 'ob-gyn':
-      case 'obstetrics':
-      case 'gynecology':
-        return Icons.pregnant_woman;
-      case 'ophthalmology':
-        return Icons.visibility;
-      case 'anesthesiology':
-        return Icons.medical_services;
-      case 'ent':
-      case 'otolaryngology':
-        return Icons.hearing;
-      default:
-        return Icons.medical_services;
-    }
-  }
 }
 
-/// Body content of the patient Secretary Chat tab.
-///
-/// Kept public so it can be unit-tested directly (see
-/// test/chat_tab_content_test.dart): the previous inline collection-if chain
-/// let the final `else` bind to a nested guard instead of the
-/// `_conversations.isEmpty` branch, leaving the tab blank whenever
-/// conversations actually existed.
 class ChatTabContent extends StatelessWidget {
   const ChatTabContent({
     super.key,
