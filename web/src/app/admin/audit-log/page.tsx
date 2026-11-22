@@ -22,6 +22,9 @@ export default function AuditLogPage() {
   const detailModalOpen = showDetailModal && !!selectedEntry;
   const detailModalPresent = usePresence(detailModalOpen);
 
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
   useEffect(() => {
     loadAuditLog();
   }, [page, filters]);
@@ -142,29 +145,27 @@ export default function AuditLogPage() {
           </div>
 
           {/* Start Date Filter */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-400 font-medium hidden sm:inline">From:</span>
-            <div className="relative">
-              <DatePicker
-                value={filters.startDate}
-                onChange={(value) => handleFilterChange('startDate', value)}
-                maxDate={new Date().toISOString().split('T')[0]}
-                placeholder="Start date"
-              />
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-medium hidden sm:inline whitespace-nowrap">From:</span>
+            <DatePicker
+              value={filters.startDate}
+              onChange={(value) => handleFilterChange('startDate', value)}
+              maxDate={todayStr}
+              placeholder="Start date"
+              className="w-40"
+            />
           </div>
 
           {/* End Date Filter */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-400 font-medium hidden sm:inline">To:</span>
-            <div className="relative">
-              <DatePicker
-                value={filters.endDate}
-                onChange={(value) => handleFilterChange('endDate', value)}
-                maxDate={new Date().toISOString().split('T')[0]}
-                placeholder="End date"
-              />
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-medium hidden sm:inline whitespace-nowrap">To:</span>
+            <DatePicker
+              value={filters.endDate}
+              onChange={(value) => handleFilterChange('endDate', value)}
+              maxDate={todayStr}
+              placeholder="End date"
+              className="w-40"
+            />
           </div>
         </div>
 
