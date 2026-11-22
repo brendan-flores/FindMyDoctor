@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/navigation/app_navigator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -29,7 +30,7 @@ class PatientInfoSheet extends StatefulWidget {
     required String conversationId,
     String? patientName,
   }) {
-    return showModalBottomSheet<void>(
+    return AppNavigator.showAppModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

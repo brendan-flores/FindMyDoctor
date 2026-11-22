@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/navigation/app_navigator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -850,7 +851,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                 GestureDetector(
                   onTap: () {
                     print('Invoice button tapped for paymentId: $paymentId');
-                    showModalBottomSheet(
+                    AppNavigator.showAppModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
                       backgroundColor: Colors.transparent,

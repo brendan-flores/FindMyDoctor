@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../core/navigation/app_navigator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
@@ -61,7 +62,7 @@ class _WaitlistPageState extends State<WaitlistPage> {
   }
 
   Future<void> _leaveWaitlist(Waitlist waitlist) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await AppNavigator.showAppDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Leave Waitlist'),
