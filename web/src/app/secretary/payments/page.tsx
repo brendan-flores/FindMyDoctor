@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { secretaryApi, Payment, BillingStatus } from '@/lib/api/secretaryApi';
 import Toast from '@/components/ui/Toast';
 import BillingPanel from '@/components/BillingPanel';
+import DatePicker from '@/components/DatePicker';
 
 type TabType = 'review' | 'collect' | 'paid' | 'attention';
 
@@ -209,19 +210,13 @@ export default function SecretaryPayments() {
               />
             </div>
             <div className="flex gap-2">
-              <input
-                type="date"
+              <DatePicker
                 value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                aria-label="From date"
+                onChange={setDateFrom}
               />
-              <input
-                type="date"
+              <DatePicker
                 value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                aria-label="To date"
+                onChange={setDateTo}
               />
             </div>
           </div>

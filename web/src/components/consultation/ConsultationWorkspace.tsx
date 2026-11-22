@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Toast from '@/components/ui/Toast';
 import Select from '@/components/ui/Select';
+import DatePicker from '@/components/DatePicker';
 import { consultationApi, type ConsultationContext, type ConsultationPrescription, type MedicationInput } from '@/lib/api/consultationApi';
 import { usePresence } from '@/hooks/usePresence';
 
@@ -764,11 +765,10 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
           {context.missingPatientInfo.includes('dateOfBirth') && (
             <div>
               <label className="block text-xs font-medium text-amber-900 mb-1">Date of birth</label>
-              <input
-                type="date"
+              <DatePicker
                 value={missingDob}
-                onChange={(event) => setMissingDob(event.target.value)}
-                className="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm bg-white"
+                onChange={setMissingDob}
+                maxDate={new Date().toLocaleDateString('en-CA')}
               />
             </div>
           )}

@@ -92,6 +92,18 @@ npm start
 
 The web application communicates with the REST API located in `backend/`. By default, the web app uses `http://127.0.0.1:3000/api/v1` for local development. Set `NEXT_PUBLIC_API_URL` to override the API URL.
 
+## End-to-end tests (Playwright)
+
+Playwright preflight requires `E2E_BASE_URL`, `E2E_API_URL`, `E2E_BACKEND_URL`,
+`NEXT_PUBLIC_API_URL`, and the other documented `E2E_*` variables. `E2E_API_URL`
+is the API base URL (for example `http://localhost:3000/api/v1`), while
+`E2E_BACKEND_URL` is the backend server root (for example
+`http://localhost:3000`) used for `/health` and `/health/e2e-db`.
+
+The Next.js development server or build must be started with the same
+`NEXT_PUBLIC_API_URL` value used for E2E. Do not assume a Playwright
+environment variable can retroactively change an already-running Next.js server.
+
 ## Architecture Notes
 
 - Uses Next.js 14 with App Router

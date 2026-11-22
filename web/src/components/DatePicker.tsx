@@ -7,58 +7,126 @@ interface DatePickerProps {
   onChange: (date: string) => void;
   maxDate?: string;
   minDate?: string;
+  disabledDates?: string[];
+  placeholder?: string;
+  showClear?: boolean;
+  showToday?: boolean;
+  onOpen?: () => void;
 }
 
-export default function DatePicker({ value, onChange, maxDate, minDate }: DatePickerProps) {
+const toLocalDateStr = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const parseDate = (s?: string | null): Date | null => {
+  if (!s) return null;
+  const [y, m, d] = s.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+};
+
+export default function DatePicker({
+  value,
+  onChange,
+  maxDate,
+  minDate,
+  disabledDates,
+  placeholder = 'Select date',
+  showClear = false,
+  showToday = false,
+  onOpen,
+}: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(value ? new Date(value) : null);
+  const maxDateObj = parseDate(maxDate);
+  const minDateObj = parseDate(minDate);
+
+  const [currentMonth, setCurrentMonth] = useState<Date>(() => {
+    const d = parseDate(value) || new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [selectedDate, setSelectedDate] = useState<Date | null>(parseDate(value));
   const [showYearSelector, setShowYearSelector] = useState(false);
   const [showMonthSelector, setShowMonthSelector] = useState(false);
 
-  const maxDateObj = maxDate ? new Date(maxDate) : new Date();
+  useEffect(() => {
+    if (isOpen) {
+      const d = parseDate(value) || new Date();
+      setSelectedDate(parseDate(value));
+      setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+    }
+  }, [isOpen, value]);
 
   useEffect(() => {
-    if (value) {
-      setSelectedDate(new Date(value));
-    }
+    setSelectedDate(parseDate(value));
   }, [value]);
 
-  const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const weekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-  // Generate years from current year back 100 years
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
+  const minYear = minDateObj ? minDateObj.getFullYear() : currentYear - 100;
+  const maxYear = maxDateObj ? maxDateObj.getFullYear() : currentYear + 10;
+  const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => maxYear - i);
 
-  const goToPreviousMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
+
+  const isMaxMonth = () => {
+    if (!maxDateObj) return false;
+    const cy = currentMonth.getFullYear();
+    const cm = currentMonth.getMonth();
+    if (cy > maxDateObj.getFullYear()) return true;
+    if (cy === maxDateObj.getFullYear() && cm >= maxDateObj.getMonth()) return true;
+    return false;
+  };
+  const isMinMonth = () => {
+    if (!minDateObj) return false;
+    const cy = currentMonth.getFullYear();
+    const cm = currentMonth.getMonth();
+    if (cy < minDateObj.getFullYear()) return true;
+    if (cy === minDateObj.getFullYear() && cm <= minDateObj.getMonth()) return true;
+    return false;
   };
 
+  const goToPreviousMonth = () => {
+    if (isMinMonth()) return;
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  };
   const goToNextMonth = () => {
-    if (currentMonth.getMonth() === maxDateObj.getMonth() && currentMonth.getFullYear() === maxDateObj.getFullYear()) {
-      return;
-    }
+    if (isMaxMonth()) return;
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  };
+
+  const isDisabled = (day: number) => {
+    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const dateStr = toLocalDateStr(date);
+    if (maxDateObj && date > maxDateObj) return true;
+    if (minDateObj && date < minDateObj) return true;
+    if (disabledDates?.includes(dateStr)) return true;
+    return false;
   };
 
   const handleDateClick = (day: number) => {
     const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    const formattedDate = newDate.toISOString().split('T')[0];
-    onChange(formattedDate);
+    onChange(toLocalDateStr(newDate));
     setSelectedDate(newDate);
     setIsOpen(false);
   };
 
   const handleYearChange = (year: number) => {
-    setCurrentMonth(new Date(year, currentMonth.getMonth(), 1));
+    let month = currentMonth.getMonth();
+    // clamp month to valid range for selected year
+    if (minDateObj && year === minDateObj.getFullYear() && month < minDateObj.getMonth()) month = minDateObj.getMonth();
+    if (maxDateObj && year === maxDateObj.getFullYear() && month > maxDateObj.getMonth()) month = maxDateObj.getMonth();
+    setCurrentMonth(new Date(year, month, 1));
     setShowYearSelector(false);
   };
-
   const handleMonthChange = (monthIndex: number) => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), monthIndex, 1));
+    const year = currentMonth.getFullYear();
+    const firstDay = new Date(year, monthIndex, 1);
+    const lastDay = new Date(year, monthIndex + 1, 0);
+    if (minDateObj && lastDay < minDateObj) return;
+    if (maxDateObj && firstDay > maxDateObj) return;
+    setCurrentMonth(new Date(year, monthIndex, 1));
     setShowMonthSelector(false);
   };
 
@@ -69,42 +137,45 @@ export default function DatePicker({ value, onChange, maxDate, minDate }: DatePi
 
   const isToday = (day: number) => {
     const today = new Date();
-    return day === today.getDate() && 
-           currentMonth.getMonth() === today.getMonth() && 
-           currentMonth.getFullYear() === today.getFullYear();
+    return day === today.getDate() && currentMonth.getMonth() === today.getMonth() && currentMonth.getFullYear() === today.getFullYear();
   };
-
   const isSelected = (day: number) => {
-    return selectedDate && 
-           day === selectedDate.getDate() && 
-           currentMonth.getMonth() === selectedDate.getMonth() && 
-           currentMonth.getFullYear() === selectedDate.getFullYear();
+    return selectedDate && day === selectedDate.getDate() && currentMonth.getMonth() === selectedDate.getMonth() && currentMonth.getFullYear() === selectedDate.getFullYear();
   };
 
-  const isPastMonth = () => {
-    return currentMonth.getFullYear() < maxDateObj.getFullYear() ||
-           (currentMonth.getFullYear() === maxDateObj.getFullYear() && currentMonth.getMonth() < maxDateObj.getMonth());
-  };
-
-  const isDisabled = (day: number) => {
-    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    if (date > maxDateObj) return true;
-    if (minDate) {
-      const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      if (dateStr < minDate) return true;
-    }
+  const isTodayDisabled = () => {
+    const today = new Date();
+    const todayStr = toLocalDateStr(today);
+    if (maxDateObj && todayStr > toLocalDateStr(maxDateObj)) return true;
+    if (minDateObj && todayStr < toLocalDateStr(minDateObj)) return true;
+    if (disabledDates?.includes(todayStr)) return true;
     return false;
+  };
+  const handleToday = () => {
+    if (isTodayDisabled()) return;
+    const today = new Date();
+    onChange(toLocalDateStr(today));
+    setSelectedDate(today);
+    setIsOpen(false);
+  };
+  const handleClear = () => {
+    onChange('');
+    setSelectedDate(null);
+    setIsOpen(false);
   };
 
   return (
-    <div className="relative">
+    <div className="relative dropdown-container">
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isOpen) onOpen?.();
+          setIsOpen(!isOpen);
+        }}
         className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-left flex items-center justify-between bg-white hover:border-emerald-300 transition-colors"
       >
         <span className={value ? 'text-slate-900' : 'text-slate-400'}>
-          {value ? formatDate(selectedDate) : 'Select date of birth'}
+          {value ? formatDate(selectedDate) : placeholder}
         </span>
         <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -113,36 +184,32 @@ export default function DatePicker({ value, onChange, maxDate, minDate }: DatePi
 
       {isOpen && (
         <div className="fmd-animate-in absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl p-4">
-          {/* Calendar Header */}
           <div className="flex items-center justify-between mb-4">
             <button
               type="button"
+              aria-label="Previous month"
               onClick={goToPreviousMonth}
-              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+              disabled={isMinMonth()}
+              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            
-            {/* Clickable Month/Year */}
+
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setShowMonthSelector(!showMonthSelector);
-                  setShowYearSelector(false);
-                }}
+                aria-label="Select month"
+                onClick={() => { setShowMonthSelector(!showMonthSelector); setShowYearSelector(false); }}
                 className="font-semibold text-slate-900 hover:text-[#1b5eb8] transition-colors"
               >
                 {monthNames[currentMonth.getMonth()]}
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowYearSelector(!showYearSelector);
-                  setShowMonthSelector(false);
-                }}
+                aria-label="Select year"
+                onClick={() => { setShowYearSelector(!showYearSelector); setShowMonthSelector(false); }}
                 className="font-semibold text-slate-900 hover:text-[#1b5eb8] transition-colors"
               >
                 {currentMonth.getFullYear()}
@@ -151,8 +218,9 @@ export default function DatePicker({ value, onChange, maxDate, minDate }: DatePi
 
             <button
               type="button"
+              aria-label="Next month"
               onClick={goToNextMonth}
-              disabled={isPastMonth()}
+              disabled={isMaxMonth()}
               className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -161,87 +229,80 @@ export default function DatePicker({ value, onChange, maxDate, minDate }: DatePi
             </button>
           </div>
 
-          {/* Month Selector Dropdown */}
           {showMonthSelector && (
             <div className="fmd-animate-in absolute top-16 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl p-2 z-30 max-h-60 overflow-y-auto">
               <div className="grid grid-cols-3 gap-1">
-                {monthNames.map((month, index) => (
-                  <button
-                    key={month}
-                    type="button"
-                    onClick={() => handleMonthChange(index)}
-                    className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                      currentMonth.getMonth() === index
-                        ? 'bg-[#1b5eb8] text-white'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    {month}
-                  </button>
-                ))}
+                {monthNames.map((month, index) => {
+                  const year = currentMonth.getFullYear();
+                  const firstDay = new Date(year, index, 1);
+                  const lastDay = new Date(year, index + 1, 0);
+                  const disabled = !!((minDateObj && lastDay < minDateObj) || (maxDateObj && firstDay > maxDateObj));
+                  return (
+                    <button
+                      key={month}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => handleMonthChange(index)}
+                      className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                        disabled ? 'text-slate-300 cursor-not-allowed' :
+                        currentMonth.getMonth() === index ? 'bg-[#1b5eb8] text-white' : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {month}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Year Selector Dropdown */}
           {showYearSelector && (
             <div className="fmd-animate-in absolute top-16 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl p-2 z-30 max-h-60 overflow-y-auto">
               <div className="grid grid-cols-4 gap-1">
-                {years.map((year) => (
-                  <button
-                    key={year}
-                    type="button"
-                    onClick={() => handleYearChange(year)}
-                    className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                      currentMonth.getFullYear() === year
-                        ? 'bg-[#1b5eb8] text-white'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    {year}
-                  </button>
-                ))}
+                {years.map((year) => {
+                  const disabled = !!((minDateObj && year < minDateObj.getFullYear()) || (maxDateObj && year > maxDateObj.getFullYear()));
+                  return (
+                    <button
+                      key={year}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => handleYearChange(year)}
+                      className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                        disabled ? 'text-slate-300 cursor-not-allowed' :
+                        currentMonth.getFullYear() === year ? 'bg-[#1b5eb8] text-white' : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {year}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Weekday Headers */}
           <div className="grid grid-cols-7 gap-1 mb-2">
             {weekDays.map((day) => (
-              <div key={day} className="text-center text-xs font-medium text-slate-500 py-1">
-                {day}
-              </div>
+              <div key={day} className="text-center text-xs font-medium text-slate-500 py-1">{day}</div>
             ))}
           </div>
 
-          {/* Calendar Grid */}
           <div className="grid grid-cols-7 gap-1">
-            {/* Empty cells for days before the first day of the month */}
             {Array.from({ length: firstDayOfMonth }).map((_, i) => (
               <div key={`empty-${i}`} className="py-2" />
             ))}
-
-            {/* Days of the month */}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
               const disabled = isDisabled(day);
               const selected = isSelected(day);
               const today = isToday(day);
-
               return (
                 <button
                   key={day}
                   type="button"
                   onClick={() => !disabled && handleDateClick(day)}
                   disabled={disabled}
-                  className={`
-                    py-2 text-sm rounded-lg transition-all duration-150
-                    ${selected 
-                      ? 'bg-[#1b5eb8] text-white font-medium' 
-                      : disabled
-                        ? 'text-slate-300 cursor-not-allowed'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }
+                  className={`py-2 text-sm rounded-lg transition-all duration-150
+                    ${selected ? 'bg-[#1b5eb8] text-white font-medium' : disabled ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-100'}
                     ${today && !selected ? 'border-2 border-[#1b5eb8]' : ''}
                   `}
                 >
@@ -250,10 +311,24 @@ export default function DatePicker({ value, onChange, maxDate, minDate }: DatePi
               );
             })}
           </div>
+
+          {(showClear || showToday) && (
+            <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
+              {showClear && (
+                <button type="button" onClick={handleClear} className="flex-1 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                  Clear
+                </button>
+              )}
+              {showToday && (
+                <button type="button" onClick={handleToday} disabled={isTodayDisabled()} className="flex-1 px-3 py-2 text-sm font-medium text-[#1b5eb8] hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                  Today
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Close dropdown when clicking outside */}
       {isOpen && (
         <div
           className="fixed inset-0 z-10"

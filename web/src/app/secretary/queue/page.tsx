@@ -5,7 +5,7 @@ import { secretaryApi, QueueEntry, SecretaryProfile } from '@/lib/api/secretaryA
 import Toast from '@/components/ui/Toast';
 import BillingPanel from '@/components/BillingPanel';
 import Select from '@/components/ui/Select';
-import { usePresence } from '@/hooks/usePresence';
+import DatePicker from '@/components/DatePicker';
 
 
 
@@ -62,8 +62,6 @@ export default function SecretaryQueue() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const datePickerPresent = usePresence(showDatePicker);
   const [showBillingPanel, setShowBillingPanel] = useState(false);
   const [billingPanelData, setBillingPanelData] = useState<{
     paymentId: string;
@@ -279,104 +277,6 @@ export default function SecretaryQueue() {
     return dateString === today;
   };
 
-  const getDaysInMonth = (year: number, month: number) => {
-    return new Date(year, month + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (year: number, month: number) => {
-    return new Date(year, month, 1).getDay();
-  };
-
-  const DatePicker = () => {
-    const currentDate = selectedDate ? (() => {
-      const [year, month, day] = selectedDate.split('-').map(Number);
-      return new Date(year, month - 1, day);
-    })() : new Date();
-    const [viewMonth, setViewMonth] = useState(currentDate.getMonth());
-    const [viewYear, setViewYear] = useState(currentDate.getFullYear());
-
-    const daysInMonth = getDaysInMonth(viewYear, viewMonth);
-    const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-    const handleDateClick = (day: number) => {
-      const formattedDate = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      setSelectedDate(formattedDate);
-      setShowDatePicker(false);
-    };
-
-    const previousMonth = () => {
-      if (viewMonth === 0) {
-        setViewMonth(11);
-        setViewYear(viewYear - 1);
-      } else {
-        setViewMonth(viewMonth - 1);
-      }
-    };
-
-    const nextMonth = () => {
-      if (viewMonth === 11) {
-        setViewMonth(0);
-        setViewYear(viewYear + 1);
-      } else {
-        setViewMonth(viewMonth + 1);
-      }
-    };
-
-    return (
-      <div className="dropdown-container relative">
-        <button
-          onClick={() => setShowDatePicker(!showDatePicker)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-sm text-slate-700"
-        >
-          <span className="material-symbols-outlined text-[18px] text-slate-500">calendar_today</span>
-          <span>{formatDate(selectedDate)}</span>
-          <span className="material-symbols-outlined text-[18px] text-slate-400">expand_more</span>
-        </button>
-
-        {datePickerPresent && (
-          <div
-            data-state={showDatePicker ? 'open' : 'closed'}
-            className="fmd-dropdown absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-lg shadow-lg p-4 z-50 w-72"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <button onClick={previousMonth} className="p-1 hover:bg-slate-100 rounded">
-                <span className="material-symbols-outlined text-[20px] text-slate-600">chevron_left</span>
-              </button>
-              <span className="font-semibold text-slate-900">{monthNames[viewMonth]} {viewYear}</span>
-              <button onClick={nextMonth} className="p-1 hover:bg-slate-100 rounded">
-                <span className="material-symbols-outlined text-[20px] text-slate-600">chevron_right</span>
-              </button>
-            </div>
-            <div className="grid grid-cols-7 gap-1 text-center text-xs">
-              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
-                <div key={day} className="font-medium text-slate-500 py-1">{day}</div>
-              ))}
-              {Array.from({ length: firstDay }).map((_, i) => (
-                <div key={`empty-${i}`} className="py-1"></div>
-              ))}
-              {Array.from({ length: daysInMonth }).map((_, i) => {
-                const day = i + 1;
-                const formattedDate = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const isSelected = formattedDate === selectedDate;
-                return (
-                  <button
-                    key={day}
-                    onClick={() => handleDateClick(day)}
-                    className={`py-1 rounded hover:bg-slate-100 transition-colors ${
-                      isSelected ? 'bg-purple-600 text-white hover:bg-purple-700' : 'text-slate-700'
-                    }`}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   // Calculate metrics
   const totalQueue = queueEntries.length;
@@ -452,7 +352,7 @@ export default function SecretaryQueue() {
     <div className="space-y-6">
       {/* Header Controls */}
       <div className="flex flex-col sm:flex-row gap-3 justify-between items-start">
-        <DatePicker />
+        <DatePicker value={selectedDate} onChange={setSelectedDate} />
         <div className="flex gap-3">
           <button
             onClick={handleCallNext}

@@ -11,6 +11,7 @@ import {
   toPatientMobileE164,
 } from '@/lib/phone';
 import Select from '@/components/ui/Select';
+import DatePicker from '@/components/DatePicker';
 
 export default function SecretaryPatientDetail() {
   const router = useRouter();
@@ -295,12 +296,10 @@ export default function SecretaryPatientDetail() {
               </div>
               <div>
                 <label className="block text-sm text-slate-500 mb-1">Date of Birth *</label>
-                <input
-                  type="date"
-                  name="dateOfBirth"
+                <DatePicker
                   value={formData.dateOfBirth}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  onChange={(date) => setFormData(prev => ({ ...prev, dateOfBirth: date }))}
+                  maxDate={new Date().toLocaleDateString('en-CA')}
                 />
               </div>
               <div>

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
-    "test": "node --test src/lib/api/requestPolicy.test.ts src/lib/api/ttlCache.test.ts src/lib/phone.test.ts"
+    "test": "node --test src/lib/api/requestPolicy.test.ts src/lib/api/ttlCache.test.ts src/lib/phone.test.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
@@ -17,6 +18,7 @@
     "sharp": "^0.35.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@types/node": "^20.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
