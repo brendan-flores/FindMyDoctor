@@ -7,9 +7,10 @@ interface DatePickerProps {
   onChange: (date: string) => void;
   maxDate?: string;
   minDate?: string;
+  placeholder?: string;
 }
 
-export default function DatePicker({ value, onChange, maxDate, minDate }: DatePickerProps) {
+export default function DatePicker({ value, onChange, maxDate, minDate, placeholder = 'Select date of birth' }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(value ? new Date(value) : null);
@@ -104,7 +105,7 @@ export default function DatePicker({ value, onChange, maxDate, minDate }: DatePi
         className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-left flex items-center justify-between bg-white hover:border-emerald-300 transition-colors"
       >
         <span className={value ? 'text-slate-900' : 'text-slate-400'}>
-          {value ? formatDate(selectedDate) : 'Select date of birth'}
+          {value ? formatDate(selectedDate) : placeholder}
         </span>
         <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
