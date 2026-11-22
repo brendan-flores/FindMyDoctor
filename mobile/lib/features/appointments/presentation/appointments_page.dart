@@ -904,7 +904,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                 children: [
                   const Icon(
                     Icons.warning_amber_rounded,
-                    color: AppColors.urgentAmber,
+                    color: AppColors.statusWarning,
                     size: spacing.AppSpacing.iconSm,
                   ),
                   const SizedBox(width: spacing.AppSpacing.gutterXs),
@@ -1060,9 +1060,9 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                                 : Icons.schedule,
                             size: 12,
                             color: paymentStatus == 'PAID'
-                                ? AppColors.brandAccentBlue
+                                ? AppColors.statusCompleted
                                 : paymentStatus == 'PENDING_VERIFICATION'
-                                ? AppColors.urgentAmber
+                                ? AppColors.statusWarning
                                 : paymentStatus == 'REJECTED'
                                 ? AppColors.error
                                 : AppColors.secondary,
@@ -1072,9 +1072,9 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                             _formatPaymentStatus(paymentStatus),
                             style: AppTextStyles.labelSm.copyWith(
                               color: paymentStatus == 'PAID'
-                                  ? AppColors.brandAccentBlue
+                                  ? AppColors.statusCompleted
                                   : paymentStatus == 'PENDING_VERIFICATION'
-                                  ? AppColors.urgentAmber
+                                  ? AppColors.statusWarning
                                   : paymentStatus == 'REJECTED'
                                   ? AppColors.error
                                   : AppColors.secondary,

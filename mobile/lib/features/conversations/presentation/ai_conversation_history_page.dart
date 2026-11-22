@@ -296,7 +296,7 @@ class _AiConversationHistoryPageState extends State<AiConversationHistoryPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Conversation renamed'),
-              backgroundColor: AppColors.brandTeal,
+              backgroundColor: AppColors.statusSuccess,
             ),
           );
         }
@@ -359,7 +359,7 @@ class _AiConversationHistoryPageState extends State<AiConversationHistoryPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Conversation deleted'),
-              backgroundColor: AppColors.brandTeal,
+              backgroundColor: AppColors.statusSuccess,
             ),
           );
         }

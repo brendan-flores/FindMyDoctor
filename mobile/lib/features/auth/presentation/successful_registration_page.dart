@@ -11,7 +11,7 @@ class SuccessfulRegistrationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.brandBgLight,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.all(AppSpacing.screenPadding),
@@ -74,7 +74,7 @@ class SuccessfulRegistrationPage extends StatelessWidget {
             width: 128,
             height: 128,
             decoration: BoxDecoration(
-              color: AppColors.skyBlue.withValues(alpha: 0.2),
+              color: AppColors.primaryContainer.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
           ),
@@ -83,10 +83,10 @@ class SuccessfulRegistrationPage extends StatelessWidget {
             width: 96,
             height: 96,
             decoration: BoxDecoration(
-              color: AppColors.skyBlue.withValues(alpha: 0.3),
+              color: AppColors.primaryContainer.withValues(alpha: 0.3),
               shape: BoxShape.circle,
               border: Border.all(
-                color: AppColors.skyBlue.withValues(alpha: 0.2),
+                color: AppColors.primaryContainer.withValues(alpha: 0.2),
                 width: 4,
               ),
             ),

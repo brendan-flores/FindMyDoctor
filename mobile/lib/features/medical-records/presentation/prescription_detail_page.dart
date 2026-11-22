@@ -608,7 +608,7 @@ class _PrescriptionDetailPageState extends State<PrescriptionDetailPage> {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: AppColors.surfaceLowest,
                   ),
                 )
               : const Icon(Icons.picture_as_pdf),

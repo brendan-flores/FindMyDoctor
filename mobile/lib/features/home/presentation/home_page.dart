@@ -1361,7 +1361,7 @@ class _HomePageState extends State<HomePage> {
             child: Center(
               child: Text(
                 'No specialties available',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: TextStyle(fontSize: 12, color: AppColors.slate500),
               ),
             ),
           )

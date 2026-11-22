@@ -333,10 +333,10 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         Flexible(
           child: SingleChildScrollView(
             child: Container(
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.slate50,
               padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
               child: Container(
-                color: Colors.white,
+                color: AppColors.surfaceLowest,
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -363,7 +363,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                                     'Find My Doctor',
                                     style: const TextStyle(
                                       fontSize: 18,
-                                      color: Color(0xFF1B5EB8),
+                                      color: AppColors.primary,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -373,7 +373,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                                       data['clinic']['name'],
                                       style: const TextStyle(
                                         fontSize: 12,
-                                        color: Color(0xFF64748B),
+                                        color: AppColors.slate500,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -383,7 +383,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                                       data['clinic']['address'],
                                       style: const TextStyle(
                                         fontSize: 12,
-                                        color: Color(0xFF64748B),
+                                        color: AppColors.slate500,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -393,7 +393,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                                       'Contact: ${data['clinic']['contact_number']}',
                                       style: const TextStyle(
                                         fontSize: 12,
-                                        color: Color(0xFF64748B),
+                                        color: AppColors.slate500,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -413,7 +413,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
+                                color: AppColors.slate900,
                               ),
                             ),
                             Column(
@@ -423,14 +423,14 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                                   'Invoice #: $invoiceNumber',
                                   style: const TextStyle(
                                     fontSize: 12,
-                                    color: Color(0xFF64748B),
+                                    color: AppColors.slate500,
                                   ),
                                 ),
                                 Text(
                                   _formatDate(invoiceDate),
                                   style: const TextStyle(
                                     fontSize: 12,
-                                    color: Color(0xFF64748B),
+                                    color: AppColors.slate500,
                                   ),
                                 ),
                               ],
@@ -469,7 +469,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                     // Line separator
                     Container(
                       height: 1,
-                      color: const Color(0xFFE2E8F0),
+                      color: AppColors.slate200,
                     ),
                     const SizedBox(height: 16),
 
@@ -484,7 +484,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                     // Footer
                     Container(
                       height: 1,
-                      color: const Color(0xFFE2E8F0),
+                      color: AppColors.slate200,
                     ),
                     const SizedBox(height: 16),
                     if (data['clinic']?['footer_line'] != null)
@@ -494,7 +494,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                           data['clinic']['footer_line'],
                           style: const TextStyle(
                             fontSize: 14,
-                            color: Color(0xFF64748B),
+                            color: AppColors.slate500,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -503,7 +503,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                       'This is a computer-generated invoice.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF94A3B8),
+                        color: AppColors.slate400,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -566,7 +566,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                               width: 16,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(AppColors.surfaceLowest),
                               ),
                             )
                           : const Row(
@@ -598,7 +598,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         Container(
           decoration: const BoxDecoration(
             border: Border(
-              bottom: BorderSide(color: Color(0xFFE2E8F0)),
+              bottom: BorderSide(color: AppColors.slate200),
             ),
           ),
           child: const Row(
@@ -613,7 +613,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
+                      color: AppColors.slate900,
                     ),
                     maxLines: 1,
                     softWrap: false,
@@ -628,7 +628,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.slate900,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -640,7 +640,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.slate900,
                   ),
                   textAlign: TextAlign.right,
                 ),
@@ -652,7 +652,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.slate900,
                   ),
                   textAlign: TextAlign.right,
                 ),
@@ -704,7 +704,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
     return Container(
       decoration: const BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: Color(0xFFF1F5F9)),
+          bottom: BorderSide(color: AppColors.slate100),
         ),
       ),
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -719,7 +719,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 description,
                 style: const TextStyle(
                   fontSize: 12,
-                  color: Color(0xFF334155),
+                  color: AppColors.slate700,
                 ),
                 maxLines: 1,
                 softWrap: false,
@@ -733,7 +733,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
               quantity,
               style: const TextStyle(
                 fontSize: 12,
-                color: Color(0xFF334155),
+                color: AppColors.slate700,
               ),
               textAlign: TextAlign.center,
             ),
@@ -744,7 +744,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
               rate,
               style: const TextStyle(
                 fontSize: 12,
-                color: Color(0xFF334155),
+                color: AppColors.slate700,
               ),
               textAlign: TextAlign.right,
             ),
@@ -755,7 +755,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
               amount,
               style: const TextStyle(
                 fontSize: 12,
-                color: Color(0xFF334155),
+                color: AppColors.slate700,
               ),
               textAlign: TextAlign.right,
             ),
@@ -769,9 +769,9 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFFECACA)),
+        border: Border.all(color: AppColors.statusErrorBorder),
         borderRadius: BorderRadius.circular(8),
-        color: const Color(0xFFFEF2F2),
+        color: AppColors.statusErrorContainer,
       ),
       margin: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -782,7 +782,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: Color(0xFFB91C1C),
+              color: AppColors.statusError,
             ),
           ),
           Text(
@@ -790,7 +790,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Color(0xFFB91C1C),
+              color: AppColors.statusError,
             ),
             textAlign: TextAlign.right,
           ),
@@ -865,7 +865,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 'Subtotal:',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF475569),
+                  color: AppColors.slate600,
                 ),
               ),
             ),
@@ -875,7 +875,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 _formatCurrency(subtotal),
                 style: const TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF475569),
+                  color: AppColors.slate600,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -887,7 +887,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         // Line separator
         Container(
           height: 1,
-          color: const Color(0xFFE2E8F0),
+          color: AppColors.slate200,
         ),
         const SizedBox(height: 8),
 
@@ -897,7 +897,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF64748B),
+            color: AppColors.slate500,
             letterSpacing: 0.5,
           ),
         ),
@@ -907,9 +907,9 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: AppColors.slate200),
             borderRadius: BorderRadius.circular(8),
-            color: const Color(0xFFF8FAFC),
+            color: AppColors.slate50,
           ),
           margin: const EdgeInsets.only(bottom: 8),
           child: Row(
@@ -921,7 +921,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B),
+                    color: AppColors.slate800,
                   ),
                 ),
               ),
@@ -931,7 +931,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B),
+                    color: AppColors.slate800,
                   ),
                   textAlign: TextAlign.right,
                 ),
@@ -945,9 +945,9 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: AppColors.slate200),
               borderRadius: BorderRadius.circular(8),
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.slate50,
             ),
             margin: const EdgeInsets.only(bottom: 8),
             child: Row(
@@ -964,8 +964,8 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                           ? FontWeight.w400
                           : FontWeight.w600,
                       color: gcashRefsText.isNotEmpty
-                          ? const Color(0xFF475569)
-                          : const Color(0xFF1E293B),
+                          ? AppColors.slate600
+                          : AppColors.slate800,
                     ),
                     softWrap: true,
                     overflow: TextOverflow.visible,
@@ -977,7 +977,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B),
+                    color: AppColors.slate800,
                   ),
                   textAlign: TextAlign.right,
                 ),
@@ -996,9 +996,9 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: AppColors.slate200),
               borderRadius: BorderRadius.circular(8),
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.slate50,
             ),
             margin: const EdgeInsets.only(bottom: 8),
             child: Column(
@@ -1012,7 +1012,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF1E293B),
+                          color: AppColors.slate800,
                         ),
                       ),
                     ),
@@ -1023,7 +1023,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF1E293B),
+                          color: AppColors.slate800,
                         ),
                         textAlign: TextAlign.right,
                       ),
@@ -1040,7 +1040,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                           'Amount applied to balance',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF64748B),
+                            color: AppColors.slate500,
                           ),
                         ),
                       ),
@@ -1050,7 +1050,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                           _formatCurrency(_parseDouble(payment['amount_applied'])),
                           style: const TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF64748B),
+                            color: AppColors.slate500,
                           ),
                           textAlign: TextAlign.right,
                         ),
@@ -1067,9 +1067,9 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: AppColors.slate200),
               borderRadius: BorderRadius.circular(8),
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.slate50,
             ),
             margin: const EdgeInsets.only(bottom: 8),
             child: Row(
@@ -1081,7 +1081,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B),
+                      color: AppColors.slate800,
                     ),
                   ),
                 ),
@@ -1092,7 +1092,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B),
+                      color: AppColors.slate800,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -1106,13 +1106,13 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
           const SizedBox(height: 8),
           Container(
             height: 1,
-            color: const Color(0xFFA7F3D0),
+            color: AppColors.statusSuccessBorder,
           ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFECFDF5),
+              color: AppColors.statusSuccessContainer,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -1124,7 +1124,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF059669),
+                      color: AppColors.statusSuccess,
                     ),
                   ),
                 ),
@@ -1135,7 +1135,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF059669),
+                      color: AppColors.statusSuccess,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -1148,7 +1148,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
         const SizedBox(height: 8),
         Container(
           height: 1,
-          color: const Color(0xFFCBD5E1),
+          color: AppColors.slate300,
         ),
         const SizedBox(height: 8),
 
@@ -1162,7 +1162,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
+                  color: AppColors.slate900,
                 ),
               ),
             ),
@@ -1173,7 +1173,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
+                  color: AppColors.slate900,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -1193,7 +1193,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                     'Remaining Balance:',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Color(0xFFDC2626),
+                      color: AppColors.statusError,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -1204,7 +1204,7 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
                     _formatCurrency(finalBalance),
                     style: const TextStyle(
                       fontSize: 14,
-                      color: Color(0xFFDC2626),
+                      color: AppColors.statusError,
                       fontWeight: FontWeight.w500,
                     ),
                     textAlign: TextAlign.center,

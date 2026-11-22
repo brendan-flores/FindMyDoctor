@@ -251,10 +251,10 @@ class _AiConversationPageState extends State<AiConversationPage> {
               width: double.infinity,
               padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
               decoration: BoxDecoration(
-                color: AppColors.urgentAmber.withValues(alpha: 0.1),
+                color: AppColors.statusWarning.withValues(alpha: 0.1),
                 border: Border(
                   bottom: BorderSide(
-                    color: AppColors.urgentAmber.withValues(alpha: 0.3),
+                    color: AppColors.statusWarning.withValues(alpha: 0.3),
                   ),
                 ),
               ),
@@ -262,7 +262,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
                 children: [
                   Icon(
                     Icons.warning_amber_outlined,
-                    color: AppColors.urgentAmber,
+                    color: AppColors.statusWarning,
                     size: 20,
                   ),
                   const SizedBox(width: spacing.AppSpacing.gutterSm),
@@ -270,7 +270,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
                     child: Text(
                       '${AiConstants.fullName} is an AI assistant, not a doctor. Personal identifiers are not sent to the AI provider.',
                       style: AppTextStyles.labelSm.copyWith(
-                        color: AppColors.urgentAmber,
+                        color: AppColors.statusWarning,
                       ),
                     ),
                   ),
@@ -410,7 +410,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
                                 spacing.AppSpacing.gutterMd,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.urgentAmber.withValues(
+                                color: AppColors.statusWarning.withValues(
                                   alpha: 0.1,
                                 ),
                                 borderRadius: BorderRadius.circular(
@@ -424,7 +424,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
                                     children: [
                                       Icon(
                                         Icons.warning_amber_outlined,
-                                        color: AppColors.urgentAmber,
+                                        color: AppColors.statusWarning,
                                         size: 20,
                                       ),
                                       const SizedBox(
@@ -434,7 +434,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
                                         child: Text(
                                           'Important',
                                           style: AppTextStyles.labelSm.copyWith(
-                                            color: AppColors.urgentAmber,
+                                            color: AppColors.statusWarning,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
@@ -1033,7 +1033,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(
-            color: AppColors.urgentAmber.withValues(alpha: 0.5),
+            color: AppColors.statusWarning.withValues(alpha: 0.5),
           ),
           borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
         ),
@@ -1061,7 +1061,7 @@ class _AiConversationPageState extends State<AiConversationPage> {
                   Text(
                     'I cannot diagnose',
                     style: AppTextStyles.bodyMdMedium.copyWith(
-                      color: AppColors.urgentAmber,
+                      color: AppColors.statusWarning,
                     ),
                   ),
                 ],

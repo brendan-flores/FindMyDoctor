@@ -120,7 +120,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.brandBgLight,
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
           _buildBackground(),
@@ -185,13 +185,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       child: IgnorePointer(
         child: Stack(
           children: [
-            const ColoredBox(color: AppColors.brandBgLight),
+            const ColoredBox(color: AppColors.background),
             Positioned(
               top: -130,
               right: -100,
               child: _softBlob(
                 size: 320,
-                color: AppColors.brandAccentBlue.withValues(alpha: 0.14),
+                color: AppColors.statusCompleted.withValues(alpha: 0.14),
               ),
             ),
             Positioned(

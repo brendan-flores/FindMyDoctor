@@ -1410,7 +1410,7 @@ class InvoiceSkeleton extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
         child: Container(
-          color: Colors.white,
+          color: AppColors.surfaceLowest,
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

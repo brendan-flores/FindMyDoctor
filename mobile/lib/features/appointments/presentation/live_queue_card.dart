@@ -169,15 +169,15 @@ class _LiveQueueCardState extends State<LiveQueueCard>
       case 'CALLED':
         return AppColors.primary;
       case 'IN_CHECKUP':
-        return const Color(0xFF9333EA);
+        return AppColors.statusInProgress;
       case 'COMPLETED':
-        return AppColors.brandAccentBlue;
+        return AppColors.statusCompleted;
       case 'CANCELLED':
       case 'NO_SHOW':
         return AppColors.error;
       case 'NOT_PRESENT':
       case 'SKIPPED':
-        return AppColors.urgentAmber;
+        return AppColors.statusWarning;
       default:
         return AppColors.tertiary;
     }

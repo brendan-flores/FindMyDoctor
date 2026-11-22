@@ -1017,7 +1017,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                   ),
                 ),
               if (showStar)
-                Icon(Icons.star, color: Colors.amber, size: 14, weight: 700),
+                Icon(Icons.star, color: AppColors.statusWarning, size: 14, weight: 700),
               Text(
                 label,
                 style: AppTextStyles.labelMd.copyWith(
@@ -1606,7 +1606,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                   children: [
                     Icon(
                       Icons.star,
-                      color: Colors.amber,
+                      color: AppColors.statusWarning,
                       size: 14,
                       weight: 700,
                     ),

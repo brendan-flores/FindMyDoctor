@@ -156,7 +156,7 @@ class _AppHeaderState extends State<AppHeader> {
                                   ? '9+'
                                   : widget.unreadCount.toString(),
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: AppColors.surfaceLowest,
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
                               ),

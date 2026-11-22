@@ -209,7 +209,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     return PopScope(
       canPop: !_isRequiredChange,
       child: Scaffold(
-        backgroundColor: AppColors.brandBgLight,
+        backgroundColor: AppColors.background,
         body: SafeArea(
           child: SingleChildScrollView(
             child: Padding(

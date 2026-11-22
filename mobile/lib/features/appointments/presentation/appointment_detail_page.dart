@@ -139,13 +139,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       case 'CONFIRMED':
         return AppColors.primary;
       case 'IN_PROGRESS':
-        return const Color(0xFF9333EA); // Purple
+        return AppColors.statusInProgress; // Purple
       case 'COMPLETED':
-        return AppColors.brandAccentBlue;
+        return AppColors.statusCompleted;
       case 'CANCELLED':
         return AppColors.error;
       case 'NO_SHOW':
-        return AppColors.urgentAmber;
+        return AppColors.statusWarning;
       default:
         return AppColors.secondary;
     }
@@ -403,10 +403,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       width: double.infinity,
       padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       decoration: BoxDecoration(
-        color: AppColors.urgentAmber.withValues(alpha: 0.1),
+        color: AppColors.statusWarning.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
         border: Border.all(
-          color: AppColors.urgentAmber.withValues(alpha: 0.4),
+          color: AppColors.statusWarning.withValues(alpha: 0.4),
         ),
       ),
       child: Row(
@@ -414,7 +414,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         children: [
           const Icon(
             Icons.warning_amber_rounded,
-            color: AppColors.urgentAmber,
+            color: AppColors.statusWarning,
             size: spacing.AppSpacing.iconMd,
           ),
           const SizedBox(width: spacing.AppSpacing.gutterSm),
@@ -628,13 +628,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         : queueStatus == 'CALLED'
             ? AppColors.primary
             : queueStatus == 'IN_CHECKUP'
-                ? const Color(0xFF9333EA) // Purple
+                ? AppColors.statusInProgress // Purple
                 : queueStatus == 'COMPLETED'
-                    ? AppColors.brandAccentBlue
+                    ? AppColors.statusCompleted
                     : queueStatus == 'CANCELLED'
                         ? AppColors.error
                         : queueStatus == 'NO_SHOW'
-                            ? AppColors.urgentAmber
+                            ? AppColors.statusWarning
                             : AppColors.secondary;
 
     final statusIcon = queueStatus == 'WAITING'
@@ -717,9 +717,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     }
 
     final statusColor = paymentStatus == 'PAID'
-        ? AppColors.brandAccentBlue
+        ? AppColors.statusCompleted
         : paymentStatus == 'PENDING_VERIFICATION'
-            ? AppColors.urgentAmber
+            ? AppColors.statusWarning
             : paymentStatus == 'REJECTED'
                 ? AppColors.error
                 : AppColors.secondary;
@@ -1030,7 +1030,7 @@ class _ReceiptViewerDialog extends StatelessWidget {
             top: 8,
             right: 8,
             child: IconButton(
-              icon: const Icon(Icons.close, color: Colors.white),
+              icon: const Icon(Icons.close, color: AppColors.surfaceLowest),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),

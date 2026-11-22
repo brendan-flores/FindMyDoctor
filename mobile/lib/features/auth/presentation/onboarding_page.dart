@@ -107,7 +107,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.brandBgLight,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -212,7 +212,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             width: 224,
             height: 224,
             decoration: BoxDecoration(
-              color: AppColors.skyBlue.withValues(alpha: 0.15),
+              color: AppColors.primaryContainer.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
           ),
@@ -221,11 +221,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
             width: 176,
             height: 176,
             decoration: BoxDecoration(
-              color: AppColors.skyBlue.withValues(alpha: 0.25),
+              color: AppColors.primaryContainer.withValues(alpha: 0.25),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.skyBlue.withValues(alpha: 0.1),
+                  color: AppColors.primaryContainer.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),

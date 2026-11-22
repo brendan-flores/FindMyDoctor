@@ -628,7 +628,7 @@ class _ReschedulePageState extends State<ReschedulePage> {
                                   : status == 'AVAILABLE'
                                   ? AppColors.tertiary
                                   : status == 'FULL'
-                                  ? AppColors.urgentAmber
+                                  ? AppColors.statusWarning
                                   : Colors.transparent,
                             ),
                           ),
@@ -692,7 +692,7 @@ class _ReschedulePageState extends State<ReschedulePage> {
                 size: spacing.AppSpacing.iconSm,
                 color: status == 'AVAILABLE'
                     ? AppColors.tertiary
-                    : AppColors.urgentAmber,
+                    : AppColors.statusWarning,
               ),
               const SizedBox(width: spacing.AppSpacing.gutterXs),
               Text(
@@ -702,7 +702,7 @@ class _ReschedulePageState extends State<ReschedulePage> {
                 style: AppTextStyles.labelSm.copyWith(
                   color: status == 'AVAILABLE'
                       ? AppColors.tertiary
-                      : AppColors.urgentAmber,
+                      : AppColors.statusWarning,
                 ),
               ),
             ],

@@ -63,28 +63,21 @@ class AppColors {
   static const Color outline = Color(0xFF6E7881);
   static const Color outlineVariant = Color(0xFFBEC8D2);
 
-  // Brand Specific Colors (from login prototype)
-  static const Color brandNavy = Color(0xFF002B49);
-  static const Color brandDark = Color(0xFF0F172A);
-  static const Color brandPrimary = Color(0xFF005B94);
-  static const Color brandPrimaryHover = Color(0xFF004C7D);
-  static const Color brandTeal = Color(0xFF059669);
-  static const Color brandTealBadge = Color(0xFF00A86B);
-  static const Color brandBgLight = Color(0xFFF8F9FF);
-  static const Color brandSoftGray = Color(0xFFF1F5F9);
-  static const Color brandAccentBlue = Color(0xFF0284C7);
+  // Status Colors — semantic tokens for success, warning, and
+  // appointment/queue status indicators. Use these instead of raw hex
+  // values or ad-hoc color picks.
+  static const Color statusSuccess = Color(0xFF059669);
+  static const Color statusSuccessContainer = Color(0xFFECFDF5);
+  static const Color statusSuccessBorder = Color(0xFFA7F3D0);
+  static const Color statusWarning = Color(0xFFF59E0B);
+  static const Color statusError = Color(0xFFDC2626);
+  static const Color statusErrorContainer = Color(0xFFFEF2F2);
+  static const Color statusErrorBorder = Color(0xFFFECACA);
+  static const Color statusInProgress = Color(0xFF9333EA);
+  static const Color statusCompleted = Color(0xFF0284C7);
 
-  // Functional Colors
-  static const Color skyBlue = Color(0xFF0EA5E9);
-  static const Color deepNavy = Color(0xFF0F172A);
-  static const Color medicalTeal = Color(0xFF14B8A6);
-  static const Color slateMuted = Color(0xFF64748B);
-  static const Color canvasBase = Color(0xFFF8FAFC);
-  static const Color pureWhite = Color(0xFFFFFFFF);
-  static const Color urgentAmber = Color(0xFFF59E0B);
-  static const Color emergencyCrimson = Color(0xFFEF4444);
-
-  // Neutral Colors
+  // Neutral Colors — slate scale used for text, borders, and subtle
+  // surfaces where the semantic surface/outline tokens are too coarse.
   static const Color slate50 = Color(0xFFF8FAFC);
   static const Color slate100 = Color(0xFFF1F5F9);
   static const Color slate200 = Color(0xFFE2E8F0);
@@ -95,4 +88,28 @@ class AppColors {
   static const Color slate700 = Color(0xFF334155);
   static const Color slate800 = Color(0xFF1E293B);
   static const Color slate900 = Color(0xFF0F172A);
+
+  // Brand Palette — intentional brand identity colors used by the auth,
+  // onboarding, and brand-accent surfaces. Prefer the semantic tokens
+  // above for general UI; only use these where the brand look is required.
+  static const Color brandNavy = Color(0xFF002B49);
+  static const Color brandPrimary = Color(0xFF005B94);
+  static const Color brandPrimaryHover = Color(0xFF004C7D);
+  static const Color brandTealBadge = Color(0xFF00A86B);
+  static const Color medicalTeal = Color(0xFF14B8A6);
+  static const Color emergencyCrimson = Color(0xFFEF4444);
+
+  // Legacy aliases — retained for backward compatibility. These are
+  // exact duplicates of canonical tokens; prefer the canonical name.
+  static const Color brandBgLight = background;
+  static const Color brandSoftGray = slate100;
+  static const Color brandDark = slate900;
+  static const Color deepNavy = slate900;
+  static const Color canvasBase = slate50;
+  static const Color pureWhite = surfaceLowest;
+  static const Color skyBlue = primaryContainer;
+  static const Color slateMuted = slate500;
+  static const Color urgentAmber = statusWarning;
+  static const Color brandTeal = statusSuccess;
+  static const Color brandAccentBlue = statusCompleted;
 }

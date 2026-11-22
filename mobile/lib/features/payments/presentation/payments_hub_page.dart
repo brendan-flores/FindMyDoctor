@@ -1131,7 +1131,7 @@ class _ReceiptViewerDialog extends StatelessWidget {
             top: 8,
             right: 8,
             child: IconButton(
-              icon: const Icon(Icons.close, color: Colors.white),
+              icon: const Icon(Icons.close, color: AppColors.surfaceLowest),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
