@@ -12,16 +12,17 @@ import { usePathname } from 'next/navigation';
  * reveals, state updates) from animating. Browsers without View
  * Transitions API support render normally with no animation.
  *
- * Guard: the View Transitions API throws `InvalidStateError`
- * ("Transition was aborted because of invalid state. Document hidden")
- * when `startViewTransition` is called on a document that is not fully
- * active (hidden). That can happen mid-navigation or when the tab is
- * backgrounded/minimized, which is exactly the "right after navigating to
- * the doctor portal" symptom. While the document is hidden we render the
- * children without a transition and resume the crossfade once the document
- * becomes visible again. This single shared component is used by the
- * Doctor, Secretary, and Admin portal layouts (and their auth layouts), so
- * the guard covers all web portals.
+ * The rendered element type stays a `ViewTransition` regardless of document
+ * visibility. Previously the component switched between a Fragment and a
+ * `ViewTransition` based on `visibilityState`, which unmounted and remounted
+ * the whole page subtree on every tab show/hide and destroyed form state,
+ * open modals, wizard steps, and OTP state. Keeping the wrapper type stable
+ * preserves that state across ordinary visibility changes.
+ *
+ * Transition props are disabled while the document is hidden (or during
+ * SSR/hydration) so we never start a view transition on a hidden document.
+ * The wrapper itself remains mounted, so no hidden-document abort occurs and
+ * no subtree remount happens.
  */
 export default function PageTransition({
   children,
@@ -34,7 +35,8 @@ export default function PageTransition({
     return document.visibilityState === 'visible';
   });
 
-  // Track visibility so we never call startViewTransition on a hidden document.
+  // Track visibility so we never start a view transition on a hidden document.
+  // This only updates state; it does not change the rendered element type.
   useEffect(() => {
     const onVisibilityChange = () => {
       setIsVisible(document.visibilityState === 'visible');
@@ -45,19 +47,18 @@ export default function PageTransition({
     };
   }, []);
 
-  // No animation during SSR/hydration, while the document is hidden, or in
-  // browsers without the View Transitions API.
-  if (
-    isVisible === undefined ||
-    !isVisible ||
-    typeof document === 'undefined' ||
-    !document.startViewTransition
-  ) {
-    return <>{children}</>;
-  }
+  const canTransition =
+    isVisible === true &&
+    typeof document !== 'undefined' &&
+    typeof document.startViewTransition === 'function';
 
   return (
-    <ViewTransition key={pathname} enter="page-fade" exit="page-fade" default="none">
+    <ViewTransition
+      key={pathname}
+      enter={canTransition ? 'page-fade' : 'none'}
+      exit={canTransition ? 'page-fade' : 'none'}
+      default="none"
+    >
       {children}
     </ViewTransition>
   );
