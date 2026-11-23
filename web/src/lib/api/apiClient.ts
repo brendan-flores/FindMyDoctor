@@ -426,6 +426,14 @@ class ApiClient {
     return this.resolveAuthToken();
   }
 
+  /**
+   * Read the session-policy metadata stored for the current portal. Returns
+   * null for legacy sessions that predate session metadata.
+   */
+  getSessionMetadata(): SessionMetadata | null {
+    return this.session ?? this.readSessionMetadata();
+  }
+
   private subscribeTokenRefresh(callback: (token: string | null) => void) {
     this.refreshSubscribers.push(callback);
   }

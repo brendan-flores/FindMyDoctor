@@ -708,6 +708,44 @@ export async function registerTrustedBrowser(userId: string, deviceInfo?: string
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
   const safeDeviceInfo = deviceInfo ? deviceInfo.slice(0, 500) : null;
 
+  // One active row per device: when the same browser/OS is trusted again
+  // (for example after its cookie was cleared or rotated out), refresh the
+  // existing record instead of inserting a duplicate. Any older duplicate
+  // rows for the same device are revoked so only a single active entry remains
+  // and its last-used timestamp reflects the latest trust.
+  const existing = await query(
+    `SELECT id FROM trusted_browsers
+     WHERE user_id = $1
+     AND revoked_at IS NULL
+     AND expires_at > CURRENT_TIMESTAMP
+     AND device_info IS NOT DISTINCT FROM $2
+     ORDER BY last_used_at DESC NULLS LAST, created_at DESC`,
+    [userId, safeDeviceInfo]
+  );
+
+  if (existing.rows.length > 0) {
+    const keepId = existing.rows[0].id;
+    const duplicateIds = existing.rows.slice(1).map((row: any) => row.id);
+
+    await query(
+      `UPDATE trusted_browsers
+       SET token_hash = $1, device_info = $2, expires_at = $3, last_used_at = CURRENT_TIMESTAMP
+       WHERE id = $4`,
+      [tokenHash, safeDeviceInfo, expiresAt, keepId]
+    );
+
+    if (duplicateIds.length > 0) {
+      await query(
+        `UPDATE trusted_browsers
+         SET revoked_at = CURRENT_TIMESTAMP
+         WHERE id = ANY($1::uuid[]) AND revoked_at IS NULL`,
+        [duplicateIds]
+      );
+    }
+
+    return token;
+  }
+
   await query(
     `INSERT INTO trusted_browsers (user_id, token_hash, device_info, expires_at)
      VALUES ($1, $2, $3, $4)`,

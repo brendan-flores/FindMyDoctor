@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authApi } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
+import { secretaryApi } from '@/lib/api/secretaryApi';
 import OtpVerification from '@/components/auth/OtpVerification';
 import Toast from '@/components/ui/Toast';
 
@@ -16,7 +17,51 @@ export default function SecretaryLogin() {
   const [error, setError] = useState('');
   const [showOtp, setShowOtp] = useState(false);
   const [challengeId, setChallengeId] = useState('');
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const router = useRouter();
+
+  // An existing valid session must skip the login form and resume the normal
+  // portal routing. Password change takes precedence, then the device-trust
+  // step for non-persistent sessions, then the dashboard — whose layout owns
+  // the profile-completion redirect.
+  useEffect(() => {
+    const restoreExistingSession = async () => {
+      if (!apiClient.getStoredToken()) {
+        setIsCheckingSession(false);
+        return;
+      }
+
+      try {
+        const response = await secretaryApi.getProfile({ skipCache: true });
+
+        if (response.success && response.data) {
+          let storedUser: any = null;
+          try {
+            storedUser = JSON.parse(localStorage.getItem('secretary_user') || 'null');
+          } catch {
+            storedUser = null;
+          }
+
+          if (storedUser?.mustChangePassword === true) {
+            router.replace('/secretary/change-password');
+          } else {
+            const session = apiClient.getSessionMetadata();
+            const isPersistent =
+              session?.persistent === true || session?.rememberMe === true;
+            router.replace(isPersistent ? '/secretary/dashboard' : '/secretary/trust-device');
+          }
+        } else {
+          apiClient.clearToken();
+        }
+      } catch {
+        apiClient.clearToken();
+      } finally {
+        setIsCheckingSession(false);
+      }
+    };
+
+    restoreExistingSession();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +154,21 @@ export default function SecretaryLogin() {
   const handleChallengeIdUpdate = (newChallengeId: string) => {
     setChallengeId(newChallengeId);
   };
+
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F3F5F9] px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col items-center gap-4">
+          <img
+            src="/images/findmydoctor_logo.png"
+            alt="FindMyDoctor Logo"
+            className="h-16 w-auto"
+          />
+          <p className="text-sm font-medium text-slate-500">Checking your session…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F3F5F9] px-4 sm:px-6 lg:px-8">

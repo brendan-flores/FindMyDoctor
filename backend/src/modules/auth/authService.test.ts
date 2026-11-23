@@ -4,7 +4,7 @@
  * role validation, password verification, and mustChangePassword handling
  */
 
-import { login, changePassword } from './authService';
+import { login, changePassword, registerTrustedBrowser } from './authService';
 import { ErrorCodes } from '../../utils/response';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config';
@@ -674,5 +674,61 @@ describe('AuthService - Change Password Behavior', () => {
       code: ErrorCodes.VALIDATION_ERROR,
       message: 'Current password is required'
     });
+  });
+});
+
+describe('AuthService - Trusted Browser Registration', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('refreshes the existing row and revokes duplicates instead of inserting for the same device', async () => {
+    const statements: string[] = [];
+    query.mockImplementation((sql: string) => {
+      statements.push(sql);
+      if (sql.includes('SELECT id FROM trusted_browsers')) {
+        return Promise.resolve({ rows: [{ id: 'keep-id' }, { id: 'dup-id' }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const token = await registerTrustedBrowser('user-id', 'UA-string');
+
+    expect(typeof token).toBe('string');
+    expect(statements.some((s) => s.includes('INSERT INTO trusted_browsers'))).toBe(false);
+    expect(statements.some((s) => s.includes('SET token_hash'))).toBe(true);
+    expect(
+      statements.some((s) => s.includes('revoked_at = CURRENT_TIMESTAMP') && s.includes('ANY'))
+    ).toBe(true);
+  });
+
+  it('keeps a single active row without revoking anything when only one match exists', async () => {
+    const statements: string[] = [];
+    query.mockImplementation((sql: string) => {
+      statements.push(sql);
+      if (sql.includes('SELECT id FROM trusted_browsers')) {
+        return Promise.resolve({ rows: [{ id: 'keep-id' }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    await registerTrustedBrowser('user-id', 'UA-string');
+
+    expect(statements.some((s) => s.includes('INSERT INTO trusted_browsers'))).toBe(false);
+    expect(statements.some((s) => s.includes('SET token_hash'))).toBe(true);
+    expect(statements.some((s) => s.includes('ANY'))).toBe(false);
+  });
+
+  it('inserts a new row when no active row exists for the device', async () => {
+    const statements: string[] = [];
+    query.mockImplementation((sql: string) => {
+      statements.push(sql);
+      return Promise.resolve({ rows: [] });
+    });
+
+    await registerTrustedBrowser('user-id', 'UA-string');
+
+    expect(statements.some((s) => s.includes('INSERT INTO trusted_browsers'))).toBe(true);
+    expect(statements.some((s) => s.includes('SET token_hash'))).toBe(false);
   });
 });

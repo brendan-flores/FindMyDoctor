@@ -208,6 +208,26 @@ describe('Auth routes - session behavior', () => {
   });
 
   it('allows SuperAdmin to log in without OTP', async () => {
+    query.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT * FROM users')) {
+        return Promise.resolve({
+          rows: [{
+            id: 'superadmin-id',
+            email: 'superadmin@example.com',
+            password_hash: '$2a$10$hashedpassword',
+            role: 'SUPERADMIN',
+            is_active: true,
+            must_change_password: false,
+            session_version: 0,
+          }],
+        });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const bcrypt = require('bcryptjs');
+    jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
+
     const response = await request(app)
       .post('/api/v1/auth/login')
       .send({ email: 'superadmin@example.com', password: 'password123', expectedRole: 'ADMIN' });
