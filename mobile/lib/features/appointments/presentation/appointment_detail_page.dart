@@ -297,6 +297,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         ? DateTime.tryParse(appointmentDateStr)
         : null;
     final endTime = parseString(appointment['end_time']);
+    final createdAtStr = parseString(appointment['created_at']);
+    final bookedAt = createdAtStr != null
+        ? DateTime.tryParse(createdAtStr)?.toLocal()
+        : null;
     final queueNumber = parseInt(appointment['queue_number']);
     final queueStatus = parseString(appointment['queue_status']);
     final registrationSource =
@@ -316,7 +320,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             const SizedBox(height: spacing.AppSpacing.gutterLg),
             _buildDoctorInfo(doctorFirstName, doctorLastName, specialty, practiceName, practiceAddress, professionalPhotoUrl),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
-            _buildAppointmentDetails(appointmentDate, endTime, queueNumber, registrationSource, notes),
+            _buildAppointmentDetails(appointmentDate, endTime, bookedAt, queueNumber, registrationSource, notes),
             const SizedBox(height: spacing.AppSpacing.gutterLg),
             if (appointment['needs_attention'] == true &&
                 (status == 'SCHEDULED' || status == 'CONFIRMED' || status == 'IN_PROGRESS')) ...[
@@ -530,6 +534,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   Widget _buildAppointmentDetails(
     DateTime? appointmentDate,
     String? endTime,
+    DateTime? bookedAt,
     int? queueNumber,
     String registrationSource,
     String? notes,
@@ -555,11 +560,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               'Date',
               dateFormat.format(appointmentDate),
             ),
-          if (appointmentDate != null)
+          if (bookedAt != null)
             _buildDetailRow(
               Icons.access_time,
               'Time',
-              timeFormat.format(appointmentDate),
+              timeFormat.format(bookedAt),
             ),
           if (queueNumber != null)
             _buildDetailRow(
