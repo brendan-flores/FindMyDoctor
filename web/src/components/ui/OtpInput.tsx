@@ -63,22 +63,22 @@ export default function OtpInput({
   };
 
   const getBorderColor = (index: number, hasValue: boolean) => {
-    if (error) return 'border-red-500';
-    if (focusedIndex === index) return 'border-[#1A62CD]';
-    if (hasValue) return 'border-[#1A62CD]';
-    return 'border-[#E2E8F0]';
+    if (error) return 'border-error-500';
+    if (focusedIndex === index) return 'border-primary-600';
+    if (hasValue) return 'border-primary-600';
+    return 'border-neutral-200';
   };
 
   const getBgColor = (index: number, hasValue: boolean) => {
-    if (error) return 'bg-red-50';
+    if (error) return 'bg-error-50';
     if (focusedIndex === index) return 'bg-white';
-    if (hasValue) return 'bg-[#1A62CD]/5';
+    if (hasValue) return 'bg-primary-600/5';
     return 'bg-white';
   };
 
   return (
     <div className="flex flex-col items-center gap-2" onPaste={handlePaste}>
-      <label className="text-[15px] font-bold text-[#1A202C]">
+      <label className="text-[15px] font-bold text-neutral-900">
         Verification Code
       </label>
       <div className="flex gap-2">
@@ -95,7 +95,7 @@ export default function OtpInput({
             onFocus={() => setFocusedIndex(index)}
             onBlur={() => setFocusedIndex(null)}
             disabled={disabled}
-            className={`w-14 h-14 text-center text-2xl font-bold text-[#0D1829] rounded-xl border-2 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 disabled:opacity-50 disabled:cursor-not-allowed ${getBorderColor(index, !!value[index])} ${getBgColor(index, !!value[index])}`}
+            className={`w-14 h-14 text-center text-2xl font-bold text-neutral-900 rounded-xl border-2 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-600/20 disabled:opacity-50 disabled:cursor-not-allowed ${getBorderColor(index, !!value[index])} ${getBgColor(index, !!value[index])}`}
           />
         ))}
       </div>

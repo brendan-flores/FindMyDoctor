@@ -13,19 +13,19 @@ interface TwoFactorBannerProps {
  */
 export default function TwoFactorBanner({ settingsHref }: TwoFactorBannerProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
-        <span className="material-symbols-outlined text-[22px] text-amber-600">gpp_maybe</span>
+        <span className="material-symbols-outlined text-[22px] text-warning-600">gpp_maybe</span>
         <div>
-          <p className="text-sm font-semibold text-amber-900">Two-factor authentication is off</p>
-          <p className="text-sm text-amber-800 mt-0.5">
+          <p className="text-sm font-semibold text-warning-900">Two-factor authentication is off</p>
+          <p className="text-sm text-warning-800 mt-0.5">
             Enable email verification codes to better protect patient information and your account.
           </p>
         </div>
       </div>
       <Link
         href={settingsHref}
-        className="flex-shrink-0 rounded-lg bg-amber-900 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-amber-800 transition-colors"
+        className="flex-shrink-0 rounded-lg bg-warning-900 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-warning-800 transition-colors"
       >
         Enable 2FA
       </Link>

@@ -78,21 +78,21 @@ export default function AdminHeader({ userName = 'E. Vance', userRole = 'Super A
   };
 
   return (
-    <header className="fixed top-0 left-64 right-0 h-16 bg-white border-b border-slate-200 z-20 flex items-center justify-between px-8">
+    <header className="fixed top-0 left-64 right-0 h-16 bg-white border-b border-neutral-200 z-20 flex items-center justify-between px-8">
       {/* Left: Badge & Hierarchy */}
       <div className="flex items-center gap-4 min-w-0">
         <div className="flex items-center gap-3">
-          <span className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-blue-50 text-[#1b5eb8] border border-blue-100">
+          <span className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-primary-50 text-primary-600 border border-primary-100">
             Admin Console
           </span>
-          <span className="text-slate-300">|</span>
-          <div className="text-sm font-semibold text-slate-800 truncate">
+          <span className="text-neutral-300">|</span>
+          <div className="text-sm font-semibold text-neutral-800 truncate">
             Central Medical Healthcare Network
           </div>
-          <span className="text-slate-400 text-xs hidden lg:inline">System Directory & Governance</span>
+          <span className="text-neutral-400 text-xs hidden lg:inline">System Directory & Governance</span>
         </div>
-        <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200/60">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success-50 text-success-700 text-xs font-semibold border border-success-200/60">
+          <span className="w-1.5 h-1.5 rounded-full bg-success-500 animate-pulse"></span>
           <span>99.98% Operational</span>
         </div>
       </div>
@@ -101,11 +101,11 @@ export default function AdminHeader({ userName = 'E. Vance', userRole = 'Super A
       <div className="flex items-center gap-5">
         {/* Search Input */}
         <div className="relative hidden md:block w-72">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-[18px]">
             search
           </span>
           <input
-            className="w-full h-9 pl-9 pr-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20 focus:border-[#1b5eb8] transition-all"
+            className="w-full h-9 pl-9 pr-3 text-xs bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-700 placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 transition-all"
             placeholder="Search physicians, clinics, NPI..."
             type="text"
           />
@@ -113,28 +113,28 @@ export default function AdminHeader({ userName = 'E. Vance', userRole = 'Super A
 
         {/* Date / Shift Tag */}
         <div className="hidden xl:flex flex-col text-right leading-tight">
-          <span className="text-xs font-semibold text-slate-700">{formattedDate}</span>
-          <span className="text-[11px] font-mono text-slate-400">{formattedTime} • Shift A</span>
+          <span className="text-xs font-semibold text-neutral-700">{formattedDate}</span>
+          <span className="text-[11px] font-mono text-neutral-400">{formattedTime} • Shift A</span>
         </div>
 
         {/* Notification Bell */}
-        <button className="relative w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+        <button className="relative w-9 h-9 rounded-lg border border-neutral-200 flex items-center justify-center text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 transition-colors">
           <span className="material-symbols-outlined text-[20px]">notifications</span>
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white"></span>
+          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-error-500 ring-2 ring-white"></span>
         </button>
 
         {/* Admin Avatar with Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={handleProfileClick}
-            className="flex items-center gap-2.5 pl-1 border-l border-slate-200 hover:bg-slate-50 rounded-lg px-2 py-1 transition-colors"
+            className="flex items-center gap-2.5 pl-1 border-l border-neutral-200 hover:bg-neutral-50 rounded-lg px-2 py-1 transition-colors"
           >
-            <div className="w-8 h-8 rounded-full bg-[#1b5eb8] text-white flex items-center justify-center font-semibold text-xs shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center font-semibold text-xs shadow-sm">
               {getInitials(userName)}
             </div>
             <div className="hidden lg:block text-left leading-none">
-              <div className="text-xs font-semibold text-slate-800">{userName}</div>
-              <div className="text-[10px] text-slate-400">{userRole}</div>
+              <div className="text-xs font-semibold text-neutral-800">{userName}</div>
+              <div className="text-[10px] text-neutral-400">{userRole}</div>
             </div>
           </button>
 
@@ -142,19 +142,19 @@ export default function AdminHeader({ userName = 'E. Vance', userRole = 'Super A
           {dropdownPresent && (
             <div
               data-state={isDropdownOpen ? 'open' : 'closed'}
-              className="fmd-dropdown absolute right-0 top-full mt-2 w-48 bg-white rounded-lg border border-slate-200 shadow-lg py-1 z-50"
+              className="fmd-dropdown absolute right-0 top-full mt-2 w-48 bg-white rounded-lg border border-neutral-200 shadow-lg py-1 z-50"
             >
               <button
                 onClick={handleChangeSettings}
-                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                className="w-full px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50 flex items-center gap-2 transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">settings</span>
                 Settings
               </button>
-              <div className="border-t border-slate-100 my-1"></div>
+              <div className="border-t border-neutral-100 my-1"></div>
               <button
                 onClick={handleSignOut}
-                className="w-full px-4 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                className="w-full px-4 py-2 text-left text-sm text-error-600 hover:bg-error-50 flex items-center gap-2 transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">logout</span>
                 Sign Out

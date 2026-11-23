@@ -94,7 +94,7 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F3F5F9] px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-neutral-100 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-[460px] flex flex-col items-center">
         {/* Brand Header */}
         <div className="flex flex-col items-center mb-8 text-center">
@@ -109,21 +109,21 @@ export default function AdminLogin() {
         {!showOtp && (
           <>
             <div className="text-center mb-7 w-full">
-              <h1 className="text-[34px] font-black tracking-tight text-[#0D1829] mb-2 leading-tight">
+              <h1 className="text-[34px] font-black tracking-tight text-neutral-900 mb-2 leading-tight">
                 Welcome back
               </h1>
-              <p className="text-[15px] text-[#718096] font-normal leading-relaxed">
+              <p className="text-[15px] text-neutral-500 font-normal leading-relaxed">
                 Please enter your administrator credentials to sign in.
               </p>
             </div>
 
             {/* Admin Role Badge */}
-            <div className="w-full bg-[#EAEFF5] p-1 rounded-full mb-7">
+            <div className="w-full bg-neutral-100 p-1 rounded-full mb-7">
               <div className="w-full bg-white rounded-full py-2.5 px-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex items-center justify-center gap-2 text-center transition-all">
-                <svg className="w-4 h-4 text-[#1A62CD]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
                 </svg>
-                <span className="text-[#1A62CD] font-bold text-[15px] tracking-wide">Administrator Access</span>
+                <span className="text-primary-600 font-bold text-[15px] tracking-wide">Administrator Access</span>
               </div>
             </div>
           </>
@@ -139,11 +139,11 @@ export default function AdminLogin() {
 
             {/* Email Field */}
             <div className="space-y-2">
-              <label htmlFor="email" className="block text-[15px] font-bold text-[#1A202C]">
+              <label htmlFor="email" className="block text-[15px] font-bold text-neutral-900">
                 Email Address
               </label>
               <div className="relative rounded-2xl shadow-md">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-neutral-400">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="16" rx="3" strokeWidth="1.8" width="20" x="2" y="4"></rect>
                     <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" strokeLinecap="round" strokeWidth="1.8"></path>
@@ -156,7 +156,7 @@ export default function AdminLogin() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@example.com"
                   required
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 pl-12 pr-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all duration-150"
                 />
               </div>
             </div>
@@ -164,15 +164,15 @@ export default function AdminLogin() {
             {/* Password Field */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label htmlFor="password" className="block text-[15px] font-bold text-[#1A202C]">
+                <label htmlFor="password" className="block text-[15px] font-bold text-neutral-900">
                   Password
                 </label>
-                <a href="#" className="text-[14px] font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors">
+                <a href="#" className="text-[14px] font-bold text-primary-600 hover:text-primary-800 transition-colors">
                   Forgot Password?
                 </a>
               </div>
               <div className="relative rounded-2xl shadow-md">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-neutral-400">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
@@ -185,13 +185,13 @@ export default function AdminLogin() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-12 text-[15px] tracking-wider text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 pl-12 pr-12 text-[15px] tracking-wider text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all duration-150"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
-                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#94A3B8] hover:text-[#64748B] focus:outline-none"
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-neutral-400 hover:text-neutral-500 focus:outline-none"
                 >
                   {showPassword ? (
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,8 +208,8 @@ export default function AdminLogin() {
             </div>
 
             {/* Session policy notice: no device trust for administrators */}
-            <div className="rounded-2xl border border-[#D6E2F5] bg-[#F5F8FD] px-4 py-3">
-              <p className="text-[13px] leading-relaxed text-[#4A5B75]">
+            <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+              <p className="text-[13px] leading-relaxed text-neutral-600">
                 Administrator access always requires a verification code and ends after 2 hours of
                 inactivity or 8 hours in total. Stay signed in is not available for this portal.
               </p>
@@ -220,7 +220,7 @@ export default function AdminLogin() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Signing in...' : 'Sign In'}
               </button>

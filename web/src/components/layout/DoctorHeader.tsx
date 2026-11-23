@@ -91,15 +91,15 @@ export default function DoctorHeader({
   };
 
   return (
-    <header className="fixed top-0 left-64 right-0 h-16 bg-white border-b border-slate-200 z-20 flex items-center justify-between px-8">
+    <header className="fixed top-0 left-64 right-0 h-16 bg-white border-b border-neutral-200 z-20 flex items-center justify-between px-8">
       {/* Left: Badge & Hierarchy */}
       <div className="flex items-center gap-4 min-w-0">
         <div className="flex items-center gap-3">
-          <span className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-blue-50 text-[#1b5eb8] border border-blue-100">
+          <span className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-primary-50 text-primary-600 border border-primary-100">
             Doctor Portal
           </span>
-          <span className="text-slate-300">|</span>
-          <div className="text-sm font-semibold text-slate-800 truncate">
+          <span className="text-neutral-300">|</span>
+          <div className="text-sm font-semibold text-neutral-800 truncate">
             FindMyDoctor Healthcare Network
           </div>
         </div>
@@ -109,12 +109,12 @@ export default function DoctorHeader({
       <div className="flex items-center gap-5">
         {/* Date / Shift Tag */}
         <div className="hidden xl:flex flex-col text-right leading-tight">
-          <span className="text-xs font-semibold text-slate-700">{formattedDate}</span>
-          <span className="text-[11px] font-mono text-slate-400">{formattedTime}</span>
+          <span className="text-xs font-semibold text-neutral-700">{formattedDate}</span>
+          <span className="text-[11px] font-mono text-neutral-400">{formattedTime}</span>
         </div>
 
         {/* Notification Bell */}
-        <button className="relative w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+        <button className="relative w-9 h-9 rounded-lg border border-neutral-200 flex items-center justify-center text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 transition-colors">
           <span className="material-symbols-outlined text-[20px]">notifications</span>
         </button>
 
@@ -122,18 +122,18 @@ export default function DoctorHeader({
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={handleProfileClick}
-            className="flex items-center gap-2.5 pl-1 border-l border-slate-200 hover:bg-slate-50 rounded-lg px-2 py-1 transition-colors"
+            className="flex items-center gap-2.5 pl-1 border-l border-neutral-200 hover:bg-neutral-50 rounded-lg px-2 py-1 transition-colors"
           >
-            <div className="w-8 h-8 rounded-full bg-[#1b5eb8] text-white flex items-center justify-center font-semibold text-xs shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center font-semibold text-xs shadow-sm">
               {getInitials(userName)}
             </div>
             <div className="hidden lg:block text-left leading-tight max-w-[220px]">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-slate-800 truncate" title={userName}>
+                <span className="text-xs font-semibold text-neutral-800 truncate" title={userName}>
                   {userName}
                 </span>
               </div>
-              <div className="text-[10px] text-slate-500 truncate" title={userEmail}>
+              <div className="text-[10px] text-neutral-500 truncate" title={userEmail}>
                 {userEmail}
               </div>
             </div>
@@ -143,26 +143,26 @@ export default function DoctorHeader({
           {dropdownPresent && (
             <div
               data-state={isDropdownOpen ? 'open' : 'closed'}
-              className="fmd-dropdown absolute right-0 top-full mt-2 w-48 bg-white rounded-lg border border-slate-200 shadow-lg py-1 z-50"
+              className="fmd-dropdown absolute right-0 top-full mt-2 w-48 bg-white rounded-lg border border-neutral-200 shadow-lg py-1 z-50"
             >
               <button
                 onClick={handleViewProfile}
-                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                className="w-full px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50 flex items-center gap-2 transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">account_circle</span>
                 Profile
               </button>
               <button
                 onClick={handleChangeSettings}
-                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                className="w-full px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50 flex items-center gap-2 transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">settings</span>
                 Settings
               </button>
-              <div className="border-t border-slate-100 my-1"></div>
+              <div className="border-t border-neutral-100 my-1"></div>
               <button
                 onClick={handleSignOut}
-                className="w-full px-4 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                className="w-full px-4 py-2 text-left text-sm text-error-600 hover:bg-error-50 flex items-center gap-2 transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">logout</span>
                 Sign Out

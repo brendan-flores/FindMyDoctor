@@ -266,11 +266,11 @@ export default function SecretarySettings() {
   const qrIsActive = !!gcashQr?.gcashQrUrl;
 
   return (
-    <div className="min-h-screen bg-[#F3F5F9]">
+    <div className="min-h-screen bg-neutral-100">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
-          <p className="text-slate-600 mt-2">Manage your account and clinic settings</p>
+          <h1 className="text-3xl font-bold text-neutral-900">Settings</h1>
+          <p className="text-neutral-600 mt-2">Manage your account and clinic settings</p>
         </div>
 
         {/* Toast notifications */}
@@ -279,22 +279,22 @@ export default function SecretarySettings() {
 
         {/* ============ Account section ============ */}
         <section aria-labelledby="account-section-heading" className="mb-10">
-          <h2 id="account-section-heading" className="text-lg font-bold text-slate-500 uppercase tracking-wide mb-4">
+          <h2 id="account-section-heading" className="text-lg font-bold text-neutral-500 uppercase tracking-wide mb-4">
             Account
           </h2>
 
           <div className="space-y-6">
             {/* Two-Factor Authentication */}
-            <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
+            <div className="bg-white rounded-2xl shadow-md border border-neutral-200 p-6">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h3 className="font-semibold text-slate-900">Two-Factor Authentication</h3>
-                  <p className="text-sm text-slate-600 mt-1">
+                  <h3 className="font-semibold text-neutral-900">Two-Factor Authentication</h3>
+                  <p className="text-sm text-neutral-600 mt-1">
                     Require a verification code when you sign in from a new or untrusted browser.
                   </p>
                 </div>
                 {!twoFactorLoaded ? (
-                  <span className="text-sm text-slate-400" aria-busy="true">
+                  <span className="text-sm text-neutral-400" aria-busy="true">
                     Loading…
                   </span>
                 ) : (
@@ -305,7 +305,7 @@ export default function SecretarySettings() {
                     aria-checked={twoFactorEnabled}
                     aria-label="Two-Factor Authentication"
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                      twoFactorEnabled ? 'bg-gradient-to-r from-blue-500 to-blue-600' : 'bg-slate-300'
+                      twoFactorEnabled ? 'bg-gradient-to-r from-primary-500 to-primary-600' : 'bg-neutral-300'
                     } ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <span
@@ -328,33 +328,33 @@ export default function SecretarySettings() {
 
         {/* ============ Clinic section ============ */}
         <section aria-labelledby="clinic-section-heading">
-          <h2 id="clinic-section-heading" className="text-lg font-bold text-slate-500 uppercase tracking-wide mb-4">
+          <h2 id="clinic-section-heading" className="text-lg font-bold text-neutral-500 uppercase tracking-wide mb-4">
             Clinic
           </h2>
 
           <div className="space-y-6">
             {/* Clinic Payment Settings (GCash QR) */}
-            <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
+            <div className="bg-white rounded-2xl shadow-md border border-neutral-200 p-6">
               <div>
-                <h3 className="text-xl font-semibold text-slate-900">Clinic Payment Settings</h3>
-                <p className="text-sm text-slate-600 mt-1">
+                <h3 className="text-xl font-semibold text-neutral-900">Clinic Payment Settings</h3>
+                <p className="text-sm text-neutral-600 mt-1">
                   Upload and manage the clinic&apos;s GCash QR code for patient payments
                 </p>
               </div>
 
               {isQrLoading ? (
-                <div className="mt-5 text-sm text-slate-500" aria-busy="true">
+                <div className="mt-5 text-sm text-neutral-500" aria-busy="true">
                   Loading QR status…
                 </div>
               ) : qrError ? (
                 <div className="mt-5">
-                  <p className="text-sm text-rose-600" role="alert">
+                  <p className="text-sm text-error-600" role="alert">
                     {qrError}
                   </p>
                   {doctorId && (
                     <button
                       onClick={() => fetchGcashQr(doctorId)}
-                      className="mt-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-[#1A62CD] hover:bg-blue-50 transition-colors"
+                      className="mt-2 rounded-lg border border-neutral-200 px-3 py-1.5 text-sm font-semibold text-primary-600 hover:bg-primary-50 transition-colors"
                     >
                       Try again
                     </button>
@@ -368,11 +368,11 @@ export default function SecretarySettings() {
                     <img
                       src={gcashQr!.gcashQrUrl!}
                       alt="GCash QR code"
-                      className="h-24 w-24 flex-shrink-0 rounded-2xl border border-slate-200 object-contain bg-white p-1"
+                      className="h-24 w-24 flex-shrink-0 rounded-2xl border border-neutral-200 object-contain bg-white p-1"
                     />
                   ) : (
-                    <div className="h-24 w-24 flex-shrink-0 rounded-2xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-slate-400">qr_code_2</span>
+                    <div className="h-24 w-24 flex-shrink-0 rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-neutral-400">qr_code_2</span>
                     </div>
                   )}
 
@@ -380,15 +380,15 @@ export default function SecretarySettings() {
                     <span
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                         qrIsActive
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-slate-100 text-slate-600 border border-slate-200'
+                          ? 'bg-success-50 text-success-700 border border-success-200'
+                          : 'bg-neutral-100 text-neutral-600 border border-neutral-200'
                       }`}
                     >
                       {qrIsActive ? 'Active' : 'Not uploaded'}
                     </span>
-                    <p className="text-sm text-slate-600 mt-2">
+                    <p className="text-sm text-neutral-600 mt-2">
                       Last updated:{' '}
-                      <span className="font-medium text-slate-800">
+                      <span className="font-medium text-neutral-800">
                         {qrLastUpdated ?? '—'}
                       </span>
                     </p>
@@ -397,7 +397,7 @@ export default function SecretarySettings() {
                   <div className="flex-shrink-0">
                     <button
                       onClick={() => router.push('/secretary/settings/gcash-qr')}
-                      className="px-4 py-2 bg-[#1A62CD] text-white rounded-lg hover:bg-[#1550A8] transition-colors"
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
                     >
                       Manage QR Code
                     </button>
@@ -405,34 +405,34 @@ export default function SecretarySettings() {
                 </div>
               )}
 
-              <div className="mt-4 p-4 bg-amber-50 rounded-2xl border border-amber-200">
-                <p className="text-sm text-amber-800">
+              <div className="mt-4 p-4 bg-warning-50 rounded-2xl border border-warning-200">
+                <p className="text-sm text-warning-800">
                   Patients see this QR code in the mobile app when they pay. Receipt review is on the Payments page.
                 </p>
               </div>
             </div>
 
             {/* Invoice Details */}
-            <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
+            <div className="bg-white rounded-2xl shadow-md border border-neutral-200 p-6">
               <div>
-                <h3 className="font-semibold text-slate-900">Invoice details</h3>
-                <p className="text-sm text-slate-600 mt-1">
+                <h3 className="font-semibold text-neutral-900">Invoice details</h3>
+                <p className="text-sm text-neutral-600 mt-1">
                   Clinic name, address, contact number, and footer line shown on invoices.
                 </p>
               </div>
 
               {isInvoiceLoading ? (
-                <div className="mt-5 text-sm text-slate-500" aria-busy="true">
+                <div className="mt-5 text-sm text-neutral-500" aria-busy="true">
                   Loading invoice details…
                 </div>
               ) : invoiceError ? (
                 <div className="mt-5">
-                  <p className="text-sm text-rose-600" role="alert">
+                  <p className="text-sm text-error-600" role="alert">
                     {invoiceError}
                   </p>
                   <button
                     onClick={fetchInvoiceSettings}
-                    className="mt-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-[#1A62CD] hover:bg-blue-50 transition-colors"
+                    className="mt-2 rounded-lg border border-neutral-200 px-3 py-1.5 text-sm font-semibold text-primary-600 hover:bg-primary-50 transition-colors"
                   >
                     Try again
                   </button>
@@ -440,7 +440,7 @@ export default function SecretarySettings() {
               ) : (
                 <form onSubmit={handleSaveInvoice} className="mt-5 space-y-4">
                   <div>
-                    <label htmlFor="clinicName" className="block text-sm font-medium text-slate-700 mb-1">
+                    <label htmlFor="clinicName" className="block text-sm font-medium text-neutral-700 mb-1">
                       Clinic Name
                     </label>
                     <input
@@ -448,14 +448,14 @@ export default function SecretarySettings() {
                       id="clinicName"
                       value={invoiceForm.clinicName}
                       onChange={(e) => setInvoiceForm({ ...invoiceForm, clinicName: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]"
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600"
                       placeholder="Enter clinic name"
                       required
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="address" className="block text-sm font-medium text-slate-700 mb-1">
+                    <label htmlFor="address" className="block text-sm font-medium text-neutral-700 mb-1">
                       Address
                     </label>
                     <textarea
@@ -463,14 +463,14 @@ export default function SecretarySettings() {
                       value={invoiceForm.address}
                       onChange={(e) => setInvoiceForm({ ...invoiceForm, address: e.target.value })}
                       rows={3}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]"
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600"
                       placeholder="Enter clinic address"
                       required
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="contactNumber" className="block text-sm font-medium text-slate-700 mb-1">
+                    <label htmlFor="contactNumber" className="block text-sm font-medium text-neutral-700 mb-1">
                       Contact Number
                     </label>
                     <input
@@ -478,14 +478,14 @@ export default function SecretarySettings() {
                       id="contactNumber"
                       value={invoiceForm.contactNumber}
                       onChange={(e) => setInvoiceForm({ ...invoiceForm, contactNumber: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]"
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600"
                       placeholder="Enter contact number"
                       required
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="footerLine" className="block text-sm font-medium text-slate-700 mb-1">
+                    <label htmlFor="footerLine" className="block text-sm font-medium text-neutral-700 mb-1">
                       Footer Line
                     </label>
                     <input
@@ -493,7 +493,7 @@ export default function SecretarySettings() {
                       id="footerLine"
                       value={invoiceForm.footerLine}
                       onChange={(e) => setInvoiceForm({ ...invoiceForm, footerLine: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]"
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600"
                       placeholder="Enter footer line (e.g., Thank you for your visit)"
                       required
                     />
@@ -503,7 +503,7 @@ export default function SecretarySettings() {
                     <button
                       type="submit"
                       disabled={isSavingInvoice}
-                      className="px-4 py-2 bg-[#1A62CD] text-white rounded-lg hover:bg-[#1550A8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSavingInvoice ? 'Saving…' : 'Save Changes'}
                     </button>
@@ -513,28 +513,28 @@ export default function SecretarySettings() {
             </div>
 
             {/* GCash Account Details */}
-            <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
+            <div className="bg-white rounded-2xl shadow-md border border-neutral-200 p-6">
               <div>
-                <h3 className="font-semibold text-slate-900">GCash account details</h3>
-                <p className="text-sm text-slate-600 mt-1">
+                <h3 className="font-semibold text-neutral-900">GCash account details</h3>
+                <p className="text-sm text-neutral-600 mt-1">
                   Account name and GCash number shown to patients beside the QR code.
                 </p>
               </div>
 
               {isQrLoading ? (
-                <div className="mt-5 text-sm text-slate-500" aria-busy="true">
+                <div className="mt-5 text-sm text-neutral-500" aria-busy="true">
                   Loading account details…
                 </div>
               ) : qrError ? (
                 <div className="mt-5">
-                  <p className="text-sm text-rose-600" role="alert">
+                  <p className="text-sm text-error-600" role="alert">
                     {qrError}
                   </p>
                 </div>
               ) : (
                 <form onSubmit={handleSaveGcashAccount} className="mt-5 space-y-4">
                   <div>
-                    <label htmlFor="accountName" className="block text-sm font-medium text-slate-700 mb-1">
+                    <label htmlFor="accountName" className="block text-sm font-medium text-neutral-700 mb-1">
                       Account Name
                     </label>
                     <input
@@ -545,13 +545,13 @@ export default function SecretarySettings() {
                         setGcashAccountForm({ ...gcashAccountForm, accountName: e.target.value });
                         setHasUnsavedGcashAccountChanges(true);
                       }}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]"
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600"
                       placeholder="e.g., Maria Santos"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="accountNumber" className="block text-sm font-medium text-slate-700 mb-1">
+                    <label htmlFor="accountNumber" className="block text-sm font-medium text-neutral-700 mb-1">
                       Account Number
                     </label>
                     <input
@@ -563,22 +563,22 @@ export default function SecretarySettings() {
                         setGcashAccountForm({ ...gcashAccountForm, accountNumber: e.target.value });
                         setHasUnsavedGcashAccountChanges(true);
                       }}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]"
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600"
                       placeholder="e.g., 09171234567 or +639171234567"
                     />
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-neutral-500">
                       Philippine mobile format: 09XXXXXXXXX or +639XXXXXXXXX
                     </p>
                   </div>
 
                   {gcashAccountError && (
-                    <p className="text-sm text-rose-600" role="alert">
+                    <p className="text-sm text-error-600" role="alert">
                       {gcashAccountError}
                     </p>
                   )}
 
                   {hasUnsavedGcashAccountChanges && (
-                    <p className="text-sm text-amber-600">
+                    <p className="text-sm text-warning-600">
                       You have unsaved changes.
                     </p>
                   )}
@@ -587,7 +587,7 @@ export default function SecretarySettings() {
                     <button
                       type="submit"
                       disabled={isSavingGcashAccount || !hasUnsavedGcashAccountChanges}
-                      className="px-4 py-2 bg-[#1A62CD] text-white rounded-lg hover:bg-[#1550A8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSavingGcashAccount ? 'Saving…' : 'Save Changes'}
                     </button>

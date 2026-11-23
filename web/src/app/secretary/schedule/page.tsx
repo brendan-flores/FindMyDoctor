@@ -570,19 +570,19 @@ export default function SecretarySchedule() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Schedule Management</h1>
-        <p className="text-slate-600 mt-1">Manage your assigned doctor&apos;s schedule, exceptions, and capacity</p>
+        <h1 className="text-2xl font-bold text-neutral-900">Schedule Management</h1>
+        <p className="text-neutral-600 mt-1">Manage your assigned doctor&apos;s schedule, exceptions, and capacity</p>
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100 mb-6">
-        <div className="flex border-b border-slate-200">
+      <div className="bg-white rounded-2xl shadow-md border border-neutral-100 mb-6">
+        <div className="flex border-b border-neutral-200">
           <button
             onClick={() => setActiveTab('working-hours')}
             className={`flex-1 px-6 py-4 font-semibold text-sm transition-all ${
               activeTab === 'working-hours'
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50'
+                : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50'
             }`}
           >
             <span className="flex items-center justify-center gap-2">
@@ -594,14 +594,14 @@ export default function SecretarySchedule() {
             onClick={() => setActiveTab('exceptions')}
             className={`flex-1 px-6 py-4 font-semibold text-sm transition-all ${
               activeTab === 'exceptions'
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50'
+                : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50'
             }`}
           >
             <span className="flex items-center justify-center gap-2">
               <span className="material-symbols-outlined text-[20px]">event_busy</span>
               Exceptions
-              <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-semibold">
+              <span className="px-2 py-0.5 rounded-full bg-error-100 text-error-600 text-xs font-semibold">
                 {activeUnavailability.length}
               </span>
             </span>
@@ -610,14 +610,14 @@ export default function SecretarySchedule() {
             onClick={() => setActiveTab('breaks')}
             className={`flex-1 px-6 py-4 font-semibold text-sm transition-all ${
               activeTab === 'breaks'
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50'
+                : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50'
             }`}
           >
             <span className="flex items-center justify-center gap-2">
               <span className="material-symbols-outlined text-[20px]">free_breakfast</span>
               Break Periods
-              <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-xs font-semibold">
+              <span className="px-2 py-0.5 rounded-full bg-primary-100 text-primary-600 text-xs font-semibold">
                 {activeBreakPeriods.length}
               </span>
             </span>
@@ -626,8 +626,8 @@ export default function SecretarySchedule() {
             onClick={() => setActiveTab('capacity')}
             className={`flex-1 px-6 py-4 font-semibold text-sm transition-all ${
               activeTab === 'capacity'
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50'
+                : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50'
             }`}
           >
             <span className="flex items-center justify-center gap-2">
@@ -643,25 +643,25 @@ export default function SecretarySchedule() {
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="text-slate-500">Loading...</div>
+          <div className="text-neutral-500">Loading...</div>
         </div>
       ) : (
         <>
           {/* Working Hours Tab - Read Only */}
           {activeTab === 'working-hours' && (
-            <div className="bg-white rounded-2xl shadow-md border border-slate-100">
-              <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+            <div className="bg-white rounded-2xl shadow-md border border-neutral-100">
+              <div className="p-6 border-b border-neutral-100 bg-gradient-to-r from-neutral-50 to-white">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-800">Weekly Working Hours</h2>
-                    <p className="text-sm text-slate-500 mt-1">View-only: Contact your doctor to modify weekly working hours</p>
+                    <h2 className="text-xl font-bold text-neutral-800">Weekly Working Hours</h2>
+                    <p className="text-sm text-neutral-500 mt-1">View-only: Contact your doctor to modify weekly working hours</p>
                   </div>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Active
+                    <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-success-100 text-success-700 font-medium">
+                      <span className="w-2.5 h-2.5 rounded-full bg-success-500"></span> Active
                     </span>
-                    <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 font-medium">
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span> Inactive
+                    <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-neutral-100 text-neutral-600 font-medium">
+                      <span className="w-2.5 h-2.5 rounded-full bg-neutral-400"></span> Inactive
                     </span>
                   </div>
                 </div>
@@ -669,43 +669,43 @@ export default function SecretarySchedule() {
 
               {/* KPI Cards */}
               <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gradient-to-br from-blue-50 to-white border border-blue-100 rounded-2xl p-6 shadow-md">
+                <div className="bg-gradient-to-br from-primary-50 to-white border border-primary-100 rounded-2xl p-6 shadow-md">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-md">
                       <span className="material-symbols-outlined text-white text-[24px]">calendar_today</span>
                     </div>
                     <div>
-                      <div className="text-sm text-slate-500 font-medium">Active Days</div>
-                      <div className="text-3xl font-bold text-slate-900">{activeDays}</div>
+                      <div className="text-sm text-neutral-500 font-medium">Active Days</div>
+                      <div className="text-3xl font-bold text-neutral-900">{activeDays}</div>
                     </div>
                   </div>
                 </div>
-                <div className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-6 shadow-md">
+                <div className="bg-gradient-to-br from-success-50 to-white border border-success-100 rounded-2xl p-6 shadow-md">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-md">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-success-500 to-success-600 flex items-center justify-center shadow-md">
                       <span className="material-symbols-outlined text-white text-[24px]">schedule</span>
                     </div>
                     <div>
-                      <div className="text-sm text-slate-500 font-medium">Total Hours</div>
-                      <div className="text-3xl font-bold text-slate-900">{totalHours.toFixed(1)}h</div>
+                      <div className="text-sm text-neutral-500 font-medium">Total Hours</div>
+                      <div className="text-3xl font-bold text-neutral-900">{totalHours.toFixed(1)}h</div>
                     </div>
                   </div>
                 </div>
-                <div className="bg-gradient-to-br from-purple-50 to-white border border-purple-100 rounded-2xl p-6 shadow-md">
+                <div className="bg-gradient-to-br from-primary-50 to-white border border-primary-100 rounded-2xl p-6 shadow-md">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-md">
                       <span className="material-symbols-outlined text-white text-[24px]">wb_sunny</span>
                     </div>
                     <div>
-                      <div className="text-sm text-slate-500 font-medium">Active Shifts</div>
-                      <div className="text-3xl font-bold text-slate-900">{activeShifts}</div>
+                      <div className="text-sm text-neutral-500 font-medium">Active Shifts</div>
+                      <div className="text-3xl font-bold text-neutral-900">{activeShifts}</div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Schedule Grid */}
-              <div className="divide-y divide-slate-200">
+              <div className="divide-y divide-neutral-200">
                 {DAYS_OF_WEEK.map((day) => {
                   const daySchedules = getSchedulesForDay(day.value);
                   const active = isDayActive(day.value);
@@ -714,13 +714,13 @@ export default function SecretarySchedule() {
                     <div key={day.value} className="p-5">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-slate-900">{day.label}</h3>
+                          <h3 className="font-semibold text-neutral-900">{day.label}</h3>
                           {active ? (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+                            <span className="px-2 py-0.5 rounded-full bg-success-100 text-success-700 text-xs font-semibold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-success-500"></span> Active
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-medium">
+                            <span className="px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-500 text-xs font-medium">
                               Inactive
                             </span>
                           )}
@@ -728,7 +728,7 @@ export default function SecretarySchedule() {
                       </div>
 
                       {daySchedules.length === 0 ? (
-                        <div className="text-center py-6 text-slate-400 text-sm">
+                        <div className="text-center py-6 text-neutral-400 text-sm">
                           No schedules for this day
                         </div>
                       ) : (
@@ -740,34 +740,34 @@ export default function SecretarySchedule() {
                                 key={schedule.id}
                                 className={`flex flex-col sm:flex-row sm:items-center justify-between p-5 rounded-2xl border transition-all hover:shadow-lg ${
                                   schedule.is_active
-                                    ? 'bg-gradient-to-br from-white to-slate-50 border-slate-200 hover:border-blue-300 shadow-md'
-                                    : 'bg-slate-50/50 border-dashed border-slate-300 opacity-60'
+                                    ? 'bg-gradient-to-br from-white to-neutral-50 border-neutral-200 hover:border-primary-300 shadow-md'
+                                    : 'bg-neutral-50/50 border-dashed border-neutral-300 opacity-60'
                                 }`}
                               >
                                 <div className="flex items-center gap-4 min-w-0">
                                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md ${
                                     schedule.is_active
-                                      ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
-                                      : 'bg-slate-200 text-slate-400'
+                                      ? 'bg-gradient-to-br from-primary-500 to-primary-600 text-white'
+                                      : 'bg-neutral-200 text-neutral-400'
                                   }`}>
                                     <span className="material-symbols-outlined text-[22px]">wb_sunny</span>
                                   </div>
                                   <div className="flex flex-col">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <span className={`font-mono text-lg font-bold ${schedule.is_active ? 'text-slate-800' : 'text-slate-400 line-through'}`}>
+                                      <span className={`font-mono text-lg font-bold ${schedule.is_active ? 'text-neutral-800' : 'text-neutral-400 line-through'}`}>
                                         {formatTime(schedule.start_time)} – {formatTime(schedule.end_time)}
                                       </span>
-                                      <span className="text-sm text-slate-500 font-medium">({duration.toFixed(1)}h)</span>
+                                      <span className="text-sm text-neutral-500 font-medium">({duration.toFixed(1)}h)</span>
                                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${
                                         schedule.is_active
-                                          ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md'
-                                          : 'bg-slate-200 text-slate-500'
+                                          ? 'bg-gradient-to-r from-success-500 to-success-600 text-white shadow-md'
+                                          : 'bg-neutral-200 text-neutral-500'
                                       }`}>
-                                        <span className={`w-2 h-2 rounded-full ${schedule.is_active ? 'bg-white' : 'bg-slate-400'}`}></span>
+                                        <span className={`w-2 h-2 rounded-full ${schedule.is_active ? 'bg-white' : 'bg-neutral-400'}`}></span>
                                         {schedule.is_active ? 'Active' : 'Inactive'}
                                       </span>
                                     </div>
-                                    <span className="text-sm text-slate-400 mt-1">
+                                    <span className="text-sm text-neutral-400 mt-1">
                                       Consultation: {schedule.consultation_duration_minutes} min
                                     </span>
                                   </div>
@@ -786,14 +786,14 @@ export default function SecretarySchedule() {
 
           {/* Exceptions Tab */}
           {activeTab === 'exceptions' && (
-            <div className="bg-white rounded-2xl shadow-md border border-slate-100">
-              <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+            <div className="bg-white rounded-2xl shadow-md border border-neutral-100">
+              <div className="p-6 border-b border-neutral-100 bg-gradient-to-r from-neutral-50 to-white">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-slate-800">Date-Specific Exceptions</h2>
+                  <h2 className="text-xl font-bold text-neutral-800">Date-Specific Exceptions</h2>
                   <button
                     onClick={() => setShowExceptionAddModal(true)}
                     disabled={pendingExceptionCreates.length > 0}
-                    className="h-10 px-4 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:from-red-500 disabled:hover:to-red-600"
+                    className="h-10 px-4 rounded-2xl bg-gradient-to-r from-error-500 to-error-600 hover:from-error-600 hover:to-error-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:from-error-500 disabled:hover:to-error-600"
                     title={pendingExceptionCreates.length > 0 ? 'An exception change is already waiting for confirmation' : 'Add exception'}
                   >
                     <span className="material-symbols-outlined text-[18px]">add</span>
@@ -804,14 +804,14 @@ export default function SecretarySchedule() {
 
               {pendingExceptionCreates.length > 0 && (
                 <div className="px-6 pt-4">
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Pending confirmation</p>
+                  <div className="bg-warning-50 border border-warning-200 rounded-2xl p-4 space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-warning-800">Pending confirmation</p>
                     {pendingExceptionCreates.map((req) => (
                       <div key={req.id} className="flex items-start gap-2">
-                        <span className="material-symbols-outlined text-amber-600 text-[18px] mt-0.5">pending_actions</span>
+                        <span className="material-symbols-outlined text-warning-600 text-[18px] mt-0.5">pending_actions</span>
                         <div className="text-sm">
-                          <p className="font-semibold text-amber-900">{pendingSummaryText(req)}</p>
-                          <p className="text-xs text-amber-800">
+                          <p className="font-semibold text-warning-900">{pendingSummaryText(req)}</p>
+                          <p className="text-xs text-warning-800">
                             {pendingRequestDateLabel(req)} · {req.affectedCount} affected appointment{req.affectedCount === 1 ? '' : 's'} · waiting for confirmation in Schedule Alerts on the dashboard
                           </p>
                         </div>
@@ -821,9 +821,9 @@ export default function SecretarySchedule() {
                 </div>
               )}
 
-              <div className="divide-y divide-slate-200">
+              <div className="divide-y divide-neutral-200">
                 {activeUnavailability.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500">No exceptions configured</div>
+                  <div className="p-8 text-center text-neutral-500">No exceptions configured</div>
                 ) : (
                   activeUnavailability.map((exception) => {
                     const [year, month, day] = exception.start_date.split('T')[0].split('-').map(Number);
@@ -835,28 +835,28 @@ export default function SecretarySchedule() {
                         key={exception.id}
                         className={`flex flex-col sm:flex-row sm:items-center justify-between p-5 rounded-2xl border transition-all hover:shadow-lg ${
                           exception.is_active
-                            ? 'bg-gradient-to-br from-white to-slate-50 border-slate-200 hover:border-red-300 shadow-md'
-                            : 'bg-slate-50/50 border-dashed border-slate-300 opacity-60'
+                            ? 'bg-gradient-to-br from-white to-neutral-50 border-neutral-200 hover:border-error-300 shadow-md'
+                            : 'bg-neutral-50/50 border-dashed border-neutral-300 opacity-60'
                         }`}
                       >
                         <div className="flex items-center gap-4 min-w-0">
                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md ${
                             exception.is_active
-                              ? 'bg-gradient-to-br from-red-500 to-red-600 text-white'
-                              : 'bg-slate-200 text-slate-400'
+                              ? 'bg-gradient-to-br from-error-500 to-error-600 text-white'
+                              : 'bg-neutral-200 text-neutral-400'
                           }`}>
                             <span className="material-symbols-outlined text-[22px]">event_busy</span>
                           </div>
                           <div className="flex flex-col">
-                            <div className="font-semibold text-slate-900">{formattedDate}</div>
+                            <div className="font-semibold text-neutral-900">{formattedDate}</div>
                             {pendingTarget && (
-                              <div className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-800 text-xs font-semibold w-fit">
+                              <div className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-warning-100 border border-warning-300 text-warning-800 text-xs font-semibold w-fit">
                                 <span className="material-symbols-outlined text-[14px]">pending_actions</span>
                                 Pending confirmation
                               </div>
                             )}
                             {exception.reason && (
-                              <div className="text-sm text-slate-500 mt-1">{exception.reason}</div>
+                              <div className="text-sm text-neutral-500 mt-1">{exception.reason}</div>
                             )}
                           </div>
                         </div>
@@ -864,7 +864,7 @@ export default function SecretarySchedule() {
                           <button
                             onClick={() => openExceptionEditModal(exception)}
                             disabled={!!pendingTarget}
-                            className="h-10 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold flex items-center gap-2 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:bg-slate-100"
+                            className="h-10 px-4 rounded-2xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-sm font-semibold flex items-center gap-2 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:bg-neutral-100"
                             title={pendingTarget ? 'This exception is waiting for confirmation' : 'Edit'}
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span>
@@ -873,7 +873,7 @@ export default function SecretarySchedule() {
                           <button
                             onClick={() => openExceptionDeleteModal(exception)}
                             disabled={!!pendingTarget}
-                            className="h-10 px-4 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:from-red-500 disabled:hover:to-red-600"
+                            className="h-10 px-4 rounded-2xl bg-gradient-to-r from-error-500 to-error-600 hover:from-error-600 hover:to-error-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:from-error-500 disabled:hover:to-error-600"
                             title={pendingTarget ? 'This exception is waiting for confirmation' : 'Delete'}
                           >
                             <span className="material-symbols-outlined text-[18px]">delete</span>
@@ -890,14 +890,14 @@ export default function SecretarySchedule() {
 
           {/* Break Periods Tab */}
           {activeTab === 'breaks' && (
-            <div className="bg-white rounded-2xl shadow-md border border-slate-100">
-              <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+            <div className="bg-white rounded-2xl shadow-md border border-neutral-100">
+              <div className="p-6 border-b border-neutral-100 bg-gradient-to-r from-neutral-50 to-white">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-slate-800">Break Periods</h2>
+                  <h2 className="text-xl font-bold text-neutral-800">Break Periods</h2>
                   <button
                     onClick={() => setShowBreakAddModal(true)}
                     disabled={pendingBreakCreates.length > 0}
-                    className="h-10 px-4 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:from-blue-500 disabled:hover:to-blue-600"
+                    className="h-10 px-4 rounded-2xl bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:from-primary-500 disabled:hover:to-primary-600"
                     title={pendingBreakCreates.length > 0 ? 'A break change is already waiting for confirmation' : 'Add break'}
                   >
                     <span className="material-symbols-outlined text-[18px]">add</span>
@@ -908,14 +908,14 @@ export default function SecretarySchedule() {
 
               {pendingBreakCreates.length > 0 && (
                 <div className="px-6 pt-4">
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Pending confirmation</p>
+                  <div className="bg-warning-50 border border-warning-200 rounded-2xl p-4 space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-warning-800">Pending confirmation</p>
                     {pendingBreakCreates.map((req) => (
                       <div key={req.id} className="flex items-start gap-2">
-                        <span className="material-symbols-outlined text-amber-600 text-[18px] mt-0.5">pending_actions</span>
+                        <span className="material-symbols-outlined text-warning-600 text-[18px] mt-0.5">pending_actions</span>
                         <div className="text-sm">
-                          <p className="font-semibold text-amber-900">{pendingSummaryText(req)}</p>
-                          <p className="text-xs text-amber-800">
+                          <p className="font-semibold text-warning-900">{pendingSummaryText(req)}</p>
+                          <p className="text-xs text-warning-800">
                             {pendingRequestDateLabel(req)} · {req.affectedCount} affected appointment{req.affectedCount === 1 ? '' : 's'} · waiting for confirmation in Schedule Alerts on the dashboard
                           </p>
                         </div>
@@ -925,9 +925,9 @@ export default function SecretarySchedule() {
                 </div>
               )}
 
-              <div className="divide-y divide-slate-200">
+              <div className="divide-y divide-neutral-200">
                 {activeBreakPeriods.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500">No break periods configured</div>
+                  <div className="p-8 text-center text-neutral-500">No break periods configured</div>
                 ) : (
                   activeBreakPeriods.map((breakPeriod) => {
                     const [year, month, day] = breakPeriod.break_date.split('-').map(Number);
@@ -939,31 +939,31 @@ export default function SecretarySchedule() {
                         key={breakPeriod.id}
                         className={`flex flex-col sm:flex-row sm:items-center justify-between p-5 rounded-2xl border transition-all hover:shadow-lg ${
                           breakPeriod.is_active
-                            ? 'bg-gradient-to-br from-white to-slate-50 border-slate-200 hover:border-blue-300 shadow-md'
-                            : 'bg-slate-50/50 border-dashed border-slate-300 opacity-60'
+                            ? 'bg-gradient-to-br from-white to-neutral-50 border-neutral-200 hover:border-primary-300 shadow-md'
+                            : 'bg-neutral-50/50 border-dashed border-neutral-300 opacity-60'
                         }`}
                       >
                         <div className="flex items-center gap-4 min-w-0">
                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md ${
                             breakPeriod.is_active
-                              ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white'
-                              : 'bg-slate-200 text-slate-400'
+                              ? 'bg-gradient-to-br from-warning-500 to-warning-600 text-white'
+                              : 'bg-neutral-200 text-neutral-400'
                           }`}>
                             <span className="material-symbols-outlined text-[22px]">free_breakfast</span>
                           </div>
                           <div className="flex flex-col">
-                            <div className="font-semibold text-slate-900">{formattedDate}</div>
+                            <div className="font-semibold text-neutral-900">{formattedDate}</div>
                             {pendingTarget && (
-                              <div className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-800 text-xs font-semibold w-fit">
+                              <div className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-warning-100 border border-warning-300 text-warning-800 text-xs font-semibold w-fit">
                                 <span className="material-symbols-outlined text-[14px]">pending_actions</span>
                                 Pending confirmation
                               </div>
                             )}
-                            <div className="text-sm text-slate-500 mt-1">
+                            <div className="text-sm text-neutral-500 mt-1">
                               {formatTime(breakPeriod.start_time)} - {formatTime(breakPeriod.end_time)}
                             </div>
                             {breakPeriod.reason && (
-                              <div className="text-sm text-slate-500 mt-1">{breakPeriod.reason}</div>
+                              <div className="text-sm text-neutral-500 mt-1">{breakPeriod.reason}</div>
                             )}
                           </div>
                         </div>
@@ -971,7 +971,7 @@ export default function SecretarySchedule() {
                           <button
                             onClick={() => openBreakEditModal(breakPeriod)}
                             disabled={!!pendingTarget}
-                            className="h-10 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold flex items-center gap-2 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:bg-slate-100"
+                            className="h-10 px-4 rounded-2xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-sm font-semibold flex items-center gap-2 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:bg-neutral-100"
                             title={pendingTarget ? 'This break is waiting for confirmation' : 'Edit'}
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span>
@@ -980,7 +980,7 @@ export default function SecretarySchedule() {
                           <button
                             onClick={() => openBreakDeleteModal(breakPeriod)}
                             disabled={!!pendingTarget}
-                            className="h-10 px-4 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:from-red-500 disabled:hover:to-red-600"
+                            className="h-10 px-4 rounded-2xl bg-gradient-to-r from-error-500 to-error-600 hover:from-error-600 hover:to-error-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:from-error-500 disabled:hover:to-error-600"
                             title={pendingTarget ? 'This break is waiting for confirmation' : 'Delete'}
                           >
                             <span className="material-symbols-outlined text-[18px]">delete</span>
@@ -997,15 +997,15 @@ export default function SecretarySchedule() {
 
           {/* Capacity Tab */}
           {activeTab === 'capacity' && (
-            <div className="bg-white rounded-2xl shadow-md border border-slate-100">
-              <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                <h2 className="text-xl font-bold text-slate-800">Daily Capacity Management</h2>
-                <p className="text-sm text-slate-500 mt-1">Configure maximum patient capacity for specific dates</p>
+            <div className="bg-white rounded-2xl shadow-md border border-neutral-100">
+              <div className="p-6 border-b border-neutral-100 bg-gradient-to-r from-neutral-50 to-white">
+                <h2 className="text-xl font-bold text-neutral-800">Daily Capacity Management</h2>
+                <p className="text-sm text-neutral-500 mt-1">Configure maximum patient capacity for specific dates</p>
               </div>
 
               <div className="p-6">
                 <div className="mb-6">
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Select Date</label>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-2">Select Date</label>
                   <DatePicker
                     value={selectedDate}
                     onChange={handleDateChange}
@@ -1017,32 +1017,32 @@ export default function SecretarySchedule() {
 
                 {capacityData && (
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-                    <div className="bg-gradient-to-br from-blue-50 to-white border border-blue-100 rounded-2xl p-5 shadow-md">
-                      <div className="text-xs text-slate-500 font-semibold mb-1">Calculated</div>
-                      <div className="text-2xl font-bold text-slate-900">{capacityData.calculated_capacity}</div>
+                    <div className="bg-gradient-to-br from-primary-50 to-white border border-primary-100 rounded-2xl p-5 shadow-md">
+                      <div className="text-xs text-neutral-500 font-semibold mb-1">Calculated</div>
+                      <div className="text-2xl font-bold text-neutral-900">{capacityData.calculated_capacity}</div>
                     </div>
-                    <div className="bg-white border-2 border-slate-200 rounded-2xl p-5 shadow-md">
-                      <div className="text-xs text-slate-500 font-semibold mb-1">Configured</div>
+                    <div className="bg-white border-2 border-neutral-200 rounded-2xl p-5 shadow-md">
+                      <div className="text-xs text-neutral-500 font-semibold mb-1">Configured</div>
                       <input
                         type="number"
                         value={configuredCapacity}
                         onChange={(e) => handleConfiguredCapacityChange(e.target.value)}
                         min="0"
                         max={capacityData.calculated_capacity}
-                        className="w-full text-2xl font-bold text-slate-900 border-b-2 border-slate-300 focus:border-blue-500 focus:outline-none bg-transparent"
+                        className="w-full text-2xl font-bold text-neutral-900 border-b-2 border-neutral-300 focus:border-primary-500 focus:outline-none bg-transparent"
                       />
                     </div>
-                    <div className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-5 shadow-md">
-                      <div className="text-xs text-slate-500 font-semibold mb-1">Final Limit</div>
-                      <div className="text-2xl font-bold text-slate-900">{capacityData.final_capacity}</div>
+                    <div className="bg-gradient-to-br from-success-50 to-white border border-success-100 rounded-2xl p-5 shadow-md">
+                      <div className="text-xs text-neutral-500 font-semibold mb-1">Final Limit</div>
+                      <div className="text-2xl font-bold text-neutral-900">{capacityData.final_capacity}</div>
                     </div>
-                    <div className="bg-gradient-to-br from-purple-50 to-white border border-purple-100 rounded-2xl p-5 shadow-md">
-                      <div className="text-xs text-slate-500 font-semibold mb-1">Registered</div>
-                      <div className="text-2xl font-bold text-slate-900">{capacityData.registered_count}</div>
+                    <div className="bg-gradient-to-br from-primary-50 to-white border border-primary-100 rounded-2xl p-5 shadow-md">
+                      <div className="text-xs text-neutral-500 font-semibold mb-1">Registered</div>
+                      <div className="text-2xl font-bold text-neutral-900">{capacityData.registered_count}</div>
                     </div>
-                    <div className="bg-gradient-to-br from-orange-50 to-white border border-orange-100 rounded-2xl p-5 shadow-md">
-                      <div className="text-xs text-slate-500 font-semibold mb-1">Remaining</div>
-                      <div className="text-2xl font-bold text-slate-900">{capacityData.remaining_capacity}</div>
+                    <div className="bg-gradient-to-br from-warning-50 to-white border border-warning-100 rounded-2xl p-5 shadow-md">
+                      <div className="text-xs text-neutral-500 font-semibold mb-1">Remaining</div>
+                      <div className="text-2xl font-bold text-neutral-900">{capacityData.remaining_capacity}</div>
                     </div>
                   </div>
                 )}
@@ -1051,7 +1051,7 @@ export default function SecretarySchedule() {
                   <button
                     onClick={handleSaveCapacity}
                     disabled={capacityLoading}
-                    className="h-12 px-8 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    className="h-12 px-8 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white text-sm font-semibold flex items-center gap-2 shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                   >
                     <span className="material-symbols-outlined text-[20px]">save</span>
                     {capacityLoading ? 'Saving...' : 'Save Capacity'}
@@ -1073,10 +1073,10 @@ export default function SecretarySchedule() {
             className="fmd-modal-panel bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
             data-state={showExceptionAddModal ? 'open' : 'closed'}
           >
-            <h3 className="text-xl font-bold text-slate-900 mb-6">Add Exception</h3>
+            <h3 className="text-xl font-bold text-neutral-900 mb-6">Add Exception</h3>
             <form onSubmit={handleExceptionAddSubmit}>
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Date</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Date</label>
                 <DatePicker
                   value={exceptionFormData.date}
                   onChange={(date) => setExceptionFormData({ ...exceptionFormData, date })}
@@ -1087,26 +1087,26 @@ export default function SecretarySchedule() {
                 />
               </div>
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Reason (optional)</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Reason (optional)</label>
                 <input
                   type="text"
                   value={exceptionFormData.reason}
                   onChange={(e) => setExceptionFormData({ ...exceptionFormData, reason: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500"
                 />
               </div>
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowExceptionAddModal(false)}
-                  className="h-10 px-6 rounded-2xl border-2 border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-all"
+                  className="h-10 px-6 rounded-2xl border-2 border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
+                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
                 >
                   {saving ? 'Saving...' : 'Add'}
                 </button>
@@ -1126,10 +1126,10 @@ export default function SecretarySchedule() {
             className="fmd-modal-panel bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
             data-state={exceptionEditModalOpen ? 'open' : 'closed'}
           >
-            <h3 className="text-xl font-bold text-slate-900 mb-6">Edit Exception</h3>
+            <h3 className="text-xl font-bold text-neutral-900 mb-6">Edit Exception</h3>
             <form onSubmit={handleExceptionEditSubmit}>
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Date</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Date</label>
                 <DatePicker
                   value={exceptionFormData.date}
                   onChange={(date) => setExceptionFormData({ ...exceptionFormData, date })}
@@ -1139,26 +1139,26 @@ export default function SecretarySchedule() {
                 />
               </div>
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Reason (optional)</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Reason (optional)</label>
                 <input
                   type="text"
                   value={exceptionFormData.reason}
                   onChange={(e) => setExceptionFormData({ ...exceptionFormData, reason: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500"
                 />
               </div>
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowExceptionEditModal(false)}
-                  className="h-10 px-6 rounded-2xl border-2 border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-all"
+                  className="h-10 px-6 rounded-2xl border-2 border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
+                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
                 >
                   {saving ? 'Saving...' : 'Save'}
                 </button>
@@ -1178,19 +1178,19 @@ export default function SecretarySchedule() {
             className="fmd-modal-panel bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
             data-state={exceptionDeleteModalOpen ? 'open' : 'closed'}
           >
-            <h3 className="text-xl font-bold text-slate-900 mb-4">Delete Exception</h3>
-            <p className="text-slate-600 mb-6">Are you sure you want to delete this exception?</p>
+            <h3 className="text-xl font-bold text-neutral-900 mb-4">Delete Exception</h3>
+            <p className="text-neutral-600 mb-6">Are you sure you want to delete this exception?</p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowExceptionDeleteModal(false)}
-                className="h-10 px-6 rounded-2xl border-2 border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-all"
+                className="h-10 px-6 rounded-2xl border-2 border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleExceptionDelete}
                 disabled={saving}
-                className="h-10 px-6 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
+                className="h-10 px-6 rounded-2xl bg-gradient-to-r from-error-500 to-error-600 hover:from-error-600 hover:to-error-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
               >
                 {saving ? 'Deleting...' : 'Delete'}
               </button>
@@ -1209,10 +1209,10 @@ export default function SecretarySchedule() {
             className="fmd-modal-panel bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
             data-state={showBreakAddModal ? 'open' : 'closed'}
           >
-            <h3 className="text-xl font-bold text-slate-900 mb-6">Add Break Period</h3>
+            <h3 className="text-xl font-bold text-neutral-900 mb-6">Add Break Period</h3>
             <form onSubmit={handleBreakAddSubmit}>
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Day of Week</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Day of Week</label>
                 <Select
                   value={String(breakFormData.dayOfWeek)}
                   onChange={(value) => setBreakFormData({ ...breakFormData, dayOfWeek: parseInt(value) })}
@@ -1220,46 +1220,46 @@ export default function SecretarySchedule() {
                 />
               </div>
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Start Time</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Start Time</label>
                 <input
                   type="time"
                   value={breakFormData.startTime}
                   onChange={(e) => setBreakFormData({ ...breakFormData, startTime: e.target.value })}
                   required
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500"
                 />
               </div>
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">End Time</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">End Time</label>
                 <input
                   type="time"
                   value={breakFormData.endTime}
                   onChange={(e) => setBreakFormData({ ...breakFormData, endTime: e.target.value })}
                   required
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500"
                 />
               </div>
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Reason (optional)</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Reason (optional)</label>
                 <input
                   type="text"
                   value={breakFormData.reason}
                   onChange={(e) => setBreakFormData({ ...breakFormData, reason: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500"
                 />
               </div>
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowBreakAddModal(false)}
-                  className="h-10 px-6 rounded-2xl border-2 border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-all"
+                  className="h-10 px-6 rounded-2xl border-2 border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
+                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
                 >
                   {saving ? 'Saving...' : 'Add'}
                 </button>
@@ -1279,10 +1279,10 @@ export default function SecretarySchedule() {
             className="fmd-modal-panel bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
             data-state={breakEditModalOpen ? 'open' : 'closed'}
           >
-            <h3 className="text-xl font-bold text-slate-900 mb-6">Edit Break Period</h3>
+            <h3 className="text-xl font-bold text-neutral-900 mb-6">Edit Break Period</h3>
             <form onSubmit={handleBreakEditSubmit}>
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Day of Week</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Day of Week</label>
                 <Select
                   value={String(breakFormData.dayOfWeek)}
                   onChange={(value) => setBreakFormData({ ...breakFormData, dayOfWeek: parseInt(value) })}
@@ -1290,46 +1290,46 @@ export default function SecretarySchedule() {
                 />
               </div>
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Start Time</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Start Time</label>
                 <input
                   type="time"
                   value={breakFormData.startTime}
                   onChange={(e) => setBreakFormData({ ...breakFormData, startTime: e.target.value })}
                   required
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500"
                 />
               </div>
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">End Time</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">End Time</label>
                 <input
                   type="time"
                   value={breakFormData.endTime}
                   onChange={(e) => setBreakFormData({ ...breakFormData, endTime: e.target.value })}
                   required
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500"
                 />
               </div>
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Reason (optional)</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Reason (optional)</label>
                 <input
                   type="text"
                   value={breakFormData.reason}
                   onChange={(e) => setBreakFormData({ ...breakFormData, reason: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500"
                 />
               </div>
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowBreakEditModal(false)}
-                  className="h-10 px-6 rounded-2xl border-2 border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-all"
+                  className="h-10 px-6 rounded-2xl border-2 border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
+                  className="h-10 px-6 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
                 >
                   {saving ? 'Saving...' : 'Save'}
                 </button>
@@ -1349,19 +1349,19 @@ export default function SecretarySchedule() {
             className="fmd-modal-panel bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
             data-state={breakDeleteModalOpen ? 'open' : 'closed'}
           >
-            <h3 className="text-xl font-bold text-slate-900 mb-4">Delete Break Period</h3>
-            <p className="text-slate-600 mb-6">Are you sure you want to delete this break period?</p>
+            <h3 className="text-xl font-bold text-neutral-900 mb-4">Delete Break Period</h3>
+            <p className="text-neutral-600 mb-6">Are you sure you want to delete this break period?</p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowBreakDeleteModal(false)}
-                className="h-10 px-6 rounded-2xl border-2 border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-all"
+                className="h-10 px-6 rounded-2xl border-2 border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleBreakDelete}
                 disabled={saving}
-                className="h-10 px-6 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
+                className="h-10 px-6 rounded-2xl bg-gradient-to-r from-error-500 to-error-600 hover:from-error-600 hover:to-error-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-md transition-all transform hover:scale-105"
               >
                 {saving ? 'Deleting...' : 'Delete'}
               </button>

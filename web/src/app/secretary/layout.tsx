@@ -182,8 +182,8 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8f9ff]">
-        <div className="text-slate-600">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="text-neutral-600">Loading...</div>
       </div>
     );
   }
@@ -193,10 +193,10 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9ff]">
+    <div className="min-h-screen bg-neutral-50">
       <SecretarySidebar userName={userName} userRole={userRole} />
       <SecretaryHeader userName={userName} userEmail={userEmail} userRole={userRole} />
-      <main className="ml-64 pt-20 bg-[#f8f9ff] p-6">
+      <main className="ml-64 pt-20 bg-neutral-50 p-6">
         <div className="max-w-[1600px] mx-auto">
           <PageTransition>{children}</PageTransition>
         </div>

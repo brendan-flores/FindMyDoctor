@@ -53,8 +53,8 @@ export default function ConfirmDialog({
 
   const confirmClasses =
     confirmVariant === 'danger'
-      ? 'bg-rose-600 text-white hover:bg-rose-700'
-      : 'bg-[#1A62CD] text-white hover:bg-[#1550A8]';
+      ? 'bg-error-600 text-white hover:bg-error-700'
+      : 'bg-primary-600 text-white hover:bg-primary-700';
   const state = open ? 'open' : 'closed';
 
   return (
@@ -71,10 +71,10 @@ export default function ConfirmDialog({
         className="fmd-modal-panel bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
         data-state={state}
       >
-        <h3 id="confirm-dialog-title" className="text-lg font-bold text-slate-800">
+        <h3 id="confirm-dialog-title" className="text-lg font-bold text-neutral-800">
           {title}
         </h3>
-        <p id="confirm-dialog-message" className="mt-2 text-sm text-slate-600">
+        <p id="confirm-dialog-message" className="mt-2 text-sm text-neutral-600">
           {message}
         </p>
         <div className="mt-6 flex justify-end gap-3">
@@ -83,7 +83,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {cancelLabel}
           </button>

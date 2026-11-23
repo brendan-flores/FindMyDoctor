@@ -111,53 +111,53 @@ export default function DoctorPatients() {
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-neutral-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 font-medium">Total Patients</p>
-              <p className="text-2xl font-bold text-slate-800">{patients.length}</p>
+              <p className="text-sm text-neutral-500 font-medium">Total Patients</p>
+              <p className="text-2xl font-bold text-neutral-800">{patients.length}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
-              <span className="material-symbols-outlined text-blue-600 text-2xl">people</span>
+            <div className="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary-600 text-2xl">people</span>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-neutral-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 font-medium">Active Patients</p>
-              <p className="text-2xl font-bold text-emerald-600">
+              <p className="text-sm text-neutral-500 font-medium">Active Patients</p>
+              <p className="text-2xl font-bold text-success-600">
                 {patients.length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
-              <span className="material-symbols-outlined text-emerald-600 text-2xl">person_check</span>
+            <div className="w-12 h-12 bg-success-50 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-success-600 text-2xl">person_check</span>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-neutral-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 font-medium">Filtered Results</p>
-              <p className="text-2xl font-bold text-blue-600">
+              <p className="text-sm text-neutral-500 font-medium">Filtered Results</p>
+              <p className="text-2xl font-bold text-primary-600">
                 {filteredPatients.length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
-              <span className="material-symbols-outlined text-blue-600 text-2xl">filter_list</span>
+            <div className="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary-600 text-2xl">filter_list</span>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-neutral-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 font-medium">Search Active</p>
-              <p className="text-2xl font-bold text-purple-600">
+              <p className="text-sm text-neutral-500 font-medium">Search Active</p>
+              <p className="text-2xl font-bold text-primary-600">
                 {searchTerm ? 'Yes' : 'No'}
               </p>
             </div>
-            <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
-              <span className="material-symbols-outlined text-purple-600 text-2xl">search</span>
+            <div className="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary-600 text-2xl">search</span>
             </div>
           </div>
         </div>
@@ -167,7 +167,7 @@ export default function DoctorPatients() {
       <div className="flex justify-end">
         <button
           onClick={() => { setAddPhoneError(''); setShowAddModal(true); }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
+          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium flex items-center gap-2"
         >
           <span className="material-symbols-outlined">add</span>
           Add Patient
@@ -175,9 +175,9 @@ export default function DoctorPatients() {
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+      <div className="bg-white rounded-xl p-4 shadow-sm border border-neutral-100">
         <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">
             search
           </span>
           <input
@@ -185,72 +185,72 @@ export default function DoctorPatients() {
             placeholder="Search by name, email, or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
           />
         </div>
       </div>
 
       {/* Patients List */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+      <div className="bg-white rounded-xl shadow-sm border border-neutral-100">
         {isLoading ? (
           <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-slate-600">Loading patients...</p>
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            <p className="mt-4 text-neutral-600">Loading patients...</p>
           </div>
         ) : error ? (
           <div className="p-8 text-center">
-            <p className="text-red-600">{error}</p>
+            <p className="text-error-600">{error}</p>
             <button
               onClick={() => fetchDoctorProfile()}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
             >
               Retry
             </button>
           </div>
         ) : filteredPatients.length === 0 ? (
           <div className="p-8 text-center">
-            <span className="material-symbols-outlined text-6xl text-slate-300">person_search</span>
-            <p className="mt-4 text-slate-600">
+            <span className="material-symbols-outlined text-6xl text-neutral-300">person_search</span>
+            <p className="mt-4 text-neutral-600">
               {searchTerm ? 'No patients match your search' : 'No patients found'}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-neutral-100">
             {filteredPatients.map((patient) => (
               <div
                 key={patient.id}
-                className="p-6 hover:bg-slate-50 transition-colors"
+                className="p-6 hover:bg-neutral-50 transition-colors"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-800">
+                    <h3 className="text-lg font-semibold text-neutral-800">
                       {getFullName(patient)}
                     </h3>
 
                     <div className="mt-2 space-y-1">
                       {patient.email && (
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <div className="flex items-center gap-2 text-sm text-neutral-600">
                           <span className="material-symbols-outlined text-lg">email</span>
                           <span>{patient.email}</span>
                         </div>
                       )}
 
                       {patient.phone && (
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <div className="flex items-center gap-2 text-sm text-neutral-600">
                           <span className="material-symbols-outlined text-lg">phone</span>
                           <span>{patient.phone}</span>
                         </div>
                       )}
 
                       {patient.date_of_birth && (
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <div className="flex items-center gap-2 text-sm text-neutral-600">
                           <span className="material-symbols-outlined text-lg">cake</span>
                           <span>Date of Birth: {formatDate(patient.date_of_birth)}</span>
                         </div>
                       )}
 
                       {patient.sex && (
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <div className="flex items-center gap-2 text-sm text-neutral-600">
                           <span className="material-symbols-outlined text-lg">wc</span>
                           <span>Sex: {patient.sex}</span>
                         </div>
@@ -261,7 +261,7 @@ export default function DoctorPatients() {
                   <div className="ml-4">
                     <button
                       onClick={() => router.push(`/doctor/patients/${patient.id}`)}
-                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                       title="View Details"
                     >
                       <span className="material-symbols-outlined">visibility</span>
@@ -284,9 +284,9 @@ export default function DoctorPatients() {
             className="fmd-modal-panel bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             data-state={showAddModal ? 'open' : 'closed'}
           >
-            <div className="p-6 border-b border-slate-100">
+            <div className="p-6 border-b border-neutral-100">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-slate-800">Add Patient</h2>
+                <h2 className="text-xl font-semibold text-neutral-800">Add Patient</h2>
                 <button
                   onClick={() => {
                     setShowAddModal(false);
@@ -308,68 +308,68 @@ export default function DoctorPatients() {
                       currentMedications: '',
                     });
                   }}
-                  className="text-slate-400 hover:text-slate-600"
+                  className="text-neutral-400 hover:text-neutral-600"
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-sm text-neutral-500 mt-1">
                 Enter the patient&apos;s email to associate them with your practice. The patient must have an existing account.
               </p>
             </div>
 
             {addError && (
-              <div className="p-4 bg-red-50 border border-red-200 mx-6 mt-4 rounded-lg">
-                <p className="text-red-600 text-sm">{addError}</p>
+              <div className="p-4 bg-error-50 border border-error-200 mx-6 mt-4 rounded-lg">
+                <p className="text-error-600 text-sm">{addError}</p>
               </div>
             )}
 
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Email *</label>
+                <label className="block text-sm text-neutral-500 mb-1">Email *</label>
                 <input
                   type="email"
                   value={addFormData.email}
                   onChange={(e) => setAddFormData({ ...addFormData, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                   placeholder="patient@example.com"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-slate-500 mb-1">First Name *</label>
+                  <label className="block text-sm text-neutral-500 mb-1">First Name *</label>
                   <input
                     type="text"
                     value={addFormData.firstName}
                     onChange={(e) => setAddFormData({ ...addFormData, firstName: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-500 mb-1">Middle Name</label>
+                  <label className="block text-sm text-neutral-500 mb-1">Middle Name</label>
                   <input
                     type="text"
                     value={addFormData.middleName}
                     onChange={(e) => setAddFormData({ ...addFormData, middleName: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Last Name *</label>
+                <label className="block text-sm text-neutral-500 mb-1">Last Name *</label>
                 <input
                   type="text"
                   value={addFormData.lastName}
                   onChange={(e) => setAddFormData({ ...addFormData, lastName: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-slate-500 mb-1">Date of Birth *</label>
+                  <label className="block text-sm text-neutral-500 mb-1">Date of Birth *</label>
                   <DatePicker
                     value={addFormData.dateOfBirth}
                     onChange={(date) => setAddFormData({ ...addFormData, dateOfBirth: date })}
@@ -377,7 +377,7 @@ export default function DoctorPatients() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-500 mb-1">Sex *</label>
+                  <label className="block text-sm text-neutral-500 mb-1">Sex *</label>
                   <Select
                     value={addFormData.sex}
                     onChange={(value) => setAddFormData({ ...addFormData, sex: value })}
@@ -392,9 +392,9 @@ export default function DoctorPatients() {
               </div>
 
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Phone *</label>
+                <label className="block text-sm text-neutral-500 mb-1">Phone *</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">+63</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 font-medium">+63</span>
                   <input
                     type="text"
                     value={addFormData.phone}
@@ -404,77 +404,77 @@ export default function DoctorPatients() {
                       setAddPhoneError(result.error ? phoneFormatErrorMessage(result.error) : '');
                     }}
                     className={`w-full pl-12 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                      addPhoneError ? 'border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500'
+                      addPhoneError ? 'border-error-500 focus:ring-error-500' : 'border-neutral-200 focus:ring-primary-600'
                     }`}
                     placeholder="9171234567"
                   />
                 </div>
-                {addPhoneError && <p className="text-xs text-red-600 mt-1">{addPhoneError}</p>}
+                {addPhoneError && <p className="text-xs text-error-600 mt-1">{addPhoneError}</p>}
               </div>
 
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Address *</label>
+                <label className="block text-sm text-neutral-500 mb-1">Address *</label>
                 <input
                   type="text"
                   value={addFormData.address}
                   onChange={(e) => setAddFormData({ ...addFormData, address: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-slate-500 mb-1">Emergency Contact Name</label>
+                  <label className="block text-sm text-neutral-500 mb-1">Emergency Contact Name</label>
                   <input
                     type="text"
                     value={addFormData.emergencyContactName}
                     onChange={(e) => setAddFormData({ ...addFormData, emergencyContactName: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-500 mb-1">Emergency Contact Phone</label>
+                  <label className="block text-sm text-neutral-500 mb-1">Emergency Contact Phone</label>
                   <input
                     type="text"
                     value={addFormData.emergencyContactPhone}
                     onChange={(e) => setAddFormData({ ...addFormData, emergencyContactPhone: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Medical History</label>
+                <label className="block text-sm text-neutral-500 mb-1">Medical History</label>
                 <textarea
                   value={addFormData.medicalHistory}
                   onChange={(e) => setAddFormData({ ...addFormData, medicalHistory: e.target.value })}
                   rows={2}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Allergies</label>
+                <label className="block text-sm text-neutral-500 mb-1">Allergies</label>
                 <textarea
                   value={addFormData.allergies}
                   onChange={(e) => setAddFormData({ ...addFormData, allergies: e.target.value })}
                   rows={2}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Current Medications</label>
+                <label className="block text-sm text-neutral-500 mb-1">Current Medications</label>
                 <textarea
                   value={addFormData.currentMedications}
                   onChange={(e) => setAddFormData({ ...addFormData, currentMedications: e.target.value })}
                   rows={2}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                 />
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+            <div className="p-6 border-t border-neutral-100 flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowAddModal(false);
@@ -496,7 +496,7 @@ export default function DoctorPatients() {
                     currentMedications: '',
                   });
                 }}
-                className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
+                className="px-4 py-2 border border-neutral-200 rounded-lg hover:bg-neutral-50"
                 disabled={isAdding}
               >
                 Cancel
@@ -572,7 +572,7 @@ export default function DoctorPatients() {
                     setIsAdding(false);
                   }
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isAdding}
               >
                 {isAdding ? 'Adding...' : 'Add Patient'}

@@ -462,10 +462,10 @@ export default function DoctorProfile() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#F3F5F9] flex items-center justify-center">
+      <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1A62CD] mx-auto"></div>
-          <p className="mt-4 text-[#64748B]">Loading your profile...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-neutral-500">Loading your profile...</p>
         </div>
       </div>
     );
@@ -489,7 +489,7 @@ export default function DoctorProfile() {
     Boolean(formData.practice_name.trim());
 
   return (
-    <div className="min-h-screen bg-[#F3F5F9]">
+    <div className="min-h-screen bg-neutral-100">
       <div className="px-4 py-8 overflow-y-auto" style={{ height: '100vh' }}>
         <div className="w-full max-w-[560px] mx-auto">
 
@@ -503,57 +503,57 @@ export default function DoctorProfile() {
           </div>
 
           {/* Card */}
-          <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8">
+          <div className="bg-white rounded-3xl shadow-lg border border-neutral-200 p-8">
 
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-[#0F172A]">
+              <h1 className="text-2xl font-bold text-neutral-900">
                 Complete Your Professional Profile
               </h1>
-              <p className="text-[#64748B] mt-2 text-[15px]">
+              <p className="text-neutral-500 mt-2 text-[15px]">
                 Please provide your professional information. Once complete, submit for admin approval.
               </p>
             </div>
 
             {/* Status Banner */}
             {isRejected && (
-              <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="mb-6 bg-error-50 border border-error-200 rounded-xl p-4">
                 <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-red-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-error-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                   <div>
-                    <p className="text-sm font-semibold text-red-900">Profile Rejected</p>
+                    <p className="text-sm font-semibold text-error-900">Profile Rejected</p>
                     {profile?.rejection_reason && (
-                      <p className="text-sm text-red-700 mt-1">Reason: {profile.rejection_reason}</p>
+                      <p className="text-sm text-error-700 mt-1">Reason: {profile.rejection_reason}</p>
                     )}
-                    <p className="text-sm text-red-700 mt-1">Please correct your profile information and resubmit for approval.</p>
+                    <p className="text-sm text-error-700 mt-1">Please correct your profile information and resubmit for approval.</p>
                   </div>
                 </div>
               </div>
             )}
 
             {isProfileSubmitted && !isRejected && (
-              <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <div className="mb-6 bg-primary-50 border border-primary-200 rounded-xl p-4">
                 <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-primary-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
-                    <p className="text-sm font-semibold text-blue-900">Profile Submitted for Review</p>
-                    <p className="text-sm text-blue-700 mt-1">Your profile is pending admin approval. You will be notified once approved.</p>
+                    <p className="text-sm font-semibold text-primary-900">Profile Submitted for Review</p>
+                    <p className="text-sm text-primary-700 mt-1">Your profile is pending admin approval. You will be notified once approved.</p>
                   </div>
                 </div>
               </div>
             )}
 
             {error && (
-              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+              <div className="mb-6 bg-error-50 border border-error-200 text-error-700 px-4 py-3 rounded-xl text-sm">
                 <p>{error}</p>
                 {profileNotFound && (
                   <button
                     type="button"
                     onClick={handleReauthenticate}
-                    className="mt-3 inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
+                    className="mt-3 inline-flex items-center rounded-lg bg-error-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-error-700 transition-colors"
                   >
                     Sign out and sign in again
                   </button>
@@ -562,7 +562,7 @@ export default function DoctorProfile() {
             )}
 
             {successMessage && (
-              <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
+              <div className="mb-6 bg-success-50 border border-success-200 text-success-700 px-4 py-3 rounded-xl text-sm">
                 {successMessage}
               </div>
             )}
@@ -572,7 +572,7 @@ export default function DoctorProfile() {
 
               {/* Professional Photo */}
               <div>
-                <label className="block text-[15px] font-semibold text-[#334155] mb-2">
+                <label className="block text-[15px] font-semibold text-neutral-700 mb-2">
                   Professional Photo
                 </label>
                 <div className="space-y-3">
@@ -588,7 +588,7 @@ export default function DoctorProfile() {
                             ? photoPreview
                             : `${apiOrigin}${photoPreview}`}
                           alt="Professional Photo Preview"
-                          className="w-32 h-32 rounded-xl object-cover border-2 border-[#E2E8F0]"
+                          className="w-32 h-32 rounded-xl object-cover border-2 border-neutral-200"
                           onError={(e) => {
                             console.error('Image failed to load:', photoPreview);
                             console.error('Error event:', e);
@@ -602,14 +602,14 @@ export default function DoctorProfile() {
                         type="button"
                         onClick={handlePhotoDelete}
                         disabled={isDeletingPhoto || !canEdit}
-                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-error-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-error-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         {isDeletingPhoto ? '...' : '×'}
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center w-32 h-32 rounded-xl border-2 border-dashed border-[#E2E8F0] bg-gray-50">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center justify-center w-32 h-32 rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50">
+                      <svg className="w-8 h-8 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                     </div>
@@ -620,9 +620,9 @@ export default function DoctorProfile() {
                       accept="image/png"
                       onChange={handlePhotoUpload}
                       disabled={isUploadingPhoto || !canEdit}
-                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#1A62CD] file:text-white hover:file:bg-[#0D3B75] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      className="block w-full text-sm text-neutral-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-600 file:text-white hover:file:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     />
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-neutral-500">
                       PNG only (max 4MB)
                     </p>
                   </div>
@@ -631,8 +631,8 @@ export default function DoctorProfile() {
 
               {/* Specialty */}
               <div>
-                <label className="block text-[15px] font-semibold text-[#334155] mb-2">
-                  Specialty <span className="text-red-500">*</span>
+                <label className="block text-[15px] font-semibold text-neutral-700 mb-2">
+                  Specialty <span className="text-error-500">*</span>
                 </label>
                 <SearchableSelect
                   value={formData.specialty}
@@ -648,8 +648,8 @@ export default function DoctorProfile() {
 
               {/* Credentials */}
               <div>
-                <label className="block text-[15px] font-semibold text-[#334155] mb-2">
-                  Credentials <span className="text-red-500">*</span>
+                <label className="block text-[15px] font-semibold text-neutral-700 mb-2">
+                  Credentials <span className="text-error-500">*</span>
                 </label>
                 <SearchableMultiSelect
                   value={
@@ -669,8 +669,8 @@ export default function DoctorProfile() {
 
               {/* PRC License Number */}
               <div>
-                <label className="block text-[15px] font-semibold text-[#334155] mb-2">
-                  PRC License Number <span className="text-red-500">*</span>
+                <label className="block text-[15px] font-semibold text-neutral-700 mb-2">
+                  PRC License Number <span className="text-error-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -684,14 +684,14 @@ export default function DoctorProfile() {
                     setError('');
                   }}
                   placeholder="Enter your 7-digit PRC license number"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 px-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all"
                 />
               </div>
 
               {/* Hospital/Clinic */}
               <div>
-                <label className="block text-[15px] font-semibold text-[#334155] mb-2">
-                  Hospital/Clinic <span className="text-red-500">*</span>
+                <label className="block text-[15px] font-semibold text-neutral-700 mb-2">
+                  Hospital/Clinic <span className="text-error-500">*</span>
                 </label>
                 <SearchableSelect
                   value={formData.practice_name}
@@ -713,7 +713,7 @@ export default function DoctorProfile() {
               {/* Room Number (only for facilities that assign rooms) */}
               {selectedFacility?.hasRoomNumber && (
                 <div>
-                  <label className="block text-[15px] font-semibold text-[#334155] mb-2">
+                  <label className="block text-[15px] font-semibold text-neutral-700 mb-2">
                     Room Number
                   </label>
                   <input
@@ -725,9 +725,9 @@ export default function DoctorProfile() {
                     }}
                     placeholder="e.g., Room 406, Suite 302"
                     maxLength={50}
-                    className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                    className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 px-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all"
                   />
-                  <p className="mt-2 text-[13px] text-[#64748B]">
+                  <p className="mt-2 text-[13px] text-neutral-500">
                     This facility assigns consultation rooms. Enter your room or suite number.
                   </p>
                 </div>
@@ -735,7 +735,7 @@ export default function DoctorProfile() {
 
               {/* Years of Experience */}
               <div>
-                <label className="block text-[15px] font-semibold text-[#334155] mb-2">
+                <label className="block text-[15px] font-semibold text-neutral-700 mb-2">
                   Years of Experience
                 </label>
                 <input
@@ -748,13 +748,13 @@ export default function DoctorProfile() {
                     setError('');
                   }}
                   placeholder="e.g., 10"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 px-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all"
                 />
               </div>
 
               {/* Areas of Expertise */}
               <div>
-                <label className="block text-[15px] font-semibold text-[#334155] mb-2">
+                <label className="block text-[15px] font-semibold text-neutral-700 mb-2">
                   Areas of Expertise
                 </label>
                 <Select
@@ -770,7 +770,7 @@ export default function DoctorProfile() {
 
               {/* Short Biography */}
               <div>
-                <label className="block text-[15px] font-semibold text-[#334155] mb-2">
+                <label className="block text-[15px] font-semibold text-neutral-700 mb-2">
                   Short Biography
                 </label>
                 <textarea
@@ -781,13 +781,13 @@ export default function DoctorProfile() {
                   }}
                   placeholder="Tell patients about your background and approach to care..."
                   rows={4}
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all resize-none"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 px-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all resize-none"
                 />
               </div>
 
               {/* Consultation Fee */}
               <div>
-                <label className="block text-[15px] font-semibold text-[#334155] mb-2">
+                <label className="block text-[15px] font-semibold text-neutral-700 mb-2">
                   Consultation Fee (₱)
                 </label>
                 <input
@@ -800,13 +800,13 @@ export default function DoctorProfile() {
                     setError('');
                   }}
                   placeholder="e.g., 500"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 px-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all"
                 />
               </div>
 
               {/* Languages Spoken */}
               <div>
-                <label className="block text-[15px] font-semibold text-[#334155] mb-2">
+                <label className="block text-[15px] font-semibold text-neutral-700 mb-2">
                   Languages Spoken
                 </label>
                 <SearchableMultiSelect
@@ -828,14 +828,14 @@ export default function DoctorProfile() {
               {/* Available Schedule */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-[15px] font-semibold text-[#334155]">
+                  <label className="block text-[15px] font-semibold text-neutral-700">
                     Available Schedule
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowScheduleForm(!showScheduleForm)}
                     disabled={!canEdit}
-                    className="text-sm font-semibold text-[#1967D2] hover:text-[#0D3B75] disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                    className="text-sm font-semibold text-primary-600 hover:text-primary-800 disabled:text-neutral-400 disabled:cursor-not-allowed transition-colors"
                   >
                     {showScheduleForm ? 'Cancel' : '+ Add Schedule'}
                   </button>
@@ -843,9 +843,9 @@ export default function DoctorProfile() {
 
                 {/* Schedule Form */}
                 <div className={`fmd-expand ${showScheduleForm ? 'mb-4' : ''}`} data-open={showScheduleForm}>
-                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                  <div className="bg-neutral-50 rounded-xl p-4 space-y-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Day of Week</label>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">Day of Week</label>
                       <Select
                         value={scheduleForm.day_of_week}
                         onChange={(value) => setScheduleForm({ ...scheduleForm, day_of_week: value })}
@@ -855,21 +855,21 @@ export default function DoctorProfile() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                        <label className="block text-sm font-medium text-neutral-700 mb-1">Start Time</label>
                         <input
                           type="time"
                           value={scheduleForm.start_time}
                           onChange={(e) => setScheduleForm({ ...scheduleForm, start_time: e.target.value })}
-                          className="block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm text-gray-900 focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]/20"
+                          className="block w-full rounded-lg border border-neutral-300 bg-white py-2 px-3 text-sm text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600/20"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                        <label className="block text-sm font-medium text-neutral-700 mb-1">End Time</label>
                         <input
                           type="time"
                           value={scheduleForm.end_time}
                           onChange={(e) => setScheduleForm({ ...scheduleForm, end_time: e.target.value })}
-                          className="block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm text-gray-900 focus:border-[#1A62CD] focus:outline-none focus:ring-1 focus:ring-[#1A62CD]/20"
+                          className="block w-full rounded-lg border border-neutral-300 bg-white py-2 px-3 text-sm text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600/20"
                         />
                       </div>
                     </div>
@@ -877,7 +877,7 @@ export default function DoctorProfile() {
                       type="button"
                       onClick={handleAddSchedule}
                       disabled={isScheduleSaving || !scheduleForm.day_of_week || !scheduleForm.start_time || !scheduleForm.end_time}
-                      className="w-full py-2 px-4 rounded-lg text-sm font-semibold text-white bg-[#1A62CD] hover:bg-[#0D3B75] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="w-full py-2 px-4 rounded-lg text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {isScheduleSaving ? 'Saving...' : 'Add Schedule'}
                     </button>
@@ -888,10 +888,10 @@ export default function DoctorProfile() {
                 {schedules.length > 0 ? (
                   <div className="space-y-2">
                     {schedules.map((schedule) => (
-                      <div key={schedule.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                      <div key={schedule.id} className="flex items-center justify-between bg-neutral-50 rounded-lg p-3">
                         <div className="text-sm">
-                          <span className="font-medium text-gray-900">{getDayLabel(schedule.day_of_week?.toString())}</span>
-                          <span className="text-gray-600 ml-2">
+                          <span className="font-medium text-neutral-900">{getDayLabel(schedule.day_of_week?.toString())}</span>
+                          <span className="text-neutral-600 ml-2">
                             {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
                           </span>
                         </div>
@@ -899,7 +899,7 @@ export default function DoctorProfile() {
                           type="button"
                           onClick={() => handleDeleteSchedule(schedule.id)}
                           disabled={!canEdit || isScheduleSaving}
-                          className="text-red-600 hover:text-red-800 disabled:text-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+                          className="text-error-600 hover:text-error-800 disabled:text-neutral-400 disabled:cursor-not-allowed text-sm font-medium"
                         >
                           {isScheduleSaving ? 'Removing...' : 'Remove'}
                         </button>
@@ -907,7 +907,7 @@ export default function DoctorProfile() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 italic">No schedules added yet</p>
+                  <p className="text-sm text-neutral-500 italic">No schedules added yet</p>
                 )}
               </div>
 
@@ -919,12 +919,12 @@ export default function DoctorProfile() {
                       type="button"
                       onClick={handleSubmit}
                       disabled={isSubmitting || !isProfileReadyToSubmit}
-                      className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
                     </button>
                     {!isProfileReadyToSubmit && (
-                      <p className="mt-2 text-center text-xs text-[#64748B]">
+                      <p className="mt-2 text-center text-xs text-neutral-500">
                         Complete the required professional fields to submit.
                       </p>
                     )}
@@ -936,7 +936,7 @@ export default function DoctorProfile() {
 
           </div>
 
-          <p className="text-center text-[13px] text-[#94A3B8] mt-6">
+          <p className="text-center text-[13px] text-neutral-400 mt-6">
             By continuing, you agree to our Terms of Service and Privacy Policy
           </p>
 
@@ -950,26 +950,26 @@ export default function DoctorProfile() {
           data-state={showSubmissionModal ? 'open' : 'closed'}
         >
           <div
-            className="fmd-modal-panel bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8 max-w-md w-full"
+            className="fmd-modal-panel bg-white rounded-3xl shadow-lg border border-neutral-200 p-8 max-w-md w-full"
             data-state={showSubmissionModal ? 'open' : 'closed'}
           >
             <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-16 h-16 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-[#0F172A] mb-3">
+              <h2 className="text-2xl font-bold text-neutral-900 mb-3">
                 Profile Submitted Successfully!
               </h2>
-              <p className="text-[#64748B] text-[15px] leading-relaxed mb-6">
+              <p className="text-neutral-500 text-[15px] leading-relaxed mb-6">
                 Your professional profile has been submitted successfully. You can sign in to the
                 doctor portal once an administrator approves your account. Your profile will then
                 be displayed to patients in the FindMyDoctor mobile app.
               </p>
               <button
                 onClick={handleModalContinue}
-                className="w-full py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#1A62CD] hover:bg-[#0D3B75] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1A62CD] transition-colors duration-150"
+                className="w-full py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600 transition-colors duration-150"
               >
                 Continue to Login
               </button>
@@ -991,7 +991,7 @@ export default function DoctorProfile() {
           >
             <button
               onClick={() => setShowPhotoModal(false)}
-              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+              className="absolute -top-10 right-0 text-white hover:text-neutral-300 transition-colors"
             >
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

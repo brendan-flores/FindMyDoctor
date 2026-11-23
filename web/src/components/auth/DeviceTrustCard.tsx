@@ -124,7 +124,7 @@ export default function DeviceTrustCard({
   const details = describeDevice(deviceInfo || fallbackDeviceInfo);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F3F5F9] px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-neutral-100 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-[520px]">
         <div className="flex flex-col items-center mb-6 text-center">
           <img
@@ -132,14 +132,14 @@ export default function DeviceTrustCard({
             alt="FindMyDoctor Logo"
             className="h-16 w-auto mb-2"
           />
-          <p className="text-[13px] font-bold uppercase tracking-widest text-[#1967D2]">
+          <p className="text-[13px] font-bold uppercase tracking-widest text-primary-600">
             {portalLabel}
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6 sm:p-8">
+        <div className="bg-white rounded-2xl shadow-md border border-neutral-100 p-6 sm:p-8">
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-[#EAF2FF] text-[#1A62CD]">
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"
@@ -150,10 +150,10 @@ export default function DeviceTrustCard({
               </svg>
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight text-[#0D1829]">
+              <h1 className="text-2xl font-black tracking-tight text-neutral-900">
                 Trust this device?
               </h1>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-1 text-sm text-neutral-600">
                 We don&apos;t recognize this browser. Trusting it lets you skip the
                 verification code on future logins from this device for 30 days. Your
                 password is always required.
@@ -167,32 +167,32 @@ export default function DeviceTrustCard({
             </div>
           )}
 
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
             {isLoading ? (
-              <p className="text-sm text-slate-500">Loading device details...</p>
+              <p className="text-sm text-neutral-500">Loading device details...</p>
             ) : (
               <dl className="space-y-3 text-sm">
                 <div className="flex items-center justify-between gap-4">
-                  <dt className="text-slate-500">Browser</dt>
-                  <dd className="font-semibold text-slate-800">{details.browser}</dd>
+                  <dt className="text-neutral-500">Browser</dt>
+                  <dd className="font-semibold text-neutral-800">{details.browser}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <dt className="text-slate-500">Operating system</dt>
-                  <dd className="font-semibold text-slate-800">{details.platform}</dd>
+                  <dt className="text-neutral-500">Operating system</dt>
+                  <dd className="font-semibold text-neutral-800">{details.platform}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <dt className="text-slate-500">Device type</dt>
-                  <dd className="font-semibold text-slate-800">{details.deviceType}</dd>
+                  <dt className="text-neutral-500">Device type</dt>
+                  <dd className="font-semibold text-neutral-800">{details.deviceType}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <dt className="text-slate-500">Detected</dt>
-                  <dd className="font-semibold text-slate-800">{formatCapturedAt(capturedAt)}</dd>
+                  <dt className="text-neutral-500">Detected</dt>
+                  <dd className="font-semibold text-neutral-800">{formatCapturedAt(capturedAt)}</dd>
                 </div>
               </dl>
             )}
           </div>
 
-          <p className="mt-4 text-xs leading-relaxed text-slate-500">
+          <p className="mt-4 text-xs leading-relaxed text-neutral-500">
             You can remove this device anytime from Settings &gt; Trusted Browsers.
             Choosing &ldquo;Do not trust&rdquo; keeps this session limited to the current
             browser session.
@@ -203,7 +203,7 @@ export default function DeviceTrustCard({
               type="button"
               onClick={handleTrust}
               disabled={isSubmitting || isLoading}
-              className="flex-1 rounded-xl bg-[#0D3B75] px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-[#0D3B75] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 rounded-xl bg-primary-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting ? 'Saving...' : 'Trust this device'}
             </button>
@@ -211,7 +211,7 @@ export default function DeviceTrustCard({
               type="button"
               onClick={handleDecline}
               disabled={isSubmitting}
-              className="flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm font-bold text-neutral-700 transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Do not trust this device
             </button>

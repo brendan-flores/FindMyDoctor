@@ -191,9 +191,9 @@ export default function SearchableSelect({
           onKeyDown={handleKeyDown}
           placeholder={selectedOption ? selectedOption.label : placeholder}
           className={`block w-full rounded-lg border ${
-            error ? 'border-red-500' : 'border-slate-200'
-          } bg-white px-4 py-2 text-sm text-slate-700 placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors overflow-hidden text-ellipsis whitespace-nowrap ${
-            disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'cursor-pointer'
+            error ? 'border-error-500' : 'border-neutral-200'
+          } bg-white px-4 py-2 text-sm text-neutral-700 placeholder-neutral-400 focus:border-success-500 focus:outline-none focus:ring-2 focus:ring-success-500 transition-colors overflow-hidden text-ellipsis whitespace-nowrap ${
+            disabled ? 'opacity-50 cursor-not-allowed bg-neutral-50' : 'cursor-pointer'
           }`}
         />
 
@@ -202,7 +202,7 @@ export default function SearchableSelect({
             <button
               type="button"
               onClick={handleClear}
-              className="text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+              className="text-neutral-400 hover:text-neutral-600 p-0.5 rounded-full hover:bg-neutral-100 transition-colors"
               aria-label="Clear selection"
               tabIndex={-1}
             >
@@ -224,7 +224,7 @@ export default function SearchableSelect({
               }
             }}
             tabIndex={-1}
-            className="text-slate-400 hover:text-slate-600 p-0.5 transition-colors"
+            className="text-neutral-400 hover:text-neutral-600 p-0.5 transition-colors"
             aria-label="Toggle dropdown"
           >
             <svg
@@ -246,10 +246,10 @@ export default function SearchableSelect({
           role="listbox"
           tabIndex={-1}
           data-state={isOpen ? 'open' : 'closed'}
-          className="fmd-dropdown absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg bg-white shadow-xl border border-slate-200 focus:outline-none"
+          className="fmd-dropdown absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg bg-white shadow-xl border border-neutral-200 focus:outline-none"
         >
           {filteredOptions.length === 0 ? (
-            <li className="px-4 py-3 text-center text-sm text-slate-400">
+            <li className="px-4 py-3 text-center text-sm text-neutral-400">
               {noResultsText}
             </li>
           ) : (
@@ -267,21 +267,21 @@ export default function SearchableSelect({
                   onClick={() => handleSelect(opt.value)}
                   className={`flex items-center justify-between px-4 py-2 cursor-pointer text-sm transition-colors ${
                     isHighlighted || isSelected
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'
+                      ? 'bg-success-50 text-success-700'
+                      : 'text-neutral-700 hover:bg-success-50 hover:text-success-700'
                   }`}
                 >
                   <div className="flex flex-col min-w-0 pr-2">
                     <span className="truncate">{opt.label}</span>
                     {opt.sublabel && (
-                      <span className="text-xs text-slate-400 truncate">
+                      <span className="text-xs text-neutral-400 truncate">
                         {opt.sublabel}
                       </span>
                     )}
                   </div>
                   {isSelected && (
                     <svg
-                      className="w-4 h-4 text-emerald-600 shrink-0"
+                      className="w-4 h-4 text-success-600 shrink-0"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"

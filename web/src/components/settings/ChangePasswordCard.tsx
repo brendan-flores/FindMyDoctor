@@ -109,7 +109,7 @@ export default function ChangePasswordCard({ onSuccess }: ChangePasswordCardProp
   };
 
   const inputClasses =
-    'block w-full rounded-xl border border-slate-200 bg-white py-3 pl-12 pr-12 text-sm tracking-wider text-slate-800 placeholder-slate-400 focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150';
+    'block w-full rounded-xl border border-neutral-200 bg-white py-3 pl-12 pr-12 text-sm tracking-wider text-neutral-800 placeholder-neutral-400 focus:border-primary-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all duration-150';
 
   const renderField = (
     id: string,
@@ -120,11 +120,11 @@ export default function ChangePasswordCard({ onSuccess }: ChangePasswordCardProp
     toggleShown: () => void
   ) => (
     <div className="space-y-2">
-      <label htmlFor={id} className="block text-sm font-semibold text-slate-700">
+      <label htmlFor={id} className="block text-sm font-semibold text-neutral-700">
         {label}
       </label>
       <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-neutral-400">
           {passwordIcon}
         </div>
         <input
@@ -143,7 +143,7 @@ export default function ChangePasswordCard({ onSuccess }: ChangePasswordCardProp
           type="button"
           onClick={toggleShown}
           aria-label={isShown ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
-          className="absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400 hover:text-slate-600 focus:outline-none focus:visible:ring-2 focus:visible:ring-[#1A62CD]/40 rounded-full"
+          className="absolute inset-y-0 right-0 flex items-center pr-4 text-neutral-400 hover:text-neutral-600 focus:outline-none focus:visible:ring-2 focus:visible:ring-primary-600/40 rounded-full"
         >
           {eyeIcon(isShown)}
         </button>
@@ -152,18 +152,18 @@ export default function ChangePasswordCard({ onSuccess }: ChangePasswordCardProp
   );
 
   return (
-    <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+    <div className="bg-white rounded-2xl shadow-md border border-neutral-100 p-6">
       {success && <Toast message={success} type="success" onClose={() => setSuccess('')} />}
       {error && <Toast message={error} type="error" onClose={() => setError('')} />}
 
-      <h2 className="text-xl font-bold text-slate-800">Change Password</h2>
-      <p className="text-sm text-slate-600 mt-1 max-w-2xl">
+      <h2 className="text-xl font-bold text-neutral-800">Change Password</h2>
+      <p className="text-sm text-neutral-600 mt-1 max-w-2xl">
         Changing your password signs out your other trusted browsers and devices. This browser stays
         signed in.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-5 max-w-md space-y-4" noValidate>
-        <div className="text-sm text-rose-600" role="alert">
+        <div className="text-sm text-error-600" role="alert">
           {error ? error : ''}
         </div>
 
@@ -171,7 +171,7 @@ export default function ChangePasswordCard({ onSuccess }: ChangePasswordCardProp
 
         <div>
           {renderField('newPassword', 'New Password', newPassword, setNewPassword, showNewPassword, () => setShowNewPassword(!showNewPassword))}
-          <p className="text-xs text-slate-500 mt-1.5">Must be at least 8 characters.</p>
+          <p className="text-xs text-neutral-500 mt-1.5">Must be at least 8 characters.</p>
         </div>
 
         {renderField('confirmPassword', 'Confirm New Password', confirmPassword, setConfirmPassword, showConfirmPassword, () => setShowConfirmPassword(!showConfirmPassword))}
@@ -179,7 +179,7 @@ export default function ChangePasswordCard({ onSuccess }: ChangePasswordCardProp
         <button
           type="submit"
           disabled={isLoading}
-          className="mt-2 rounded-lg bg-[#1A62CD] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#1550A8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="mt-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? 'Changing password…' : 'Change password'}
         </button>

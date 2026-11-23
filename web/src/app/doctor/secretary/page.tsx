@@ -94,48 +94,48 @@ export default function DoctorSecretary() {
   return (
     <div className="space-y-6">
       {/* Secretaries List */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
-        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex items-center justify-between">
-          <h3 className="text-xl font-bold text-slate-800">Your Secretaries</h3>
+      <div className="bg-white rounded-2xl shadow-md border border-neutral-100">
+        <div className="p-6 border-b border-neutral-100 bg-gradient-to-r from-neutral-50 to-white flex items-center justify-between">
+          <h3 className="text-xl font-bold text-neutral-800">Your Secretaries</h3>
           <button
             onClick={() => setShowAddModal(true)}
-            className="h-10 px-4 rounded-xl bg-white hover:bg-blue-50 text-blue-600 font-semibold text-sm flex items-center gap-2 shadow-md transition-all transform hover:scale-105 border border-blue-200"
+            className="h-10 px-4 rounded-xl bg-white hover:bg-primary-50 text-primary-600 font-semibold text-sm flex items-center gap-2 shadow-md transition-all transform hover:scale-105 border border-primary-200"
           >
             <span className="material-symbols-outlined text-[18px]">add_circle</span>
             <span>Add Secretary</span>
           </button>
         </div>
         {listError ? (
-          <div className="p-8 text-center text-red-700">
+          <div className="p-8 text-center text-error-700">
             <p className="text-sm">{listError}</p>
           </div>
         ) : secretaries.length === 0 ? (
-          <div className="p-8 text-center text-slate-500">
-            <span className="material-symbols-outlined text-[48px] text-slate-300 mb-2">badge</span>
+          <div className="p-8 text-center text-neutral-500">
+            <span className="material-symbols-outlined text-[48px] text-neutral-300 mb-2">badge</span>
             <p className="text-sm">No secretaries added yet</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-neutral-100">
             {secretaries.map((secretary) => (
-              <div key={secretary.id} className="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+              <div key={secretary.id} className="p-5 flex items-center justify-between hover:bg-neutral-50 transition-colors">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shadow-md">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-white flex items-center justify-center shadow-md">
                     <span className="material-symbols-outlined text-[22px]">person</span>
                   </div>
                   <div>
-                    <div className="text-base font-semibold text-slate-800">
+                    <div className="text-base font-semibold text-neutral-800">
                       {[secretary.first_name, secretary.middle_name, secretary.last_name].filter(Boolean).join(' ') || secretary.email}
                     </div>
-                    <div className="text-sm text-slate-500">{secretary.email}</div>
+                    <div className="text-sm text-neutral-500">{secretary.email}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${
                     secretary.is_active
-                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md'
-                      : 'bg-slate-200 text-slate-500'
+                      ? 'bg-gradient-to-r from-success-500 to-success-600 text-white shadow-md'
+                      : 'bg-neutral-200 text-neutral-500'
                   }`}>
-                    <span className={`w-2 h-2 rounded-full ${secretary.is_active ? 'bg-white' : 'bg-slate-400'}`}></span>
+                    <span className={`w-2 h-2 rounded-full ${secretary.is_active ? 'bg-white' : 'bg-neutral-400'}`}></span>
                     {secretary.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
@@ -152,10 +152,10 @@ export default function DoctorSecretary() {
           data-state={showAddModal ? 'open' : 'closed'}
         >
           <div
-            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100"
+            className="fmd-modal-panel bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-neutral-100"
             data-state={showAddModal ? 'open' : 'closed'}
           >
-            <h3 className="text-2xl font-bold text-slate-800 mb-6">Add Secretary</h3>
+            <h3 className="text-2xl font-bold text-neutral-800 mb-6">Add Secretary</h3>
             <div className="space-y-4">
               {error && (
                 <Toast message={error} type="error" onClose={() => setError('')} />
@@ -164,23 +164,23 @@ export default function DoctorSecretary() {
                 <Toast message={success} type="success" onClose={() => setSuccess('')} />
               )}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Email</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Email</label>
                 <input
                   type="email"
                   value={secretaryForm.email}
                   onChange={(e) => setSecretaryForm({ ...secretaryForm, email: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 bg-white hover:border-blue-300 transition-all"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500 text-neutral-700 bg-white hover:border-primary-300 transition-all"
                   placeholder="secretary@example.com"
                   disabled={isCreating}
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Temporary Password</label>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">Temporary Password</label>
                 <input
                   type="password"
                   value={secretaryForm.password}
                   onChange={(e) => setSecretaryForm({ ...secretaryForm, password: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 bg-white hover:border-blue-300 transition-all"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500 text-neutral-700 bg-white hover:border-primary-300 transition-all"
                   placeholder="Enter temporary password"
                   disabled={isCreating}
                 />
@@ -194,14 +194,14 @@ export default function DoctorSecretary() {
                   setError('');
                   setSuccess('');
                 }}
-                className="flex-1 px-6 py-3 border-2 border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 hover:border-slate-300 font-semibold transition-all"
+                className="flex-1 px-6 py-3 border-2 border-neutral-200 rounded-xl text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 font-semibold transition-all"
                 disabled={isCreating}
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddSecretary}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isCreating}
               >
                 {isCreating ? 'Creating...' : 'Create Secretary'}

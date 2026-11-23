@@ -71,8 +71,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8f9ff]">
-        <div className="text-slate-600">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="text-neutral-600">Loading...</div>
       </div>
     );
   }
@@ -83,10 +83,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9ff]">
+    <div className="min-h-screen bg-neutral-50">
       <AdminSidebar userName={userName} userRole={userRole} />
       <AdminHeader userName={userName} userRole={userRole} />
-      <main className="ml-64 pt-20 bg-[#f8f9ff] p-6">
+      <main className="ml-64 pt-20 bg-neutral-50 p-6">
         <div className="max-w-[1600px] mx-auto">
           <PageTransition>{children}</PageTransition>
         </div>

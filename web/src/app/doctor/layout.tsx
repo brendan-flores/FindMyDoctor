@@ -132,8 +132,8 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8f9ff]">
-        <div className="text-slate-600">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="text-neutral-600">Loading...</div>
       </div>
     );
   }
@@ -145,14 +145,14 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
   const identity = resolveDoctorIdentity(doctorProfile, sessionEmail);
 
   return (
-    <div className="min-h-screen bg-[#f8f9ff]">
+    <div className="min-h-screen bg-neutral-50">
       <DoctorSidebar profile={doctorProfile} />
       <DoctorHeader
         userName={identity.displayName}
         userEmail={identity.email}
         userRole={identity.role}
       />
-      <main className="ml-64 pt-20 bg-[#f8f9ff] p-6">
+      <main className="ml-64 pt-20 bg-neutral-50 p-6">
         <div className="max-w-[1600px] mx-auto">
           <PageTransition>{children}</PageTransition>
         </div>

@@ -154,7 +154,7 @@ export default function SecretaryResetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F3F5F9] px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-neutral-100 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-[460px] flex flex-col items-center">
         <div className="flex flex-col items-center mb-8 text-center">
           <img
@@ -165,10 +165,10 @@ export default function SecretaryResetPassword() {
         </div>
 
         <div className="text-center mb-7 w-full">
-          <h1 className="text-[34px] font-black tracking-tight text-[#0D1829] mb-2 leading-tight">
+          <h1 className="text-[34px] font-black tracking-tight text-neutral-900 mb-2 leading-tight">
             Reset Password
           </h1>
-          <p className="text-[15px] text-[#718096] font-normal leading-relaxed">
+          <p className="text-[15px] text-neutral-500 font-normal leading-relaxed">
             {isVerified
               ? 'Enter your new password below.'
               : `Enter the code sent to ${email}`}
@@ -230,7 +230,7 @@ export default function SecretaryResetPassword() {
                 type="button"
                 onClick={handleResendCode}
                 disabled={!canResend || isVerifying}
-                className="text-[14px] font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors disabled:text-[#94A3B8] disabled:cursor-not-allowed"
+                className="text-[14px] font-bold text-primary-600 hover:text-primary-800 transition-colors disabled:text-neutral-400 disabled:cursor-not-allowed"
               >
                 {canResend ? 'Resend Code' : `Resend Code (${resendCooldown}s)`}
               </button>
@@ -240,7 +240,7 @@ export default function SecretaryResetPassword() {
               <button
                 type="submit"
                 disabled={isVerifying || otp.length !== 6}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isVerifying ? 'Verifying...' : 'Verify Code'}
               </button>
@@ -250,11 +250,11 @@ export default function SecretaryResetPassword() {
           /* Step 2: New password and confirm password (after successful verification) */
           <form onSubmit={handleResetPassword} className="w-full space-y-5">
             <div className="space-y-2">
-              <label htmlFor="newPassword" className="block text-[15px] font-bold text-[#1A202C]">
+              <label htmlFor="newPassword" className="block text-[15px] font-bold text-neutral-900">
                 New Password
               </label>
               <div className="relative rounded-2xl shadow-md">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-neutral-400">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
@@ -268,13 +268,13 @@ export default function SecretaryResetPassword() {
                   placeholder="Enter your new password"
                   required
                   disabled={isLoading}
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-12 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 pl-12 pr-12 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#94A3B8] hover:text-[#64748B] focus:outline-none"
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-neutral-400 hover:text-neutral-500 focus:outline-none"
                 >
                   {showPassword ? (
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -309,7 +309,7 @@ export default function SecretaryResetPassword() {
             <div className="space-y-1 pl-1">
               <div className="flex items-center gap-2">
                 <svg
-                  className={`w-4 h-4 ${hasMinLength ? 'text-[#10B981]' : 'text-[#94A3B8]'}`}
+                  className={`w-4 h-4 ${hasMinLength ? 'text-success-500' : 'text-neutral-400'}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -325,13 +325,13 @@ export default function SecretaryResetPassword() {
                     <circle cx="12" cy="12" r="10" strokeWidth="2"></circle>
                   )}
                 </svg>
-                <span className={`text-[13px] ${hasMinLength ? 'text-[#10B981]' : 'text-[#94A3B8]'}`}>
+                <span className={`text-[13px] ${hasMinLength ? 'text-success-500' : 'text-neutral-400'}`}>
                   At least 8 characters
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <svg
-                  className={`w-4 h-4 ${hasNumber ? 'text-[#10B981]' : 'text-[#94A3B8]'}`}
+                  className={`w-4 h-4 ${hasNumber ? 'text-success-500' : 'text-neutral-400'}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -347,13 +347,13 @@ export default function SecretaryResetPassword() {
                     <circle cx="12" cy="12" r="10" strokeWidth="2"></circle>
                   )}
                 </svg>
-                <span className={`text-[13px] ${hasNumber ? 'text-[#10B981]' : 'text-[#94A3B8]'}`}>
+                <span className={`text-[13px] ${hasNumber ? 'text-success-500' : 'text-neutral-400'}`}>
                   At least 1 number
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <svg
-                  className={`w-4 h-4 ${hasUppercase ? 'text-[#10B981]' : 'text-[#94A3B8]'}`}
+                  className={`w-4 h-4 ${hasUppercase ? 'text-success-500' : 'text-neutral-400'}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -369,18 +369,18 @@ export default function SecretaryResetPassword() {
                     <circle cx="12" cy="12" r="10" strokeWidth="2"></circle>
                   )}
                 </svg>
-                <span className={`text-[13px] ${hasUppercase ? 'text-[#10B981]' : 'text-[#94A3B8]'}`}>
+                <span className={`text-[13px] ${hasUppercase ? 'text-success-500' : 'text-neutral-400'}`}>
                   At least 1 uppercase letter
                 </span>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="block text-[15px] font-bold text-[#1A202C]">
+              <label htmlFor="confirmPassword" className="block text-[15px] font-bold text-neutral-900">
                 Confirm Password
               </label>
               <div className="relative rounded-2xl shadow-md">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-neutral-400">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
@@ -394,13 +394,13 @@ export default function SecretaryResetPassword() {
                   placeholder="Confirm your new password"
                   required
                   disabled={isLoading}
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-12 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 pl-12 pr-12 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#94A3B8] hover:text-[#64748B] focus:outline-none"
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-neutral-400 hover:text-neutral-500 focus:outline-none"
                 >
                   {showConfirmPassword ? (
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -435,7 +435,7 @@ export default function SecretaryResetPassword() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Resetting...' : 'Reset Password'}
               </button>
@@ -447,7 +447,7 @@ export default function SecretaryResetPassword() {
           <button
             type="button"
             onClick={() => router.push('/secretary-login')}
-            className="text-[15px] text-[#64748B] font-normal hover:text-[#1A202C] transition-colors"
+            className="text-[15px] text-neutral-500 font-normal hover:text-neutral-900 transition-colors"
           >
             Back to Login
           </button>

@@ -27,10 +27,10 @@ const apiOrigin = new URL(
 function Detail({ label, value, isEditing, onEdit, disabled, children }: { label: string; value?: string | number | null; isEditing?: boolean; onEdit?: (value: string) => void; disabled?: boolean; children?: React.ReactNode }) {
   return (
     <div className="py-4 last:pb-0">
-      <dt className="text-sm font-semibold text-slate-500 uppercase tracking-wide">{label}</dt>
+      <dt className="text-sm font-semibold text-neutral-500 uppercase tracking-wide">{label}</dt>
       <dd className="mt-1.5">
         {children || (
-          <span className="whitespace-pre-wrap break-words text-base font-medium text-slate-800">
+          <span className="whitespace-pre-wrap break-words text-base font-medium text-neutral-800">
             {value === null || value === undefined || value === '' ? 'Not provided' : value}
           </span>
         )}
@@ -401,14 +401,14 @@ export default function DoctorProfilePage() {
   if (isLoading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-slate-600">Loading your profile...</p>
+        <p className="text-neutral-600">Loading your profile...</p>
       </div>
     );
   }
 
   if (error || !profile) {
     return (
-      <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
+      <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-5 text-sm text-error-700">
         {error || 'Profile information is unavailable.'}
       </div>
     );
@@ -424,26 +424,26 @@ export default function DoctorProfilePage() {
     : null;
   const status = profile.approval_status || profile.profile_completion_status || 'Not available';
   const statusStyle = status === 'ACTIVE'
-    ? 'bg-emerald-50 text-emerald-700'
+    ? 'bg-success-50 text-success-700'
     : status === 'REJECTED'
-      ? 'bg-rose-50 text-rose-700'
-      : 'bg-amber-50 text-amber-700';
+      ? 'bg-error-50 text-error-700'
+      : 'bg-warning-50 text-warning-700';
 
   return (
     <div className="space-y-6">
       {error && (
-        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
+        <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-5 text-sm text-error-700">
           {error}
         </div>
       )}
 
       {successMessage && (
-        <div role="alert" className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-700">
+        <div role="alert" className="rounded-xl border border-success-200 bg-success-50 p-5 text-sm text-success-700">
           {successMessage}
         </div>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+      <section className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-lg">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
             <div className="relative">
@@ -453,15 +453,15 @@ export default function DoctorProfilePage() {
                     ? photoPreview
                     : `${apiOrigin}${photoPreview}`}
                   alt={`Professional photo of ${fullName}`}
-                  className="h-32 w-32 rounded-2xl border-4 border-blue-100 object-cover shadow-md"
+                  className="h-32 w-32 rounded-2xl border-4 border-primary-100 object-cover shadow-md"
                 />
               ) : (
-                <div className="flex h-32 w-32 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 text-3xl font-bold text-blue-700 shadow-md">
+                <div className="flex h-32 w-32 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 text-3xl font-bold text-primary-700 shadow-md">
                   {profile.first_name.charAt(0)}{profile.last_name.charAt(0)}
                 </div>
               )}
               {isEditing && (
-                <label className="absolute bottom-0 right-0 w-9 h-9 bg-blue-600 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-700 transition-colors shadow-lg">
+                <label className="absolute bottom-0 right-0 w-9 h-9 bg-primary-600 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-primary-700 transition-colors shadow-lg">
                   <span className="material-symbols-outlined text-[18px]">edit</span>
                   <input
                     type="file"
@@ -474,8 +474,8 @@ export default function DoctorProfilePage() {
               )}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">{fullName}</h1>
-              <p className="mt-1 text-slate-600">{profile.specialty || 'Specialty not provided'}</p>
+              <h1 className="text-2xl font-bold text-neutral-900">{fullName}</h1>
+              <p className="mt-1 text-neutral-600">{profile.specialty || 'Specialty not provided'}</p>
               <span className={`mt-3 inline-flex rounded-full px-4 py-1.5 text-sm font-semibold ${statusStyle}`}>
                 {status.replaceAll('_', ' ')}
               </span>
@@ -484,7 +484,7 @@ export default function DoctorProfilePage() {
           {!isEditing && (
             <button
               onClick={handleEdit}
-              className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
+              className="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105"
             >
               Edit Profile
             </button>
@@ -493,14 +493,14 @@ export default function DoctorProfilePage() {
       </section>
 
       {profile.approval_status === 'REJECTED' && profile.rejection_reason && (
-        <section className="rounded-xl border border-rose-200 bg-rose-50 p-5">
-          <h2 className="font-semibold text-rose-800">Profile needs attention</h2>
-          <p className="mt-1 text-sm text-rose-700">{profile.rejection_reason}</p>
+        <section className="rounded-xl border border-error-200 bg-error-50 p-5">
+          <h2 className="font-semibold text-error-800">Profile needs attention</h2>
+          <p className="mt-1 text-sm text-error-700">{profile.rejection_reason}</p>
           {!isEditing && (
             <button
               type="button"
               onClick={handleEdit}
-              className="mt-3 text-sm font-semibold text-rose-800 underline"
+              className="mt-3 text-sm font-semibold text-error-800 underline"
             >
               Update profile
             </button>
@@ -509,12 +509,12 @@ export default function DoctorProfilePage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+        <section className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-lg">
           <div className="flex items-center gap-3 mb-6">
-            <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center">
-              <span className="material-symbols-outlined text-blue-600 text-[20px]">person</span>
+            <div className="h-10 w-10 rounded-xl bg-primary-100 flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary-600 text-[20px]">person</span>
             </div>
-            <h2 className="text-xl font-bold text-slate-900">Personal Information</h2>
+            <h2 className="text-xl font-bold text-neutral-900">Personal Information</h2>
           </div>
           <dl className="space-y-1">
             <Detail label="First Name" value={profile.first_name}>
@@ -523,7 +523,7 @@ export default function DoctorProfilePage() {
                   type="text"
                   value={editForm.first_name || ''}
                   onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 transition-all"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500 text-neutral-700 transition-all"
                   placeholder="Enter first name"
                 />
               )}
@@ -534,7 +534,7 @@ export default function DoctorProfilePage() {
                   type="text"
                   value={editForm.middle_name || ''}
                   onChange={(e) => setEditForm({ ...editForm, middle_name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 transition-all"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500 text-neutral-700 transition-all"
                   placeholder="Enter middle name (optional)"
                 />
               )}
@@ -545,7 +545,7 @@ export default function DoctorProfilePage() {
                   type="text"
                   value={editForm.last_name || ''}
                   onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 transition-all"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500 text-neutral-700 transition-all"
                   placeholder="Enter last name"
                 />
               )}
@@ -559,7 +559,7 @@ export default function DoctorProfilePage() {
               {isEditing && (
                 <>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">+63</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500 font-medium">+63</span>
                     <input
                       type="tel"
                       value={editForm.contact_number || ''}
@@ -569,24 +569,24 @@ export default function DoctorProfilePage() {
                         setContactError(result.error ? phoneFormatErrorMessage(result.error) : '');
                         if (!result.error) setContactWarning(null);
                       }}
-                      className="w-full pl-14 pr-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 transition-all"
+                      className="w-full pl-14 pr-4 py-3 border-2 border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500 text-neutral-700 transition-all"
                       placeholder="9171234567"
                     />
                   </div>
-                  {contactWarning && <p className="mt-2 text-sm text-amber-600">{contactWarning}</p>}
-                  {contactError && <p className="mt-2 text-sm text-rose-600">{contactError}</p>}
+                  {contactWarning && <p className="mt-2 text-sm text-warning-600">{contactWarning}</p>}
+                  {contactError && <p className="mt-2 text-sm text-error-600">{contactError}</p>}
                 </>
               )}
             </Detail>
           </dl>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+        <section className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-lg">
           <div className="flex items-center gap-3 mb-6">
-            <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center">
-              <span className="material-symbols-outlined text-blue-600 text-[20px]">medical_services</span>
+            <div className="h-10 w-10 rounded-xl bg-primary-100 flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary-600 text-[20px]">medical_services</span>
             </div>
-            <h2 className="text-xl font-bold text-slate-900">Professional Information</h2>
+            <h2 className="text-xl font-bold text-neutral-900">Professional Information</h2>
           </div>
           <dl className="space-y-1">
             <Detail label="Specialty" value={profile.specialty}>
@@ -630,7 +630,7 @@ export default function DoctorProfilePage() {
                   type="text"
                   value={editForm.room_number || ''}
                   onChange={(e) => setEditForm({ ...editForm, room_number: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 transition-all"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500 text-neutral-700 transition-all"
                   placeholder="e.g., Room 406, Suite 302"
                 />
               )}
@@ -642,7 +642,7 @@ export default function DoctorProfilePage() {
                   min="0"
                   value={editForm.years_of_experience || ''}
                   onChange={(e) => setEditForm({ ...editForm, years_of_experience: e.target.value ? parseInt(e.target.value) : undefined })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 transition-all"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500 text-neutral-700 transition-all"
                   placeholder="Enter years of experience"
                 />
               )}
@@ -655,7 +655,7 @@ export default function DoctorProfilePage() {
                   step="0.01"
                   value={editForm.consultation_fee || ''}
                   onChange={(e) => setEditForm({ ...editForm, consultation_fee: e.target.value ? parseFloat(e.target.value) : undefined })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 transition-all"
+                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500 text-neutral-700 transition-all"
                   placeholder="Enter consultation fee"
                 />
               )}
@@ -684,44 +684,44 @@ export default function DoctorProfilePage() {
         </section>
       </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+      <section className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-lg">
         <div className="flex items-center gap-3 mb-6">
-          <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center">
-            <span className="material-symbols-outlined text-blue-600 text-[20px]">description</span>
+          <div className="h-10 w-10 rounded-xl bg-primary-100 flex items-center justify-center">
+            <span className="material-symbols-outlined text-primary-600 text-[20px]">description</span>
           </div>
-          <h2 className="text-xl font-bold text-slate-900">Biography</h2>
+          <h2 className="text-xl font-bold text-neutral-900">Biography</h2>
         </div>
         {isEditing ? (
           <textarea
             defaultValue={profile.biography || ''}
             onChange={(e) => setEditForm({ ...editForm, biography: e.target.value })}
-            className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 min-h-[150px] transition-all resize-none"
+            className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500 text-neutral-700 min-h-[150px] transition-all resize-none"
             placeholder="Enter your biography..."
           />
         ) : (
-          <p className="whitespace-pre-wrap text-base leading-7 text-slate-600">
+          <p className="whitespace-pre-wrap text-base leading-7 text-neutral-600">
             {profile.biography || 'Not provided'}
           </p>
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+      <section className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-lg">
         <div className="flex items-center gap-3 mb-6">
-          <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center">
-            <span className="material-symbols-outlined text-blue-600 text-[20px]">draw</span>
+          <div className="h-10 w-10 rounded-xl bg-primary-100 flex items-center justify-center">
+            <span className="material-symbols-outlined text-primary-600 text-[20px]">draw</span>
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Signature</h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <h2 className="text-xl font-bold text-neutral-900">Signature</h2>
+            <p className="mt-1 text-sm text-neutral-500">
               Your signature is printed on prescription PDFs. Upload a PNG image of your actual signature (maximum 4MB).
             </p>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5">
           {isUploadingSignature || isDeletingSignature ? (
-            <div className="flex h-28 items-center justify-center gap-3 text-sm font-medium text-slate-600">
-              <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+            <div className="flex h-28 items-center justify-center gap-3 text-sm font-medium text-neutral-600">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-neutral-300 border-t-blue-600" />
               {isUploadingSignature ? 'Uploading signature...' : 'Removing signature...'}
             </div>
           ) : signaturePreviewUrl ? (
@@ -735,15 +735,15 @@ export default function DoctorProfilePage() {
               />
             </div>
           ) : isLoadingSignature ? (
-            <div className="flex h-28 items-center justify-center gap-3 text-sm font-medium text-slate-600">
-              <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+            <div className="flex h-28 items-center justify-center gap-3 text-sm font-medium text-neutral-600">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-neutral-300 border-t-blue-600" />
               Loading signature preview...
             </div>
           ) : (
-            <div className="flex h-28 flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white px-4 text-center">
-              <span className="material-symbols-outlined text-slate-400 text-[28px]">signature</span>
-              <p className="mt-1 text-sm font-medium text-slate-600">No signature uploaded</p>
-              <p className="text-xs text-slate-500">
+            <div className="flex h-28 flex-col items-center justify-center rounded-lg border-2 border-dashed border-neutral-300 bg-white px-4 text-center">
+              <span className="material-symbols-outlined text-neutral-400 text-[28px]">signature</span>
+              <p className="mt-1 text-sm font-medium text-neutral-600">No signature uploaded</p>
+              <p className="text-xs text-neutral-500">
                 Prescription PDFs will show a blank &quot;Physician&apos;s Signature&quot; line.
               </p>
             </div>
@@ -753,8 +753,8 @@ export default function DoctorProfilePage() {
             <label
               className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all ${
                 isUploadingSignature || isDeletingSignature
-                  ? 'cursor-not-allowed bg-slate-400'
-                  : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
+                  ? 'cursor-not-allowed bg-neutral-400'
+                  : 'bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800'
               }`}
             >
               <span className="material-symbols-outlined text-[18px]">upload</span>
@@ -774,7 +774,7 @@ export default function DoctorProfilePage() {
                   type="button"
                   onClick={() => void loadSignaturePreview()}
                   disabled={isLoadingSignature || isUploadingSignature || isDeletingSignature}
-                  className="rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-all hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl border-2 border-neutral-200 px-4 py-2.5 text-sm font-semibold text-neutral-600 transition-all hover:border-neutral-300 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Refresh preview
                 </button>
@@ -782,7 +782,7 @@ export default function DoctorProfilePage() {
                   type="button"
                   onClick={handleSignatureDelete}
                   disabled={isDeletingSignature || isUploadingSignature}
-                  className="rounded-xl border-2 border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 transition-all hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl border-2 border-error-200 px-4 py-2.5 text-sm font-semibold text-error-700 transition-all hover:border-error-300 hover:bg-error-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Delete signature
                 </button>
@@ -790,7 +790,7 @@ export default function DoctorProfilePage() {
             )}
           </div>
 
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-neutral-500">
             PNG only, up to 4MB. Signatures are stored privately and shown through short-lived secure links.
           </p>
         </div>
@@ -801,14 +801,14 @@ export default function DoctorProfilePage() {
           <button
             onClick={handleCancel}
             disabled={isSaving}
-            className="flex-1 px-6 py-3 border-2 border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 hover:border-slate-300 font-semibold transition-all disabled:opacity-50"
+            className="flex-1 px-6 py-3 border-2 border-neutral-200 rounded-xl text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 font-semibold transition-all disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-xl font-semibold shadow-md transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? 'Saving...' : 'Save Changes'}
           </button>

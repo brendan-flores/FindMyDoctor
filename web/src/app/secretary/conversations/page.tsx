@@ -334,7 +334,7 @@ export default function SecretaryConversations() {
     <div className="space-y-4">
       {/* Errors */}
       {listError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+        <div className="bg-error-50 border border-error-200 text-error-700 px-4 py-3 rounded-lg text-sm">
           {listError}
         </div>
       )}
@@ -342,16 +342,16 @@ export default function SecretaryConversations() {
       {/* Three-column chat layout */}
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr_320px] gap-4 h-[calc(100vh-120px)] min-h-[560px]">
         {/* Column 1: Conversation list */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-md flex flex-col overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <h2 className="text-sm font-bold text-slate-900">Chats</h2>
-            <p className="text-xs text-slate-500">{conversations.length} conversation{conversations.length === 1 ? '' : 's'}</p>
+        <div className="bg-white border border-neutral-200 rounded-2xl shadow-md flex flex-col overflow-hidden">
+          <div className="px-4 py-3 border-b border-neutral-100">
+            <h2 className="text-sm font-bold text-neutral-900">Chats</h2>
+            <p className="text-xs text-neutral-500">{conversations.length} conversation{conversations.length === 1 ? '' : 's'}</p>
           </div>
           <div className="flex-1 overflow-y-auto">
             {isLoadingList ? (
-              <div className="p-4 text-xs text-slate-500">Loading conversations…</div>
+              <div className="p-4 text-xs text-neutral-500">Loading conversations…</div>
             ) : conversations.length === 0 ? (
-              <div className="p-4 text-xs text-slate-500">No conversations yet.</div>
+              <div className="p-4 text-xs text-neutral-500">No conversations yet.</div>
             ) : (
               conversations.map((conversation) => {
                 const unreadCountValue = Number(conversation.unread_count);
@@ -360,30 +360,30 @@ export default function SecretaryConversations() {
                   <button
                     key={conversation.patient_id}
                     onClick={() => handleSelectConversation(conversation)}
-                    className={`w-full text-left px-4 py-3 border-b border-slate-100 transition-all duration-200 cursor-pointer bg-white hover:bg-slate-100 ${
-                      selectedConversation?.patient_id === conversation.patient_id ? 'bg-blue-50' : ''
+                    className={`w-full text-left px-4 py-3 border-b border-neutral-100 transition-all duration-200 cursor-pointer bg-white hover:bg-neutral-100 ${
+                      selectedConversation?.patient_id === conversation.patient_id ? 'bg-primary-50' : ''
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">
+                        <p className="text-sm font-semibold text-neutral-900 truncate">
                           {getPatientName(conversation)}
                         </p>
                         {conversation.last_message_preview ? (
-                          <p className={`text-xs mt-1 truncate ${unreadCount > 0 ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
+                          <p className={`text-xs mt-1 truncate ${unreadCount > 0 ? 'text-neutral-700 font-medium' : 'text-neutral-500'}`}>
                             {conversation.last_message_sender_user_id === currentUserId ? 'You: ' : ''}
                             {conversation.last_message_preview}
                           </p>
                         ) : (
-                          <p className="text-xs mt-1 text-slate-400 italic">No messages yet</p>
+                          <p className="text-xs mt-1 text-neutral-400 italic">No messages yet</p>
                         )}
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-[11px] text-neutral-400">
                           {formatListTime(conversation.last_message_sent_at)}
                         </span>
                         {unreadCount > 0 && (
-                          <span className="bg-[#1b5eb8] text-white text-[11px] font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center">
+                          <span className="bg-primary-600 text-white text-[11px] font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center">
                             {unreadCount}
                           </span>
                         )}
@@ -397,18 +397,18 @@ export default function SecretaryConversations() {
         </div>
 
         {/* Column 2: Conversation thread */}
-        <div className="min-w-0 bg-white border border-slate-200 rounded-2xl shadow-md flex flex-col overflow-hidden">
+        <div className="min-w-0 bg-white border border-neutral-200 rounded-2xl shadow-md flex flex-col overflow-hidden">
           {selectedConversation ? (
             <>
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <div className="px-4 py-3 border-b border-neutral-100 flex items-center justify-between">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900">{getPatientName(selectedConversation)}</h2>
+                  <h2 className="text-sm font-bold text-neutral-900">{getPatientName(selectedConversation)}</h2>
                 </div>
-                <span className="material-symbols-outlined text-[20px] text-slate-400">chat</span>
+                <span className="material-symbols-outlined text-[20px] text-neutral-400">chat</span>
               </div>
 
               {threadError && (
-                <div className="mx-4 mt-3 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+                <div className="mx-4 mt-3 bg-error-50 border border-error-200 text-error-700 px-3 py-2 rounded-lg text-xs">
                   {threadError}
                 </div>
               )}
@@ -418,9 +418,9 @@ export default function SecretaryConversations() {
                 onScroll={() => setHoveredMessage(null)}
               >
                 {isLoadingThread && messages.length === 0 ? (
-                  <p className="text-xs text-slate-500 text-center">Loading messages…</p>
+                  <p className="text-xs text-neutral-500 text-center">Loading messages…</p>
                 ) : messages.length === 0 ? (
-                  <p className="text-xs text-slate-500 text-center py-8">No messages yet. Say hello to start the conversation.</p>
+                  <p className="text-xs text-neutral-500 text-center py-8">No messages yet. Say hello to start the conversation.</p>
                 ) : (
                   messages.map((message) => {
                     const isOwn = message.sender_user_id === currentUserId;
@@ -430,16 +430,16 @@ export default function SecretaryConversations() {
                     return (
                       <div key={message.id} className={`flex w-full min-w-0 items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                         {!isOwn && (
-                          <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-slate-500 text-[20px]">person</span>
+                          <div className="w-9 h-9 rounded-full bg-neutral-200 flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-neutral-500 text-[20px]">person</span>
                           </div>
                         )}
                         <div className={`relative flex min-w-0 flex-1 flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
                           <div
                             className={`w-fit min-w-0 max-w-[75%] rounded-2xl px-4 py-2 ${
                               isOwn
-                                ? 'bg-[#1b5eb8] text-white rounded-br-md'
-                                : 'bg-slate-100 text-slate-900 rounded-bl-md'
+                                ? 'bg-primary-600 text-white rounded-br-md'
+                                : 'bg-neutral-100 text-neutral-900 rounded-bl-md'
                             }`}
                             onMouseEnter={(event) => {
                               const bounds = event.currentTarget.getBoundingClientRect();
@@ -466,7 +466,7 @@ export default function SecretaryConversations() {
                           </div>
                           {isHovered && typeof document !== 'undefined' && createPortal(
                             <div
-                              className="fixed z-[1000] flex -translate-y-1/2 items-center rounded-lg bg-slate-800 px-3 py-1.5 text-[11px] text-white shadow-lg whitespace-nowrap"
+                              className="fixed z-[1000] flex -translate-y-1/2 items-center rounded-lg bg-neutral-800 px-3 py-1.5 text-[11px] text-white shadow-lg whitespace-nowrap"
                               style={{
                                 top: hoveredMessage?.top ?? 0,
                                 left: hoveredMessage?.left ?? 0,
@@ -488,12 +488,12 @@ export default function SecretaryConversations() {
               </div>
 
               {/* Composer */}
-              <div className="border-t border-slate-100 p-3">
+              <div className="border-t border-neutral-100 p-3">
                 <div className="flex items-end gap-2">
                   <button
                     onClick={handleOpenInvoicePicker}
                     disabled={isSending}
-                    className="px-3 py-2 rounded-lg text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    className="px-3 py-2 rounded-lg text-sm font-medium border border-neutral-200 text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                     title="Send invoice to patient"
                   >
                     <span className="material-symbols-outlined text-[18px]">receipt_long</span>
@@ -510,12 +510,12 @@ export default function SecretaryConversations() {
                     }}
                     placeholder="Type your message…"
                     rows={1}
-                    className="flex-1 resize-none border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/30 focus:border-[#1b5eb8]"
+                    className="flex-1 resize-none border border-neutral-200 rounded-lg px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
                   />
                   <button
                     onClick={handleSend}
                     disabled={!draft.trim() || isSending}
-                    className="bg-[#1b5eb8] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1a4f9e] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                   >
                     {isSending ? 'Sending…' : 'Send'}
                     <span className="material-symbols-outlined text-[18px]">send</span>
@@ -525,48 +525,48 @@ export default function SecretaryConversations() {
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-              <span className="material-symbols-outlined text-5xl text-slate-300 mb-3">chat</span>
-              <p className="text-sm text-slate-600 font-medium">Select a conversation</p>
-              <p className="text-xs text-slate-500 mt-1">Choose a patient chat from the list to view the message thread.</p>
+              <span className="material-symbols-outlined text-5xl text-neutral-300 mb-3">chat</span>
+              <p className="text-sm text-neutral-600 font-medium">Select a conversation</p>
+              <p className="text-xs text-neutral-500 mt-1">Choose a patient chat from the list to view the message thread.</p>
             </div>
           )}
         </div>
 
         {/* Column 3: Patient info sheet */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-md flex flex-col overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <h2 className="text-sm font-bold text-slate-900">Patient Info</h2>
-            <p className="text-xs text-slate-500">Read-only appointment details</p>
+        <div className="bg-white border border-neutral-200 rounded-2xl shadow-md flex flex-col overflow-hidden">
+          <div className="px-4 py-3 border-b border-neutral-100">
+            <h2 className="text-sm font-bold text-neutral-900">Patient Info</h2>
+            <p className="text-xs text-neutral-500">Read-only appointment details</p>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {selectedConversation ? (
               !summary ? (
-                <p className="text-xs text-slate-500">Loading patient details…</p>
+                <p className="text-xs text-neutral-500">Loading patient details…</p>
               ) : (
                 <>
                   {/* Patient block */}
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Patient</p>
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2">Patient</p>
+                    <p className="text-sm font-semibold text-neutral-900">
                       {summary.patient.firstName} {summary.patient.middleName ? `${summary.patient.middleName} ` : ''}
                       {summary.patient.lastName}
                     </p>
                     <dl className="mt-2 space-y-1">
                       {summary.patient.phone && (
-                        <div className="flex items-center gap-2 text-xs text-slate-600">
-                          <span className="material-symbols-outlined text-[16px] text-slate-400">call</span>
+                        <div className="flex items-center gap-2 text-xs text-neutral-600">
+                          <span className="material-symbols-outlined text-[16px] text-neutral-400">call</span>
                           {summary.patient.phone}
                         </div>
                       )}
                       {summary.patient.email && (
-                        <div className="flex items-center gap-2 text-xs text-slate-600 break-all">
-                          <span className="material-symbols-outlined text-[16px] text-slate-400">mail</span>
+                        <div className="flex items-center gap-2 text-xs text-neutral-600 break-all">
+                          <span className="material-symbols-outlined text-[16px] text-neutral-400">mail</span>
                           {summary.patient.email}
                         </div>
                       )}
                       {summary.patient.dateOfBirth && (
-                        <div className="flex items-center gap-2 text-xs text-slate-600">
-                          <span className="material-symbols-outlined text-[16px] text-slate-400">cake</span>
+                        <div className="flex items-center gap-2 text-xs text-neutral-600">
+                          <span className="material-symbols-outlined text-[16px] text-neutral-400">cake</span>
                           DOB: {formatDate(summary.patient.dateOfBirth)}
                         </div>
                       )}
@@ -576,58 +576,58 @@ export default function SecretaryConversations() {
                   {/* Appointment block */}
                   {summary.appointment ? (
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Appointment</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2">Appointment</p>
                       <dl className="space-y-1">
                         {summary.appointment.appointmentDate && (
-                          <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <span className="material-symbols-outlined text-[16px] text-slate-400">calendar_today</span>
+                          <div className="flex items-center gap-2 text-xs text-neutral-600">
+                            <span className="material-symbols-outlined text-[16px] text-neutral-400">calendar_today</span>
                             {formatDate(summary.appointment.appointmentDate)}
                           </div>
                         )}
                         {summary.appointment.status && (
-                          <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <span className="material-symbols-outlined text-[16px] text-slate-400">info</span>
+                          <div className="flex items-center gap-2 text-xs text-neutral-600">
+                            <span className="material-symbols-outlined text-[16px] text-neutral-400">info</span>
                             Status: {summary.appointment.status}
                           </div>
                         )}
                         {summary.appointment.reasonForVisit && (
-                          <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <span className="material-symbols-outlined text-[16px] text-slate-400">medical_services</span>
+                          <div className="flex items-center gap-2 text-xs text-neutral-600">
+                            <span className="material-symbols-outlined text-[16px] text-neutral-400">medical_services</span>
                             {summary.appointment.reasonForVisit}
                           </div>
                         )}
                         {summary.appointment.queueNumber && (
-                          <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <span className="material-symbols-outlined text-[16px] text-slate-400">tag</span>
+                          <div className="flex items-center gap-2 text-xs text-neutral-600">
+                            <span className="material-symbols-outlined text-[16px] text-neutral-400">tag</span>
                             Queue #{summary.appointment.queueNumber}
                           </div>
                         )}
                       </dl>
                     </div>
                   ) : summary.appointmentStatus ? (
-                    <div className="bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-lg text-xs">
+                    <div className="bg-warning-50 border border-warning-200 text-warning-700 px-3 py-2 rounded-lg text-xs">
                       No active appointment (last appointment status: {summary.appointmentStatus})
                     </div>
                   ) : (
-                    <div className="bg-slate-50 border border-slate-200 text-slate-600 px-3 py-2 rounded-lg text-xs">
+                    <div className="bg-neutral-50 border border-neutral-200 text-neutral-600 px-3 py-2 rounded-lg text-xs">
                       No appointment on record
                     </div>
                   )}
 
                   {/* Doctor block */}
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Clinic</p>
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2">Clinic</p>
+                    <p className="text-sm font-semibold text-neutral-900">
                       Dr. {summary.doctor.firstName} {summary.doctor.lastName}
                     </p>
-                    <p className="text-xs text-slate-600 mt-0.5">{summary.doctor.practiceName}</p>
+                    <p className="text-xs text-neutral-600 mt-0.5">{summary.doctor.practiceName}</p>
                   </div>
                 </>
               )
             ) : (
               <div className="flex flex-col items-center justify-center text-center pt-12">
-                <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">badge</span>
-                <p className="text-xs text-slate-500">Select a conversation to view patient details.</p>
+                <span className="material-symbols-outlined text-4xl text-neutral-300 mb-2">badge</span>
+                <p className="text-xs text-neutral-500">Select a conversation to view patient details.</p>
               </div>
             )}
           </div>
@@ -644,41 +644,41 @@ export default function SecretaryConversations() {
             className="fmd-modal-panel bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col"
             data-state={showInvoicePicker ? 'open' : 'closed'}
           >
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">Send Invoice to Patient</h3>
+            <div className="px-4 py-3 border-b border-neutral-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-neutral-900">Send Invoice to Patient</h3>
               <button
                 onClick={() => setShowInvoicePicker(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-neutral-400 hover:text-neutral-600"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               {isLoadingInvoices ? (
-                <p className="text-xs text-slate-500 text-center py-4">Loading invoices…</p>
+                <p className="text-xs text-neutral-500 text-center py-4">Loading invoices…</p>
               ) : invoices.length === 0 ? (
-                <p className="text-xs text-slate-500 text-center py-4">No invoices available for this appointment.</p>
+                <p className="text-xs text-neutral-500 text-center py-4">No invoices available for this appointment.</p>
               ) : (
                 <div className="space-y-2">
                   {invoices.map((invoice) => (
                     <button
                       key={invoice.id}
                       onClick={() => handleSendInvoice(invoice.id)}
-                      className="w-full text-left px-4 py-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                      className="w-full text-left px-4 py-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-semibold text-slate-900">{invoice.invoice_number}</p>
+                          <p className="text-sm font-semibold text-neutral-900">{invoice.invoice_number}</p>
                           {invoice.appointment_date && (
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-xs text-neutral-500 mt-1">
                               {new Date(invoice.appointment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </p>
                           )}
-                          <p className="text-xs text-slate-500 mt-1">
+                          <p className="text-xs text-neutral-500 mt-1">
                             Total: ₱{typeof invoice.total_amount === 'string' ? parseFloat(invoice.total_amount).toFixed(2) : invoice.total_amount.toFixed(2)}
                           </p>
                         </div>
-                        <span className="material-symbols-outlined text-slate-400 text-[20px]">send</span>
+                        <span className="material-symbols-outlined text-neutral-400 text-[20px]">send</span>
                       </div>
                     </button>
                   ))}

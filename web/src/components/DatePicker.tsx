@@ -172,7 +172,7 @@ export default function DatePicker({
   return (
     <div className="relative dropdown-container">
       {label && (
-        <label className="block text-xs font-medium text-slate-500 mb-1.5">{label}</label>
+        <label className="block text-xs font-medium text-neutral-500 mb-1.5">{label}</label>
       )}
       <button
         type="button"
@@ -180,19 +180,19 @@ export default function DatePicker({
           if (!isOpen) onOpen?.();
           setIsOpen(!isOpen);
         }}
-        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-left flex items-center justify-between bg-white hover:border-emerald-300 transition-colors"
+        className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500 text-left flex items-center justify-between bg-white hover:border-success-300 transition-colors"
       >
-        <span className={value ? 'text-slate-900' : 'text-slate-400'}>
+        <span className={value ? 'text-neutral-900' : 'text-neutral-400'}>
           {value ? formatDate(selectedDate) : placeholder}
         </span>
-        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       </button>
 
       {isOpen && (
         <div
-          className={`fmd-animate-in absolute z-[9999] mt-1 min-w-[360px] max-w-[calc(100vw-32px)] bg-white border border-slate-200 rounded-lg shadow-2xl p-4 ${
+          className={`fmd-animate-in absolute z-[9999] mt-1 min-w-[360px] max-w-[calc(100vw-32px)] bg-white border border-neutral-200 rounded-lg shadow-2xl p-4 ${
             popupPosition === 'left' ? 'right-0 left-auto' : 'left-0 right-auto'
           }`}
         >
@@ -202,9 +202,9 @@ export default function DatePicker({
               aria-label="Previous month"
               onClick={goToPreviousMonth}
               disabled={isMinMonth()}
-              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1.5 hover:bg-neutral-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
@@ -214,7 +214,7 @@ export default function DatePicker({
                 type="button"
                 aria-label="Select month"
                 onClick={() => { setShowMonthSelector(!showMonthSelector); setShowYearSelector(false); }}
-                className="font-semibold text-slate-900 hover:text-[#1b5eb8] transition-colors"
+                className="font-semibold text-neutral-900 hover:text-primary-600 transition-colors"
               >
                 {monthNames[currentMonth.getMonth()]}
               </button>
@@ -222,7 +222,7 @@ export default function DatePicker({
                 type="button"
                 aria-label="Select year"
                 onClick={() => { setShowYearSelector(!showYearSelector); setShowMonthSelector(false); }}
-                className="font-semibold text-slate-900 hover:text-[#1b5eb8] transition-colors"
+                className="font-semibold text-neutral-900 hover:text-primary-600 transition-colors"
               >
                 {currentMonth.getFullYear()}
               </button>
@@ -233,16 +233,16 @@ export default function DatePicker({
               aria-label="Next month"
               onClick={goToNextMonth}
               disabled={isMaxMonth()}
-              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1.5 hover:bg-neutral-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
           </div>
 
           {showMonthSelector && (
-            <div className="fmd-animate-in absolute top-16 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl p-2 z-30 max-h-60 overflow-y-auto">
+            <div className="fmd-animate-in absolute top-16 left-0 right-0 bg-white border border-neutral-200 rounded-lg shadow-xl p-2 z-30 max-h-60 overflow-y-auto">
               <div className="grid grid-cols-3 gap-1">
                 {monthNames.map((month, index) => {
                   const year = currentMonth.getFullYear();
@@ -256,8 +256,8 @@ export default function DatePicker({
                       disabled={disabled}
                       onClick={() => handleMonthChange(index)}
                       className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                        disabled ? 'text-slate-300 cursor-not-allowed' :
-                        currentMonth.getMonth() === index ? 'bg-[#1b5eb8] text-white' : 'text-slate-700 hover:bg-slate-100'
+                        disabled ? 'text-neutral-300 cursor-not-allowed' :
+                        currentMonth.getMonth() === index ? 'bg-primary-600 text-white' : 'text-neutral-700 hover:bg-neutral-100'
                       }`}
                     >
                       {month}
@@ -269,7 +269,7 @@ export default function DatePicker({
           )}
 
           {showYearSelector && (
-            <div className="fmd-animate-in absolute top-16 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl p-2 z-30 max-h-60 overflow-y-auto">
+            <div className="fmd-animate-in absolute top-16 left-0 right-0 bg-white border border-neutral-200 rounded-lg shadow-xl p-2 z-30 max-h-60 overflow-y-auto">
               <div className="grid grid-cols-4 gap-1">
                 {years.map((year) => {
                   const disabled = !!((minDateObj && year < minDateObj.getFullYear()) || (maxDateObj && year > maxDateObj.getFullYear()));
@@ -280,8 +280,8 @@ export default function DatePicker({
                       disabled={disabled}
                       onClick={() => handleYearChange(year)}
                       className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                        disabled ? 'text-slate-300 cursor-not-allowed' :
-                        currentMonth.getFullYear() === year ? 'bg-[#1b5eb8] text-white' : 'text-slate-700 hover:bg-slate-100'
+                        disabled ? 'text-neutral-300 cursor-not-allowed' :
+                        currentMonth.getFullYear() === year ? 'bg-primary-600 text-white' : 'text-neutral-700 hover:bg-neutral-100'
                       }`}
                     >
                       {year}
@@ -294,7 +294,7 @@ export default function DatePicker({
 
           <div className="grid grid-cols-7 gap-1 mb-1 px-2">
             {weekDays.map((day) => (
-              <div key={day} className="text-center text-xs font-medium text-slate-500 py-1 whitespace-nowrap">{day}</div>
+              <div key={day} className="text-center text-xs font-medium text-neutral-500 py-1 whitespace-nowrap">{day}</div>
             ))}
           </div>
 
@@ -314,8 +314,8 @@ export default function DatePicker({
                   onClick={() => !disabled && handleDateClick(day)}
                   disabled={disabled}
                   className={`w-[40px] h-[40px] flex items-center justify-center px-1 py-2 text-sm rounded-lg transition-all duration-150
-                    ${selected ? 'bg-[#1b5eb8] text-white font-medium' : disabled ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-100'}
-                    ${today && !selected ? 'border-2 border-[#1b5eb8]' : ''}
+                    ${selected ? 'bg-primary-600 text-white font-medium' : disabled ? 'text-neutral-300 cursor-not-allowed' : 'text-neutral-700 hover:bg-neutral-100'}
+                    ${today && !selected ? 'border-2 border-primary-600' : ''}
                   `}
                 >
                   {day}
@@ -325,14 +325,14 @@ export default function DatePicker({
           </div>
 
           {(showClear || showToday) && (
-            <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
+            <div className="flex gap-2 mt-4 pt-4 border-t border-neutral-200">
               {showClear && (
-                <button type="button" onClick={handleClear} className="flex-1 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                <button type="button" onClick={handleClear} className="flex-1 px-3 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">
                   Clear
                 </button>
               )}
               {showToday && (
-                <button type="button" onClick={handleToday} disabled={isTodayDisabled()} className="flex-1 px-3 py-2 text-sm font-medium text-[#1b5eb8] hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                <button type="button" onClick={handleToday} disabled={isTodayDisabled()} className="flex-1 px-3 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                   Today
                 </button>
               )}

@@ -65,13 +65,13 @@ export default function Select({
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-left flex items-center justify-between bg-white transition-colors ${
           error
-            ? 'border-red-500 focus:ring-red-500'
-            : 'border-slate-200 focus:ring-emerald-500 hover:border-emerald-300'
-        } ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''} ${triggerClassName}`}
+            ? 'border-error-500 focus:ring-error-500'
+            : 'border-neutral-200 focus:ring-success-500 hover:border-success-300'
+        } ${disabled ? 'opacity-50 cursor-not-allowed bg-neutral-50' : ''} ${triggerClassName}`}
       >
         <span className="truncate">{displayLabel}</span>
         <svg
-          className={`w-4 h-4 text-slate-400 shrink-0 ml-2 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-neutral-400 shrink-0 ml-2 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -83,7 +83,7 @@ export default function Select({
         <div
           data-dropdown-content
           data-state={isOpen ? 'open' : 'closed'}
-          className="fmd-dropdown absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+          className="fmd-dropdown absolute z-10 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-60 overflow-y-auto"
         >
           {options.map((opt) => (
             <button
@@ -91,8 +91,8 @@ export default function Select({
               type="button"
               disabled={opt.disabled}
               onClick={() => handleSelect(opt.value)}
-              className={`w-full px-4 py-2 text-left hover:bg-emerald-50 hover:text-emerald-700 transition-colors truncate first:rounded-t-lg last:rounded-b-lg ${
-                opt.value === value ? 'bg-emerald-50 text-emerald-700' : 'text-slate-700'
+              className={`w-full px-4 py-2 text-left hover:bg-success-50 hover:text-success-700 transition-colors truncate first:rounded-t-lg last:rounded-b-lg ${
+                opt.value === value ? 'bg-success-50 text-success-700' : 'text-neutral-700'
               } ${opt.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {opt.label}

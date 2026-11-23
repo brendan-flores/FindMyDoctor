@@ -86,7 +86,7 @@ export default function AdminDashboard() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-slate-600">Loading dashboard...</div>
+        <div className="text-neutral-600">Loading dashboard...</div>
       </div>
     );
   }
@@ -94,7 +94,7 @@ export default function AdminDashboard() {
   if (!stats) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-slate-600">Failed to load dashboard data</div>
+        <div className="text-neutral-600">Failed to load dashboard data</div>
       </div>
     );
   }
@@ -105,48 +105,48 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Pending Doctor Approvals */}
         <div
-          className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4 cursor-pointer"
+          className="bg-white rounded-2xl p-5 shadow-md border border-neutral-100 hover:shadow-lg transition-shadow flex items-center gap-4 cursor-pointer"
           onClick={() => router.push('/admin/doctors')}
         >
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-warning-500 to-warning-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
             <span className="material-symbols-outlined text-[28px]">schedule</span>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Pending Approvals</span>
-            <span className="text-2xl font-bold text-slate-800">{stats.doctors.pending}</span>
-            <span className="text-xs text-slate-400">{stats.doctors.pending > 0 ? 'Action needed' : 'Awaiting review'}</span>
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-semibold">Pending Approvals</span>
+            <span className="text-2xl font-bold text-neutral-800">{stats.doctors.pending}</span>
+            <span className="text-xs text-neutral-400">{stats.doctors.pending > 0 ? 'Action needed' : 'Awaiting review'}</span>
           </div>
         </div>
 
         {/* Doctors by Status */}
         <div
-          className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4 cursor-pointer"
+          className="bg-white rounded-2xl p-5 shadow-md border border-neutral-100 hover:shadow-lg transition-shadow flex items-center gap-4 cursor-pointer"
           onClick={() => router.push('/admin/doctors')}
         >
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
             <span className="material-symbols-outlined text-[28px]">stethoscope</span>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Doctors by Status</span>
-            <span className="text-2xl font-bold text-slate-800">{stats.doctors.total}</span>
-            <span className="text-xs text-slate-400">{stats.doctors.active} active • {stats.doctors.rejected} rejected</span>
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-semibold">Doctors by Status</span>
+            <span className="text-2xl font-bold text-neutral-800">{stats.doctors.total}</span>
+            <span className="text-xs text-neutral-400">{stats.doctors.active} active • {stats.doctors.rejected} rejected</span>
           </div>
         </div>
 
         {/* Accounts by Role */}
         <div
-          className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4 cursor-pointer"
+          className="bg-white rounded-2xl p-5 shadow-md border border-neutral-100 hover:shadow-lg transition-shadow flex items-center gap-4 cursor-pointer"
           onClick={() => router.push('/admin/users')}
         >
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
             <span className="material-symbols-outlined text-[28px]">group</span>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Accounts by Role</span>
-            <span className="text-2xl font-bold text-slate-800">
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-semibold">Accounts by Role</span>
+            <span className="text-2xl font-bold text-neutral-800">
               {(stats.users.patient || 0) + (stats.users.doctor || 0) + (stats.users.secretary || 0) + (stats.users.admin || 0)}
             </span>
-            <span className="text-xs text-slate-400">{stats.users.patient || 0} patients • {stats.users.doctor || 0} doctors</span>
+            <span className="text-xs text-neutral-400">{stats.users.patient || 0} patients • {stats.users.doctor || 0} doctors</span>
           </div>
         </div>
 
@@ -154,72 +154,72 @@ export default function AdminDashboard() {
         <div
           className={`bg-white rounded-2xl p-5 shadow-md border hover:shadow-lg transition-shadow flex items-center gap-4 cursor-pointer ${
             stats.unassignedSecretaries > 0
-              ? 'border-amber-300'
-              : 'border-slate-100'
+              ? 'border-warning-300'
+              : 'border-neutral-100'
           }`}
           onClick={() => router.push('/admin/secretaries')}
         >
           <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br text-white flex items-center justify-center flex-shrink-0 shadow-md ${
             stats.unassignedSecretaries > 0
-              ? 'from-amber-500 to-amber-600'
-              : 'from-blue-500 to-blue-600'
+              ? 'from-warning-500 to-warning-600'
+              : 'from-primary-500 to-primary-600'
           }`}>
             <span className="material-symbols-outlined text-[28px]">badge</span>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Unassigned Secretaries</span>
-            <span className="text-2xl font-bold text-slate-800">{stats.unassignedSecretaries}</span>
-            <span className="text-xs text-slate-400">{stats.unassignedSecretaries > 0 ? 'Warning' : 'All assigned'}</span>
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-semibold">Unassigned Secretaries</span>
+            <span className="text-2xl font-bold text-neutral-800">{stats.unassignedSecretaries}</span>
+            <span className="text-xs text-neutral-400">{stats.unassignedSecretaries > 0 ? 'Warning' : 'All assigned'}</span>
           </div>
         </div>
       </div>
 
       {/* Pending Approvals List */}
       {stats.pendingApprovals.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-md border border-slate-100">
-          <div className="p-5 border-b border-slate-100">
-            <h3 className="text-xl font-bold text-slate-800">Pending Doctor Approvals</h3>
-            <p className="text-xs text-slate-500 mt-1">Oldest submissions first</p>
+        <div className="bg-white rounded-2xl shadow-md border border-neutral-100">
+          <div className="p-5 border-b border-neutral-100">
+            <h3 className="text-xl font-bold text-neutral-800">Pending Doctor Approvals</h3>
+            <p className="text-xs text-neutral-500 mt-1">Oldest submissions first</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Doctor</th>
-                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Specialty</th>
-                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Submitted</th>
-                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Waiting</th>
-                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Status</th>
-                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Action</th>
+                <tr className="border-b border-neutral-100 bg-neutral-50/50">
+                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Doctor</th>
+                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Specialty</th>
+                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Submitted</th>
+                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Waiting</th>
+                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Status</th>
+                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {stats.pendingApprovals.map((doctor) => (
-                  <tr key={doctor.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                  <tr key={doctor.id} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition-colors">
                     <td className="px-5 py-4">
-                      <div className="text-sm font-semibold text-slate-900">
+                      <div className="text-sm font-semibold text-neutral-900">
                         {doctor.firstName} {doctor.lastName}
                       </div>
-                      <div className="text-xs text-slate-500">{doctor.email}</div>
+                      <div className="text-xs text-neutral-500">{doctor.email}</div>
                     </td>
                     <td className="px-5 py-4">
-                      <span className="text-sm text-slate-700">{doctor.specialty}</span>
+                      <span className="text-sm text-neutral-700">{doctor.specialty}</span>
                     </td>
                     <td className="px-5 py-4">
-                      <span className="text-sm text-slate-600">
+                      <span className="text-sm text-neutral-600">
                         {doctor.profileSubmittedAt ? new Date(doctor.profileSubmittedAt).toLocaleDateString() : '—'}
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <span className="text-sm text-slate-600">{formatTimeWaiting(doctor.profileSubmittedAt)}</span>
+                      <span className="text-sm text-neutral-600">{formatTimeWaiting(doctor.profileSubmittedAt)}</span>
                     </td>
                     <td className="px-5 py-4">
                       {doctor.profileCompletionStatus === 'SUBMITTED' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-[#1b5eb8] border border-blue-100">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-50 text-primary-600 border border-primary-100">
                           Submitted
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-warning-50 text-warning-700 border border-warning-200">
                           Incomplete
                         </span>
                       )}
@@ -227,7 +227,7 @@ export default function AdminDashboard() {
                     <td className="px-5 py-4">
                       <button
                         onClick={() => router.push(`/admin/doctors`)}
-                        className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+                        className="px-3 py-1.5 text-xs font-semibold text-neutral-700 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-lg transition-colors"
                       >
                         Review
                       </button>
@@ -241,53 +241,53 @@ export default function AdminDashboard() {
       )}
 
       {/* Recent Admin Activity */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-md">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+      <div className="bg-white border border-neutral-200 rounded-2xl shadow-md">
+        <div className="p-5 border-b border-neutral-100 flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-bold text-slate-800">Recent Admin Activity</h3>
-            <p className="text-xs text-slate-500 mt-1">Latest administrative actions</p>
+            <h3 className="text-xl font-bold text-neutral-800">Recent Admin Activity</h3>
+            <p className="text-xs text-neutral-500 mt-1">Latest administrative actions</p>
           </div>
           <button
             onClick={() => router.push('/admin/audit-log')}
-            className="text-xs font-semibold text-[#1b5eb8] hover:text-[#14468f] transition-colors"
+            className="text-xs font-semibold text-primary-600 hover:text-primary-700 transition-colors"
           >
             View All
           </button>
         </div>
         {recentActivity.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-sm">
+          <div className="p-8 text-center text-neutral-500 text-sm">
             No recent activity to display.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-neutral-100">
             {recentActivity.map((entry) => (
-              <div key={entry.id} className="p-4 hover:bg-slate-50/50 transition-colors">
+              <div key={entry.id} className="p-4 hover:bg-neutral-50/50 transition-colors">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-slate-900">
+                      <span className="text-sm font-semibold text-neutral-900">
                         {getActionLabel(entry.action)}
                       </span>
                       {entry.targetType && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-600">
                           {entry.targetType}
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-slate-500">
-                      <span className="font-medium text-slate-700">{entry.actorEmail}</span>
+                    <div className="text-xs text-neutral-500">
+                      <span className="font-medium text-neutral-700">{entry.actorEmail}</span>
                       {entry.targetEmail && (
                         <>
                           {' '}→{' '}
-                          <span className="font-medium text-slate-700">{entry.targetEmail}</span>
+                          <span className="font-medium text-neutral-700">{entry.targetEmail}</span>
                         </>
                       )}
                     </div>
                     {entry.reason && (
-                      <div className="text-xs text-slate-600 mt-1 italic">{entry.reason}</div>
+                      <div className="text-xs text-neutral-600 mt-1 italic">{entry.reason}</div>
                     )}
                   </div>
-                  <div className="text-xs text-slate-400 whitespace-nowrap">
+                  <div className="text-xs text-neutral-400 whitespace-nowrap">
                     {formatTimestamp(entry.timestamp)}
                   </div>
                 </div>

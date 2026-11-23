@@ -102,18 +102,18 @@ export default function AuditLogPage() {
 
   const getActionColor = (action: string) => {
     if (action.includes('APPROVE') || action.includes('REACTIVATE') || action.includes('CREATE')) {
-      return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+      return 'bg-success-50 text-success-700 border border-success-200';
     }
     if (action.includes('REJECT') || action.includes('DEACTIVATE')) {
-      return 'bg-red-50 text-red-700 border border-red-200';
+      return 'bg-error-50 text-error-700 border border-error-200';
     }
-    return 'bg-blue-50 text-[#1b5eb8] border border-blue-100';
+    return 'bg-primary-50 text-primary-600 border border-primary-100';
   };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-slate-600">Loading audit log...</div>
+        <div className="text-neutral-600">Loading audit log...</div>
       </div>
     );
   }
@@ -121,11 +121,11 @@ export default function AuditLogPage() {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-md flex flex-col lg:flex-row gap-3 items-center justify-between">
+      <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-md flex flex-col lg:flex-row gap-3 items-center justify-between">
         <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
           {/* Action Filter */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-400 font-medium hidden sm:inline">Action:</span>
+            <span className="text-xs text-neutral-400 font-medium hidden sm:inline">Action:</span>
             <Select
               className="w-52"
               triggerClassName="h-9 px-3 text-xs"
@@ -150,7 +150,7 @@ export default function AuditLogPage() {
 
           {/* Start Date Filter */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-medium hidden sm:inline whitespace-nowrap">From:</span>
+            <span className="text-xs text-neutral-400 font-medium hidden sm:inline whitespace-nowrap">From:</span>
             <DatePicker
               value={filters.startDate}
               onChange={(value) => handleFilterChange('startDate', value)}
@@ -162,7 +162,7 @@ export default function AuditLogPage() {
 
           {/* End Date Filter */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-medium hidden sm:inline whitespace-nowrap">To:</span>
+            <span className="text-xs text-neutral-400 font-medium hidden sm:inline whitespace-nowrap">To:</span>
             <DatePicker
               value={filters.endDate}
               onChange={(value) => handleFilterChange('endDate', value)}
@@ -178,14 +178,14 @@ export default function AuditLogPage() {
             setFilters({ action: '', actorId: '', startDate: '', endDate: '' });
             setPage(1);
           }}
-          className="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+          className="px-3 py-2 text-xs font-semibold text-neutral-700 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-lg transition-colors"
         >
           Clear Filters
         </button>
       </div>
 
       {/* Audit Log Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
+      <div className="bg-white rounded-2xl border border-neutral-200 shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <colgroup>
@@ -196,18 +196,18 @@ export default function AuditLogPage() {
               <col className="w-[20%]" />
             </colgroup>
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
+              <tr className="border-b border-neutral-200 bg-neutral-50">
                 <th className="min-w-[160px] whitespace-nowrap px-4 py-3 text-left">Timestamp</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap text-center">Actor</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap text-center">Action</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap text-center">Target</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap text-center">Reason</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 whitespace-nowrap text-center">Actor</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 whitespace-nowrap text-center">Action</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 whitespace-nowrap text-center">Target</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 whitespace-nowrap text-center">Reason</th>
               </tr>
             </thead>
             <tbody>
               {!auditLog || auditLog.entries.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-10 text-center text-slate-500 text-sm">
+                  <td colSpan={5} className="px-5 py-10 text-center text-neutral-500 text-sm">
                     No audit log entries found matching your criteria.
                   </td>
                 </tr>
@@ -216,22 +216,22 @@ export default function AuditLogPage() {
                   <tr
                     key={entry.id}
                     onClick={() => handleRowClick(entry)}
-                    className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60 cursor-pointer transition-colors"
+                    className="border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50/60 cursor-pointer transition-colors"
                   >
                     <td className="min-w-[160px] whitespace-nowrap px-4 py-4">
-                      <div className="text-sm font-medium text-gray-900 whitespace-nowrap">
+                      <div className="text-sm font-medium text-neutral-900 whitespace-nowrap">
                         {formatTimestamp(entry.timestamp).datePart}
                       </div>
-                      <div className="text-xs text-gray-500 whitespace-nowrap">
+                      <div className="text-xs text-neutral-500 whitespace-nowrap">
                         {formatTimestamp(entry.timestamp).timePart}
                       </div>
                     </td>
                     <td className="px-5 py-4 align-middle">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-slate-900 truncate" title={entry.actorEmail}>
+                        <div className="text-sm font-medium text-neutral-900 truncate" title={entry.actorEmail}>
                           {entry.actorEmail}
                         </div>
-                        <div className="text-xs text-slate-500">{entry.actorRole}</div>
+                        <div className="text-xs text-neutral-500">{entry.actorRole}</div>
                       </div>
                     </td>
                     <td className="px-5 py-4 align-middle">
@@ -242,21 +242,21 @@ export default function AuditLogPage() {
                     <td className="px-5 py-4 align-middle">
                       {entry.targetEmail ? (
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-slate-900 truncate" title={entry.targetEmail}>
+                          <div className="text-sm font-medium text-neutral-900 truncate" title={entry.targetEmail}>
                             {entry.targetEmail}
                           </div>
                           {entry.targetType && (
-                            <div className="text-xs text-slate-500 truncate" title={entry.targetType}>
+                            <div className="text-xs text-neutral-500 truncate" title={entry.targetType}>
                               {entry.targetType}
                             </div>
                           )}
                         </div>
                       ) : (
-                        <span className="text-sm text-slate-400">—</span>
+                        <span className="text-sm text-neutral-400">—</span>
                       )}
                     </td>
                     <td className="px-5 py-4 align-middle">
-                      <span className="text-sm text-slate-600 truncate block" title={entry.reason || undefined}>
+                      <span className="text-sm text-neutral-600 truncate block" title={entry.reason || undefined}>
                         {entry.reason || '—'}
                       </span>
                     </td>
@@ -269,8 +269,8 @@ export default function AuditLogPage() {
 
         {/* Pagination */}
         {auditLog && auditLog.pagination.totalPages > 1 && (
-          <div className="p-4 border-t border-slate-100 flex items-center justify-between">
-            <div className="text-xs text-slate-500">
+          <div className="p-4 border-t border-neutral-100 flex items-center justify-between">
+            <div className="text-xs text-neutral-500">
               Showing {((auditLog.pagination.page - 1) * auditLog.pagination.limit) + 1} to{' '}
               {Math.min(auditLog.pagination.page * auditLog.pagination.limit, auditLog.pagination.total)} of{' '}
               {auditLog.pagination.total} entries
@@ -279,17 +279,17 @@ export default function AuditLogPage() {
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={auditLog.pagination.page === 1}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-xs font-semibold text-neutral-700 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
-              <span className="text-xs text-slate-600">
+              <span className="text-xs text-neutral-600">
                 Page {auditLog.pagination.page} of {auditLog.pagination.totalPages}
               </span>
               <button
                 onClick={() => setPage(p => Math.min(auditLog.pagination.totalPages, p + 1))}
                 disabled={auditLog.pagination.page === auditLog.pagination.totalPages}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-xs font-semibold text-neutral-700 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>
@@ -308,93 +308,93 @@ export default function AuditLogPage() {
             className="fmd-modal-panel bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             data-state={detailModalOpen ? 'open' : 'closed'}
           >
-            <div className="p-6 border-b border-slate-200">
-              <h2 className="text-lg font-bold text-slate-900">Audit Details</h2>
-              <p className="text-sm text-slate-500 mt-1">Complete audit log entry</p>
+            <div className="p-6 border-b border-neutral-200">
+              <h2 className="text-lg font-bold text-neutral-900">Audit Details</h2>
+              <p className="text-sm text-neutral-500 mt-1">Complete audit log entry</p>
             </div>
             <div className="p-6 space-y-6">
               {/* Actor Section */}
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Actor</h3>
-                <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-3">Actor</h3>
+                <div className="bg-neutral-50 rounded-lg p-4 space-y-2">
                   <div>
-                    <span className="text-xs text-slate-500 font-medium">Email:</span>
-                    <p className="text-sm font-medium text-slate-900 mt-0.5">{selectedEntry.actorEmail}</p>
+                    <span className="text-xs text-neutral-500 font-medium">Email:</span>
+                    <p className="text-sm font-medium text-neutral-900 mt-0.5">{selectedEntry.actorEmail}</p>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 font-medium">Role:</span>
-                    <p className="text-sm font-medium text-slate-900 mt-0.5">{selectedEntry.actorRole}</p>
+                    <span className="text-xs text-neutral-500 font-medium">Role:</span>
+                    <p className="text-sm font-medium text-neutral-900 mt-0.5">{selectedEntry.actorRole}</p>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 font-medium">User ID:</span>
-                    <p className="text-sm font-mono text-slate-600 mt-0.5">{selectedEntry.actorUserId}</p>
+                    <span className="text-xs text-neutral-500 font-medium">User ID:</span>
+                    <p className="text-sm font-mono text-neutral-600 mt-0.5">{selectedEntry.actorUserId}</p>
                   </div>
                 </div>
               </div>
 
               {/* Target Section */}
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Target</h3>
-                <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-3">Target</h3>
+                <div className="bg-neutral-50 rounded-lg p-4 space-y-2">
                   {selectedEntry.targetEmail ? (
                     <>
                       <div>
-                        <span className="text-xs text-slate-500 font-medium">Email:</span>
-                        <p className="text-sm font-medium text-slate-900 mt-0.5">{selectedEntry.targetEmail}</p>
+                        <span className="text-xs text-neutral-500 font-medium">Email:</span>
+                        <p className="text-sm font-medium text-neutral-900 mt-0.5">{selectedEntry.targetEmail}</p>
                       </div>
                       {selectedEntry.targetRole && (
                         <div>
-                          <span className="text-xs text-slate-500 font-medium">Role:</span>
-                          <p className="text-sm font-medium text-slate-900 mt-0.5">{selectedEntry.targetRole}</p>
+                          <span className="text-xs text-neutral-500 font-medium">Role:</span>
+                          <p className="text-sm font-medium text-neutral-900 mt-0.5">{selectedEntry.targetRole}</p>
                         </div>
                       )}
                       {selectedEntry.targetType && (
                         <div>
-                          <span className="text-xs text-slate-500 font-medium">Type:</span>
-                          <p className="text-sm font-medium text-slate-900 mt-0.5">{selectedEntry.targetType}</p>
+                          <span className="text-xs text-neutral-500 font-medium">Type:</span>
+                          <p className="text-sm font-medium text-neutral-900 mt-0.5">{selectedEntry.targetType}</p>
                         </div>
                       )}
                       {selectedEntry.targetUserId && (
                         <div>
-                          <span className="text-xs text-slate-500 font-medium">User ID:</span>
-                          <p className="text-sm font-mono text-slate-600 mt-0.5">{selectedEntry.targetUserId}</p>
+                          <span className="text-xs text-neutral-500 font-medium">User ID:</span>
+                          <p className="text-sm font-mono text-neutral-600 mt-0.5">{selectedEntry.targetUserId}</p>
                         </div>
                       )}
                     </>
                   ) : (
-                    <p className="text-sm text-slate-400">—</p>
+                    <p className="text-sm text-neutral-400">—</p>
                   )}
                 </div>
               </div>
 
               {/* Action Section */}
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Action</h3>
-                <div className="bg-slate-50 rounded-lg p-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-3">Action</h3>
+                <div className="bg-neutral-50 rounded-lg p-4">
                   <span className={`inline-flex items-center px-3 py-1.5 h-8 rounded-full text-sm font-semibold whitespace-nowrap ${getActionColor(selectedEntry.action)}`}>
                     {getActionLabel(selectedEntry.action)}
                   </span>
-                  <p className="text-xs text-slate-500 font-mono mt-2">{selectedEntry.action}</p>
+                  <p className="text-xs text-neutral-500 font-mono mt-2">{selectedEntry.action}</p>
                 </div>
               </div>
 
               {/* Timestamp Section */}
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Timestamp</h3>
-                <div className="bg-slate-50 rounded-lg p-4">
-                  <p className="text-xs font-medium text-slate-900">{formatTimestamp(selectedEntry.timestamp).datePart}</p>
-                  <p className="text-xs text-slate-500 font-mono mt-1">{selectedEntry.timestamp}</p>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-3">Timestamp</h3>
+                <div className="bg-neutral-50 rounded-lg p-4">
+                  <p className="text-xs font-medium text-neutral-900">{formatTimestamp(selectedEntry.timestamp).datePart}</p>
+                  <p className="text-xs text-neutral-500 font-mono mt-1">{selectedEntry.timestamp}</p>
                 </div>
               </div>
 
               {/* Reason Section */}
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Reason</h3>
-                <div className="bg-slate-50 rounded-lg p-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-3">Reason</h3>
+                <div className="bg-neutral-50 rounded-lg p-4">
                   {selectedEntry.reason ? (
-                    <p className="text-sm text-slate-900 whitespace-pre-wrap">{selectedEntry.reason}</p>
+                    <p className="text-sm text-neutral-900 whitespace-pre-wrap">{selectedEntry.reason}</p>
                   ) : (
-                    <p className="text-sm text-slate-400">Not provided</p>
+                    <p className="text-sm text-neutral-400">Not provided</p>
                   )}
                 </div>
               </div>
@@ -402,19 +402,19 @@ export default function AuditLogPage() {
               {/* Metadata Section */}
               {selectedEntry.metadata && Object.keys(selectedEntry.metadata).length > 0 && (
                 <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Metadata</h3>
-                  <div className="bg-slate-50 rounded-lg p-4">
-                    <pre className="text-xs text-slate-700 overflow-x-auto whitespace-pre-wrap">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-3">Metadata</h3>
+                  <div className="bg-neutral-50 rounded-lg p-4">
+                    <pre className="text-xs text-neutral-700 overflow-x-auto whitespace-pre-wrap">
                       {JSON.stringify(selectedEntry.metadata, null, 2)}
                     </pre>
                   </div>
                 </div>
               )}
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end">
+            <div className="p-6 border-t border-neutral-200 flex justify-end">
               <button
                 onClick={handleCloseDetailModal}
-                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-neutral-700 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-lg transition-colors"
               >
                 Close
               </button>

@@ -201,26 +201,26 @@ export default function GcashQrManagement() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1A62CD] mx-auto"></div>
-          <p className="mt-4 text-slate-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-neutral-600">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F3F5F9]">
+    <div className="min-h-screen bg-neutral-100">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-8">
           <button
             onClick={() => router.push('/secretary/settings')}
-            className="inline-flex items-center gap-1.5 rounded-lg text-sm font-semibold text-[#1A62CD] hover:text-[#1550A8] hover:bg-blue-50 px-2 py-1 -ml-2 mb-4 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1A62CD]/40"
+            className="inline-flex items-center gap-1.5 rounded-lg text-sm font-semibold text-primary-600 hover:text-primary-700 hover:bg-primary-50 px-2 py-1 -ml-2 mb-4 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/40"
           >
             <span className="material-symbols-outlined text-[20px]">arrow_back</span>
             Back to Settings
           </button>
-          <h1 className="text-3xl font-bold text-slate-900">GCash QR Management</h1>
-          <p className="text-slate-600 mt-2">
+          <h1 className="text-3xl font-bold text-neutral-900">GCash QR Management</h1>
+          <p className="text-neutral-600 mt-2">
             Manage the GCash QR code for {doctor?.first_name} {doctor?.last_name}
           </p>
         </div>
@@ -229,14 +229,14 @@ export default function GcashQrManagement() {
         {success && <Toast message={success} type="success" onClose={() => setSuccess('')} />}
         {error && <Toast message={error} type="error" onClose={() => setError('')} />}
 
-        <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">Current GCash QR Code</h2>
+        <div className="bg-white rounded-2xl shadow-md border border-neutral-200 p-6 mb-6">
+          <h2 className="text-xl font-semibold text-neutral-900 mb-4">Current GCash QR Code</h2>
 
           {gcashQrUrl ? (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-6">
                 <div className="flex-shrink-0">
-                  <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                  <div className="border border-neutral-200 rounded-lg p-4 bg-neutral-50">
                     <img
                       src={gcashQrUrl}
                       alt="GCash QR Code"
@@ -245,26 +245,26 @@ export default function GcashQrManagement() {
                   </div>
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-slate-900 mb-3">Account Details</h3>
+                  <h3 className="font-semibold text-neutral-900 mb-3">Account Details</h3>
                   {gcashAccountName || gcashAccountNumber ? (
                     <div className="space-y-2">
                       {gcashAccountName && (
                         <div>
-                          <p className="text-sm text-slate-600">Account Name:</p>
-                          <p className="font-medium text-slate-900">{gcashAccountName}</p>
+                          <p className="text-sm text-neutral-600">Account Name:</p>
+                          <p className="font-medium text-neutral-900">{gcashAccountName}</p>
                         </div>
                       )}
                       {gcashAccountNumber && (
                         <div>
-                          <p className="text-sm text-slate-600">Account Number:</p>
-                          <p className="font-medium text-slate-900">{gcashAccountNumber}</p>
+                          <p className="text-sm text-neutral-600">Account Number:</p>
+                          <p className="font-medium text-neutral-900">{gcashAccountNumber}</p>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-500 italic">No account details configured</p>
+                    <p className="text-sm text-neutral-500 italic">No account details configured</p>
                   )}
-                  <p className="text-xs text-slate-500 mt-3">
+                  <p className="text-xs text-neutral-500 mt-3">
                     Edit account details in Settings
                   </p>
                 </div>
@@ -273,48 +273,48 @@ export default function GcashQrManagement() {
                 <button
                   onClick={handleDelete}
                   disabled={isDeleting}
-                  className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 bg-error-600 text-white rounded-lg hover:bg-error-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isDeleting ? 'Deleting...' : 'Delete QR Code'}
                 </button>
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 bg-slate-50 rounded-lg border border-slate-200">
-              <span className="material-symbols-outlined text-4xl text-slate-400 mb-2">qr_code_2</span>
-              <p className="text-slate-600">No GCash QR code has been uploaded yet</p>
+            <div className="text-center py-8 bg-neutral-50 rounded-lg border border-neutral-200">
+              <span className="material-symbols-outlined text-4xl text-neutral-400 mb-2">qr_code_2</span>
+              <p className="text-neutral-600">No GCash QR code has been uploaded yet</p>
             </div>
           )}
         </div>
 
-        <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">Upload New QR Code</h2>
+        <div className="bg-white rounded-2xl shadow-md border border-neutral-200 p-6">
+          <h2 className="text-xl font-semibold text-neutral-900 mb-4">Upload New QR Code</h2>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
                 Select QR Code Image
               </label>
               <input
                 type="file"
                 accept="image/png, image/jpeg, image/jpg"
                 onChange={handleFileSelect}
-                className="block w-full text-sm text-slate-500
+                className="block w-full text-sm text-neutral-500
                   file:mr-4 file:py-2 file:px-4
                   file:rounded-full file:border-0
                   file:text-sm file:font-semibold
-                  file:bg-purple-50 file:text-purple-700
-                  hover:file:bg-purple-100
+                  file:bg-primary-50 file:text-primary-700
+                  hover:file:bg-primary-100
                   cursor-pointer"
               />
-              <p className="text-xs text-slate-500 mt-2">
+              <p className="text-xs text-neutral-500 mt-2">
                 Accepted formats: PNG, JPEG. Maximum file size: 5MB
               </p>
             </div>
 
             {previewUrl && (
-              <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-                <p className="text-sm font-medium text-slate-700 mb-2">Preview:</p>
+              <div className="border border-neutral-200 rounded-lg p-4 bg-neutral-50">
+                <p className="text-sm font-medium text-neutral-700 mb-2">Preview:</p>
                 <img
                   src={previewUrl}
                   alt="QR Code Preview"
@@ -331,29 +331,29 @@ export default function GcashQrManagement() {
                   setError('');
                 }}
                 disabled={!selectedFile || isUploading}
-                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleUpload}
                 disabled={!selectedFile || !doctor || isUploading}
-                className="px-4 py-2 bg-[#1A62CD] text-white rounded-lg hover:bg-[#1550A8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isUploading ? 'Uploading...' : 'Upload QR Code'}
               </button>
             </div>
             {!doctor && (
-              <p className="text-xs text-rose-600 mt-2">
+              <p className="text-xs text-error-600 mt-2">
                 Doctor information not loaded. Please refresh the page.
               </p>
             )}
           </div>
         </div>
 
-        <div className="mt-6 p-4 bg-blue-50 rounded-2xl border border-blue-200">
-          <h3 className="font-semibold text-blue-900 mb-2">About GCash QR Codes</h3>
-          <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+        <div className="mt-6 p-4 bg-primary-50 rounded-2xl border border-primary-200">
+          <h3 className="font-semibold text-primary-900 mb-2">About GCash QR Codes</h3>
+          <ul className="text-sm text-primary-800 space-y-1 list-disc list-inside">
             <li>The QR code displayed here will be shown to patients in the mobile app</li>
             <li>Patients can scan this QR code to make GCash payments</li>
             <li>You can replace the QR code at any time by uploading a new one</li>

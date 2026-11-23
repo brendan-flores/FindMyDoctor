@@ -149,7 +149,7 @@ export default function AdminManagement() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-slate-600">Loading...</div>
+        <div className="text-neutral-600">Loading...</div>
       </div>
     );
   }
@@ -158,48 +158,48 @@ export default function AdminManagement() {
     <div className="space-y-6">
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-lg border border-slate-200 p-6">
-          <div className="text-sm font-medium text-slate-600">Total Admins</div>
-          <div className="text-3xl font-bold text-slate-900 mt-2">{admins.length}</div>
+        <div className="bg-white rounded-lg border border-neutral-200 p-6">
+          <div className="text-sm font-medium text-neutral-600">Total Admins</div>
+          <div className="text-3xl font-bold text-neutral-900 mt-2">{admins.length}</div>
         </div>
-        <div className="bg-white rounded-lg border border-slate-200 p-6">
-          <div className="text-sm font-medium text-slate-600">Active Admins</div>
-          <div className="text-3xl font-bold text-green-600 mt-2">{admins.filter(admin => admin.is_active).length}</div>
+        <div className="bg-white rounded-lg border border-neutral-200 p-6">
+          <div className="text-sm font-medium text-neutral-600">Active Admins</div>
+          <div className="text-3xl font-bold text-success-600 mt-2">{admins.filter(admin => admin.is_active).length}</div>
         </div>
       </div>
 
       {/* Admin Table */}
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-200 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-slate-900">Admin Accounts</h2>
+      <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
+        <div className="p-4 border-b border-neutral-200 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-neutral-900">Admin Accounts</h2>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 text-sm font-semibold text-white bg-[#1b5eb8] hover:bg-[#0d3b75] rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
           >
             Create Admin
           </button>
         </div>
         <table className="w-full">
-          <thead className="bg-slate-50 border-b border-slate-200">
+          <thead className="bg-neutral-50 border-b border-neutral-200">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
                 Email
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
                 Created
               </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-semibold text-neutral-600 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200">
+          <tbody className="divide-y divide-neutral-200">
             {admins.map((admin) => (
-              <tr key={admin.id} className="hover:bg-slate-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+              <tr key={admin.id} className="hover:bg-neutral-50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
                   {admin.email}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -207,20 +207,20 @@ export default function AdminManagement() {
                     onClick={() => handleToggleStatus(admin.id, admin.is_active)}
                     className={`px-2 py-1 rounded-full text-xs font-medium ${
                       admin.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                        ? 'bg-success-100 text-success-800'
+                        : 'bg-error-100 text-error-800'
                     }`}
                   >
                     {admin.is_active ? 'Active' : 'Inactive'}
                   </button>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
                   {new Date(admin.created_at).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                   <button
                     onClick={() => handleDeleteAdmin(admin.id)}
-                    className="text-red-600 hover:text-red-800"
+                    className="text-error-600 hover:text-error-800"
                   >
                     Delete
                   </button>
@@ -244,7 +244,7 @@ export default function AdminManagement() {
             <h2 className="text-xl font-bold mb-4">Create New Admin</h2>
             <form onSubmit={handleCreateAdmin} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Email
                 </label>
                 <input
@@ -253,11 +253,11 @@ export default function AdminManagement() {
                   onChange={(e) => setNewAdminEmail(e.target.value)}
                   required
                   placeholder="admin@example.com"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]"
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Password (min 8 characters)
                 </label>
                 <input
@@ -267,7 +267,7 @@ export default function AdminManagement() {
                   required
                   minLength={8}
                   placeholder="•••••••••"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]"
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                 />
               </div>
               <div className="flex justify-end gap-3">
@@ -278,13 +278,13 @@ export default function AdminManagement() {
                     setNewAdminEmail('');
                     setNewAdminPassword('');
                   }}
-                  className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50"
+                  className="px-4 py-2 border border-neutral-300 rounded-lg hover:bg-neutral-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#1b5eb8] text-white rounded-lg hover:bg-[#0d3b75]"
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                 >
                   Create Admin
                 </button>

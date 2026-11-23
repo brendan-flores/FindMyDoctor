@@ -151,11 +151,11 @@ export default function SecretaryPayments() {
 
   const getBillingStatusBadge = (status?: BillingStatus) => {
     const badges: Record<BillingStatus, { label: string; className: string }> = {
-      UNPAID: { label: 'Unpaid', className: 'bg-gray-100 text-gray-800' },
-      FOR_REVIEW: { label: 'For Review', className: 'bg-yellow-100 text-yellow-800' },
-      PARTIAL: { label: 'Partial', className: 'bg-blue-100 text-blue-800' },
-      PAID: { label: 'Paid', className: 'bg-green-100 text-green-800' },
-      OVERPAID: { label: 'Overpaid', className: 'bg-purple-100 text-purple-800' },
+      UNPAID: { label: 'Unpaid', className: 'bg-neutral-100 text-neutral-800' },
+      FOR_REVIEW: { label: 'For Review', className: 'bg-warning-100 text-warning-800' },
+      PARTIAL: { label: 'Partial', className: 'bg-primary-100 text-primary-800' },
+      PAID: { label: 'Paid', className: 'bg-success-100 text-success-800' },
+      OVERPAID: { label: 'Overpaid', className: 'bg-primary-100 text-primary-800' },
     };
     const badge = badges[status || 'UNPAID'];
     return (
@@ -189,12 +189,12 @@ export default function SecretaryPayments() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-neutral-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Payments</h1>
-          <p className="text-gray-600 mt-2">Manage patient payments and billing</p>
+          <h1 className="text-3xl font-bold text-neutral-900">Payments</h1>
+          <p className="text-neutral-600 mt-2">Manage patient payments and billing</p>
         </div>
 
         {/* Filters */}
@@ -206,16 +206,16 @@ export default function SecretaryPayments() {
                 placeholder="Search by patient name or payment ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
               />
             </div>
             <div className="flex gap-4 items-center">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-slate-500 whitespace-nowrap">From</label>
+                <label className="text-xs font-medium text-neutral-500 whitespace-nowrap">From</label>
                 <DatePicker value={dateFrom} onChange={setDateFrom} />
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-slate-500 whitespace-nowrap">To</label>
+                <label className="text-xs font-medium text-neutral-500 whitespace-nowrap">To</label>
                 <DatePicker value={dateTo} onChange={setDateTo} popupPosition="left" />
               </div>
             </div>
@@ -231,13 +231,13 @@ export default function SecretaryPayments() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === tab.id
-                    ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
+                    : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50'
                 }`}
               >
                 <span>{tab.label}</span>
                 {tab.count > 0 && (
-                  <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
+                  <span className="bg-primary-100 text-primary-800 text-xs px-2 py-0.5 rounded-full">
                     {tab.count}
                   </span>
                 )}
@@ -249,19 +249,19 @@ export default function SecretaryPayments() {
         {/* Day Summary (for Paid tab) */}
         {activeTab === 'paid' && (
           <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Today&apos;s Summary</h3>
+            <h3 className="text-sm font-semibold text-neutral-900 mb-3">Today&apos;s Summary</h3>
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <p className="text-xs text-gray-500">Cash Total</p>
-                <p className="text-lg font-bold text-gray-900">₱{daySummary.cashTotal.toFixed(2)}</p>
+                <p className="text-xs text-neutral-500">Cash Total</p>
+                <p className="text-lg font-bold text-neutral-900">₱{daySummary.cashTotal.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">GCash Total</p>
-                <p className="text-lg font-bold text-gray-900">₱{daySummary.gcashTotal.toFixed(2)}</p>
+                <p className="text-xs text-neutral-500">GCash Total</p>
+                <p className="text-lg font-bold text-neutral-900">₱{daySummary.gcashTotal.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Grand Total</p>
-                <p className="text-lg font-bold text-green-600">₱{daySummary.grandTotal.toFixed(2)}</p>
+                <p className="text-xs text-neutral-500">Grand Total</p>
+                <p className="text-lg font-bold text-success-600">₱{daySummary.grandTotal.toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -271,11 +271,11 @@ export default function SecretaryPayments() {
         <div className="bg-white rounded-lg shadow-md">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
             </div>
           ) : filteredPayments.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500">No payments found</p>
+              <p className="text-neutral-500">No payments found</p>
             </div>
           ) : (
             <div className="divide-y">
@@ -285,28 +285,28 @@ export default function SecretaryPayments() {
                 const billTotal = parseFloat(String(payment.total_amount || 0));
                 const netPaid = parseFloat(String(payment.amount_paid || 0));
                 return (
-                  <div key={payment.id} className="p-4 hover:bg-gray-50 transition-colors">
+                  <div key={payment.id} className="p-4 hover:bg-neutral-50 transition-colors">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold text-gray-900">{patientDisplayName(payment)}</h3>
+                          <h3 className="font-semibold text-neutral-900">{patientDisplayName(payment)}</h3>
                           {getBillingStatusBadge(status)}
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div>
-                            <p className="text-gray-500">Total</p>
+                            <p className="text-neutral-500">Total</p>
                             <p className="font-medium">₱{billTotal.toFixed(2)}</p>
                           </div>
                           <div>
-                            <p className="text-gray-500">Paid</p>
-                            <p className="font-medium text-green-600">₱{netPaid.toFixed(2)}</p>
+                            <p className="text-neutral-500">Paid</p>
+                            <p className="font-medium text-success-600">₱{netPaid.toFixed(2)}</p>
                           </div>
                           <div>
-                            <p className="text-gray-500">Balance</p>
-                            <p className="font-medium text-red-600">₱{balance.toFixed(2)}</p>
+                            <p className="text-neutral-500">Balance</p>
+                            <p className="font-medium text-error-600">₱{balance.toFixed(2)}</p>
                           </div>
                           <div>
-                            <p className="text-gray-500">Age</p>
+                            <p className="text-neutral-500">Age</p>
                             <p className="font-medium">{getPatientAgeDisplay(payment)}</p>
                           </div>
                         </div>
@@ -315,7 +315,7 @@ export default function SecretaryPayments() {
                         {status === 'FOR_REVIEW' && (
                           <button
                             onClick={() => handleOpenBillingPanel(payment)}
-                            className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm"
+                            className="px-4 py-2 bg-warning-600 text-white rounded-lg hover:bg-warning-700 text-sm"
                           >
                             Review
                           </button>
@@ -323,7 +323,7 @@ export default function SecretaryPayments() {
                         {(status === 'UNPAID' || status === 'PARTIAL') && (
                           <button
                             onClick={() => handleOpenBillingPanel(payment)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
                           >
                             Bill
                           </button>
@@ -331,7 +331,7 @@ export default function SecretaryPayments() {
                         {status === 'PAID' && (
                           <button
                             onClick={() => handleOpenBillingPanel(payment)}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                            className="px-4 py-2 bg-success-600 text-white rounded-lg hover:bg-success-700 text-sm"
                           >
                             View Invoice
                           </button>
@@ -339,7 +339,7 @@ export default function SecretaryPayments() {
                         {status === 'OVERPAID' && (
                           <button
                             onClick={() => handleOpenBillingPanel(payment)}
-                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+                            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
                           >
                             Resolve
                           </button>

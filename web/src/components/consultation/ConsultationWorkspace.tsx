@@ -683,20 +683,20 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
 
   if (isLoading || isStarting) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <p className="mt-4 text-slate-600">{isStarting ? 'Starting consultation...' : 'Loading consultation...'}</p>
+      <div className="bg-white rounded-xl shadow-sm border border-neutral-100 p-8 text-center">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        <p className="mt-4 text-neutral-600">{isStarting ? 'Starting consultation...' : 'Loading consultation...'}</p>
       </div>
     );
   }
 
   if (error || !context) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center">
-        <p className="text-red-600">{error || 'Consultation not found'}</p>
+      <div className="bg-white rounded-xl shadow-sm border border-neutral-100 p-8 text-center">
+        <p className="text-error-600">{error || 'Consultation not found'}</p>
         <button
           onClick={() => router.push('/doctor/appointments')}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
         >
           Back to Appointments
         </button>
@@ -706,14 +706,14 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
 
   const formField = (label: string, key: keyof VisitFormState, placeholder: string, type: 'text' | 'number' | 'textarea' = 'text') => (
     <div>
-      <label className="block text-sm font-medium text-slate-600 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-neutral-600 mb-1">{label}</label>
       {type === 'textarea' ? (
         <textarea
           rows={4}
           value={form[key]}
           onChange={(event) => setForm({ ...form, [key]: event.target.value })}
           placeholder={placeholder}
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-sm"
         />
       ) : (
         <input
@@ -721,7 +721,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
           value={form[key]}
           onChange={(event) => setForm({ ...form, [key]: event.target.value })}
           placeholder={placeholder}
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-sm"
         />
       )}
     </div>
@@ -729,20 +729,20 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
 
   const issuedField = (label: string, key: keyof VisitFormState, type: 'text' | 'number' | 'textarea' = 'text') => (
     <div>
-      <label className="block text-sm font-medium text-slate-600 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-neutral-600 mb-1">{label}</label>
       {type === 'textarea' ? (
         <textarea
           rows={4}
           value={issuedForm[key]}
           onChange={(event) => setIssuedForm({ ...issuedForm, [key]: event.target.value })}
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-sm"
         />
       ) : (
         <input
           type={type}
           value={issuedForm[key]}
           onChange={(event) => setIssuedForm({ ...issuedForm, [key]: event.target.value })}
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-sm"
         />
       )}
     </div>
@@ -751,12 +751,12 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
   const validationRow = () => {
     if (context.missingPatientInfo.length === 0) return null;
     return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+      <div className="rounded-xl border border-warning-200 bg-warning-50 p-4 space-y-3">
         <div className="flex items-start gap-2">
-          <span className="material-symbols-outlined text-amber-600">warning</span>
+          <span className="material-symbols-outlined text-warning-600">warning</span>
           <div>
-            <p className="text-sm font-semibold text-amber-900">Missing patient information</p>
-            <p className="text-xs text-amber-800">
+            <p className="text-sm font-semibold text-warning-900">Missing patient information</p>
+            <p className="text-xs text-warning-800">
               The prescription PDF needs the patient&apos;s date of birth and sex. Add them before issuing.
             </p>
           </div>
@@ -764,7 +764,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {context.missingPatientInfo.includes('dateOfBirth') && (
             <div>
-              <label className="block text-xs font-medium text-amber-900 mb-1">Date of birth</label>
+              <label className="block text-xs font-medium text-warning-900 mb-1">Date of birth</label>
               <DatePicker
                 value={missingDob}
                 onChange={setMissingDob}
@@ -774,7 +774,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
           )}
           {context.missingPatientInfo.includes('sex') && (
             <div>
-              <label className="block text-xs font-medium text-amber-900 mb-1">Sex</label>
+              <label className="block text-xs font-medium text-warning-900 mb-1">Sex</label>
               <Select
                 value={missingSex}
                 onChange={setMissingSex}
@@ -791,7 +791,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
         <button
           onClick={handleSavePatientInfo}
           disabled={isSavingPatient || (!missingDob && !missingSex)}
-          className="px-3 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50"
+          className="px-3 py-2 bg-warning-600 text-white rounded-lg text-sm font-medium hover:bg-warning-700 disabled:opacity-50"
         >
           {isSavingPatient ? 'Saving...' : 'Save patient information'}
         </button>
@@ -804,33 +804,33 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
         <div>
-          <p className="text-slate-500">Reason for visit</p>
-          <p className="text-slate-800 font-medium">{visit.reason_for_visit || '—'}</p>
+          <p className="text-neutral-500">Reason for visit</p>
+          <p className="text-neutral-800 font-medium">{visit.reason_for_visit || '—'}</p>
         </div>
         <div>
-          <p className="text-slate-500">Diagnosis</p>
-          <p className="text-slate-800 font-medium">{visit.diagnosis || '—'}</p>
+          <p className="text-neutral-500">Diagnosis</p>
+          <p className="text-neutral-800 font-medium">{visit.diagnosis || '—'}</p>
         </div>
         <div className="md:col-span-2">
-          <p className="text-slate-500">Notes</p>
-          <p className="text-slate-800 whitespace-pre-wrap">{visit.notes || '—'}</p>
+          <p className="text-neutral-500">Notes</p>
+          <p className="text-neutral-800 whitespace-pre-wrap">{visit.notes || '—'}</p>
         </div>
         <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <p className="text-slate-500">Blood pressure</p>
-            <p className="text-slate-800 font-medium">{visit.blood_pressure || '—'}</p>
+            <p className="text-neutral-500">Blood pressure</p>
+            <p className="text-neutral-800 font-medium">{visit.blood_pressure || '—'}</p>
           </div>
           <div>
-            <p className="text-slate-500">Weight</p>
-            <p className="text-slate-800 font-medium">{visit.weight ? `${visit.weight} kg` : '—'}</p>
+            <p className="text-neutral-500">Weight</p>
+            <p className="text-neutral-800 font-medium">{visit.weight ? `${visit.weight} kg` : '—'}</p>
           </div>
           <div>
-            <p className="text-slate-500">Height</p>
-            <p className="text-slate-800 font-medium">{visit.height ? `${visit.height} cm` : '—'}</p>
+            <p className="text-neutral-500">Height</p>
+            <p className="text-neutral-800 font-medium">{visit.height ? `${visit.height} cm` : '—'}</p>
           </div>
           <div>
-            <p className="text-slate-500">Temperature</p>
-            <p className="text-slate-800 font-medium">{visit.temperature ? `${visit.temperature} °C` : '—'}</p>
+            <p className="text-neutral-500">Temperature</p>
+            <p className="text-neutral-800 font-medium">{visit.temperature ? `${visit.temperature} °C` : '—'}</p>
           </div>
         </div>
       </div>
@@ -838,23 +838,23 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
   };
 
   const prescriptionReadOnly = (prescription: ConsultationPrescription) => (
-    <div key={prescription.id} className="rounded-xl border border-slate-200 p-4 space-y-3">
+    <div key={prescription.id} className="rounded-xl border border-neutral-200 p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-800">
+          <span className="text-sm font-semibold text-neutral-800">
             {formatDate(prescription.prescription_date)}
           </span>
           <span
             className={`px-2 py-1 rounded-full text-xs font-medium ${
               prescription.status === 'VOIDED'
-                ? 'bg-red-100 text-red-700'
-                : 'bg-emerald-100 text-emerald-700'
+                ? 'bg-error-100 text-error-700'
+                : 'bg-success-100 text-success-700'
             }`}
           >
             {prescription.status === 'VOIDED' ? 'Voided' : 'Issued'}
           </span>
           {prescription.replaces_prescription_id && (
-            <span className="text-xs text-slate-500">Replacement</span>
+            <span className="text-xs text-neutral-500">Replacement</span>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -863,7 +863,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
               <button
                 onClick={() => handlePdf(prescription)}
                 disabled={busyPdfId === prescription.id}
-                className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="px-3 py-1.5 border border-neutral-200 rounded-lg text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
               >
                 {busyPdfId === prescription.id
                   ? 'Preparing...'
@@ -873,7 +873,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
               </button>
               <button
                 onClick={() => openVoid(prescription)}
-                className="px-3 py-1.5 border border-red-200 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50"
+                className="px-3 py-1.5 border border-error-200 rounded-lg text-xs font-medium text-error-600 hover:bg-error-50"
               >
                 Void and replace
               </button>
@@ -882,7 +882,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
           {prescription.status === 'VOIDED' && !context.prescriptions.some((item) => item.status === 'ISSUED') && (
             <button
               onClick={() => startReplacement(prescription)}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700"
+              className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700"
             >
               Issue replacement
             </button>
@@ -890,25 +890,25 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
         </div>
       </div>
       {prescription.void_reason && (
-        <p className="text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2">
+        <p className="text-xs text-error-700 bg-error-50 rounded-lg px-3 py-2">
           Void reason: {prescription.void_reason}
         </p>
       )}
       <div className="space-y-2">
         {(prescription.items || []).map((item) => (
-          <div key={item.id} className="bg-slate-50 rounded-lg px-3 py-2 text-sm">
-            <p className="font-medium text-slate-800">{item.medication_name || item.medicationName}</p>
-            <p className="text-xs text-slate-600">
+          <div key={item.id} className="bg-neutral-50 rounded-lg px-3 py-2 text-sm">
+            <p className="font-medium text-neutral-800">{item.medication_name || item.medicationName}</p>
+            <p className="text-xs text-neutral-600">
               {[item.dosage, item.frequency, item.duration, item.quantity ? `qty ${item.quantity}` : null]
                 .filter(Boolean)
                 .join(' · ')}
             </p>
-            {item.instructions && <p className="text-xs text-slate-500">{item.instructions}</p>}
+            {item.instructions && <p className="text-xs text-neutral-500">{item.instructions}</p>}
           </div>
         ))}
-        {prescription.items.length === 0 && <p className="text-sm text-slate-500">No medications recorded.</p>}
+        {prescription.items.length === 0 && <p className="text-sm text-neutral-500">No medications recorded.</p>}
       </div>
-      {prescription.notes && <p className="text-sm text-slate-700 whitespace-pre-wrap">{prescription.notes}</p>}
+      {prescription.notes && <p className="text-sm text-neutral-700 whitespace-pre-wrap">{prescription.notes}</p>}
     </div>
   );
 
@@ -925,39 +925,39 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
         <div>
           <button
             onClick={() => router.push('/doctor/appointments')}
-            className="text-slate-600 hover:text-slate-900 mb-2 flex items-center gap-2 text-sm"
+            className="text-neutral-600 hover:text-neutral-900 mb-2 flex items-center gap-2 text-sm"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             Back to Appointments
           </button>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-neutral-900">
             {mode === 'review' ? 'Review before issuing' : mode === 'issued' ? 'Consultation record' : 'Consultation'}
             {context.appointment.queue_number ? ` · Q-${String(context.appointment.queue_number).padStart(2, '0')}` : ''}
             {` · ${patientName(context)}`}
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-neutral-500 mt-1">
             {formatDateTime(context.appointment.appointment_date)}
             {context.appointment.queue_status ? ` · Queue ${context.appointment.queue_status.replace('_', ' ')}` : ''}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {context.doctorFinished && (
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-success-100 text-success-700">
               Doctor finished
             </span>
           )}
           {context.visit?.is_edited && (
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-warning-100 text-warning-800">
               Edited {formatDateTime(context.visit.edited_at)}
             </span>
           )}
           {context.isInCheckup && (
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary-100 text-primary-700">
               In checkup{context.appointment.queue_started_at ? ` since ${formatTime(context.appointment.queue_started_at)}` : ''}
             </span>
           )}
           {context.appointment.status === 'CANCELLED' || context.appointment.status === 'NO_SHOW' ? (
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-error-100 text-error-700">
               Appointment {context.appointment.status.replace('_', ' ')}
             </span>
           ) : null}
@@ -965,15 +965,15 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
       </div>
 
       {/* Patient banner */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+      <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+            <div className="w-12 h-12 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center font-bold">
               {context.patient.first_name[0]}{context.patient.last_name[0]}
             </div>
             <div>
-              <p className="font-semibold text-slate-900">{patientName(context)}</p>
-              <p className="text-xs text-slate-500">
+              <p className="font-semibold text-neutral-900">{patientName(context)}</p>
+              <p className="text-xs text-neutral-500">
                 {ageFromDob(context.patient.date_of_birth) !== null ? `${ageFromDob(context.patient.date_of_birth)} years old` : 'Age not recorded'}
                 {' · '}
                 {sexLabel(context.patient.sex)}
@@ -987,10 +987,10 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
               onClick={() => openBannerEditor('allergies')}
               className={`flex items-center gap-2 text-left rounded-lg px-3 py-2 ${
                 allergiesState.kind === 'missing'
-                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                  ? 'bg-warning-50 text-warning-800 border border-warning-200'
                   : allergiesState.kind === 'none'
-                  ? 'bg-slate-50 text-slate-600 border border-slate-200'
-                  : 'bg-red-50 text-red-800 border border-red-200'
+                  ? 'bg-neutral-50 text-neutral-600 border border-neutral-200'
+                  : 'bg-error-50 text-error-800 border border-error-200'
               }`}
             >
               <span className="material-symbols-outlined text-[18px]">
@@ -1005,8 +1005,8 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
               onClick={() => openBannerEditor('medications')}
               className={`flex items-center gap-2 text-left rounded-lg px-3 py-2 ${
                 medicationsState.kind === 'missing'
-                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                  : 'bg-slate-50 text-slate-600 border border-slate-200'
+                  ? 'bg-warning-50 text-warning-800 border border-warning-200'
+                  : 'bg-neutral-50 text-neutral-600 border border-neutral-200'
               }`}
             >
               <span className="material-symbols-outlined text-[18px]">
@@ -1021,8 +1021,8 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
         </div>
 
         {bannerEditor && (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-800">
+          <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4 space-y-3">
+            <p className="text-sm font-semibold text-neutral-800">
               {bannerEditor === 'allergies' ? 'Allergies' : 'Current medications'}
             </p>
             <textarea
@@ -1034,9 +1034,9 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
                   : setMedicationDraft(event.target.value)
               }
               placeholder={bannerEditor === 'allergies' ? 'e.g., Penicillin' : 'e.g., Metformin 500mg twice daily'}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
             />
-            <label className="flex items-center gap-2 text-sm text-slate-700">
+            <label className="flex items-center gap-2 text-sm text-neutral-700">
               <input
                 type="checkbox"
                 checked={bannerEditor === 'allergies' ? allergyNone : medicationNone}
@@ -1052,13 +1052,13 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
               <button
                 onClick={saveBanner}
                 disabled={isSavingPatient}
-                className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                className="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
               >
                 {isSavingPatient ? 'Saving...' : 'Save'}
               </button>
               <button
                 onClick={() => setBannerEditor(null)}
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-white"
+                className="px-3 py-2 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-600 hover:bg-white"
               >
                 Cancel
               </button>
@@ -1069,27 +1069,27 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
 
       {/* No consultation started and not in checkup */}
       {!context.visit && !context.canStart && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-slate-800">Appointment details</h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-neutral-800">Appointment details</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-slate-500">Status</p>
-              <p className="text-slate-800 font-medium">{context.appointment.status.replace('_', ' ')}</p>
+              <p className="text-neutral-500">Status</p>
+              <p className="text-neutral-800 font-medium">{context.appointment.status.replace('_', ' ')}</p>
             </div>
             <div>
-              <p className="text-slate-500">Reason for visit</p>
-              <p className="text-slate-800 font-medium">{context.appointment.reason_for_visit || '—'}</p>
+              <p className="text-neutral-500">Reason for visit</p>
+              <p className="text-neutral-800 font-medium">{context.appointment.reason_for_visit || '—'}</p>
             </div>
             <div>
-              <p className="text-slate-500">Phone</p>
-              <p className="text-slate-800 font-medium">{context.patient.phone || '—'}</p>
+              <p className="text-neutral-500">Phone</p>
+              <p className="text-neutral-800 font-medium">{context.patient.phone || '—'}</p>
             </div>
             <div>
-              <p className="text-slate-500">Email</p>
-              <p className="text-slate-800 font-medium">{context.patient.email || '—'}</p>
+              <p className="text-neutral-500">Email</p>
+              <p className="text-neutral-800 font-medium">{context.patient.email || '—'}</p>
             </div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
             A consultation can be started when the secretary marks this patient as In Checkup.
           </div>
         </div>
@@ -1097,15 +1097,15 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
 
       {/* Start CTA */}
       {!context.visit && context.canStart && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-800">Patient is in checkup</h2>
-            <p className="text-sm text-slate-500">Start the consultation to record the visit and prescription.</p>
+            <h2 className="text-lg font-semibold text-neutral-800">Patient is in checkup</h2>
+            <p className="text-sm text-neutral-500">Start the consultation to record the visit and prescription.</p>
           </div>
           <button
             onClick={handleStart}
             disabled={isStarting}
-            className="px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50"
+            className="px-5 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-50"
           >
             {isStarting ? 'Starting...' : 'Start consultation'}
           </button>
@@ -1115,8 +1115,8 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
       {context.visit && mode === 'edit' && (
         <>
           {conflict && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm text-red-800">
+            <div className="rounded-xl border border-error-200 bg-error-50 p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-error-800">
                 <p className="font-semibold">This draft was updated in another tab.</p>
                 <p>Reload the latest draft before saving so no changes are lost.</p>
               </div>
@@ -1125,16 +1125,16 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
                   const data = await loadContext();
                   if (data) applyContext(data);
                 }}
-                className="px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                className="px-3 py-2 bg-error-600 text-white rounded-lg text-sm font-medium hover:bg-error-700"
               >
                 Reload latest
               </button>
             </div>
           )}
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-              <span className="material-symbols-outlined text-blue-600">clinical_notes</span>
+          <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-neutral-800 flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary-600">clinical_notes</span>
               Visit
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1150,30 +1150,30 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                <span className="material-symbols-outlined text-blue-600">medication</span>
+              <h2 className="text-lg font-semibold text-neutral-800 flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary-600">medication</span>
                 Prescription
               </h2>
               <div className="flex flex-wrap gap-2">
                 {context.previousPrescription && (
                   <button
                     onClick={copyFromPrevious}
-                    className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    className="px-3 py-2 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-700 hover:bg-neutral-50"
                   >
                     Copy from previous
                   </button>
                 )}
                 <button
                   onClick={() => setShowFavorites((current) => !current)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="px-3 py-2 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-700 hover:bg-neutral-50"
                 >
                   Favorites
                 </button>
                 <button
                   onClick={() => addMedication()}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                  className="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700"
                 >
                   + Add medication
                 </button>
@@ -1181,9 +1181,9 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
             </div>
 
             {showFavorites && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 space-y-2">
                 {context.favorites.length === 0 ? (
-                  <p className="text-sm text-slate-500">No favorites yet. Use the star on a medication row to save one.</p>
+                  <p className="text-sm text-neutral-500">No favorites yet. Use the star on a medication row to save one.</p>
                 ) : (
                   context.favorites.map((favorite) => (
                     <div key={favorite.id} className="flex items-center justify-between gap-2 bg-white rounded-lg px-3 py-2">
@@ -1199,14 +1199,14 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
                         }
                         className="text-left text-sm flex-1"
                       >
-                        <span className="font-medium text-slate-800">{favorite.medication_name}</span>
-                        <span className="text-xs text-slate-500 ml-2">
+                        <span className="font-medium text-neutral-800">{favorite.medication_name}</span>
+                        <span className="text-xs text-neutral-500 ml-2">
                           {[favorite.dosage, favorite.frequency, favorite.duration].filter(Boolean).join(' · ')}
                         </span>
                       </button>
                       <button
                         onClick={() => removeFavorite(favorite.id)}
-                        className="text-xs text-red-600 hover:underline"
+                        className="text-xs text-error-600 hover:underline"
                       >
                         Remove
                       </button>
@@ -1223,30 +1223,30 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
             </datalist>
 
             {medications.length === 0 ? (
-              <div className="text-center py-6 border border-dashed border-slate-200 rounded-xl">
-                <p className="text-sm text-slate-500">No medications yet. No prescription will be created.</p>
-                <button onClick={() => addMedication()} className="mt-2 text-sm text-blue-600 font-medium hover:underline">
+              <div className="text-center py-6 border border-dashed border-neutral-200 rounded-xl">
+                <p className="text-sm text-neutral-500">No medications yet. No prescription will be created.</p>
+                <button onClick={() => addMedication()} className="mt-2 text-sm text-primary-600 font-medium hover:underline">
                   Add the first medication
                 </button>
               </div>
             ) : (
               <div className="space-y-3">
                 {medications.map((row, index) => (
-                  <div key={row.key} className="rounded-xl border border-slate-200 p-3 space-y-3">
+                  <div key={row.key} className="rounded-xl border border-neutral-200 p-3 space-y-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-slate-700">Medication {index + 1}</p>
+                      <p className="text-sm font-semibold text-neutral-700">Medication {index + 1}</p>
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => addFavorite(row)}
                           title="Save as favorite"
-                          className="text-slate-400 hover:text-amber-500"
+                          className="text-neutral-400 hover:text-warning-500"
                         >
                           <span className="material-symbols-outlined text-[20px]">star</span>
                         </button>
                         <button
                           onClick={() => removeMedication(row.key)}
                           title="Remove medication"
-                          className="text-slate-400 hover:text-red-600"
+                          className="text-neutral-400 hover:text-error-600"
                         >
                           <span className="material-symbols-outlined text-[20px]">delete</span>
                         </button>
@@ -1258,25 +1258,25 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
                         value={row.medicationName}
                         onChange={(event) => updateMedication(row.key, 'medicationName', event.target.value)}
                         placeholder="Medication name"
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="px-3 py-2 border border-neutral-200 rounded-lg text-sm"
                       />
                       <input
                         value={row.dosage}
                         onChange={(event) => updateMedication(row.key, 'dosage', event.target.value)}
                         placeholder="Dosage (e.g., 500mg, 1 cap)"
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="px-3 py-2 border border-neutral-200 rounded-lg text-sm"
                       />
                       <input
                         value={row.frequency}
                         onChange={(event) => updateMedication(row.key, 'frequency', event.target.value)}
                         placeholder="Frequency (e.g., 3x daily)"
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="px-3 py-2 border border-neutral-200 rounded-lg text-sm"
                       />
                       <input
                         value={row.duration}
                         onChange={(event) => updateMedication(row.key, 'duration', event.target.value)}
                         placeholder="Duration (e.g., 7 days)"
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="px-3 py-2 border border-neutral-200 rounded-lg text-sm"
                       />
                       <input
                         type="number"
@@ -1284,13 +1284,13 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
                         value={row.quantity}
                         onChange={(event) => updateMedication(row.key, 'quantity', event.target.value)}
                         placeholder="Quantity to dispense"
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="px-3 py-2 border border-neutral-200 rounded-lg text-sm"
                       />
                       <input
                         value={row.instructions}
                         onChange={(event) => updateMedication(row.key, 'instructions', event.target.value)}
                         placeholder="Instructions"
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="px-3 py-2 border border-neutral-200 rounded-lg text-sm"
                       />
                     </div>
                   </div>
@@ -1299,20 +1299,20 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
             )}
 
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">Notes for patient</label>
+              <label className="block text-sm font-medium text-neutral-600 mb-1">Notes for patient</label>
               <textarea
                 rows={3}
                 value={prescriptionNotes}
                 onChange={(event) => setPrescriptionNotes(event.target.value)}
                 placeholder="Notes shown with the prescription…"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
               />
             </div>
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur px-4 py-3 lg:pl-64">
+          <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-neutral-200 bg-white/95 backdrop-blur px-4 py-3 lg:pl-64">
             <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-neutral-500">
                 {conflict
                   ? 'Autosave paused — reload the latest draft'
                   : isSaving
@@ -1324,7 +1324,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
               <button
                 onClick={handleFinish}
                 disabled={isFinishing || isSaving || conflict}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50"
+                className="px-6 py-2.5 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-50"
               >
                 {isFinishing ? 'Preparing review…' : 'Finish'}
               </button>
@@ -1336,17 +1336,17 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
       {context.visit && mode === 'review' && (
         <>
           {validationRow()}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-slate-800">Visit</h2>
+          <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-neutral-800">Visit</h2>
             {readOnlyVisit(context.visit)}
           </div>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-3">
+          <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-800">Prescription</h2>
-              <span className="text-xs text-slate-500">As the patient will see it</span>
+              <h2 className="text-lg font-semibold text-neutral-800">Prescription</h2>
+              <span className="text-xs text-neutral-500">As the patient will see it</span>
             </div>
             {medications.filter((row) => row.medicationName.trim()).length === 0 ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              <div className="rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800">
                 No prescription will be created.
               </div>
             ) : (
@@ -1354,34 +1354,34 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
                 {medications
                   .filter((row) => row.medicationName.trim())
                   .map((row) => (
-                    <div key={row.key} className="bg-slate-50 rounded-lg px-3 py-2">
-                      <p className="text-sm font-medium text-slate-800">{row.medicationName}</p>
-                      <p className="text-xs text-slate-600">
+                    <div key={row.key} className="bg-neutral-50 rounded-lg px-3 py-2">
+                      <p className="text-sm font-medium text-neutral-800">{row.medicationName}</p>
+                      <p className="text-xs text-neutral-600">
                         {[row.dosage, row.frequency, row.duration, row.quantity ? `qty ${row.quantity}` : null]
                           .filter(Boolean)
                           .join(' · ')}
                       </p>
-                      {row.instructions && <p className="text-xs text-slate-500">{row.instructions}</p>}
+                      {row.instructions && <p className="text-xs text-neutral-500">{row.instructions}</p>}
                     </div>
                   ))}
               </div>
             )}
             {prescriptionNotes.trim() && (
-              <p className="text-sm text-slate-700 whitespace-pre-wrap">{prescriptionNotes}</p>
+              <p className="text-sm text-neutral-700 whitespace-pre-wrap">{prescriptionNotes}</p>
             )}
           </div>
-          <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur px-4 py-3 lg:pl-64">
+          <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-neutral-200 bg-white/95 backdrop-blur px-4 py-3 lg:pl-64">
             <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
               <button
                 onClick={() => setMode('edit')}
-                className="px-5 py-2.5 border border-slate-200 rounded-xl font-semibold text-slate-700 hover:bg-slate-50"
+                className="px-5 py-2.5 border border-neutral-200 rounded-xl font-semibold text-neutral-700 hover:bg-neutral-50"
               >
                 Back to edit
               </button>
               <button
                 onClick={handleIssue}
                 disabled={isIssuing || context.missingPatientInfo.length > 0}
-                className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50"
+                className="px-6 py-2.5 bg-success-600 text-white rounded-xl font-semibold hover:bg-success-700 disabled:opacity-50"
               >
                 {isIssuing ? 'Issuing…' : 'Issue'}
               </button>
@@ -1392,12 +1392,12 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
 
       {context.visit && mode === 'issued' && (
         <>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold text-slate-800">Visit</h2>
+              <h2 className="text-lg font-semibold text-neutral-800">Visit</h2>
               <div className="flex items-center gap-2">
                 {context.visit.is_edited && (
-                  <span className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded-full">
+                  <span className="text-xs text-warning-700 bg-warning-50 px-2 py-1 rounded-full">
                     Edited {formatDateTime(context.visit.edited_at)}
                   </span>
                 )}
@@ -1406,7 +1406,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
                     setIssuedForm(formFromContext(context));
                     setEditIssuedVisit((current) => !current);
                   }}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="px-3 py-2 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-700 hover:bg-neutral-50"
                 >
                   {editIssuedVisit ? 'Cancel edit' : 'Edit visit'}
                 </button>
@@ -1427,18 +1427,18 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
                   {issuedField('Temperature (°C)', 'temperature', 'number')}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">Reason for edit (optional)</label>
+                  <label className="block text-sm font-medium text-neutral-600 mb-1">Reason for edit (optional)</label>
                   <input
                     value={editReason}
                     onChange={(event) => setEditReason(event.target.value)}
                     placeholder="e.g., Corrected diagnosis after follow-up"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
                   />
                 </div>
                 <button
                   onClick={handleSaveIssuedVisit}
                   disabled={isSavingVisit}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
                 >
                   {isSavingVisit ? 'Saving…' : 'Save changes'}
                 </button>
@@ -1448,12 +1448,12 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
             )}
 
             {context.editHistory.length > 0 && (
-              <div className="border-t border-slate-100 pt-4">
-                <p className="text-sm font-semibold text-slate-700 mb-2">Change history</p>
+              <div className="border-t border-neutral-100 pt-4">
+                <p className="text-sm font-semibold text-neutral-700 mb-2">Change history</p>
                 <div className="space-y-2">
                   {context.editHistory.map((entry) => (
-                    <div key={entry.id} className="text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2">
-                      <p className="font-medium text-slate-700">
+                    <div key={entry.id} className="text-xs text-neutral-600 bg-neutral-50 rounded-lg px-3 py-2">
+                      <p className="font-medium text-neutral-700">
                         {formatDateTime(entry.created_at)} · {entry.edited_by_email || 'Doctor'}
                       </p>
                       <p>
@@ -1461,7 +1461,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
                           .map(([field, change]) => `${field.replace(/_/g, ' ')}: ${String(change.from ?? '—')} → ${String(change.to ?? '—')}`)
                           .join('; ')}
                       </p>
-                      {entry.reason && <p className="text-slate-500">Reason: {entry.reason}</p>}
+                      {entry.reason && <p className="text-neutral-500">Reason: {entry.reason}</p>}
                     </div>
                   ))}
                 </div>
@@ -1469,10 +1469,10 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
             )}
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-3">
-            <h2 className="text-lg font-semibold text-slate-800">Prescriptions</h2>
+          <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 space-y-3">
+            <h2 className="text-lg font-semibold text-neutral-800">Prescriptions</h2>
             {allPrescriptions.length === 0 ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
                 No prescription was created for this consultation.
               </div>
             ) : (
@@ -1481,19 +1481,19 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
           </div>
 
           {replacementSource && (
-            <div className="bg-white rounded-2xl shadow-sm border border-blue-200 p-6 space-y-3">
-              <h2 className="text-lg font-semibold text-slate-800">Replacement prescription</h2>
-              <p className="text-sm text-slate-500">
+            <div className="bg-white rounded-2xl shadow-sm border border-primary-200 p-6 space-y-3">
+              <h2 className="text-lg font-semibold text-neutral-800">Replacement prescription</h2>
+              <p className="text-sm text-neutral-500">
                 The voided prescription stays in the record. This replacement is issued as a new prescription.
               </p>
               <div className="space-y-3">
                 {replacementMeds.map((row, index) => (
-                  <div key={row.key} className="rounded-xl border border-slate-200 p-3 space-y-2">
+                  <div key={row.key} className="rounded-xl border border-neutral-200 p-3 space-y-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-slate-700">Medication {index + 1}</p>
+                      <p className="text-sm font-semibold text-neutral-700">Medication {index + 1}</p>
                       <button
                         onClick={() => setReplacementMeds((rows) => rows.filter((item) => item.key !== row.key))}
-                        className="text-slate-400 hover:text-red-600"
+                        className="text-neutral-400 hover:text-error-600"
                       >
                         <span className="material-symbols-outlined text-[20px]">delete</span>
                       </button>
@@ -1518,7 +1518,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
                             )
                           }
                           placeholder={placeholder}
-                          className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                          className="px-3 py-2 border border-neutral-200 rounded-lg text-sm"
                         />
                       ))}
                     </div>
@@ -1527,30 +1527,30 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
               </div>
               <button
                 onClick={() => setReplacementMeds((rows) => [...rows, emptyMedicationRow()])}
-                className="text-sm text-blue-600 font-medium hover:underline"
+                className="text-sm text-primary-600 font-medium hover:underline"
               >
                 + Add medication
               </button>
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Notes for patient</label>
+                <label className="block text-sm font-medium text-neutral-600 mb-1">Notes for patient</label>
                 <textarea
                   rows={2}
                   value={replacementNotes}
                   onChange={(event) => setReplacementNotes(event.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
                 />
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={submitReplacement}
                   disabled={isIssuingReplacement || hasActivePrescription}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
                 >
                   {isIssuingReplacement ? 'Issuing…' : 'Issue replacement'}
                 </button>
                 <button
                   onClick={() => setReplacementSource(null)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+                  className="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-600 hover:bg-neutral-50"
                 >
                   Cancel
                 </button>
@@ -1558,10 +1558,10 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
             </div>
           )}
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 flex flex-wrap items-center justify-between gap-3">
             <button
               onClick={() => router.push('/doctor/dashboard')}
-              className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-700 hover:bg-neutral-50"
             >
               Back to Dashboard
             </button>
@@ -1572,7 +1572,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
                   if (active) void handlePdf(active);
                 }}
                 disabled={busyPdfId !== null}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
               >
                 {busyPdfId ? 'Preparing…' : 'Print / Download PDF'}
               </button>
@@ -1592,8 +1592,8 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
             data-state={voidTarget ? 'open' : 'closed'}
           >
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Void this prescription?</h3>
-              <p className="text-sm text-slate-500 mt-1">
+              <h3 className="text-lg font-semibold text-neutral-900">Void this prescription?</h3>
+              <p className="text-sm text-neutral-500 mt-1">
                 The prescription stays visible as Voided. A reason is required.
               </p>
             </div>
@@ -1602,19 +1602,19 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
               value={voidReason}
               onChange={(event) => setVoidReason(event.target.value)}
               placeholder="Reason for voiding"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
             />
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setVoidTarget(null)}
-                className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+                className="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-600 hover:bg-neutral-50"
               >
                 Cancel
               </button>
               <button
                 onClick={submitVoid}
                 disabled={isVoiding}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                className="px-4 py-2 bg-error-600 text-white rounded-lg text-sm font-medium hover:bg-error-700 disabled:opacity-50"
               >
                 {isVoiding ? 'Voiding…' : 'Void prescription'}
               </button>

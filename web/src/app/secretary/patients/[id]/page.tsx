@@ -192,12 +192,12 @@ export default function SecretaryPatientDetail() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-2xl p-6 shadow-lg">
+        <div className="bg-gradient-to-r from-success-600 to-success-700 rounded-2xl p-6 shadow-lg">
           <h1 className="text-2xl font-bold text-white">Patient Details</h1>
         </div>
-        <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-8 text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-          <p className="mt-4 text-slate-600">Loading patient details...</p>
+        <div className="bg-white rounded-2xl shadow-md border border-neutral-100 p-8 text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-success-600"></div>
+          <p className="mt-4 text-neutral-600">Loading patient details...</p>
         </div>
       </div>
     );
@@ -206,14 +206,14 @@ export default function SecretaryPatientDetail() {
   if (error || !patient) {
     return (
       <div className="space-y-6">
-        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-2xl p-6 shadow-lg">
+        <div className="bg-gradient-to-r from-success-600 to-success-700 rounded-2xl p-6 shadow-lg">
           <h1 className="text-2xl font-bold text-white">Patient Details</h1>
         </div>
-        <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-8 text-center">
-          <p className="text-red-600">{error || 'Patient not found'}</p>
+        <div className="bg-white rounded-2xl shadow-md border border-neutral-100 p-8 text-center">
+          <p className="text-error-600">{error || 'Patient not found'}</p>
           <button
             onClick={() => router.push('/secretary/patients')}
-            className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+            className="mt-4 px-4 py-2 bg-success-600 text-white rounded-lg hover:bg-success-700"
           >
             Back to Patients
           </button>
@@ -229,18 +229,18 @@ export default function SecretaryPatientDetail() {
         <div>
           <button
             onClick={() => router.push('/secretary/patients')}
-            className="text-slate-600 hover:text-slate-900 mb-2 flex items-center gap-2"
+            className="text-neutral-600 hover:text-neutral-900 mb-2 flex items-center gap-2"
           >
             <span className="material-symbols-outlined">arrow_back</span>
             Back to Patients
           </button>
-          <h1 className="text-2xl font-bold text-slate-900">{getFullName(patient)}</h1>
-          <p className="text-slate-500 mt-1">{patient.email || 'No email on file'}</p>
+          <h1 className="text-2xl font-bold text-neutral-900">{getFullName(patient)}</h1>
+          <p className="text-neutral-500 mt-1">{patient.email || 'No email on file'}</p>
         </div>
         {!isEditMode && (
           <button
             onClick={() => setIsEditMode(true)}
-            className="px-4 py-2 bg-[#1b5eb8] text-white rounded-lg hover:bg-[#14468f] font-medium"
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
           >
             Edit Profile
           </button>
@@ -248,16 +248,16 @@ export default function SecretaryPatientDetail() {
       </div>
 
       {saveError && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-          <p className="text-red-600">{saveError}</p>
+        <div className="bg-error-50 border border-error-200 rounded-2xl p-4">
+          <p className="text-error-600">{saveError}</p>
         </div>
       )}
 
       {/* Demographics Section */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-            <span className="material-symbols-outlined text-emerald-600">person</span>
+      <div className="bg-white rounded-2xl shadow-md border border-neutral-100">
+        <div className="p-6 border-b border-neutral-100">
+          <h2 className="text-lg font-semibold text-neutral-800 flex items-center gap-2">
+            <span className="material-symbols-outlined text-success-600">person</span>
             Demographics
           </h2>
         </div>
@@ -265,37 +265,37 @@ export default function SecretaryPatientDetail() {
           {isEditMode ? (
             <>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">First Name *</label>
+                <label className="block text-sm text-neutral-500 mb-1">First Name *</label>
                 <input
                   type="text"
                   name="firstName"
                   value={formData.firstName}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500"
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Middle Name</label>
+                <label className="block text-sm text-neutral-500 mb-1">Middle Name</label>
                 <input
                   type="text"
                   name="middleName"
                   value={formData.middleName || ''}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500"
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Last Name *</label>
+                <label className="block text-sm text-neutral-500 mb-1">Last Name *</label>
                 <input
                   type="text"
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500"
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Date of Birth *</label>
+                <label className="block text-sm text-neutral-500 mb-1">Date of Birth *</label>
                 <DatePicker
                   value={formData.dateOfBirth}
                   onChange={(date) => setFormData(prev => ({ ...prev, dateOfBirth: date }))}
@@ -303,7 +303,7 @@ export default function SecretaryPatientDetail() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Sex *</label>
+                <label className="block text-sm text-neutral-500 mb-1">Sex *</label>
                 <Select
                   value={formData.sex}
                   onChange={(value) => setFormData(prev => ({ ...prev, sex: value }))}
@@ -316,33 +316,33 @@ export default function SecretaryPatientDetail() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Address *</label>
+                <label className="block text-sm text-neutral-500 mb-1">Address *</label>
                 <input
                   type="text"
                   name="address"
                   value={formData.address}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500"
                 />
               </div>
             </>
           ) : (
             <>
               <div>
-                <p className="text-sm text-slate-500 mb-1">Full Name</p>
-                <p className="text-slate-800 font-medium">{getFullName(patient)}</p>
+                <p className="text-sm text-neutral-500 mb-1">Full Name</p>
+                <p className="text-neutral-800 font-medium">{getFullName(patient)}</p>
               </div>
               <div>
-                <p className="text-sm text-slate-500 mb-1">Date of Birth</p>
-                <p className="text-slate-800 font-medium">{formatDate(patient.date_of_birth)}</p>
+                <p className="text-sm text-neutral-500 mb-1">Date of Birth</p>
+                <p className="text-neutral-800 font-medium">{formatDate(patient.date_of_birth)}</p>
               </div>
               <div>
-                <p className="text-sm text-slate-500 mb-1">Sex</p>
-                <p className="text-slate-800 font-medium">{patient.sex || 'Not specified'}</p>
+                <p className="text-sm text-neutral-500 mb-1">Sex</p>
+                <p className="text-neutral-800 font-medium">{patient.sex || 'Not specified'}</p>
               </div>
               <div>
-                <p className="text-sm text-slate-500 mb-1">Address</p>
-                <p className="text-slate-800 font-medium">{patient.address || 'Not specified'}</p>
+                <p className="text-sm text-neutral-500 mb-1">Address</p>
+                <p className="text-neutral-800 font-medium">{patient.address || 'Not specified'}</p>
               </div>
             </>
           )}
@@ -350,10 +350,10 @@ export default function SecretaryPatientDetail() {
       </div>
 
       {/* Contact Information Section */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-            <span className="material-symbols-outlined text-emerald-600">contact_phone</span>
+      <div className="bg-white rounded-2xl shadow-md border border-neutral-100">
+        <div className="p-6 border-b border-neutral-100">
+          <h2 className="text-lg font-semibold text-neutral-800 flex items-center gap-2">
+            <span className="material-symbols-outlined text-success-600">contact_phone</span>
             Contact Information
           </h2>
         </div>
@@ -361,43 +361,43 @@ export default function SecretaryPatientDetail() {
           {isEditMode ? (
             <>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Email</label>
+                <label className="block text-sm text-neutral-500 mb-1">Email</label>
                 <input
                   type="email"
                   value={patient.email || ''}
                   disabled
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg bg-neutral-50 text-neutral-500"
                 />
-                <p className="text-xs text-slate-400 mt-1">Email cannot be changed</p>
+                <p className="text-xs text-neutral-400 mt-1">Email cannot be changed</p>
               </div>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Phone *</label>
+                <label className="block text-sm text-neutral-500 mb-1">Phone *</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">+63</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 font-medium">+63</span>
                   <input
                     type="text"
                     name="phone"
                     value={formData.phone}
                     onChange={handlePhoneInputChange}
                     className={`w-full pl-14 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                      phoneError ? 'border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-emerald-500'
+                      phoneError ? 'border-error-500 focus:ring-error-500' : 'border-neutral-200 focus:ring-success-500'
                     }`}
                     placeholder="9171234567"
                   />
                 </div>
-                {phoneWarning && <p className="text-xs text-amber-600 mt-1">{phoneWarning}</p>}
-                {phoneError && <p className="text-xs text-red-600 mt-1">{phoneError}</p>}
+                {phoneWarning && <p className="text-xs text-warning-600 mt-1">{phoneWarning}</p>}
+                {phoneError && <p className="text-xs text-error-600 mt-1">{phoneError}</p>}
               </div>
             </>
           ) : (
             <>
               <div>
-                <p className="text-sm text-slate-500 mb-1">Email</p>
-                <p className="text-slate-800 font-medium">{patient.email || 'Not specified'}</p>
+                <p className="text-sm text-neutral-500 mb-1">Email</p>
+                <p className="text-neutral-800 font-medium">{patient.email || 'Not specified'}</p>
               </div>
               <div>
-                <p className="text-sm text-slate-500 mb-1">Phone</p>
-                <p className="text-slate-800 font-medium">{patient.phone || 'Not specified'}</p>
+                <p className="text-sm text-neutral-500 mb-1">Phone</p>
+                <p className="text-neutral-800 font-medium">{patient.phone || 'Not specified'}</p>
               </div>
             </>
           )}
@@ -405,10 +405,10 @@ export default function SecretaryPatientDetail() {
       </div>
 
       {/* Medical Information Section */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-            <span className="material-symbols-outlined text-emerald-600">medical_services</span>
+      <div className="bg-white rounded-2xl shadow-md border border-neutral-100">
+        <div className="p-6 border-b border-neutral-100">
+          <h2 className="text-lg font-semibold text-neutral-800 flex items-center gap-2">
+            <span className="material-symbols-outlined text-success-600">medical_services</span>
             Medical Information
           </h2>
         </div>
@@ -416,56 +416,56 @@ export default function SecretaryPatientDetail() {
           {isEditMode ? (
             <>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Medical History</label>
+                <label className="block text-sm text-neutral-500 mb-1">Medical History</label>
                 <textarea
                   name="medicalHistory"
                   value={formData.medicalHistory || ''}
                   onChange={handleInputChange}
                   rows={3}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500"
                 />
-                <p className="text-xs text-slate-400 mt-1">Leave empty to clear this field</p>
+                <p className="text-xs text-neutral-400 mt-1">Leave empty to clear this field</p>
               </div>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Allergies</label>
+                <label className="block text-sm text-neutral-500 mb-1">Allergies</label>
                 <textarea
                   name="allergies"
                   value={formData.allergies || ''}
                   onChange={handleInputChange}
                   rows={2}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500"
                 />
-                <p className="text-xs text-slate-400 mt-1">Leave empty to clear this field</p>
+                <p className="text-xs text-neutral-400 mt-1">Leave empty to clear this field</p>
               </div>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Current Medications</label>
+                <label className="block text-sm text-neutral-500 mb-1">Current Medications</label>
                 <textarea
                   name="currentMedications"
                   value={formData.currentMedications || ''}
                   onChange={handleInputChange}
                   rows={2}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500"
                 />
-                <p className="text-xs text-slate-400 mt-1">Leave empty to clear this field</p>
+                <p className="text-xs text-neutral-400 mt-1">Leave empty to clear this field</p>
               </div>
             </>
           ) : (
             <>
               <div>
-                <p className="text-sm text-slate-500 mb-1">Medical History</p>
-                <p className="text-slate-800 font-medium whitespace-pre-wrap">
+                <p className="text-sm text-neutral-500 mb-1">Medical History</p>
+                <p className="text-neutral-800 font-medium whitespace-pre-wrap">
                   {patient.medical_history || 'None on file'}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-slate-500 mb-1">Allergies</p>
-                <p className="text-slate-800 font-medium whitespace-pre-wrap">
+                <p className="text-sm text-neutral-500 mb-1">Allergies</p>
+                <p className="text-neutral-800 font-medium whitespace-pre-wrap">
                   {patient.allergies || 'None on file'}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-slate-500 mb-1">Current Medications</p>
-                <p className="text-slate-800 font-medium whitespace-pre-wrap">
+                <p className="text-sm text-neutral-500 mb-1">Current Medications</p>
+                <p className="text-neutral-800 font-medium whitespace-pre-wrap">
                   {patient.current_medications || 'None on file'}
                 </p>
               </div>
@@ -475,10 +475,10 @@ export default function SecretaryPatientDetail() {
       </div>
 
       {/* Emergency Contact Section */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-            <span className="material-symbols-outlined text-emerald-600">emergency</span>
+      <div className="bg-white rounded-2xl shadow-md border border-neutral-100">
+        <div className="p-6 border-b border-neutral-100">
+          <h2 className="text-lg font-semibold text-neutral-800 flex items-center gap-2">
+            <span className="material-symbols-outlined text-success-600">emergency</span>
             Emergency Contact
           </h2>
         </div>
@@ -486,39 +486,39 @@ export default function SecretaryPatientDetail() {
           {isEditMode ? (
             <>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Emergency Contact Name</label>
+                <label className="block text-sm text-neutral-500 mb-1">Emergency Contact Name</label>
                 <input
                   type="text"
                   name="emergencyContactName"
                   value={formData.emergencyContactName || ''}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500"
                 />
-                <p className="text-xs text-slate-400 mt-1">Leave empty to clear this field</p>
+                <p className="text-xs text-neutral-400 mt-1">Leave empty to clear this field</p>
               </div>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">Emergency Contact Phone</label>
+                <label className="block text-sm text-neutral-500 mb-1">Emergency Contact Phone</label>
                 <input
                   type="text"
                   name="emergencyContactPhone"
                   value={formData.emergencyContactPhone || ''}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500"
                 />
-                <p className="text-xs text-slate-400 mt-1">Leave empty to clear this field</p>
+                <p className="text-xs text-neutral-400 mt-1">Leave empty to clear this field</p>
               </div>
             </>
           ) : (
             <>
               <div>
-                <p className="text-sm text-slate-500 mb-1">Emergency Contact Name</p>
-                <p className="text-slate-800 font-medium">
+                <p className="text-sm text-neutral-500 mb-1">Emergency Contact Name</p>
+                <p className="text-neutral-800 font-medium">
                   {patient.emergency_contact_name || 'Not specified'}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-slate-500 mb-1">Emergency Contact Phone</p>
-                <p className="text-slate-800 font-medium">
+                <p className="text-sm text-neutral-500 mb-1">Emergency Contact Phone</p>
+                <p className="text-neutral-800 font-medium">
                   {patient.emergency_contact_phone || 'Not specified'}
                 </p>
               </div>
@@ -533,14 +533,14 @@ export default function SecretaryPatientDetail() {
           <button
             onClick={handleCancel}
             disabled={isSaving}
-            className="px-6 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+            className="px-6 py-2 border border-neutral-200 text-neutral-600 rounded-lg hover:bg-neutral-50 disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+            className="px-6 py-2 bg-success-600 text-white rounded-lg hover:bg-success-700 disabled:opacity-50"
           >
             {isSaving ? 'Saving...' : 'Save Changes'}
           </button>

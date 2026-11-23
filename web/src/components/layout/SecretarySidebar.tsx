@@ -97,11 +97,11 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
   };
 
   return (
-    <aside className="fixed left-0 top-0 w-64 h-screen bg-white border-r border-slate-200 flex flex-col justify-between z-30 select-none">
+    <aside className="fixed left-0 top-0 w-64 h-screen bg-white border-r border-neutral-200 flex flex-col justify-between z-30 select-none">
       {/* Top & Navigation Region */}
       <div className="flex flex-col min-h-0">
         {/* Brand Logo Header */}
-        <div className="h-16 px-6 border-b border-slate-100 flex items-center justify-center">
+        <div className="h-16 px-6 border-b border-neutral-100 flex items-center justify-center">
           <img
             src="/images/findmydoctor_logo.png"
             alt="FindMyDoctor Logo"
@@ -110,25 +110,25 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
         </div>
 
         {/* Secretary Identity Pill */}
-        <div className="p-4 mx-3 my-3 rounded-xl bg-slate-50 border border-slate-100">
+        <div className="p-4 mx-3 my-3 rounded-xl bg-neutral-50 border border-neutral-100">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#1b5eb8]">Clinic Staff</span>
-            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-primary-600">Clinic Staff</span>
+            <span className="inline-flex items-center gap-1 text-[11px] text-success-600 font-medium">
+              <span className="w-2 h-2 rounded-full bg-success-500 animate-pulse"></span>
               Online
             </span>
           </div>
-          <div className="text-sm font-semibold text-slate-900 truncate">{userName}</div>
-          <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+          <div className="text-sm font-semibold text-neutral-900 truncate">{userName}</div>
+          <div className="text-xs text-neutral-500 flex items-center gap-1.5 mt-0.5">
             <span>{userRole}</span>
             <span>•</span>
-            <span className="text-slate-400">On Duty</span>
+            <span className="text-neutral-400">On Duty</span>
           </div>
         </div>
 
         {/* Navigation Group */}
         <div className="px-5 pt-1 pb-2">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Front Desk</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Front Desk</span>
         </div>
 
         {/* Navigation Links */}
@@ -139,14 +139,14 @@ export default function SecretarySidebar({ userName = 'Secretary', userRole = 'S
               onClick={() => handleNavClick(item.id)}
               className={`nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium text-sm transition-all ${
                 activeTab === item.id
-                  ? 'bg-[#1b5eb8] text-white shadow-sm shadow-blue-600/20'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'bg-primary-600 text-white shadow-sm shadow-primary-600/20'
+                  : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
               }`}
             >
               <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
               <span className="flex-1 text-left">{item.label}</span>
               {item.id === 'conversations' && totalUnread > 0 && (
-                <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
+                <span className="bg-error-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
                   {totalUnread > 99 ? '99+' : totalUnread}
                 </span>
               )}

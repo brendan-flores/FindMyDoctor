@@ -115,14 +115,14 @@ export default function TrustedBrowsersCard({ confirmDialogs = true }: TrustedBr
   const visibleBrowsers = showAll ? browsers : browsers.slice(0, RECENT_LIMIT);
 
   return (
-    <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+    <div className="bg-white rounded-2xl shadow-md border border-neutral-100 p-6">
       {success && <Toast message={success} type="success" onClose={() => setSuccess('')} />}
       {error && <Toast message={error} type="error" onClose={() => setError('')} />}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Trusted Browsers</h2>
-          <p className="text-sm text-slate-600 mt-1 max-w-2xl">
+          <h2 className="text-xl font-bold text-neutral-800">Trusted Browsers</h2>
+          <p className="text-sm text-neutral-600 mt-1 max-w-2xl">
             Trusted browsers can skip the email verification code for 30 days. Your password is
             always required. Only trust private, personal devices.
           </p>
@@ -130,7 +130,7 @@ export default function TrustedBrowsersCard({ confirmDialogs = true }: TrustedBr
         <button
           onClick={() => (confirmDialogs ? setConfirm({ kind: 'signOutAll' }) : handleSignOutAll())}
           disabled={isSigningOutAll}
-          className="flex-shrink-0 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-shrink-0 rounded-lg border border-error-200 bg-error-50 px-4 py-2 text-sm font-semibold text-error-700 hover:bg-error-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSigningOutAll ? 'Signing out…' : 'Sign out of all devices'}
         </button>
@@ -138,11 +138,11 @@ export default function TrustedBrowsersCard({ confirmDialogs = true }: TrustedBr
 
       <div className="mt-5">
         {isLoading ? (
-          <p className="text-sm text-slate-500">Loading trusted browsers…</p>
+          <p className="text-sm text-neutral-500">Loading trusted browsers…</p>
         ) : browsers.length === 0 ? (
-          <div className="rounded-xl bg-slate-50 px-4 py-6 text-center">
-            <p className="text-sm font-medium text-slate-700">No trusted browsers</p>
-            <p className="text-sm text-slate-500 mt-1">
+          <div className="rounded-xl bg-neutral-50 px-4 py-6 text-center">
+            <p className="text-sm font-medium text-neutral-700">No trusted browsers</p>
+            <p className="text-sm text-neutral-500 mt-1">
               Choose &ldquo;Trust this device&rdquo; after signing in on a private device to add one.
             </p>
           </div>
@@ -151,32 +151,32 @@ export default function TrustedBrowsersCard({ confirmDialogs = true }: TrustedBr
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px]">
                 <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="text-left py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Device</th>
-                    <th className="text-left py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Added</th>
-                    <th className="text-left py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Last used</th>
-                    <th className="text-left py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Expires</th>
-                    <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Action</th>
+                  <tr className="border-b border-neutral-200">
+                    <th className="text-left py-3 px-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Device</th>
+                    <th className="text-left py-3 px-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Added</th>
+                    <th className="text-left py-3 px-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Last used</th>
+                    <th className="text-left py-3 px-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Expires</th>
+                    <th className="text-right py-3 px-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-neutral-100">
                   {visibleBrowsers.map((browser) => {
                     const isRevokeBusy = busyId === browser.id;
                     return (
                       <tr key={browser.id}>
-                        <td className="py-3 px-3 text-sm font-medium text-slate-800">
+                        <td className="py-3 px-3 text-sm font-medium text-neutral-800">
                           <span className="flex items-center gap-2 flex-wrap">
                             {describeDevice(browser.device_info).label}
                             {browser.is_current && (
-                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-[#1A62CD] border border-blue-100">
+                              <span className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-600 border border-primary-100">
                                 This browser
                               </span>
                             )}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-sm text-slate-600">{formatDate(browser.created_at)}</td>
-                        <td className="py-3 px-3 text-sm text-slate-600">{formatDate(browser.last_used_at)}</td>
-                        <td className="py-3 px-3 text-sm text-slate-600">{formatDate(browser.expires_at)}</td>
+                        <td className="py-3 px-3 text-sm text-neutral-600">{formatDate(browser.created_at)}</td>
+                        <td className="py-3 px-3 text-sm text-neutral-600">{formatDate(browser.last_used_at)}</td>
+                        <td className="py-3 px-3 text-sm text-neutral-600">{formatDate(browser.expires_at)}</td>
                         <td className="py-3 px-3 text-right">
                           <button
                             onClick={() =>
@@ -185,7 +185,7 @@ export default function TrustedBrowsersCard({ confirmDialogs = true }: TrustedBr
                                 : handleRevoke(browser)
                             }
                             disabled={isRevokeBusy}
-                            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="rounded-lg border border-neutral-200 px-3 py-1.5 text-sm font-semibold text-error-600 hover:bg-error-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {isRevokeBusy ? 'Revoking…' : 'Revoke'}
                           </button>
@@ -201,7 +201,7 @@ export default function TrustedBrowsersCard({ confirmDialogs = true }: TrustedBr
               <div className="mt-4">
                 <button
                   onClick={() => setShowAll((current) => !current)}
-                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-[#1A62CD] hover:bg-blue-50 transition-colors"
+                  className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-semibold text-primary-600 hover:bg-primary-50 transition-colors"
                   aria-expanded={showAll}
                 >
                   {showAll ? 'Show recent only' : `View all (${browsers.length})`}

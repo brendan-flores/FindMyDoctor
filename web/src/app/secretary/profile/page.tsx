@@ -168,16 +168,16 @@ export default function SecretaryProfile() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8f9ff]">
-        <div className="text-slate-600">Loading profile...</div>
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="text-neutral-600">Loading profile...</div>
       </div>
     );
   }
 
   if (!profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8f9ff]">
-        <div className="text-slate-600">Failed to load profile</div>
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="text-neutral-600">Failed to load profile</div>
       </div>
     );
   }
@@ -185,11 +185,11 @@ export default function SecretaryProfile() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
+        <h1 className="text-2xl font-bold text-neutral-900">My Profile</h1>
         {!isEditing && (
           <button
             onClick={handleEdit}
-            className="px-4 py-2 text-sm font-semibold text-white bg-[#1b5eb8] hover:bg-[#14468f] rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
           >
             Edit Profile
           </button>
@@ -199,7 +199,7 @@ export default function SecretaryProfile() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Profile Content */}
         <div className="lg:col-span-3">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6">
+          <div className="bg-white rounded-2xl border border-neutral-200 shadow-md p-6">
             {/* Toast Notification */}
             {success && <Toast message={success} type="success" onClose={() => setSuccess('')} />}
             {error && <Toast message={error} type="error" onClose={() => setError('')} />}
@@ -207,13 +207,13 @@ export default function SecretaryProfile() {
             {isEditing ? (
               <form onSubmit={handleSave} className="space-y-6">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 mb-4">Edit Personal Information</h2>
-                  <p className="text-sm text-slate-500 mb-6">Update your personal details below</p>
+                  <h2 className="text-lg font-bold text-neutral-900 mb-4">Edit Personal Information</h2>
+                  <p className="text-sm text-neutral-500 mb-6">Update your personal details below</p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label htmlFor="firstName" className="block text-sm font-semibold text-slate-700">
-                        First Name <span className="text-red-500">*</span>
+                      <label htmlFor="firstName" className="block text-sm font-semibold text-neutral-700">
+                        First Name <span className="text-error-500">*</span>
                       </label>
                       <input
                         id="firstName"
@@ -223,12 +223,12 @@ export default function SecretaryProfile() {
                         placeholder="Enter your first name"
                         required
                         maxLength={100}
-                        className="w-full h-10 px-4 text-sm border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20 focus:border-[#1b5eb8]"
+                        className="w-full h-10 px-4 text-sm border border-neutral-200 rounded-lg text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label htmlFor="middleName" className="block text-sm font-semibold text-slate-700">
+                      <label htmlFor="middleName" className="block text-sm font-semibold text-neutral-700">
                         Middle Name
                       </label>
                       <input
@@ -238,13 +238,13 @@ export default function SecretaryProfile() {
                         onChange={(e) => setMiddleName(e.target.value)}
                         placeholder="Enter your middle name"
                         maxLength={100}
-                        className="w-full h-10 px-4 text-sm border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20 focus:border-[#1b5eb8]"
+                        className="w-full h-10 px-4 text-sm border border-neutral-200 rounded-lg text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label htmlFor="lastName" className="block text-sm font-semibold text-slate-700">
-                        Last Name <span className="text-red-500">*</span>
+                      <label htmlFor="lastName" className="block text-sm font-semibold text-neutral-700">
+                        Last Name <span className="text-error-500">*</span>
                       </label>
                       <input
                         id="lastName"
@@ -254,16 +254,16 @@ export default function SecretaryProfile() {
                         placeholder="Enter your last name"
                         required
                         maxLength={100}
-                        className="w-full h-10 px-4 text-sm border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20 focus:border-[#1b5eb8]"
+                        className="w-full h-10 px-4 text-sm border border-neutral-200 rounded-lg text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label htmlFor="contactNumber" className="block text-sm font-semibold text-slate-700">
-                        Contact Number <span className="text-red-500">*</span>
+                      <label htmlFor="contactNumber" className="block text-sm font-semibold text-neutral-700">
+                        Contact Number <span className="text-error-500">*</span>
                       </label>
                       <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500">+63</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-neutral-500">+63</span>
                         <input
                           id="contactNumber"
                           type="tel"
@@ -276,12 +276,12 @@ export default function SecretaryProfile() {
                           }}
                           placeholder="9171234567"
                           required
-                          className="w-full h-10 pl-12 pr-4 text-sm border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20 focus:border-[#1b5eb8]"
+                          className="w-full h-10 pl-12 pr-4 text-sm border border-neutral-200 rounded-lg text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600"
                         />
                       </div>
-                      {contactWarning && <p className="text-xs text-amber-600">{contactWarning}</p>}
-                      {contactError && <p className="text-xs text-red-600">{contactError}</p>}
-                      <p className="text-xs text-slate-500">Enter the number without +63 (mobile 10 digits, landline 9 digits).</p>
+                      {contactWarning && <p className="text-xs text-warning-600">{contactWarning}</p>}
+                      {contactError && <p className="text-xs text-error-600">{contactError}</p>}
+                      <p className="text-xs text-neutral-500">Enter the number without +63 (mobile 10 digits, landline 9 digits).</p>
                     </div>
                   </div>
                 </div>
@@ -290,7 +290,7 @@ export default function SecretaryProfile() {
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-[#1b5eb8] hover:bg-[#14468f] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
@@ -298,7 +298,7 @@ export default function SecretaryProfile() {
                     type="button"
                     onClick={handleCancel}
                     disabled={isSaving}
-                    className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 text-sm font-semibold text-neutral-700 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
@@ -308,57 +308,57 @@ export default function SecretaryProfile() {
               <div className="space-y-8">
                 {/* Personal Information */}
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 mb-4">Personal Information</h2>
+                  <h2 className="text-lg font-bold text-neutral-900 mb-4">Personal Information</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">First Name</label>
-                      <div className="text-sm font-medium text-slate-900">{profile.first_name || '-'}</div>
+                      <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">First Name</label>
+                      <div className="text-sm font-medium text-neutral-900">{profile.first_name || '-'}</div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Middle Name</label>
-                      <div className="text-sm font-medium text-slate-900">{profile.middle_name || '-'}</div>
+                      <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">Middle Name</label>
+                      <div className="text-sm font-medium text-neutral-900">{profile.middle_name || '-'}</div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Last Name</label>
-                      <div className="text-sm font-medium text-slate-900">{profile.last_name || '-'}</div>
+                      <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">Last Name</label>
+                      <div className="text-sm font-medium text-neutral-900">{profile.last_name || '-'}</div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Contact Number</label>
-                      <div className="text-sm font-medium text-slate-900">{profile.contact_number || '-'}</div>
+                      <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">Contact Number</label>
+                      <div className="text-sm font-medium text-neutral-900">{profile.contact_number || '-'}</div>
                     </div>
                   </div>
                 </div>
 
                 {/* Account Information */}
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 mb-4">Account Information</h2>
+                  <h2 className="text-lg font-bold text-neutral-900 mb-4">Account Information</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Email</label>
-                      <div className="text-sm font-medium text-slate-900">{profile.email}</div>
+                      <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">Email</label>
+                      <div className="text-sm font-medium text-neutral-900">{profile.email}</div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Role</label>
-                      <div className="text-sm font-medium text-slate-900">{profile.role}</div>
+                      <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">Role</label>
+                      <div className="text-sm font-medium text-neutral-900">{profile.role}</div>
                     </div>
                   </div>
                 </div>
 
                 {/* Doctor/Practice Information */}
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 mb-4">Doctor / Practice Information</h2>
+                  <h2 className="text-lg font-bold text-neutral-900 mb-4">Doctor / Practice Information</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Doctor Name</label>
-                      <div className="text-sm font-medium text-slate-900">
+                      <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">Doctor Name</label>
+                      <div className="text-sm font-medium text-neutral-900">
                         {profile.doctor_first_name && profile.doctor_last_name
                           ? `${profile.doctor_first_name} ${profile.doctor_last_name}`
                           : '-'}
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Practice Name</label>
-                      <div className="text-sm font-medium text-slate-900">{profile.practice_name || '-'}</div>
+                      <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">Practice Name</label>
+                      <div className="text-sm font-medium text-neutral-900">{profile.practice_name || '-'}</div>
                     </div>
                   </div>
                 </div>

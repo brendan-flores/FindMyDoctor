@@ -602,7 +602,7 @@ export default function DoctorSignupOtp() {
 
   if (step === 'signup') {
     return (
-      <div className="min-h-screen bg-[#F3F5F9]">
+      <div className="min-h-screen bg-neutral-100">
         <div className="px-4 py-8 overflow-y-auto" style={{ height: '100vh' }}>
           <div className="w-full max-w-[560px] mx-auto">
 
@@ -616,14 +616,14 @@ export default function DoctorSignupOtp() {
           </div>
 
           {/* Card */}
-          <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8">
+          <div className="bg-white rounded-3xl shadow-lg border border-neutral-200 p-8">
 
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-[#0F172A]">
+              <h1 className="text-2xl font-bold text-neutral-900">
                 Create Doctor Account
               </h1>
 
-              <p className="text-[#64748B] mt-2 text-[15px]">
+              <p className="text-neutral-500 mt-2 text-[15px]">
                 Enter your basic information. A 6-digit verification
                 code will be sent to your email.
               </p>
@@ -635,7 +635,7 @@ export default function DoctorSignupOtp() {
               <div className="mb-5">
                 <label
                   htmlFor="firstName"
-                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                  className="block text-[15px] font-semibold text-neutral-700 mb-2"
                 >
                   First Name
                 </label>
@@ -654,7 +654,7 @@ export default function DoctorSignupOtp() {
                   }}
                   placeholder="Enter your first name"
                   autoComplete="given-name"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 px-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all"
                 />
               </div>
 
@@ -662,7 +662,7 @@ export default function DoctorSignupOtp() {
               <div className="mb-5">
                 <label
                   htmlFor="middleName"
-                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                  className="block text-[15px] font-semibold text-neutral-700 mb-2"
                 >
                   Middle Name (Optional)
                 </label>
@@ -681,7 +681,7 @@ export default function DoctorSignupOtp() {
                   }}
                   placeholder="Enter your middle name"
                   autoComplete="additional-name"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 px-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all"
                 />
               </div>
 
@@ -689,7 +689,7 @@ export default function DoctorSignupOtp() {
               <div className="mb-5">
                 <label
                   htmlFor="lastName"
-                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                  className="block text-[15px] font-semibold text-neutral-700 mb-2"
                 >
                   Last Name
                 </label>
@@ -708,7 +708,7 @@ export default function DoctorSignupOtp() {
                   }}
                   placeholder="Enter your last name"
                   autoComplete="family-name"
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 px-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all"
                 />
               </div>
 
@@ -716,14 +716,14 @@ export default function DoctorSignupOtp() {
               <div className="mb-5">
                 <label
                   htmlFor="email"
-                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                  className="block text-[15px] font-semibold text-neutral-700 mb-2"
                 >
                   Email Address
                 </label>
 
                 <div className="relative">
 
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400">
                     <MailIcon />
                   </div>
 
@@ -740,9 +740,9 @@ export default function DoctorSignupOtp() {
                     autoComplete="email"
                     className={`block w-full rounded-2xl border ${
                       emailError
-                        ? 'border-red-500'
-                        : 'border-[#E2E8F0]'
-                    } bg-white py-3.5 pl-12 pr-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all`}
+                        ? 'border-error-500'
+                        : 'border-neutral-200'
+                    } bg-white py-3.5 pl-12 pr-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all`}
                   />
 
                 </div>
@@ -752,13 +752,13 @@ export default function DoctorSignupOtp() {
               <div className="mb-5">
                 <label
                   htmlFor="contactNumber"
-                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                  className="block text-[15px] font-semibold text-neutral-700 mb-2"
                 >
                   Contact Number
                 </label>
 
                 <div className="relative">
-                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] font-medium text-[#94A3B8]">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] font-medium text-neutral-400">
                     +63
                   </span>
 
@@ -783,12 +783,12 @@ export default function DoctorSignupOtp() {
                     }}
                     placeholder="9171234567"
                     autoComplete="tel"
-                    className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-14 pr-4 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                    className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 pl-14 pr-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all"
                   />
                 </div>
 
                 {contactNumberError && (
-                  <p className="mt-1 text-[12px] text-red-600">{contactNumberError}</p>
+                  <p className="mt-1 text-[12px] text-error-600">{contactNumberError}</p>
                 )}
               </div>
 
@@ -796,7 +796,7 @@ export default function DoctorSignupOtp() {
               <div className="mb-5">
                 <label
                   htmlFor="password"
-                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                  className="block text-[15px] font-semibold text-neutral-700 mb-2"
                 >
                   Password
                 </label>
@@ -816,12 +816,12 @@ export default function DoctorSignupOtp() {
                     }}
                     placeholder="Enter your password"
                     autoComplete="new-password"
-                    className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 pr-12 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                    className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 px-4 pr-12 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569] p-0.5 transition-colors"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 p-0.5 transition-colors"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? (
@@ -841,53 +841,53 @@ export default function DoctorSignupOtp() {
                 <div className="mt-3 space-y-1.5">
                   <div className="flex items-center gap-2 text-[12px]">
                     {hasMinLength ? (
-                      <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-success-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <div className="w-4 h-4 rounded-full border-2 border-[#94A3B8] shrink-0" />
+                      <div className="w-4 h-4 rounded-full border-2 border-neutral-400 shrink-0" />
                     )}
-                    <span className={hasMinLength ? 'text-green-600' : 'text-[#94A3B8]'}>At least 8 characters</span>
+                    <span className={hasMinLength ? 'text-success-600' : 'text-neutral-400'}>At least 8 characters</span>
                   </div>
                   <div className="flex items-center gap-2 text-[12px]">
                     {hasUppercase ? (
-                      <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-success-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <div className="w-4 h-4 rounded-full border-2 border-[#94A3B8] shrink-0" />
+                      <div className="w-4 h-4 rounded-full border-2 border-neutral-400 shrink-0" />
                     )}
-                    <span className={hasUppercase ? 'text-green-600' : 'text-[#94A3B8]'}>At least one uppercase letter</span>
+                    <span className={hasUppercase ? 'text-success-600' : 'text-neutral-400'}>At least one uppercase letter</span>
                   </div>
                   <div className="flex items-center gap-2 text-[12px]">
                     {hasLowercase ? (
-                      <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-success-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <div className="w-4 h-4 rounded-full border-2 border-[#94A3B8] shrink-0" />
+                      <div className="w-4 h-4 rounded-full border-2 border-neutral-400 shrink-0" />
                     )}
-                    <span className={hasLowercase ? 'text-green-600' : 'text-[#94A3B8]'}>At least one lowercase letter</span>
+                    <span className={hasLowercase ? 'text-success-600' : 'text-neutral-400'}>At least one lowercase letter</span>
                   </div>
                   <div className="flex items-center gap-2 text-[12px]">
                     {hasNumber ? (
-                      <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-success-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <div className="w-4 h-4 rounded-full border-2 border-[#94A3B8] shrink-0" />
+                      <div className="w-4 h-4 rounded-full border-2 border-neutral-400 shrink-0" />
                     )}
-                    <span className={hasNumber ? 'text-green-600' : 'text-[#94A3B8]'}>At least one number</span>
+                    <span className={hasNumber ? 'text-success-600' : 'text-neutral-400'}>At least one number</span>
                   </div>
                   <div className="flex items-center gap-2 text-[12px]">
                     {hasSpecialChar ? (
-                      <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-success-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <div className="w-4 h-4 rounded-full border-2 border-[#94A3B8] shrink-0" />
+                      <div className="w-4 h-4 rounded-full border-2 border-neutral-400 shrink-0" />
                     )}
-                    <span className={hasSpecialChar ? 'text-green-600' : 'text-[#94A3B8]'}>At least one special character</span>
+                    <span className={hasSpecialChar ? 'text-success-600' : 'text-neutral-400'}>At least one special character</span>
                   </div>
                 </div>
               </div>
@@ -896,7 +896,7 @@ export default function DoctorSignupOtp() {
               <div className="mb-6">
                 <label
                   htmlFor="confirmPassword"
-                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                  className="block text-[15px] font-semibold text-neutral-700 mb-2"
                 >
                   Confirm Password
                 </label>
@@ -916,12 +916,12 @@ export default function DoctorSignupOtp() {
                     }}
                     placeholder="Re-enter your password"
                     autoComplete="new-password"
-                    className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 px-4 pr-12 text-[15px] text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+                    className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 px-4 pr-12 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569] p-0.5 transition-colors"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 p-0.5 transition-colors"
                     aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                   >
                     {showConfirmPassword ? (
@@ -947,7 +947,7 @@ export default function DoctorSignupOtp() {
               <button
                 type="submit"
                 disabled={emailStatus === 'loading'}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {emailStatus === 'loading'
                   ? 'Creating Account...'
@@ -957,12 +957,12 @@ export default function DoctorSignupOtp() {
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-[15px] text-[#64748B]">
+              <p className="text-[15px] text-neutral-500">
                 Already have an account?{' '}
 
                 <a
                   href="/doctor-login"
-                  className="font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors"
+                  className="font-bold text-primary-600 hover:text-primary-800 transition-colors"
                 >
                   Log In
                 </a>
@@ -971,7 +971,7 @@ export default function DoctorSignupOtp() {
 
           </div>
 
-          <p className="text-center text-[13px] text-[#94A3B8] mt-6">
+          <p className="text-center text-[13px] text-neutral-400 mt-6">
             By continuing, you agree to our Terms of Service and Privacy Policy
           </p>
 
@@ -989,7 +989,7 @@ export default function DoctorSignupOtp() {
 
   if (step === 'otp') {
     return (
-      <div className="min-h-screen bg-[#F3F5F9]">
+      <div className="min-h-screen bg-neutral-100">
         <div className="px-4 py-8 overflow-y-auto" style={{ height: '100vh' }}>
           <div className="w-full max-w-[460px] mx-auto">
 
@@ -998,7 +998,7 @@ export default function DoctorSignupOtp() {
             <button
               type="button"
               onClick={handleBackToSignup}
-              className="flex items-center gap-2 text-[#64748B] hover:text-[#0D3B75] transition-colors mb-4"
+              className="flex items-center gap-2 text-neutral-500 hover:text-primary-800 transition-colors mb-4"
             >
               <ArrowLeftIcon />
 
@@ -1007,16 +1007,16 @@ export default function DoctorSignupOtp() {
               </span>
             </button>
 
-            <h1 className="text-2xl font-bold text-[#0F172A]">
+            <h1 className="text-2xl font-bold text-neutral-900">
               Verify Your Email
             </h1>
 
-            <p className="text-[#64748B] mt-2 text-[15px]">
+            <p className="text-neutral-500 mt-2 text-[15px]">
               Enter the 6-digit code sent to{' '}
               <strong>{email}</strong>
             </p>
 
-            <p className="text-[#94A3B8] text-[13px] mt-1">
+            <p className="text-neutral-400 text-[13px] mt-1">
               OTP expires in{' '}
               {Math.floor(otpExpiresIn / 60)}:
               {String(otpExpiresIn % 60).padStart(2, '0')}
@@ -1024,14 +1024,14 @@ export default function DoctorSignupOtp() {
 
           </div>
 
-          <div className="bg-white rounded-3xl shadow-lg border border-[#E2E8F0] p-8">
+          <div className="bg-white rounded-3xl shadow-lg border border-neutral-200 p-8">
 
             <form onSubmit={handleOtpSubmit}>
 
               <div className="mb-6">
 
                 <label
-                  className="block text-[15px] font-semibold text-[#334155] mb-2"
+                  className="block text-[15px] font-semibold text-neutral-700 mb-2"
                 >
                   Verification Code
                 </label>
@@ -1052,11 +1052,11 @@ export default function DoctorSignupOtp() {
                       maxLength={1}
                       className={`w-14 h-16 text-center text-[28px] font-bold rounded-2xl border-2 ${
                         otpError
-                          ? 'border-red-500 bg-red-50'
+                          ? 'border-error-500 bg-error-50'
                           : activeOtpIndex === index
-                            ? 'border-[#1A62CD] bg-white ring-2 ring-[#1A62CD]/20'
-                            : 'border-[#E2E8F0] bg-white hover:border-[#CBD5E1]'
-                      } text-gray-900 placeholder-[#CBD5E1] focus:outline-none focus:border-[#1A62CD] transition-all duration-150`}
+                            ? 'border-primary-600 bg-white ring-2 ring-primary-600/20'
+                            : 'border-neutral-200 bg-white hover:border-neutral-300'
+                      } text-neutral-900 placeholder-neutral-300 focus:outline-none focus:border-primary-600 transition-all duration-150`}
                     />
                   ))}
                 </div>
@@ -1070,7 +1070,7 @@ export default function DoctorSignupOtp() {
               <button
                 type="submit"
                 disabled={otpStatus === 'loading'}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-sm text-[16px] font-bold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {otpStatus === 'loading'
                   ? 'Verifying...'
@@ -1081,7 +1081,7 @@ export default function DoctorSignupOtp() {
 
             <div className="text-center mt-6">
 
-              <p className="text-[15px] text-[#64748B]">
+              <p className="text-[15px] text-neutral-500">
                 Didn&apos;t receive the code?{' '}
 
                 <button
@@ -1091,7 +1091,7 @@ export default function DoctorSignupOtp() {
                     resendDisabled ||
                     emailStatus === 'loading'
                   }
-                  className="font-bold text-[#1967D2] hover:text-[#0D3B75] transition-colors disabled:text-[#94A3B8] disabled:cursor-not-allowed"
+                  className="font-bold text-primary-600 hover:text-primary-800 transition-colors disabled:text-neutral-400 disabled:cursor-not-allowed"
                 >
                   {emailStatus === 'loading'
                     ? 'Sending...'
@@ -1105,7 +1105,7 @@ export default function DoctorSignupOtp() {
 
           </div>
 
-          <p className="text-center text-[13px] text-[#94A3B8] mt-6">
+          <p className="text-center text-[13px] text-neutral-400 mt-6">
             By continuing, you agree to our Terms of Service and Privacy Policy
           </p>
 

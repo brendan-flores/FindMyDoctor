@@ -124,17 +124,17 @@ export default function DoctorPrescriptions() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 shadow-lg">
+      <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-2xl p-6 shadow-lg">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-white">Prescriptions</h1>
-            <p className="text-blue-100 text-sm mt-1">
+            <p className="text-primary-100 text-sm mt-1">
               Prescriptions are issued from a patient&apos;s consultation. Voided prescriptions stay visible for the record.
             </p>
           </div>
           <button
             onClick={() => router.push('/doctor/appointments')}
-            className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium flex items-center gap-2"
+            className="px-4 py-2 bg-white text-primary-600 rounded-lg hover:bg-primary-50 font-medium flex items-center gap-2"
           >
             <span className="material-symbols-outlined">clinical_notes</span>
             Go to consultations
@@ -142,82 +142,82 @@ export default function DoctorPrescriptions() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+      <div className="bg-white rounded-xl shadow-sm border border-neutral-100">
         {isLoading ? (
           <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-slate-600">Loading prescriptions...</p>
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            <p className="mt-4 text-neutral-600">Loading prescriptions...</p>
           </div>
         ) : error ? (
           <div className="p-8 text-center">
-            <p className="text-red-600">{error}</p>
+            <p className="text-error-600">{error}</p>
             <button
               onClick={fetchPrescriptions}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
             >
               Retry
             </button>
           </div>
         ) : prescriptions.length === 0 ? (
           <div className="p-8 text-center">
-            <span className="material-symbols-outlined text-6xl text-slate-300">medication</span>
-            <p className="mt-4 text-slate-600">No prescriptions found</p>
+            <span className="material-symbols-outlined text-6xl text-neutral-300">medication</span>
+            <p className="mt-4 text-neutral-600">No prescriptions found</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-neutral-100">
             {prescriptions.map((prescription) => {
               const isVoided = prescription.status === 'VOIDED';
               return (
-                <div key={prescription.id} className="p-6 hover:bg-slate-50 transition-colors">
+                <div key={prescription.id} className="p-6 hover:bg-neutral-50 transition-colors">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex flex-wrap items-center gap-3 mb-3">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          isVoided ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'
+                          isVoided ? 'bg-error-100 text-error-800' : 'bg-success-100 text-success-800'
                         }`}>
                           {isVoided ? 'Voided' : 'Issued'}
                         </span>
-                        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                        <span className="px-3 py-1 bg-primary-100 text-primary-800 rounded-full text-sm font-medium">
                           {prescription.items?.length || 0} Medication{(prescription.items?.length || 0) !== 1 ? 's' : ''}
                         </span>
                         {prescription.replaces_prescription_id && (
-                          <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm font-medium">
+                          <span className="px-3 py-1 bg-neutral-100 text-neutral-700 rounded-full text-sm font-medium">
                             Replacement
                           </span>
                         )}
                         {prescription.has_pdf && (
-                          <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium">
+                          <span className="px-3 py-1 bg-success-50 text-success-700 rounded-full text-sm font-medium">
                             PDF Available
                           </span>
                         )}
                       </div>
 
-                      <h3 className="text-lg font-semibold text-slate-800">
+                      <h3 className="text-lg font-semibold text-neutral-800">
                         {getPatientName(prescription.patient_id)}
                       </h3>
 
                       <div className="mt-2 space-y-1">
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <div className="flex items-center gap-2 text-sm text-neutral-600">
                           <span className="material-symbols-outlined text-lg">calendar_today</span>
                           <span>{formatDate(prescription.prescription_date)}</span>
                         </div>
 
                         {prescription.items && prescription.items.length > 0 && (
-                          <div className="flex items-start gap-2 text-sm text-slate-600">
+                          <div className="flex items-start gap-2 text-sm text-neutral-600">
                             <span className="material-symbols-outlined text-lg mt-0.5">medication</span>
                             <div className="flex-1">
                               {prescription.items.slice(0, 2).map((item, index) => (
                                 <div key={index}>{item.medication_name}</div>
                               ))}
                               {prescription.items.length > 2 && (
-                                <div className="text-slate-400">+{prescription.items.length - 2} more</div>
+                                <div className="text-neutral-400">+{prescription.items.length - 2} more</div>
                               )}
                             </div>
                           </div>
                         )}
 
                         {isVoided && prescription.void_reason && (
-                          <p className="text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2 mt-2">
+                          <p className="text-sm text-error-700 bg-error-50 rounded-lg px-3 py-2 mt-2">
                             Void reason: {prescription.void_reason}
                           </p>
                         )}
@@ -227,7 +227,7 @@ export default function DoctorPrescriptions() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleViewPrescription(prescription)}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                         title="View Details"
                       >
                         <span className="material-symbols-outlined">visibility</span>
@@ -236,14 +236,14 @@ export default function DoctorPrescriptions() {
                         <>
                           <button
                             onClick={() => handleDownloadPdf(prescription.id)}
-                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                            className="p-2 text-neutral-400 hover:text-success-600 hover:bg-success-50 rounded-lg transition-colors"
                             title="Download PDF"
                           >
                             <span className="material-symbols-outlined">download</span>
                           </button>
                           <button
                             onClick={() => handleGeneratePdf(prescription.id)}
-                            className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                             title="Regenerate PDF"
                           >
                             <span className="material-symbols-outlined">refresh</span>
@@ -252,7 +252,7 @@ export default function DoctorPrescriptions() {
                       ) : (
                         <button
                           onClick={() => handleGeneratePdf(prescription.id)}
-                          className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                          className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                           title="Generate PDF"
                         >
                           <span className="material-symbols-outlined">picture_as_pdf</span>
@@ -277,11 +277,11 @@ export default function DoctorPrescriptions() {
             className="fmd-modal-panel bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
             data-state={viewModalOpen ? 'open' : 'closed'}
           >
-            <div className="p-6 border-b border-slate-100">
+            <div className="p-6 border-b border-neutral-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-800">Prescription Details</h2>
-                  <p className="text-sm text-slate-500 mt-1">
+                  <h2 className="text-xl font-semibold text-neutral-800">Prescription Details</h2>
+                  <p className="text-sm text-neutral-500 mt-1">
                     {selectedPrescription.status === 'VOIDED' ? 'Voided' : 'Issued'}
                   </p>
                 </div>
@@ -289,7 +289,7 @@ export default function DoctorPrescriptions() {
                   onClick={() => {
                     setShowViewModal(false);
                   }}
-                  className="text-slate-400 hover:text-slate-600"
+                  className="text-neutral-400 hover:text-neutral-600"
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
@@ -299,53 +299,53 @@ export default function DoctorPrescriptions() {
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-slate-500 mb-1">Patient</label>
-                  <p className="font-medium text-slate-800">
+                  <label className="block text-sm text-neutral-500 mb-1">Patient</label>
+                  <p className="font-medium text-neutral-800">
                     {getPatientName(selectedPrescription.patient_id)}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-500 mb-1">Date</label>
-                  <p className="font-medium text-slate-800">{formatDate(selectedPrescription.prescription_date)}</p>
+                  <label className="block text-sm text-neutral-500 mb-1">Date</label>
+                  <p className="font-medium text-neutral-800">{formatDate(selectedPrescription.prescription_date)}</p>
                 </div>
               </div>
 
               {selectedPrescription.status === 'VOIDED' && selectedPrescription.void_reason && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                <div className="bg-error-50 border border-error-200 rounded-lg p-3 text-sm text-error-700">
                   Void reason: {selectedPrescription.void_reason}
                 </div>
               )}
 
               <div>
-                <label className="block text-sm text-slate-500 mb-2">Medications</label>
+                <label className="block text-sm text-neutral-500 mb-2">Medications</label>
                 <div className="space-y-3">
                   {selectedPrescription.items?.map((item, index) => (
-                    <div key={index} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                      <h4 className="font-medium text-slate-800 mb-2">{item.medication_name}</h4>
-                      <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
+                    <div key={index} className="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
+                      <h4 className="font-medium text-neutral-800 mb-2">{item.medication_name}</h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm text-neutral-600">
                         {item.dosage && (
                           <div>
-                            <span className="text-slate-500">Dosage:</span> {item.dosage}
+                            <span className="text-neutral-500">Dosage:</span> {item.dosage}
                           </div>
                         )}
                         {item.frequency && (
                           <div>
-                            <span className="text-slate-500">Frequency:</span> {item.frequency}
+                            <span className="text-neutral-500">Frequency:</span> {item.frequency}
                           </div>
                         )}
                         {item.duration && (
                           <div>
-                            <span className="text-slate-500">Duration:</span> {item.duration}
+                            <span className="text-neutral-500">Duration:</span> {item.duration}
                           </div>
                         )}
                         {item.quantity !== null && item.quantity !== undefined && (
                           <div>
-                            <span className="text-slate-500">Quantity:</span> {item.quantity}
+                            <span className="text-neutral-500">Quantity:</span> {item.quantity}
                           </div>
                         )}
                         {item.instructions && (
                           <div className="col-span-2">
-                            <span className="text-slate-500">Instructions:</span> {item.instructions}
+                            <span className="text-neutral-500">Instructions:</span> {item.instructions}
                           </div>
                         )}
                       </div>
@@ -356,18 +356,18 @@ export default function DoctorPrescriptions() {
 
               {selectedPrescription.notes && (
                 <div>
-                  <label className="block text-sm text-slate-500 mb-1">Additional Notes</label>
-                  <p className="text-slate-800">{selectedPrescription.notes}</p>
+                  <label className="block text-sm text-neutral-500 mb-1">Additional Notes</label>
+                  <p className="text-neutral-800">{selectedPrescription.notes}</p>
                 </div>
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+            <div className="p-6 border-t border-neutral-100 flex justify-end gap-3">
               {selectedPrescription.has_pdf ? (
                 <>
                   <button
                     onClick={() => handleGeneratePdf(selectedPrescription.id)}
-                    className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 flex items-center gap-2"
+                    className="px-4 py-2 border border-neutral-200 text-neutral-700 rounded-lg hover:bg-neutral-50 flex items-center gap-2"
                     title="Regenerate PDF with latest details and signature"
                   >
                     <span className="material-symbols-outlined">refresh</span>
@@ -375,7 +375,7 @@ export default function DoctorPrescriptions() {
                   </button>
                   <button
                     onClick={() => handleDownloadPdf(selectedPrescription.id)}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2"
+                    className="px-4 py-2 bg-success-600 text-white rounded-lg hover:bg-success-700 flex items-center gap-2"
                   >
                     <span className="material-symbols-outlined">download</span>
                     Download PDF
@@ -384,7 +384,7 @@ export default function DoctorPrescriptions() {
               ) : (
                 <button
                   onClick={() => handleGeneratePdf(selectedPrescription.id)}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
                 >
                   <span className="material-symbols-outlined">picture_as_pdf</span>
                   Generate PDF

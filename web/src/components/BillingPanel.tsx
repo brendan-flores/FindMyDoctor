@@ -23,11 +23,11 @@ interface BillingPanelProps {
 type ChargeType = 'SERVICE' | 'MEDICINE' | 'OTHER';
 
 const STATUS_CHIPS: Record<BillingStatus, string> = {
-  UNPAID: 'bg-red-100 text-red-800',
-  FOR_REVIEW: 'bg-amber-100 text-amber-800',
-  PARTIAL: 'bg-amber-100 text-amber-800',
-  PAID: 'bg-green-100 text-green-800',
-  OVERPAID: 'bg-purple-100 text-purple-800',
+  UNPAID: 'bg-error-100 text-error-800',
+  FOR_REVIEW: 'bg-warning-100 text-warning-800',
+  PARTIAL: 'bg-warning-100 text-warning-800',
+  PAID: 'bg-success-100 text-success-800',
+  OVERPAID: 'bg-primary-100 text-primary-800',
 };
 
 const STATUS_LABELS: Record<BillingStatus, string> = {
@@ -39,10 +39,10 @@ const STATUS_LABELS: Record<BillingStatus, string> = {
 };
 
 const TX_STATUS_CLASSES: Record<string, string> = {
-  ACCEPTED: 'bg-green-100 text-green-800',
-  PENDING: 'bg-yellow-100 text-yellow-800',
-  REJECTED: 'bg-red-100 text-red-800',
-  VOIDED: 'bg-gray-100 text-gray-800',
+  ACCEPTED: 'bg-success-100 text-success-800',
+  PENDING: 'bg-warning-100 text-warning-800',
+  REJECTED: 'bg-error-100 text-error-800',
+  VOIDED: 'bg-neutral-100 text-neutral-800',
 };
 
 const CHARGE_TYPE_LABELS: Record<string, string> = {
@@ -499,10 +499,10 @@ export default function BillingPanel({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{headerTitle}</h2>
-            <p className="text-sm text-gray-600">Review the bill, record payments, and issue the invoice.</p>
+            <h2 className="text-xl font-bold text-neutral-900">{headerTitle}</h2>
+            <p className="text-sm text-neutral-600">Review the bill, record payments, and issue the invoice.</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close">
+          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600 transition-colors" aria-label="Close">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -510,22 +510,22 @@ export default function BillingPanel({
         </div>
 
         {/* Summary Strip */}
-        <div className="bg-gray-50 p-4 border-b">
+        <div className="bg-neutral-50 p-4 border-b">
           <div className="grid grid-cols-4 gap-4 text-center">
             <div>
-              <p className="text-xs text-gray-500">Total</p>
-              <p className="text-lg font-bold text-gray-900">{formatMoney(billTotal)}</p>
+              <p className="text-xs text-neutral-500">Total</p>
+              <p className="text-lg font-bold text-neutral-900">{formatMoney(billTotal)}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500">Paid</p>
-              <p className="text-lg font-bold text-green-600">{formatMoney(netPaid)}</p>
+              <p className="text-xs text-neutral-500">Paid</p>
+              <p className="text-lg font-bold text-success-600">{formatMoney(netPaid)}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500">Balance</p>
-              <p className={`text-lg font-bold ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatMoney(balance)}</p>
+              <p className="text-xs text-neutral-500">Balance</p>
+              <p className={`text-lg font-bold ${balance > 0 ? 'text-error-600' : 'text-success-600'}`}>{formatMoney(balance)}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500">Status</p>
+              <p className="text-xs text-neutral-500">Status</p>
               <div className="mt-1 flex justify-center">
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${STATUS_CHIPS[billingStatus] || STATUS_CHIPS.UNPAID}`}>
                   {STATUS_LABELS[billingStatus] || billingStatus}
@@ -534,7 +534,7 @@ export default function BillingPanel({
             </div>
           </div>
           {paymentData?.payment?.payment_method && (
-            <p className="text-xs text-gray-500 mt-2 text-center">
+            <p className="text-xs text-neutral-500 mt-2 text-center">
               Booked as: {formatMethod(paymentData.payment.payment_method)}
             </p>
           )}
@@ -544,24 +544,24 @@ export default function BillingPanel({
         <div className="flex-1 overflow-y-auto">
           {loading && !paymentData ? (
             <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
             </div>
           ) : !paymentData ? (
-            <div className="text-red-600 text-center py-8">{error || 'No payment data found'}</div>
+            <div className="text-error-600 text-center py-8">{error || 'No payment data found'}</div>
           ) : (
             <div className="p-6 space-y-6">
               {error && (
-                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="text-sm text-error-700 bg-error-50 border border-error-200 rounded-lg p-3">
                   {error}
                 </div>
               )}
 
               {/* Bill */}
-              <section className="border border-gray-200 rounded-lg overflow-hidden">
+              <section className="border border-neutral-200 rounded-lg overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
                   <div>
-                    <h3 className="font-semibold text-gray-900">Bill</h3>
-                    <p className="text-xs text-gray-500">Consultation fee and additional charges</p>
+                    <h3 className="font-semibold text-neutral-900">Bill</h3>
+                    <p className="text-xs text-neutral-500">Consultation fee and additional charges</p>
                   </div>
                   {!hasActiveInvoice ? (
                     <button
@@ -569,7 +569,7 @@ export default function BillingPanel({
                         setShowAddCharge((open) => !open);
                         setChargeError('');
                       }}
-                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                      className="px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium"
                     >
                       {showAddCharge ? 'Close form' : '+ Add charge'}
                     </button>
@@ -580,7 +580,7 @@ export default function BillingPanel({
                         setCorrectReason('');
                         setCorrectNote('');
                       }}
-                      className="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium"
+                      className="px-3 py-1.5 bg-warning-600 text-white rounded-lg hover:bg-warning-700 text-sm font-medium"
                     >
                       Edit bill…
                     </button>
@@ -588,26 +588,26 @@ export default function BillingPanel({
                 </div>
 
                 {hasActiveInvoice && (
-                  <p className="text-sm text-amber-700 bg-amber-50 border-b border-amber-200 px-4 py-2">
+                  <p className="text-sm text-warning-700 bg-warning-50 border-b border-warning-200 px-4 py-2">
                     Invoice issued. Edit bill to change charges.
                   </p>
                 )}
 
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-neutral-100">
                   {/* Consultation fee is part of the bill total, so show it as a locked line. */}
-                  <div className="flex items-center justify-between gap-3 px-4 py-3 bg-gray-50/60">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 bg-neutral-50/60">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">Consultation fee</p>
-                      <p className="text-xs text-gray-500">Locked · set by the doctor&apos;s fee</p>
+                      <p className="text-sm font-medium text-neutral-900">Consultation fee</p>
+                      <p className="text-xs text-neutral-500">Locked · set by the doctor&apos;s fee</p>
                     </div>
-                    <span className="text-sm font-semibold text-gray-900">{formatMoney(consultationAmount)}</span>
+                    <span className="text-sm font-semibold text-neutral-900">{formatMoney(consultationAmount)}</span>
                   </div>
 
                   {charges.map((charge) => (
                     <div key={charge.id} className="flex items-center justify-between gap-3 px-4 py-3">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{charge.description}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm font-medium text-neutral-900">{charge.description}</p>
+                        <p className="text-xs text-neutral-500">
                           {CHARGE_TYPE_LABELS[charge.charge_type || 'ADDITIONAL'] || charge.charge_type}
                           {charge.quantity != null && charge.unit_price != null && (
                             <> · {charge.quantity} × {formatMoney(charge.unit_price)}</>
@@ -615,11 +615,11 @@ export default function BillingPanel({
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold text-gray-900">{formatMoney(charge.amount)}</span>
+                        <span className="text-sm font-semibold text-neutral-900">{formatMoney(charge.amount)}</span>
                         {!hasActiveInvoice && (
                           <button
                             onClick={() => handleDeleteCharge(charge)}
-                            className="text-xs text-red-600 hover:text-red-800 font-medium"
+                            className="text-xs text-error-600 hover:text-error-800 font-medium"
                           >
                             Remove
                           </button>
@@ -629,20 +629,20 @@ export default function BillingPanel({
                   ))}
 
                   {charges.length === 0 && (
-                    <p className="text-sm text-gray-500 text-center py-4">No additional charges</p>
+                    <p className="text-sm text-neutral-500 text-center py-4">No additional charges</p>
                   )}
 
-                  <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
-                    <span className="text-sm font-semibold text-gray-700">Total</span>
-                    <span className="text-sm font-bold text-gray-900">{formatMoney(billTotal)}</span>
+                  <div className="flex items-center justify-between px-4 py-3 bg-neutral-50">
+                    <span className="text-sm font-semibold text-neutral-700">Total</span>
+                    <span className="text-sm font-bold text-neutral-900">{formatMoney(billTotal)}</span>
                   </div>
                 </div>
 
                 {showAddCharge && !hasActiveInvoice && (
-                  <div className="border-t border-gray-200 bg-gray-50 p-4 space-y-3">
+                  <div className="border-t border-neutral-200 bg-neutral-50 p-4 space-y-3">
                     <div className="grid grid-cols-2 md:grid-cols-12 gap-3 items-end">
                       <div className="md:col-span-3">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+                        <label className="block text-xs font-medium text-neutral-600 mb-1">Type</label>
                         <Select
                           value={chargeType}
                           onChange={(value) => { setChargeType(value as ChargeType); setChargeError(''); }}
@@ -655,28 +655,28 @@ export default function BillingPanel({
                         />
                       </div>
                       <div className="col-span-2 md:col-span-4">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
+                        <label className="block text-xs font-medium text-neutral-600 mb-1">Name</label>
                         <input
                           type="text"
                           value={chargeDescription}
                           onChange={(e) => { setChargeDescription(e.target.value); setChargeError(''); }}
                           placeholder="e.g. Wound dressing"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm"
                         />
                       </div>
                       <div className="md:col-span-1">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Qty</label>
+                        <label className="block text-xs font-medium text-neutral-600 mb-1">Qty</label>
                         <input
                           type="number"
                           min="1"
                           step="1"
                           value={chargeQuantity}
                           onChange={(e) => { setChargeQuantity(e.target.value); setChargeError(''); }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm"
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Unit price</label>
+                        <label className="block text-xs font-medium text-neutral-600 mb-1">Unit price</label>
                         <input
                           type="number"
                           min="0"
@@ -684,17 +684,17 @@ export default function BillingPanel({
                           value={chargeUnitPrice}
                           onChange={(e) => { setChargeUnitPrice(e.target.value); setChargeError(''); }}
                           placeholder="0.00"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm"
                         />
                       </div>
                       <div className="md:col-span-2 text-right">
-                        <p className="text-xs font-medium text-gray-600 mb-1">Line total</p>
-                        <p className="text-sm font-bold text-gray-900 py-2">{formatMoney(chargeLineTotal)}</p>
+                        <p className="text-xs font-medium text-neutral-600 mb-1">Line total</p>
+                        <p className="text-sm font-bold text-neutral-900 py-2">{formatMoney(chargeLineTotal)}</p>
                       </div>
                     </div>
 
                     {chargeError && (
-                      <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded p-2">
+                      <div className="text-error-600 text-sm bg-error-50 border border-error-200 rounded p-2">
                         {chargeError}
                       </div>
                     )}
@@ -702,13 +702,13 @@ export default function BillingPanel({
                     <div className="flex gap-2">
                       <button
                         onClick={handleAddCharge}
-                        className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm font-medium"
+                        className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 text-sm font-medium"
                       >
                         Add item
                       </button>
                       <button
                         onClick={() => { setShowAddCharge(false); resetChargeForm(); }}
-                        className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 text-sm font-medium"
+                        className="flex-1 bg-neutral-200 text-neutral-700 py-2 rounded-lg hover:bg-neutral-300 text-sm font-medium"
                       >
                         Done
                       </button>
@@ -718,31 +718,31 @@ export default function BillingPanel({
               </section>
 
               {/* Payments */}
-              <section className="border border-gray-200 rounded-lg overflow-hidden">
+              <section className="border border-neutral-200 rounded-lg overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
                   <div>
-                    <h3 className="font-semibold text-gray-900">Payments</h3>
-                    <p className="text-xs text-gray-500">Accepted, pending, and voided transactions</p>
+                    <h3 className="font-semibold text-neutral-900">Payments</h3>
+                    <p className="text-xs text-neutral-500">Accepted, pending, and voided transactions</p>
                   </div>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-neutral-500">
                     {transactions.length} {transactions.length === 1 ? 'transaction' : 'transactions'}
                   </span>
                 </div>
 
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-neutral-100">
                   {transactions.map((tx) => (
                     <div
                       key={tx.id}
-                      className={`flex items-start justify-between gap-3 px-4 py-3 ${tx.status === 'PENDING' ? 'bg-yellow-50/60' : ''}`}
+                      className={`flex items-start justify-between gap-3 px-4 py-3 ${tx.status === 'PENDING' ? 'bg-warning-50/60' : ''}`}
                     >
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-neutral-900">
                           {tx.kind === 'PAYMENT' ? 'Payment' : 'Refund'} · {formatMethod(tx.method)}
                           {tx.source === 'PATIENT_UPLOAD' && (
-                            <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Patient upload</span>
+                            <span className="ml-2 text-xs bg-primary-100 text-primary-800 px-2 py-0.5 rounded">Patient upload</span>
                           )}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-neutral-500">
                           {formatTransactionDate(tx.created_at)}
                           {tx.reference_no && ` · Ref: ${tx.reference_no}`}
                           {tx.patient_declared_amount != null && ` · Declared: ${formatMoney(tx.patient_declared_amount)}`}
@@ -750,17 +750,17 @@ export default function BillingPanel({
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap justify-end">
-                        <span className={`text-sm font-bold ${tx.kind === 'REFUND' ? 'text-red-600' : 'text-green-600'}`}>
+                        <span className={`text-sm font-bold ${tx.kind === 'REFUND' ? 'text-error-600' : 'text-success-600'}`}>
                           {tx.kind === 'REFUND' ? '-' : '+'}{formatMoney(tx.amount)}
                         </span>
-                        <span className={`px-2 py-1 text-xs rounded ${TX_STATUS_CLASSES[tx.status] || 'bg-gray-100 text-gray-800'}`}>
+                        <span className={`px-2 py-1 text-xs rounded ${TX_STATUS_CLASSES[tx.status] || 'bg-neutral-100 text-neutral-800'}`}>
                           {tx.status}
                         </span>
                         {tx.receipt_url && (
                           <button
                             onClick={() => handleViewReceipt(tx)}
                             disabled={loadingReceipt}
-                            className="text-xs text-blue-600 underline hover:text-blue-800 disabled:opacity-50"
+                            className="text-xs text-primary-600 underline hover:text-primary-800 disabled:opacity-50"
                           >
                             Receipt
                           </button>
@@ -769,13 +769,13 @@ export default function BillingPanel({
                           <>
                             <button
                               onClick={() => handleAcceptReceipt(tx)}
-                              className="px-2.5 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                              className="px-2.5 py-1 bg-success-600 text-white rounded text-xs hover:bg-success-700"
                             >
                               Accept
                             </button>
                             <button
                               onClick={() => { setSelectedTransaction(tx); setRejectReason(''); setRejectNote(''); }}
-                              className="px-2.5 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                              className="px-2.5 py-1 bg-error-600 text-white rounded text-xs hover:bg-error-700"
                             >
                               Reject
                             </button>
@@ -784,7 +784,7 @@ export default function BillingPanel({
                         {tx.status === 'ACCEPTED' && !hasActiveInvoice && (
                           <button
                             onClick={() => { setVoidTarget(tx); setVoidReason(''); setVoidNote(''); }}
-                            className="text-xs text-red-600 hover:text-red-800 font-medium"
+                            className="text-xs text-error-600 hover:text-error-800 font-medium"
                           >
                             Void
                           </button>
@@ -793,37 +793,37 @@ export default function BillingPanel({
                     </div>
                   ))}
                   {transactions.length === 0 && (
-                    <p className="text-sm text-gray-500 text-center py-4">No transactions yet</p>
+                    <p className="text-sm text-neutral-500 text-center py-4">No transactions yet</p>
                   )}
                 </div>
               </section>
 
               {/* Collect payment */}
               {!hasActiveInvoice && billingStatus !== 'PAID' && billingStatus !== 'OVERPAID' && (
-                <section className="border border-gray-200 rounded-lg p-4">
+                <section className="border border-neutral-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="font-semibold text-gray-900">Collect payment</h3>
-                      <p className="text-xs text-gray-500">Record a cash or GCash payment against this bill</p>
+                      <h3 className="font-semibold text-neutral-900">Collect payment</h3>
+                      <p className="text-xs text-neutral-500">Record a cash or GCash payment against this bill</p>
                     </div>
-                    <p className="text-sm text-gray-600">
-                      Balance <span className="font-bold text-gray-900">{formatMoney(balance)}</span>
+                    <p className="text-sm text-neutral-600">
+                      Balance <span className="font-bold text-neutral-900">{formatMoney(balance)}</span>
                     </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Payment method</label>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">Payment method</label>
                       <div className="flex gap-2">
                         <button
                           onClick={() => setPaymentMethod('CASH')}
-                          className={`flex-1 px-4 py-2 rounded ${paymentMethod === 'CASH' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                          className={`flex-1 px-4 py-2 rounded ${paymentMethod === 'CASH' ? 'bg-primary-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
                         >
                           Cash
                         </button>
                         <button
                           onClick={() => setPaymentMethod('GCASH')}
-                          className={`flex-1 px-4 py-2 rounded ${paymentMethod === 'GCASH' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                          className={`flex-1 px-4 py-2 rounded ${paymentMethod === 'GCASH' ? 'bg-primary-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
                         >
                           GCash
                         </button>
@@ -831,7 +831,7 @@ export default function BillingPanel({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">Amount</label>
                       <input
                         type="number"
                         min="0"
@@ -839,13 +839,13 @@ export default function BillingPanel({
                         value={paymentAmount}
                         onChange={(e) => setPaymentAmount(e.target.value)}
                         placeholder="0.00"
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-600"
                       />
                     </div>
 
                     {paymentMethod === 'CASH' ? (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Cash tendered</label>
+                        <label className="block text-sm font-medium text-neutral-700 mb-2">Cash tendered</label>
                         <input
                           type="number"
                           min="0"
@@ -853,10 +853,10 @@ export default function BillingPanel({
                           value={cashTendered}
                           onChange={(e) => setCashTendered(e.target.value)}
                           placeholder="0.00"
-                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-600"
                         />
                         {showCashChange && (
-                          <p className={`text-sm mt-1 font-medium ${cashShortfall > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          <p className={`text-sm mt-1 font-medium ${cashShortfall > 0 ? 'text-error-600' : 'text-success-600'}`}>
                             {cashShortfall > 0
                               ? `Short by ${formatMoney(cashShortfall)} — collect at least ${formatMoney(validEnteredAmount)}.`
                               : `Change: ${formatMoney(changeAmount)}`}
@@ -865,19 +865,19 @@ export default function BillingPanel({
                       </div>
                     ) : (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Reference number</label>
+                        <label className="block text-sm font-medium text-neutral-700 mb-2">Reference number</label>
                         <input
                           type="text"
                           value={referenceNo}
                           onChange={(e) => setReferenceNo(e.target.value)}
                           placeholder="GCash reference number"
-                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-600"
                         />
                       </div>
                     )}
                   </div>
 
-                  <p className="mt-3 text-xs text-gray-500">
+                  <p className="mt-3 text-xs text-neutral-500">
                     The record button stays at the bottom of this window.
                   </p>
                 </section>
@@ -885,14 +885,14 @@ export default function BillingPanel({
 
               {/* Refund */}
               {billingStatus === 'OVERPAID' && (
-                <section className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-purple-800 mb-1">Overpaid — refund required</h3>
-                  <p className="text-sm text-purple-700 mb-4">
+                <section className="bg-primary-50 border border-primary-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-primary-800 mb-1">Overpaid — refund required</h3>
+                  <p className="text-sm text-primary-700 mb-4">
                     This bill is overpaid by {formatMoney(netPaid - billTotal)}. Please process a refund.
                   </p>
                   <button
                     onClick={handleRefund}
-                    className="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                    className="w-full bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 transition-colors"
                   >
                     Process refund
                   </button>
@@ -901,28 +901,28 @@ export default function BillingPanel({
 
               {/* Invoice card (only once it exists) */}
               {paymentData.activeInvoice ? (
-                <section className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <section className="bg-success-50 border border-success-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="font-bold text-lg text-gray-900">{paymentData.activeInvoice.invoice_number}</h3>
-                      <p className="text-sm text-gray-600">
+                      <h3 className="font-bold text-lg text-neutral-900">{paymentData.activeInvoice.invoice_number}</h3>
+                      <p className="text-sm text-neutral-600">
                         Issued: {new Date(paymentData.activeInvoice.created_at).toLocaleDateString()}
                       </p>
                       {paymentData.activeInvoice.invoice_data?.replaces_invoice_number && (
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-neutral-500">
                           Replaces {paymentData.activeInvoice.invoice_data.replaces_invoice_number}
                         </p>
                       )}
                     </div>
-                    <span className="px-3 py-1 bg-green-600 text-white text-sm rounded">ACTIVE</span>
+                    <span className="px-3 py-1 bg-success-600 text-white text-sm rounded">ACTIVE</span>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <p className="text-gray-600">Total amount</p>
+                      <p className="text-neutral-600">Total amount</p>
                       <p className="font-bold">{formatMoney(paymentData.activeInvoice.total_amount)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Payment method</p>
+                      <p className="text-neutral-600">Payment method</p>
                       <p className="font-bold">{formatMethod(paymentData.activeInvoice.payment_method)}</p>
                     </div>
                   </div>
@@ -931,7 +931,7 @@ export default function BillingPanel({
                       onClick={() => secretaryApi.getInvoiceDownloadUrl(paymentData.activeInvoice!.id).then((r) => {
                         if (r.success && r.data?.downloadUrl) window.open(r.data.downloadUrl, '_blank');
                       })}
-                      className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm"
+                      className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 text-sm"
                     >
                       View / Print
                     </button>
@@ -941,19 +941,19 @@ export default function BillingPanel({
                         setCorrectReason('');
                         setCorrectNote('');
                       }}
-                      className="flex-1 bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 text-sm"
+                      className="flex-1 bg-warning-600 text-white py-2 rounded-lg hover:bg-warning-700 text-sm"
                     >
                       Edit bill…
                     </button>
                   </div>
                 </section>
               ) : billingStatus === 'PAID' ? (
-                <section className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                  <p className="text-green-800 font-medium">This bill is paid in full.</p>
-                  <p className="text-sm text-green-700 mt-1">
+                <section className="bg-success-50 border border-success-200 rounded-lg p-4 text-center">
+                  <p className="text-success-800 font-medium">This bill is paid in full.</p>
+                  <p className="text-sm text-success-700 mt-1">
                     No active invoice, issue one when paid.
                   </p>
-                  <p className="text-sm text-green-700 mt-1">
+                  <p className="text-sm text-success-700 mt-1">
                     Issue the invoice to give the patient their receipt.
                   </p>
                 </section>
@@ -968,13 +968,13 @@ export default function BillingPanel({
             {billingStatus === 'PAID' ? (
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-green-700">Paid in full</p>
-                  <p className="text-xs text-gray-500">Issue the invoice to give the patient their receipt.</p>
+                  <p className="text-sm font-semibold text-success-700">Paid in full</p>
+                  <p className="text-xs text-neutral-500">Issue the invoice to give the patient their receipt.</p>
                 </div>
                 <button
                   onClick={handleIssueInvoice}
                   disabled={saving}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Issuing…' : 'Issue invoice'}
                 </button>
@@ -982,8 +982,8 @@ export default function BillingPanel({
             ) : (
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Balance {formatMoney(balance)}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm font-semibold text-neutral-900">Balance {formatMoney(balance)}</p>
+                  <p className="text-xs text-neutral-500">
                     {formatMethod(paymentMethod)}
                     {cashShortfall > 0
                       ? ` · cash short by ${formatMoney(cashShortfall)}`
@@ -995,7 +995,7 @@ export default function BillingPanel({
                 <button
                   onClick={handleRecordPayment}
                   disabled={saving || cashShortfall > 0}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Recording…' : recordButtonLabel}
                 </button>
@@ -1015,16 +1015,16 @@ export default function BillingPanel({
               data-state={deleteTarget ? 'open' : 'closed'}
             >
               <h3 className="text-lg font-bold mb-2">Remove charge?</h3>
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-neutral-700">
                 Remove <span className="font-medium">{deleteModal.value.description}</span> ({formatMoney(deleteModal.value.amount)}) from this bill?
               </p>
               {deleteOverpayment > 0 && (
-                <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="mt-4 text-sm text-error-700 bg-error-50 border border-error-200 rounded-lg p-3">
                   Removing this would overpay the bill by {formatMoney(deleteOverpayment)}. Void a payment first.
                 </div>
               )}
               {deleteError && (
-                <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="mt-4 text-sm text-error-700 bg-error-50 border border-error-200 rounded-lg p-3">
                   {deleteError}
                 </div>
               )}
@@ -1032,14 +1032,14 @@ export default function BillingPanel({
                 <button
                   onClick={confirmDeleteCharge}
                   disabled={saving || deleteOverpayment > 0}
-                  className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-error-600 text-white py-2 rounded-lg hover:bg-error-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Removing…' : 'Remove charge'}
                 </button>
                 <button
                   onClick={() => setDeleteTarget(null)}
                   disabled={saving}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+                  className="flex-1 bg-neutral-200 text-neutral-700 py-2 rounded-lg hover:bg-neutral-300 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -1061,7 +1061,7 @@ export default function BillingPanel({
               <h3 className="text-lg font-bold mb-4">Reject Receipt</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Reason (Required)</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Reason (Required)</label>
                   <Select
                     value={rejectReason}
                     onChange={setRejectReason}
@@ -1075,7 +1075,7 @@ export default function BillingPanel({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Note (Optional)</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Note (Optional)</label>
                   <textarea
                     value={rejectNote}
                     onChange={(e) => setRejectNote(e.target.value)}
@@ -1088,13 +1088,13 @@ export default function BillingPanel({
               <div className="flex gap-2 mt-6">
                 <button
                   onClick={handleRejectReceipt}
-                  className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700"
+                  className="flex-1 bg-error-600 text-white py-2 rounded-lg hover:bg-error-700"
                 >
                   Reject
                 </button>
                 <button
                   onClick={() => setSelectedTransaction(null)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400"
+                  className="flex-1 bg-neutral-300 text-neutral-700 py-2 rounded-lg hover:bg-neutral-400"
                 >
                   Cancel
                 </button>
@@ -1114,13 +1114,13 @@ export default function BillingPanel({
               data-state={voidTarget ? 'open' : 'closed'}
             >
               <h3 className="text-lg font-bold mb-4">Void Payment</h3>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-neutral-600 mb-4">
                 Voiding {formatMoney(voidModal.value.amount)} ({formatMethod(voidModal.value.method)}).
                 {hasActiveInvoice ? ' The active invoice will also be voided.' : ''}
               </p>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Reason (Required)</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Reason (Required)</label>
                   <input
                     type="text"
                     value={voidReason}
@@ -1130,7 +1130,7 @@ export default function BillingPanel({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Note (Optional)</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Note (Optional)</label>
                   <textarea
                     value={voidNote}
                     onChange={(e) => setVoidNote(e.target.value)}
@@ -1142,13 +1142,13 @@ export default function BillingPanel({
               <div className="flex gap-2 mt-6">
                 <button
                   onClick={handleVoidTransaction}
-                  className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700"
+                  className="flex-1 bg-error-600 text-white py-2 rounded-lg hover:bg-error-700"
                 >
                   Void
                 </button>
                 <button
                   onClick={() => setVoidTarget(null)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400"
+                  className="flex-1 bg-neutral-300 text-neutral-700 py-2 rounded-lg hover:bg-neutral-400"
                 >
                   Cancel
                 </button>
@@ -1168,14 +1168,14 @@ export default function BillingPanel({
               data-state={correctInvoiceActive ? 'open' : 'closed'}
             >
               <h3 className="text-lg font-bold mb-2">Edit bill</h3>
-              <p className="text-sm font-semibold text-amber-800 mb-4">
+              <p className="text-sm font-semibold text-warning-800 mb-4">
                 This will void {correctModal.value.invoice_number} and unlock the bill.
               </p>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-neutral-600 mb-4">
                 After voiding, you can change charges and issue a replacement invoice.
               </p>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Reason (Required)</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Reason (Required)</label>
                 <Select
                   value={correctReason}
                   onChange={setCorrectReason}
@@ -1189,7 +1189,7 @@ export default function BillingPanel({
                 />
               </div>
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Note (Optional)</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Note (Optional)</label>
                 <textarea
                   value={correctNote}
                   onChange={(e) => setCorrectNote(e.target.value)}
@@ -1202,14 +1202,14 @@ export default function BillingPanel({
                 <button
                   onClick={handleCorrectInvoice}
                   disabled={saving || !correctReason.trim()}
-                  className="flex-1 bg-amber-600 text-white py-2 rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-warning-600 text-white py-2 rounded-lg hover:bg-warning-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Unlocking…' : 'Void & unlock'}
                 </button>
                 <button
                   onClick={() => setCorrectInvoiceOpen(false)}
                   disabled={saving}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 disabled:opacity-50"
+                  className="flex-1 bg-neutral-300 text-neutral-700 py-2 rounded-lg hover:bg-neutral-400 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -1229,10 +1229,10 @@ export default function BillingPanel({
               data-state={receiptImageActive ? 'open' : 'closed'}
             >
               <div className="flex items-center justify-between p-4 border-b">
-                <h3 className="text-lg font-semibold text-gray-900">Receipt</h3>
+                <h3 className="text-lg font-semibold text-neutral-900">Receipt</h3>
                 <button
                   onClick={handleCloseReceiptViewer}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-neutral-400 hover:text-neutral-600 transition-colors"
                   aria-label="Close"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -1240,7 +1240,7 @@ export default function BillingPanel({
                   </svg>
                 </button>
               </div>
-              <div className="flex-1 overflow-auto p-4 bg-gray-50">
+              <div className="flex-1 overflow-auto p-4 bg-neutral-50">
                 <img
                   src={receiptModal.value}
                   alt="Payment receipt"

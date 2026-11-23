@@ -134,15 +134,15 @@ export default function DoctorAppointments() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'SCHEDULED':
-        return 'bg-emerald-100 text-emerald-800';
+        return 'bg-success-100 text-success-800';
       case 'COMPLETED':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-primary-100 text-primary-800';
       case 'CANCELLED':
-        return 'bg-red-100 text-red-800';
+        return 'bg-error-100 text-error-800';
       case 'NO_SHOW':
-        return 'bg-slate-100 text-slate-800';
+        return 'bg-neutral-100 text-neutral-800';
       default:
-        return 'bg-slate-100 text-slate-800';
+        return 'bg-neutral-100 text-neutral-800';
     }
   };
 
@@ -166,63 +166,63 @@ export default function DoctorAppointments() {
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-neutral-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 font-medium">Total</p>
-              <p className="text-2xl font-bold text-slate-800">{appointments.length}</p>
+              <p className="text-sm text-neutral-500 font-medium">Total</p>
+              <p className="text-2xl font-bold text-neutral-800">{appointments.length}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
-              <span className="material-symbols-outlined text-blue-600 text-2xl">calendar_month</span>
+            <div className="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary-600 text-2xl">calendar_month</span>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-neutral-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 font-medium">Scheduled</p>
-              <p className="text-2xl font-bold text-emerald-600">
+              <p className="text-sm text-neutral-500 font-medium">Scheduled</p>
+              <p className="text-2xl font-bold text-success-600">
                 {appointments.filter(a => a.status === 'SCHEDULED').length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
-              <span className="material-symbols-outlined text-emerald-600 text-2xl">event_available</span>
+            <div className="w-12 h-12 bg-success-50 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-success-600 text-2xl">event_available</span>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-neutral-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 font-medium">Completed</p>
-              <p className="text-2xl font-bold text-blue-600">
+              <p className="text-sm text-neutral-500 font-medium">Completed</p>
+              <p className="text-2xl font-bold text-primary-600">
                 {appointments.filter(a => a.status === 'COMPLETED').length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
-              <span className="material-symbols-outlined text-blue-600 text-2xl">check_circle</span>
+            <div className="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary-600 text-2xl">check_circle</span>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-neutral-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 font-medium">Cancelled</p>
-              <p className="text-2xl font-bold text-red-600">
+              <p className="text-sm text-neutral-500 font-medium">Cancelled</p>
+              <p className="text-2xl font-bold text-error-600">
                 {appointments.filter(a => a.status === 'CANCELLED').length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
-              <span className="material-symbols-outlined text-red-600 text-2xl">cancel</span>
+            <div className="w-12 h-12 bg-error-50 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-error-600 text-2xl">cancel</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+      <div className="bg-white rounded-xl p-4 shadow-sm border border-neutral-100">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-500">Date:</span>
+            <span className="text-sm text-neutral-500">Date:</span>
             <Select
               className="w-36"
               triggerClassName="px-3 py-2 text-sm"
@@ -241,8 +241,8 @@ export default function DoctorAppointments() {
               onClick={() => setStatusFilter('ALL')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 statusFilter === 'ALL'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
               }`}
             >
               All
@@ -251,8 +251,8 @@ export default function DoctorAppointments() {
               onClick={() => setStatusFilter('SCHEDULED')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 statusFilter === 'SCHEDULED'
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-success-600 text-white'
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
               }`}
             >
               Scheduled
@@ -261,8 +261,8 @@ export default function DoctorAppointments() {
               onClick={() => setStatusFilter('COMPLETED')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 statusFilter === 'COMPLETED'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
               }`}
             >
               Completed
@@ -271,8 +271,8 @@ export default function DoctorAppointments() {
               onClick={() => setStatusFilter('CANCELLED')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 statusFilter === 'CANCELLED'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-error-600 text-white'
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
               }`}
             >
               Cancelled
@@ -281,8 +281,8 @@ export default function DoctorAppointments() {
               onClick={() => setStatusFilter('NO_SHOW')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 statusFilter === 'NO_SHOW'
-                  ? 'bg-slate-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-neutral-600 text-white'
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
               }`}
             >
               No Show
@@ -292,33 +292,33 @@ export default function DoctorAppointments() {
       </div>
 
       {/* Appointments List */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+      <div className="bg-white rounded-xl shadow-sm border border-neutral-100">
         {isLoading ? (
           <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-slate-600">Loading appointments...</p>
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            <p className="mt-4 text-neutral-600">Loading appointments...</p>
           </div>
         ) : error ? (
           <div className="p-8 text-center">
-            <p className="text-red-600">{error}</p>
+            <p className="text-error-600">{error}</p>
             <button
               onClick={fetchAppointments}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
             >
               Retry
             </button>
           </div>
         ) : appointments.length === 0 ? (
           <div className="p-8 text-center">
-            <span className="material-symbols-outlined text-6xl text-slate-300">event_busy</span>
-            <p className="mt-4 text-slate-600">No appointments found</p>
+            <span className="material-symbols-outlined text-6xl text-neutral-300">event_busy</span>
+            <p className="mt-4 text-neutral-600">No appointments found</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-neutral-100">
             {appointments.map((appointment) => {
               const action = consultationAction(appointment);
               return (
-                <div key={appointment.id} className="p-6 hover:bg-slate-50 transition-colors">
+                <div key={appointment.id} className="p-6 hover:bg-neutral-50 transition-colors">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex flex-wrap items-center gap-3 mb-3">
@@ -328,7 +328,7 @@ export default function DoctorAppointments() {
                           </span>
                         )}
                         {appointment.queue_number && (
-                          <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
+                          <span className="px-3 py-1 bg-primary-100 text-primary-800 rounded-full text-sm font-medium">
                             Queue #{appointment.queue_number}
                           </span>
                         )}
@@ -336,46 +336,46 @@ export default function DoctorAppointments() {
                           <span
                             className={`px-3 py-1 rounded-full text-sm font-medium ${
                               appointment.queue_status === 'IN_CHECKUP'
-                                ? 'bg-blue-100 text-blue-800'
+                                ? 'bg-primary-100 text-primary-800'
                                 : appointment.queue_status === 'CALLED'
-                                ? 'bg-indigo-100 text-indigo-800'
-                                : 'bg-slate-100 text-slate-700'
+                                ? 'bg-primary-100 text-primary-800'
+                                : 'bg-neutral-100 text-neutral-700'
                             }`}
                           >
                             {appointment.queue_status.replace('_', ' ')}
                           </span>
                         )}
                         {appointment.doctor_finished_at && (
-                          <span className="px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800">
+                          <span className="px-3 py-1 rounded-full text-sm font-medium bg-success-100 text-success-800">
                             Doctor finished
                           </span>
                         )}
                       </div>
 
-                      <h3 className="text-lg font-semibold text-slate-800 mb-2">
+                      <h3 className="text-lg font-semibold text-neutral-800 mb-2">
                         {appointment.patient_first_name} {appointment.patient_last_name}
                       </h3>
 
                       <div className="space-y-1.5">
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <div className="flex items-center gap-2 text-sm text-neutral-600">
                           <span className="material-symbols-outlined text-lg">calendar_today</span>
                           <span>{formatDate(appointment.appointment_date)}</span>
                         </div>
 
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <div className="flex items-center gap-2 text-sm text-neutral-600">
                           <span className="material-symbols-outlined text-lg">schedule</span>
                           <span>{formatTime(appointment.appointment_date)}</span>
                         </div>
 
                         {appointment.reason_for_visit && (
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                          <div className="flex items-center gap-2 text-sm text-neutral-600">
                             <span className="material-symbols-outlined text-lg">description</span>
                             <span>{appointment.reason_for_visit}</span>
                           </div>
                         )}
 
                         {appointment.practice_name && (
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                          <div className="flex items-center gap-2 text-sm text-neutral-600">
                             <span className="material-symbols-outlined text-lg">location_on</span>
                             <span>{appointment.practice_name}</span>
                           </div>
@@ -388,15 +388,15 @@ export default function DoctorAppointments() {
                         onClick={() => openConsultation(appointment)}
                         className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                           action.highlight
-                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                            : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
+                            ? 'bg-primary-600 text-white hover:bg-primary-700'
+                            : 'border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
                         }`}
                       >
                         {action.label}
                       </button>
                       <button
                         onClick={() => openConsultation(appointment)}
-                        className="text-sm text-slate-500 hover:text-blue-600 font-medium"
+                        className="text-sm text-neutral-500 hover:text-primary-600 font-medium"
                       >
                         View details
                       </button>

@@ -129,10 +129,10 @@ export default function SecretaryDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#F3F5F9] flex items-center justify-center">
+      <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1A62CD] mx-auto"></div>
-          <p className="mt-4 text-[#64748B]">Loading dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-neutral-500">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -140,14 +140,14 @@ export default function SecretaryDashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#F3F5F9] flex items-center justify-center">
+      <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
         <div className="text-center max-w-md">
-          <span className="material-symbols-outlined text-5xl text-red-400 mb-3">error</span>
-          <p className="text-lg font-semibold text-slate-800 mb-2">Failed to load dashboard</p>
-          <p className="text-sm text-slate-600 mb-4">{error}</p>
+          <span className="material-symbols-outlined text-5xl text-error-400 mb-3">error</span>
+          <p className="text-lg font-semibold text-neutral-800 mb-2">Failed to load dashboard</p>
+          <p className="text-sm text-neutral-600 mb-4">{error}</p>
           <button
             onClick={() => loadDashboardData()}
-            className="px-4 py-2 bg-[#1A62CD] text-white rounded-lg hover:bg-[#1555b8] transition-colors"
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
             Retry
           </button>
@@ -165,61 +165,61 @@ export default function SecretaryDashboard() {
       {/* Metric Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Today's Queue */}
-        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-neutral-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
             <span className="material-symbols-outlined text-[28px]">people</span>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Today&apos;s Queue</span>
-            <span className="text-2xl font-bold text-slate-800">{dashboardData?.queueCounts.waiting || 0}</span>
-            <span className="text-xs text-slate-400">{dashboardData?.queueCounts.inConsultation || 0} in consultation • {dashboardData?.queueCounts.done || 0} done</span>
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-semibold">Today&apos;s Queue</span>
+            <span className="text-2xl font-bold text-neutral-800">{dashboardData?.queueCounts.waiting || 0}</span>
+            <span className="text-xs text-neutral-400">{dashboardData?.queueCounts.inConsultation || 0} in consultation • {dashboardData?.queueCounts.done || 0} done</span>
           </div>
         </div>
 
         {/* Remaining Capacity */}
-        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-neutral-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-success-500 to-success-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
             <span className="material-symbols-outlined text-[28px]">space_dashboard</span>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Remaining Capacity</span>
-            <span className="text-2xl font-bold text-slate-800">{dashboardData?.capacity.remaining || 0} <span className="text-lg text-slate-400">of {dashboardData?.capacity.total || 0}</span></span>
-            <span className="text-xs text-slate-400">Slots available</span>
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-semibold">Remaining Capacity</span>
+            <span className="text-2xl font-bold text-neutral-800">{dashboardData?.capacity.remaining || 0} <span className="text-lg text-neutral-400">of {dashboardData?.capacity.total || 0}</span></span>
+            <span className="text-xs text-neutral-400">Slots available</span>
           </div>
         </div>
 
         {/* Pending Verification Payments */}
-        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-neutral-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-warning-500 to-warning-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
             <span className="material-symbols-outlined text-[28px]">payments</span>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Pending Verification</span>
-            <span className="text-2xl font-bold text-slate-800">{dashboardData?.pendingVerificationPayments || 0}</span>
-            <span className="text-xs text-slate-400">payments • Action needed</span>
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-semibold">Pending Verification</span>
+            <span className="text-2xl font-bold text-neutral-800">{dashboardData?.pendingVerificationPayments || 0}</span>
+            <span className="text-xs text-neutral-400">payments • Action needed</span>
           </div>
         </div>
 
         {/* Unread Messages */}
-        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-neutral-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
             <span className="material-symbols-outlined text-[28px]">chat</span>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Unread Messages</span>
-            <span className="text-2xl font-bold text-slate-800">{dashboardData?.unreadMessages || 0}</span>
-            <span className="text-xs text-slate-400">messages • Respond soon</span>
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-semibold">Unread Messages</span>
+            <span className="text-2xl font-bold text-neutral-800">{dashboardData?.unreadMessages || 0}</span>
+            <span className="text-xs text-neutral-400">messages • Respond soon</span>
           </div>
         </div>
       </div>
 
       {/* Today's Queue */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+      <div className="bg-white rounded-2xl shadow-md border border-neutral-100 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-slate-800">Today&apos;s Queue</h3>
+          <h3 className="text-xl font-bold text-neutral-800">Today&apos;s Queue</h3>
           <button
             onClick={() => router.push('/secretary/queue')}
-            className="text-xs text-[#1b5eb8] font-medium hover:underline"
+            className="text-xs text-primary-600 font-medium hover:underline"
           >
             View Full Queue →
           </button>
@@ -228,34 +228,34 @@ export default function SecretaryDashboard() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Queue #</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Patient</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Reason</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Source</th>
+                <tr className="border-b border-neutral-200">
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Queue #</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Patient</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Reason</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Status</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Source</th>
                 </tr>
               </thead>
               <tbody>
                 {dashboardData.todayQueue.map((queueItem, index) => (
-                  <tr key={index} className="border-b border-slate-100 last:border-0">
-                    <td className="py-3 px-4 text-sm font-medium text-slate-900">#{queueItem.queueNumber}</td>
-                    <td className="py-3 px-4 text-sm text-slate-700">{queueItem.patientName}</td>
-                    <td className="py-3 px-4 text-sm text-slate-600 truncate max-w-xs">{queueItem.reason || '-'}</td>
+                  <tr key={index} className="border-b border-neutral-100 last:border-0">
+                    <td className="py-3 px-4 text-sm font-medium text-neutral-900">#{queueItem.queueNumber}</td>
+                    <td className="py-3 px-4 text-sm text-neutral-700">{queueItem.patientName}</td>
+                    <td className="py-3 px-4 text-sm text-neutral-600 truncate max-w-xs">{queueItem.reason || '-'}</td>
                     <td className="py-3 px-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        queueItem.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' :
-                        queueItem.status === 'IN_CHECKUP' ? 'bg-blue-100 text-blue-700' :
-                        queueItem.status === 'WAITING' ? 'bg-amber-100 text-amber-700' :
-                        queueItem.status === 'CALLED' ? 'bg-purple-100 text-purple-700' :
-                        'bg-slate-100 text-slate-600'
+                        queueItem.status === 'COMPLETED' ? 'bg-success-100 text-success-700' :
+                        queueItem.status === 'IN_CHECKUP' ? 'bg-primary-100 text-primary-700' :
+                        queueItem.status === 'WAITING' ? 'bg-warning-100 text-warning-700' :
+                        queueItem.status === 'CALLED' ? 'bg-primary-100 text-primary-700' :
+                        'bg-neutral-100 text-neutral-600'
                       }`}>
                         {queueItem.status.replace('_', ' ')}
                       </span>
                     </td>
                     <td className="py-3 px-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        queueItem.registrationSource === 'ONLINE' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+                        queueItem.registrationSource === 'ONLINE' ? 'bg-primary-100 text-primary-700' : 'bg-success-100 text-success-700'
                       }`}>
                         {queueItem.registrationSource}
                       </span>
@@ -267,19 +267,19 @@ export default function SecretaryDashboard() {
           </div>
         ) : (
           <div className="text-center py-8">
-            <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">queue</span>
-            <p className="text-slate-600 font-medium">No patients in queue today</p>
+            <span className="material-symbols-outlined text-4xl text-neutral-300 mb-2">queue</span>
+            <p className="text-neutral-600 font-medium">No patients in queue today</p>
           </div>
         )}
       </div>
 
       {/* Payments Needing Action */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+      <div className="bg-white rounded-2xl shadow-md border border-neutral-100 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-slate-800">Payments Needing Action</h3>
+          <h3 className="text-xl font-bold text-neutral-800">Payments Needing Action</h3>
           <button
             onClick={() => router.push('/secretary/payments')}
-            className="text-xs text-[#1b5eb8] font-medium hover:underline"
+            className="text-xs text-primary-600 font-medium hover:underline"
           >
             View All Payments →
           </button>
@@ -290,14 +290,14 @@ export default function SecretaryDashboard() {
               <div
                 key={index}
                 onClick={() => router.push(`/secretary/payments?paymentId=${payment.id}`)}
-                className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 hover:border-slate-200 transition-colors"
+                className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-100 cursor-pointer hover:bg-neutral-100 hover:border-neutral-200 transition-colors"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="material-symbols-outlined text-[16px] text-slate-500">person</span>
-                    <span className="text-sm font-semibold text-slate-900">{payment.patientName}</span>
+                    <span className="material-symbols-outlined text-[16px] text-neutral-500">person</span>
+                    <span className="text-sm font-semibold text-neutral-900">{payment.patientName}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <div className="flex items-center gap-2 text-xs text-neutral-600">
                     <span className="material-symbols-outlined text-[14px]">calendar_today</span>
                     <span>{new Date(payment.appointmentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                     <span>•</span>
@@ -306,12 +306,12 @@ export default function SecretaryDashboard() {
                   </div>
                 </div>
                 <div className="text-right ml-4">
-                  <span className="text-sm font-bold text-slate-900">₱{typeof payment.totalAmount === 'string' ? parseFloat(payment.totalAmount).toFixed(2) : payment.totalAmount.toFixed(2)}</span>
+                  <span className="text-sm font-bold text-neutral-900">₱{typeof payment.totalAmount === 'string' ? parseFloat(payment.totalAmount).toFixed(2) : payment.totalAmount.toFixed(2)}</span>
                   <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
-                    payment.status === 'PENDING_VERIFICATION' ? 'bg-amber-100 text-amber-700' :
-                    payment.status === 'UNPAID' ? 'bg-slate-100 text-slate-600' :
-                    payment.status === 'PAID' && payment.invoiceNotSent ? 'bg-emerald-100 text-emerald-700' :
-                    'bg-slate-100 text-slate-600'
+                    payment.status === 'PENDING_VERIFICATION' ? 'bg-warning-100 text-warning-700' :
+                    payment.status === 'UNPAID' ? 'bg-neutral-100 text-neutral-600' :
+                    payment.status === 'PAID' && payment.invoiceNotSent ? 'bg-success-100 text-success-700' :
+                    'bg-neutral-100 text-neutral-600'
                   }`}>
                     {payment.status === 'PENDING_VERIFICATION' ? 'Pending' :
                      payment.status === 'UNPAID' ? 'Unpaid' :
@@ -324,35 +324,35 @@ export default function SecretaryDashboard() {
           </div>
         ) : (
           <div className="text-center py-8">
-            <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">receipt_long</span>
-            <p className="text-slate-600 font-medium">No payments needing action</p>
+            <span className="material-symbols-outlined text-4xl text-neutral-300 mb-2">receipt_long</span>
+            <p className="text-neutral-600 font-medium">No payments needing action</p>
           </div>
         )}
       </div>
 
       {/* Schedule Alerts */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+      <div className="bg-white rounded-2xl shadow-md border border-neutral-100 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-slate-800">Schedule Alerts</h3>
+          <h3 className="text-xl font-bold text-neutral-800">Schedule Alerts</h3>
           {!pendingLoading && pendingChanges.length > 0 && (
-            <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full">
+            <span className="bg-warning-100 text-warning-800 text-xs font-bold px-2 py-1 rounded-full">
               {pendingChanges.length} awaiting confirmation
             </span>
           )}
         </div>
 
         {pendingNotice && (
-          <div className="mb-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-lg px-3 py-2 flex items-center gap-2">
+          <div className="mb-3 bg-success-50 border border-success-200 text-success-800 text-xs font-medium rounded-lg px-3 py-2 flex items-center gap-2">
             <span className="material-symbols-outlined text-[16px]">check_circle</span>
             <span>{pendingNotice}</span>
           </div>
         )}
         {pendingError && (
-          <div className="mb-3 bg-red-50 border border-red-200 text-red-700 text-xs font-medium rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+          <div className="mb-3 bg-error-50 border border-error-200 text-error-700 text-xs font-medium rounded-lg px-3 py-2 flex items-center justify-between gap-2">
             <span>{pendingError}</span>
             <button
               onClick={() => loadPendingChanges()}
-              className="text-red-700 font-semibold underline hover:text-red-800"
+              className="text-error-700 font-semibold underline hover:text-error-800"
             >
               Retry
             </button>
@@ -362,14 +362,14 @@ export default function SecretaryDashboard() {
         {pendingLoading ? (
           <div className="space-y-3">
             {[0, 1].map((i) => (
-              <div key={i} className="animate-pulse bg-slate-50 border border-slate-100 rounded-2xl p-4 h-20" />
+              <div key={i} className="animate-pulse bg-neutral-50 border border-neutral-100 rounded-2xl p-4 h-20" />
             ))}
           </div>
         ) : pendingChanges.length === 0 ? (
           <div className="text-center py-8">
-            <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">event_available</span>
-            <p className="text-slate-600 font-medium">No schedule changes awaiting confirmation</p>
-            <p className="text-xs text-slate-400 mt-1">Changes that affect active appointments will appear here.</p>
+            <span className="material-symbols-outlined text-4xl text-neutral-300 mb-2">event_available</span>
+            <p className="text-neutral-600 font-medium">No schedule changes awaiting confirmation</p>
+            <p className="text-xs text-neutral-400 mt-1">Changes that affect active appointments will appear here.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -379,16 +379,16 @@ export default function SecretaryDashboard() {
               return (
                 <div
                   key={request.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-warning-50 border border-warning-200 rounded-2xl"
                 >
                   <div className="flex items-start gap-3 min-w-0">
-                    <span className="material-symbols-outlined text-amber-600 text-2xl">event_busy</span>
+                    <span className="material-symbols-outlined text-warning-600 text-2xl">event_busy</span>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-amber-900">{pendingSummaryText(request)}</p>
-                      <p className="text-xs text-amber-800 mt-0.5">
+                      <p className="text-sm font-semibold text-warning-900">{pendingSummaryText(request)}</p>
+                      <p className="text-xs text-warning-800 mt-0.5">
                         Dr. {request.doctor.name} · {pendingRequestDateLabel(request)}
                       </p>
-                      <p className="text-xs text-amber-800 mt-0.5">
+                      <p className="text-xs text-warning-800 mt-0.5">
                         <span className="font-semibold">{count} affected appointment{count === 1 ? '' : 's'}</span>
                         {' · '}Requested by {request.requestedBy.name ?? request.requestedBy.role ?? 'the clinic'}
                       </p>
@@ -398,7 +398,7 @@ export default function SecretaryDashboard() {
                     <button
                       onClick={() => handleConfirmPending(request)}
                       disabled={isActing}
-                      className="h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-9 px-3 rounded-lg bg-success-600 hover:bg-success-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span className="material-symbols-outlined text-[16px]">check</span>
                       {isActing && pendingAction?.action === 'confirm'
@@ -408,7 +408,7 @@ export default function SecretaryDashboard() {
                     <button
                       onClick={() => handleDismissPending(request)}
                       disabled={isActing}
-                      className="h-9 px-3 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-9 px-3 rounded-lg bg-white border border-neutral-300 hover:bg-neutral-50 text-neutral-700 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isActing && pendingAction?.action === 'dismiss' ? 'Dismissing…' : 'Dismiss'}
                     </button>
@@ -421,12 +421,12 @@ export default function SecretaryDashboard() {
       </div>
 
       {/* Recent Conversations */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-md">
+      <div className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-md">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-slate-900">Recent Conversations</h3>
+          <h3 className="text-sm font-bold text-neutral-900">Recent Conversations</h3>
           <button
             onClick={() => router.push('/secretary/conversations')}
-            className="text-xs text-[#1b5eb8] font-medium hover:underline"
+            className="text-xs text-primary-600 font-medium hover:underline"
           >
             View All Conversations →
           </button>
@@ -437,21 +437,21 @@ export default function SecretaryDashboard() {
               <button
                 key={index}
                 onClick={() => conversation.id && router.push(`/secretary/conversations/${conversation.id}`)}
-                className="w-full flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors text-left"
+                className="w-full flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-100 hover:bg-neutral-100 transition-colors text-left"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center flex-shrink-0">
                     <span className="material-symbols-outlined text-[20px]">person</span>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">{conversation.patientName}</p>
+                    <p className="text-sm font-semibold text-neutral-900 truncate">{conversation.patientName}</p>
                     {conversation.updatedAt && (
-                      <p className="text-xs text-slate-500">{new Date(conversation.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                      <p className="text-xs text-neutral-500">{new Date(conversation.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
                     )}
                   </div>
                 </div>
                 {conversation.unreadCount > 0 && (
-                  <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-[20px] px-2 flex items-center justify-center">
+                  <span className="bg-error-500 text-white text-xs font-bold rounded-full min-w-[20px] h-[20px] px-2 flex items-center justify-center">
                     {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
                   </span>
                 )}
@@ -460,43 +460,43 @@ export default function SecretaryDashboard() {
           </div>
         ) : (
           <div className="text-center py-8">
-            <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">chat</span>
-            <p className="text-slate-600 font-medium">No recent conversations</p>
+            <span className="material-symbols-outlined text-4xl text-neutral-300 mb-2">chat</span>
+            <p className="text-neutral-600 font-medium">No recent conversations</p>
           </div>
         )}
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-md">
-        <h3 className="text-sm font-bold text-slate-900 mb-4">Quick Actions</h3>
+      <div className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-md">
+        <h3 className="text-sm font-bold text-neutral-900 mb-4">Quick Actions</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <button
             onClick={() => router.push('/secretary/queue')}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors text-left"
+            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors text-left"
           >
-            <span className="material-symbols-outlined text-[20px] text-purple-600">people</span>
-            <span className="text-sm font-medium text-slate-700">Manage Queue</span>
+            <span className="material-symbols-outlined text-[20px] text-primary-600">people</span>
+            <span className="text-sm font-medium text-neutral-700">Manage Queue</span>
           </button>
           <button
             onClick={() => router.push('/secretary/walk-ins')}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors text-left"
+            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors text-left"
           >
-            <span className="material-symbols-outlined text-[20px] text-emerald-600">person_add</span>
-            <span className="text-sm font-medium text-slate-700">Register Walk-in</span>
+            <span className="material-symbols-outlined text-[20px] text-success-600">person_add</span>
+            <span className="text-sm font-medium text-neutral-700">Register Walk-in</span>
           </button>
           <button
             onClick={() => router.push('/secretary/payments')}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors text-left"
+            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors text-left"
           >
-            <span className="material-symbols-outlined text-[20px] text-amber-600">payments</span>
-            <span className="text-sm font-medium text-slate-700">Verify Payments</span>
+            <span className="material-symbols-outlined text-[20px] text-warning-600">payments</span>
+            <span className="text-sm font-medium text-neutral-700">Verify Payments</span>
           </button>
           <button
             onClick={() => router.push('/secretary/conversations')}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors text-left"
+            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors text-left"
           >
-            <span className="material-symbols-outlined text-[20px] text-blue-600">chat</span>
-            <span className="text-sm font-medium text-slate-700">View Messages</span>
+            <span className="material-symbols-outlined text-[20px] text-primary-600">chat</span>
+            <span className="text-sm font-medium text-neutral-700">View Messages</span>
           </button>
         </div>
       </div>

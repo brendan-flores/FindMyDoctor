@@ -71,11 +71,11 @@ export default function SecretaryChangePassword() {
     <>
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-2xl max-w-[460px] w-full">
-          <div className="p-6 border-b border-slate-200">
-            <h2 className="text-[28px] font-black tracking-tight text-[#0D1829] mb-2 leading-tight">
+          <div className="p-6 border-b border-neutral-200">
+            <h2 className="text-[28px] font-black tracking-tight text-neutral-900 mb-2 leading-tight">
               Change Password
             </h2>
-            <p className="text-[15px] text-[#718096] font-normal leading-relaxed">
+            <p className="text-[15px] text-neutral-500 font-normal leading-relaxed">
               You must change your temporary password before continuing.
             </p>
           </div>
@@ -85,11 +85,11 @@ export default function SecretaryChangePassword() {
             )}
 
             <div className="space-y-2">
-              <label htmlFor="currentPassword" className="block text-[15px] font-bold text-[#1A202C]">
+              <label htmlFor="currentPassword" className="block text-[15px] font-bold text-neutral-900">
                 Current Password
               </label>
               <div className="relative rounded-2xl shadow-md">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-neutral-400">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
                     <path d="M7 11V7a5 5 0 0110 0v4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
@@ -102,13 +102,13 @@ export default function SecretaryChangePassword() {
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-12 text-[15px] tracking-wider text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 pl-12 pr-12 text-[15px] tracking-wider text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all duration-150"
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                   aria-label={showCurrentPassword ? "Hide password" : "Show password"}
-                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#94A3B8] hover:text-[#64748B] focus:outline-none"
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-neutral-400 hover:text-neutral-500 focus:outline-none"
                 >
                   {showCurrentPassword ? (
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,11 +125,11 @@ export default function SecretaryChangePassword() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="newPassword" className="block text-[15px] font-bold text-[#1A202C]">
+              <label htmlFor="newPassword" className="block text-[15px] font-bold text-neutral-900">
                 New Password
               </label>
               <div className="relative rounded-2xl shadow-md">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-neutral-400">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
                     <path d="M7 11V7a5 5 0 0110 0v4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
@@ -143,13 +143,13 @@ export default function SecretaryChangePassword() {
                   placeholder="••••••••"
                   required
                   minLength={8}
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-12 text-[15px] tracking-wider text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 pl-12 pr-12 text-[15px] tracking-wider text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all duration-150"
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
                   aria-label={showNewPassword ? "Hide password" : "Show password"}
-                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#94A3B8] hover:text-[#64748B] focus:outline-none"
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-neutral-400 hover:text-neutral-500 focus:outline-none"
                 >
                   {showNewPassword ? (
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -163,15 +163,15 @@ export default function SecretaryChangePassword() {
                   )}
                 </button>
               </div>
-              <p className="text-xs text-[#64748B]">Must be at least 8 characters</p>
+              <p className="text-xs text-neutral-500">Must be at least 8 characters</p>
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="block text-[15px] font-bold text-[#1A202C]">
+              <label htmlFor="confirmPassword" className="block text-[15px] font-bold text-neutral-900">
                 Confirm New Password
               </label>
               <div className="relative rounded-2xl shadow-md">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#94A3B8]">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-neutral-400">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect height="11" rx="2" ry="2" strokeWidth="1.8" width="16" x="4" y="11"></rect>
                     <path d="M7 11V7a5 5 0 0110 0v4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
@@ -185,13 +185,13 @@ export default function SecretaryChangePassword() {
                   placeholder="••••••••"
                   required
                   minLength={8}
-                  className="block w-full rounded-2xl border border-[#E2E8F0] bg-white py-3.5 pl-12 pr-12 text-[15px] tracking-wider text-gray-900 placeholder-[#94A3B8] focus:border-[#1A62CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all duration-150"
+                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 pl-12 pr-12 text-[15px] tracking-wider text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all duration-150"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#94A3B8] hover:text-[#64748B] focus:outline-none"
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-neutral-400 hover:text-neutral-500 focus:outline-none"
                 >
                   {showConfirmPassword ? (
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -211,7 +211,7 @@ export default function SecretaryChangePassword() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center py-3.5 px-4 rounded-2xl shadow-md text-[16px] font-bold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Changing Password...' : 'Change Password'}
               </button>
@@ -230,16 +230,16 @@ export default function SecretaryChangePassword() {
             className="fmd-modal-panel bg-white rounded-2xl max-w-md w-full p-6 text-center"
             data-state={showSuccessModal ? 'open' : 'closed'}
           >
-            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-16 h-16 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Password Changed Successfully!</h3>
-            <p className="text-sm text-slate-600 mb-6">Please log in again using your new password.</p>
+            <h3 className="text-xl font-bold text-neutral-900 mb-2">Password Changed Successfully!</h3>
+            <p className="text-sm text-neutral-600 mb-6">Please log in again using your new password.</p>
             <button
               onClick={() => router.push('/secretary-login')}
-              className="w-full py-3 px-4 rounded-2xl text-sm font-semibold text-white bg-[#0D3B75] hover:bg-[#092B57] transition-colors"
+              className="w-full py-3 px-4 rounded-2xl text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 transition-colors"
             >
               Log In
             </button>

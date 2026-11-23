@@ -12,14 +12,14 @@ import DatePicker from '@/components/DatePicker';
 type TabType = 'all' | 'waiting' | 'in-consultation' | 'completed' | 'skipped' | 'to-collect';
 
 const QUEUE_STATUS_COLORS: Record<string, string> = {
-  WAITING: 'bg-blue-50 text-blue-700 border-blue-200',
-  CALLED: 'bg-amber-50 text-amber-700 border-amber-200',
-  IN_CHECKUP: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  COMPLETED: 'bg-slate-50 text-slate-600 border-slate-200',
-  NOT_PRESENT: 'bg-red-50 text-red-700 border-red-200',
-  SKIPPED: 'bg-orange-50 text-orange-700 border-orange-200',
-  CANCELLED: 'bg-slate-50 text-slate-600 border-slate-200',
-  NO_SHOW: 'bg-slate-50 text-slate-600 border-slate-200',
+  WAITING: 'bg-primary-50 text-primary-700 border-primary-200',
+  CALLED: 'bg-warning-50 text-warning-700 border-warning-200',
+  IN_CHECKUP: 'bg-success-50 text-success-700 border-success-200',
+  COMPLETED: 'bg-neutral-50 text-neutral-600 border-neutral-200',
+  NOT_PRESENT: 'bg-error-50 text-error-700 border-error-200',
+  SKIPPED: 'bg-warning-50 text-warning-700 border-warning-200',
+  CANCELLED: 'bg-neutral-50 text-neutral-600 border-neutral-200',
+  NO_SHOW: 'bg-neutral-50 text-neutral-600 border-neutral-200',
 };
 
 const QUEUE_STATUS_LABELS: Record<string, string> = {
@@ -336,13 +336,13 @@ export default function SecretaryQueue() {
   if (loading && !secretary) {
     return (
       <div className="space-y-6">
-        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100">
-          <h1 className="text-lg font-bold text-slate-900">Daily Queue</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Manage the daily patient queue and call patients</p>
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-neutral-100">
+          <h1 className="text-lg font-bold text-neutral-900">Daily Queue</h1>
+          <p className="text-xs text-neutral-500 mt-0.5">Manage the daily patient queue and call patients</p>
         </div>
-        <div className="bg-white rounded-2xl p-8 shadow-md border border-slate-100 text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-          <p className="text-slate-600 mt-3">Loading queue...</p>
+        <div className="bg-white rounded-2xl p-8 shadow-md border border-neutral-100 text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <p className="text-neutral-600 mt-3">Loading queue...</p>
         </div>
       </div>
     );
@@ -357,7 +357,7 @@ export default function SecretaryQueue() {
           <button
             onClick={handleCallNext}
             disabled={actionLoading || waitingInLobby === 0 || !isToday(selectedDate)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
             title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
           >
             <span className="material-symbols-outlined text-[18px]">notifications_active</span>
@@ -366,9 +366,9 @@ export default function SecretaryQueue() {
           <button
             onClick={fetchQueue}
             disabled={loading}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-sm text-slate-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors text-sm text-neutral-700 disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-[18px] text-slate-500">refresh</span>
+            <span className="material-symbols-outlined text-[18px] text-neutral-500">refresh</span>
             Refresh List
           </button>
         </div>
@@ -376,63 +376,63 @@ export default function SecretaryQueue() {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-neutral-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
             <span className="material-symbols-outlined text-[28px]">groups</span>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-semibold">
               {isToday(selectedDate) ? 'Total Queue Today' : 'Total Queue'}
             </span>
-            <span className="text-2xl font-bold text-slate-800">{totalQueue}</span>
-            <span className="text-xs text-slate-400">Patients</span>
+            <span className="text-2xl font-bold text-neutral-800">{totalQueue}</span>
+            <span className="text-xs text-neutral-400">Patients</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-neutral-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
             <span className="material-symbols-outlined text-[28px]">event_seat</span>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Waiting in Lobby</span>
-            <span className="text-2xl font-bold text-slate-800">{waitingInLobby}</span>
-            <span className="text-xs text-slate-400">{waitingInLobby > 0 ? `#${queueEntries.find(e => e.status === 'WAITING')?.queue_number} Next` : 'Patients'}</span>
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-semibold">Waiting in Lobby</span>
+            <span className="text-2xl font-bold text-neutral-800">{waitingInLobby}</span>
+            <span className="text-xs text-neutral-400">{waitingInLobby > 0 ? `#${queueEntries.find(e => e.status === 'WAITING')?.queue_number} Next` : 'Patients'}</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-neutral-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-success-500 to-success-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
             <span className="material-symbols-outlined text-[28px]">medical_services</span>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">In Consultation</span>
-            <span className="text-2xl font-bold text-slate-800">{inConsultation}</span>
-            <span className="text-xs text-slate-400">{inConsultation > 0 ? `${secretary?.room_number || 'Room 101'} • Dr. ${secretary?.doctor_first_name} ${secretary?.doctor_last_name}` : 'Patient'}</span>
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-semibold">In Consultation</span>
+            <span className="text-2xl font-bold text-neutral-800">{inConsultation}</span>
+            <span className="text-xs text-neutral-400">{inConsultation > 0 ? `${secretary?.room_number || 'Room 101'} • Dr. ${secretary?.doctor_first_name} ${secretary?.doctor_last_name}` : 'Patient'}</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-md border border-slate-100 hover:shadow-lg transition-shadow flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-500 to-slate-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+        <div className="bg-white rounded-2xl p-5 shadow-md border border-neutral-100 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-neutral-500 to-neutral-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
             <span className="material-symbols-outlined text-[28px]">check_circle</span>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Completed Checkups</span>
-            <span className="text-2xl font-bold text-slate-800">{completed}</span>
-            <span className="text-xs text-slate-400">Completed</span>
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-semibold">Completed Checkups</span>
+            <span className="text-2xl font-bold text-neutral-800">{completed}</span>
+            <span className="text-xs text-neutral-400">Completed</span>
           </div>
         </div>
       </div>
 
       {/* Status Filter Bar and Search - Combined */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100">
+      <div className="bg-white rounded-2xl shadow-md border border-neutral-100">
         {/* Status Filter Tabs */}
-        <nav className="flex overflow-x-auto gap-1 p-2 border-b border-slate-200">
+        <nav className="flex overflow-x-auto gap-1 p-2 border-b border-neutral-200">
           <button
             onClick={() => setActiveTab('all')}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors ${
               activeTab === 'all'
-                ? 'bg-[#1b5eb8] text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-primary-600 text-white'
+                : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
             }`}
           >
             All ({totalQueue})
@@ -441,8 +441,8 @@ export default function SecretaryQueue() {
             onClick={() => setActiveTab('waiting')}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors ${
               activeTab === 'waiting'
-                ? 'bg-[#1b5eb8] text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-primary-600 text-white'
+                : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
             }`}
           >
             Waiting in Lobby ({waitingInLobby})
@@ -451,8 +451,8 @@ export default function SecretaryQueue() {
             onClick={() => setActiveTab('in-consultation')}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors ${
               activeTab === 'in-consultation'
-                ? 'bg-[#1b5eb8] text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-primary-600 text-white'
+                : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
             }`}
           >
             In Consultation ({inConsultation})
@@ -461,8 +461,8 @@ export default function SecretaryQueue() {
             onClick={() => setActiveTab('completed')}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors ${
               activeTab === 'completed'
-                ? 'bg-[#1b5eb8] text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-primary-600 text-white'
+                : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
             }`}
           >
             Completed ({completed})
@@ -471,8 +471,8 @@ export default function SecretaryQueue() {
             onClick={() => setActiveTab('skipped')}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors ${
               activeTab === 'skipped'
-                ? 'bg-[#1b5eb8] text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-primary-600 text-white'
+                : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
             }`}
           >
             Skipped / No-Show ({skippedNoShow})
@@ -481,8 +481,8 @@ export default function SecretaryQueue() {
             onClick={() => setActiveTab('to-collect')}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors ${
               activeTab === 'to-collect'
-                ? 'bg-[#1b5eb8] text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-primary-600 text-white'
+                : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
             }`}
           >
             To Collect ({toCollect})
@@ -493,13 +493,13 @@ export default function SecretaryQueue() {
         <div className="p-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">search</span>
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-neutral-400">search</span>
               <input
                 type="text"
                 placeholder="Search by patient name, Queue #, MRN..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1b5eb8] focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2.5 border border-neutral-200 rounded-lg text-sm text-neutral-700 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
               />
             </div>
             <Select
@@ -526,10 +526,10 @@ export default function SecretaryQueue() {
       </div>
 
       {/* Queue Data Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-md overflow-hidden">
+      <div className="bg-white border border-neutral-200 rounded-2xl shadow-md overflow-hidden">
         {!isToday(selectedDate) && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-3">
-            <div className="flex items-center gap-2 text-amber-700 text-sm">
+          <div className="bg-warning-50 border-b border-warning-200 px-4 py-3">
+            <div className="flex items-center gap-2 text-warning-700 text-sm">
               <span className="material-symbols-outlined text-[18px]">info</span>
               <span className="font-medium">View Only Mode</span>
               <span>•</span>
@@ -539,45 +539,45 @@ export default function SecretaryQueue() {
         )}
         {loading ? (
           <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-            <p className="text-slate-600 mt-3">Loading queue...</p>
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            <p className="text-neutral-600 mt-3">Loading queue...</p>
           </div>
         ) : filteredEntries.length === 0 ? (
           <div className="p-8 text-center">
-            <span className="material-symbols-outlined text-[48px] text-slate-300">hourglass_empty</span>
-            <p className="text-slate-600 mt-3">No patients in queue for this filter</p>
+            <span className="material-symbols-outlined text-[48px] text-neutral-300">hourglass_empty</span>
+            <p className="text-neutral-600 mt-3">No patients in queue for this filter</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-100 border-b border-slate-200">
+              <thead className="bg-neutral-100 border-b border-neutral-200">
                 <tr>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Queue #</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Patient</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Source</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-neutral-600 uppercase tracking-wider">Queue #</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-neutral-600 uppercase tracking-wider">Patient</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-neutral-600 uppercase tracking-wider">Source</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-neutral-600 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-neutral-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-neutral-200">
                 {filteredEntries.map((entry) => {
                   return (
-                    <tr key={entry.id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={entry.id} className="hover:bg-neutral-50 transition-colors">
                       <td className="px-4 py-4 text-center">
-                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-[#1b5eb8] text-white font-bold text-sm">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-600 text-white font-bold text-sm">
                           Q-{String(entry.queue_number).padStart(2, '0')}
                         </div>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-start gap-3 justify-center">
-                          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm">
+                          <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-600 font-bold text-sm">
                             {entry.patient_first_name[0]}{entry.patient_last_name[0]}
                           </div>
                           <div>
-                            <div className="text-sm font-bold text-slate-900">
+                            <div className="text-sm font-bold text-neutral-900">
                               {entry.patient_first_name} {entry.patient_last_name}
                             </div>
-                            <div className="text-xs text-slate-500 mt-0.5">
+                            <div className="text-xs text-neutral-500 mt-0.5">
                               {entry.patient_email || 'No email'}
                             </div>
                           </div>
@@ -586,8 +586,8 @@ export default function SecretaryQueue() {
                       <td className="px-4 py-4 text-center">
                         <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
                           entry.registration_source === 'ONLINE'
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'bg-emerald-50 text-emerald-700'
+                            ? 'bg-primary-50 text-primary-700'
+                            : 'bg-success-50 text-success-700'
                         }`}>
                           {entry.registration_source === 'ONLINE' ? 'Online' : 'Walk-in'}
                         </span>
@@ -596,17 +596,17 @@ export default function SecretaryQueue() {
                         <div className="flex flex-col gap-2 items-center">
                           {/* Queue Status */}
                           <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
-                            entry.status === 'IN_CHECKUP' ? 'bg-emerald-50 text-emerald-700' :
-                            entry.status === 'CALLED' ? 'bg-amber-50 text-amber-700' :
-                            entry.status === 'WAITING' ? 'bg-blue-50 text-blue-700' :
-                            entry.status === 'COMPLETED' ? 'bg-slate-100 text-slate-600' :
-                            'bg-slate-100 text-slate-600'
+                            entry.status === 'IN_CHECKUP' ? 'bg-success-50 text-success-700' :
+                            entry.status === 'CALLED' ? 'bg-warning-50 text-warning-700' :
+                            entry.status === 'WAITING' ? 'bg-primary-50 text-primary-700' :
+                            entry.status === 'COMPLETED' ? 'bg-neutral-100 text-neutral-600' :
+                            'bg-neutral-100 text-neutral-600'
                           }`}>
                             {QUEUE_STATUS_LABELS[entry.status] || entry.status}
                             {entry.status !== 'COMPLETED' && getTimeAgo(entry.called_at)}
                           </span>
                           {entry.status === 'IN_CHECKUP' && entry.doctor_finished && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">
                               <span className="material-symbols-outlined text-[14px]">check_circle</span>
                               Doctor finished
                             </span>
@@ -615,11 +615,11 @@ export default function SecretaryQueue() {
                           {entry.status === 'COMPLETED' && entry.payment_status && entry.payment_status !== 'PAID' && (() => {
                             const ps = entry.payment_status === 'PENDING_VERIFICATION' ? 'FOR_REVIEW' : entry.payment_status;
                             const chipClass =
-                              ps === 'PARTIAL' ? 'bg-blue-100 text-blue-800' :
-                              ps === 'FOR_REVIEW' ? 'bg-yellow-100 text-yellow-800' :
-                              ps === 'OVERPAID' ? 'bg-purple-100 text-purple-800' :
-                              ps === 'UNPAID' ? 'bg-gray-100 text-gray-800' :
-                              'bg-gray-100 text-gray-800';
+                              ps === 'PARTIAL' ? 'bg-primary-100 text-primary-800' :
+                              ps === 'FOR_REVIEW' ? 'bg-warning-100 text-warning-800' :
+                              ps === 'OVERPAID' ? 'bg-primary-100 text-primary-800' :
+                              ps === 'UNPAID' ? 'bg-neutral-100 text-neutral-800' :
+                              'bg-neutral-100 text-neutral-800';
                             const chipText =
                               ps === 'UNPAID' ? `Unpaid ₱${toAmount(entry.payment_balance ?? entry.consultation_fee).toFixed(2)}` :
                               ps === 'PARTIAL' ? `Partial ₱${toAmount(entry.payment_balance).toFixed(2)} left` :
@@ -639,7 +639,7 @@ export default function SecretaryQueue() {
                             <button
                               onClick={() => handleCompleteCheckup(entry.id)}
                               disabled={actionLoading || !isToday(selectedDate)}
-                              className="px-3 py-1.5 bg-[#1b5eb8] text-white rounded-lg hover:bg-[#1550a0] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                              className="px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                               title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                             >
                               Complete Checkup
@@ -650,7 +650,7 @@ export default function SecretaryQueue() {
                               <button
                                 onClick={() => handleStartCheckup(entry.id)}
                                 disabled={actionLoading || !isToday(selectedDate)}
-                                className="px-3 py-1.5 bg-[#1b5eb8] text-white rounded-lg hover:bg-[#1550a0] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                                className="px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                                 title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                               >
                                 Start Checkup
@@ -658,7 +658,7 @@ export default function SecretaryQueue() {
                               <button
                                 onClick={() => handleNotPresent(entry.id)}
                                 disabled={actionLoading || !isToday(selectedDate)}
-                                className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                                className="px-3 py-1.5 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                                 title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                               >
                                 Skip / Not Present
@@ -670,7 +670,7 @@ export default function SecretaryQueue() {
                               <button
                                 onClick={() => handleCallNext()}
                                 disabled={actionLoading || !isToday(selectedDate)}
-                                className="px-3 py-1.5 bg-[#1b5eb8] text-white rounded-lg hover:bg-[#1550a0] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                                className="px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                                 title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                               >
                                 Call Next Patient
@@ -678,7 +678,7 @@ export default function SecretaryQueue() {
                               <button
                                 onClick={() => handleSkip(entry.id)}
                                 disabled={actionLoading || !isToday(selectedDate)}
-                                className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                                className="px-3 py-1.5 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                                 title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                               >
                                 Skip / Not Present
@@ -689,7 +689,7 @@ export default function SecretaryQueue() {
                             <button
                               onClick={() => handleStartCheckup(entry.id)}
                               disabled={actionLoading || !isToday(selectedDate)}
-                              className="px-3 py-1.5 bg-[#1b5eb8] text-white rounded-lg hover:bg-[#1550a0] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                              className="px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                               title={!isToday(selectedDate) ? 'Actions only available for today\'s queue' : ''}
                             >
                               Start Checkup
@@ -697,7 +697,7 @@ export default function SecretaryQueue() {
                           )}
                           <button
                             disabled={actionLoading}
-                            className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                            className="px-3 py-1.5 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                           >
                             View Patient
                           </button>
@@ -720,7 +720,7 @@ export default function SecretaryQueue() {
                                 }
                               }}
                               disabled={actionLoading}
-                              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                              className="px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                             >
                               Bill
                             </button>
@@ -744,13 +744,13 @@ export default function SecretaryQueue() {
                                 }
                               }}
                               disabled={actionLoading}
-                              className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                              className="px-3 py-1.5 bg-success-600 text-white rounded-lg hover:bg-success-700 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                             >
                               {entry.payment_invoice_number ? 'View Invoice' : 'Issue Invoice'}
                             </button>
                           )}
                           {entry.status === 'COMPLETED' && entry.payment_status === 'PAID' && !entry.payment_invoice_number && (
-                            <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                            <span className="text-[10px] text-warning-700 bg-warning-50 border border-warning-200 rounded px-2 py-1">
                               No active invoice
                             </span>
                           )}
@@ -766,17 +766,17 @@ export default function SecretaryQueue() {
       </div>
 
       {/* Footer */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-md">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+      <div className="bg-white border border-neutral-200 rounded-2xl p-4 shadow-md">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-neutral-500">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-slate-700">FiDo Clinical Platform</span>
+            <span className="font-medium text-neutral-700">FiDo Clinical Platform</span>
             <span>•</span>
             <span>Secretary Terminal 01A</span>
             <span>•</span>
             <span>Desk A</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-success-500 animate-pulse"></span>
             <span>Auto-sync active</span>
             <span>•</span>
             <span>{secretary?.practice_name || 'Central Medical Clinic'}</span>

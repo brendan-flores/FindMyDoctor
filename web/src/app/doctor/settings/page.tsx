@@ -80,8 +80,8 @@ export default function DoctorSettings() {
   return (
     <div className="py-2">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
-        <p className="text-slate-600 mt-2">Manage your account security settings</p>
+        <h1 className="text-3xl font-bold text-neutral-900">Settings</h1>
+        <p className="text-neutral-600 mt-2">Manage your account security settings</p>
       </div>
 
       {/* Toast notifications */}
@@ -89,22 +89,22 @@ export default function DoctorSettings() {
       {error && <Toast message={error} type="error" onClose={() => setError('')} />}
 
       <section aria-labelledby="account-section-heading">
-        <h2 id="account-section-heading" className="text-lg font-bold text-slate-500 uppercase tracking-wide mb-4">
+        <h2 id="account-section-heading" className="text-lg font-bold text-neutral-500 uppercase tracking-wide mb-4">
           Account
         </h2>
 
         <div className="space-y-6">
           {/* Two-Factor Authentication */}
-          <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+          <div className="bg-white rounded-2xl shadow-md border border-neutral-100 p-6">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h3 className="font-semibold text-slate-800">Two-Factor Authentication</h3>
-                <p className="text-sm text-slate-600 mt-1">
+                <h3 className="font-semibold text-neutral-800">Two-Factor Authentication</h3>
+                <p className="text-sm text-neutral-600 mt-1">
                   Require a verification code when you sign in from a new or untrusted browser.
                 </p>
               </div>
               {!twoFactorLoaded ? (
-                <span className="text-sm text-slate-400" aria-busy="true">
+                <span className="text-sm text-neutral-400" aria-busy="true">
                   Loading…
                 </span>
               ) : (
@@ -115,7 +115,7 @@ export default function DoctorSettings() {
                   aria-checked={twoFactorEnabled}
                   aria-label="Two-Factor Authentication"
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    twoFactorEnabled ? 'bg-gradient-to-r from-blue-500 to-blue-600' : 'bg-slate-300'
+                    twoFactorEnabled ? 'bg-gradient-to-r from-primary-500 to-primary-600' : 'bg-neutral-300'
                   } ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                 >
                   <span

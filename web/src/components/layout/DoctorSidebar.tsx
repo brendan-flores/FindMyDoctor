@@ -81,11 +81,11 @@ export default function DoctorSidebar({ profile }: DoctorSidebarProps) {
   ];
 
   return (
-    <aside className="fixed left-0 top-0 w-64 h-screen bg-white border-r border-slate-200 flex flex-col justify-between z-30 select-none">
+    <aside className="fixed left-0 top-0 w-64 h-screen bg-white border-r border-neutral-200 flex flex-col justify-between z-30 select-none">
       {/* Top & Navigation Region */}
       <div className="flex flex-col min-h-0">
         {/* Brand Logo Header */}
-        <div className="h-16 px-6 border-b border-slate-100 flex items-center justify-center">
+        <div className="h-16 px-6 border-b border-neutral-100 flex items-center justify-center">
           <img
             src="/images/findmydoctor_logo.png"
             alt="FindMyDoctor Logo"
@@ -98,7 +98,7 @@ export default function DoctorSidebar({ profile }: DoctorSidebarProps) {
 
         {/* Navigation Group */}
         <div className="px-5 pt-1 pb-2">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Clinical Workspace</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Clinical Workspace</span>
         </div>
 
         {/* Navigation Links */}
@@ -110,8 +110,8 @@ export default function DoctorSidebar({ profile }: DoctorSidebarProps) {
               aria-current={activeTab === item.id ? 'page' : undefined}
               className={`nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium text-sm transition-all ${
                 activeTab === item.id
-                  ? 'bg-[#1b5eb8] text-white shadow-sm shadow-blue-600/20'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'bg-primary-600 text-white shadow-sm shadow-primary-600/20'
+                  : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
               }`}
             >
               <span className="material-symbols-outlined text-[20px]">{item.icon}</span>

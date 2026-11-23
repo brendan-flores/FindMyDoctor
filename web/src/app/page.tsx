@@ -34,14 +34,14 @@ export default function Home() {
 
   // Show a brief loading state while redirecting
   return (
-    <main className="min-h-screen flex items-center justify-center bg-[#F3F5F9] px-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen flex items-center justify-center bg-neutral-100 px-4 sm:px-6 lg:px-8">
       <div className="text-center">
         <img
           src="/images/findmydoctor_logo.png"
           alt="FindMyDoctor Logo"
           className="h-20 w-auto mx-auto mb-4"
         />
-        <p className="text-slate-600 mt-4">Redirecting...</p>
+        <p className="text-neutral-600 mt-4">Redirecting...</p>
       </div>
     </main>
   );

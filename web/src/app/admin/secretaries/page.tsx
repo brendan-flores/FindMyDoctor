@@ -113,7 +113,7 @@ export default function SecretaryManagement() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-slate-600">Loading secretaries...</div>
+        <div className="text-neutral-600">Loading secretaries...</div>
       </div>
     );
   }
@@ -123,64 +123,64 @@ export default function SecretaryManagement() {
       {/* Summary Metric Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Card 1: TOTAL SECRETARIES */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex items-center justify-between hover:border-blue-300 transition-all">
+        <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-md flex items-center justify-between hover:border-primary-300 transition-all">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-blue-50 text-[#1b5eb8] flex items-center justify-center">
+            <div className="w-11 h-11 rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">badge</span>
             </div>
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">TOTAL SECRETARIES</div>
-              <div className="text-2xl font-bold text-slate-900 mt-0.5">{stats.total} Secretaries</div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">TOTAL SECRETARIES</div>
+              <div className="text-2xl font-bold text-neutral-900 mt-0.5">{stats.total} Secretaries</div>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-[#1b5eb8] border border-blue-100">
+          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-primary-50 text-primary-600 border border-primary-100">
             <span className="material-symbols-outlined text-[14px]">verified</span> Registered
           </span>
         </div>
 
         {/* Card 2: ACTIVE STATUS */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex items-center justify-between hover:border-emerald-300 transition-all">
+        <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-md flex items-center justify-between hover:border-success-300 transition-all">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-2xl bg-success-50 text-success-600 flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">check_circle</span>
             </div>
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">ACTIVE STATUS</div>
-              <div className="text-2xl font-bold text-emerald-700 mt-0.5">{stats.active} Active</div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">ACTIVE STATUS</div>
+              <div className="text-2xl font-bold text-success-700 mt-0.5">{stats.active} Active</div>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-success-50 text-success-700 border border-success-200">
+            <span className="w-2 h-2 rounded-full bg-success-500 animate-pulse"></span>
             On Duty
           </span>
         </div>
 
         {/* Card 3: INACTIVE / SUSPENDED */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex items-center justify-between hover:border-amber-300 transition-all">
+        <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-md flex items-center justify-between hover:border-warning-300 transition-all">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-2xl bg-warning-50 text-warning-600 flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">pause_circle</span>
             </div>
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">INACTIVE / SUSPENDED</div>
-              <div className="text-2xl font-bold text-amber-700 mt-0.5">{stats.inactive} Inactive</div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">INACTIVE / SUSPENDED</div>
+              <div className="text-2xl font-bold text-warning-700 mt-0.5">{stats.inactive} Inactive</div>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-warning-50 text-warning-700 border border-warning-200">
             <span className="material-symbols-outlined text-[14px]">warning</span> Action Required
           </span>
         </div>
       </div>
 
       {/* Search & Filter Toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-md flex flex-col lg:flex-row gap-3 items-center justify-between">
+      <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-md flex flex-col lg:flex-row gap-3 items-center justify-between">
         {/* Search Secretary input */}
         <div className="relative w-full lg:w-96">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-[18px]">
             search
           </span>
           <input
-            className="w-full h-9 pl-9 pr-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20 focus:border-[#1b5eb8] transition-all"
+            className="w-full h-9 pl-9 pr-3 text-xs bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-700 placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 transition-all"
             placeholder="Search Secretary Name..."
             type="text"
             value={searchTerm}
@@ -190,7 +190,7 @@ export default function SecretaryManagement() {
 
         {/* Status Filter */}
         <div className="flex items-center gap-1.5 w-full lg:w-auto">
-          <span className="text-xs text-slate-400 font-medium hidden sm:inline">Status:</span>
+          <span className="text-xs text-neutral-400 font-medium hidden sm:inline">Status:</span>
           <Select
             className="w-36"
             triggerClassName="h-9 px-3 text-xs"
@@ -206,7 +206,7 @@ export default function SecretaryManagement() {
       </div>
 
       {/* Secretaries Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
+      <div className="bg-white rounded-2xl border border-neutral-200 shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <colgroup>
@@ -217,63 +217,63 @@ export default function SecretaryManagement() {
               <col className="w-[20%]" />
             </colgroup>
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Secretary</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Email</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Associated Doctor</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Status</th>
-                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Actions</th>
+              <tr className="border-b border-neutral-200 bg-neutral-50">
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 whitespace-nowrap">Secretary</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 whitespace-nowrap">Email</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 whitespace-nowrap">Associated Doctor</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 whitespace-nowrap">Status</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredSecretaries.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-10 text-center text-slate-500 text-sm">
+                  <td colSpan={5} className="px-5 py-10 text-center text-neutral-500 text-sm">
                     No secretaries found matching your criteria.
                   </td>
                 </tr>
               ) : (
                 filteredSecretaries.map((secretary) => (
-                  <tr key={secretary.id} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60 transition-colors">
+                  <tr key={secretary.id} className="border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50/60 transition-colors">
                     <td className="px-5 py-4 align-middle">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-sm flex-shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-600 font-semibold text-sm flex-shrink-0">
                           {(secretary.firstName || 'S')[0]}{(secretary.lastName || '')[0]}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold text-slate-900 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-neutral-900 whitespace-nowrap">
                             {secretary.firstName || 'N/A'} {secretary.lastName || 'N/A'}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-5 py-4 align-middle">
-                      <span className="block text-sm text-slate-700 truncate" title={secretary.email}>
+                      <span className="block text-sm text-neutral-700 truncate" title={secretary.email}>
                         {secretary.email}
                       </span>
                     </td>
                     <td className="px-5 py-4 align-middle">
                       {secretary.doctorId ? (
                         <div className="min-w-0">
-                          <div className="text-sm text-slate-700 truncate" title={`Dr. ${secretary.doctorFirstName} ${secretary.doctorLastName}`}>
+                          <div className="text-sm text-neutral-700 truncate" title={`Dr. ${secretary.doctorFirstName} ${secretary.doctorLastName}`}>
                             Dr. {secretary.doctorFirstName} {secretary.doctorLastName}
                           </div>
-                          <div className="text-xs text-slate-500 truncate" title={secretary.doctorSpecialty}>
+                          <div className="text-xs text-neutral-500 truncate" title={secretary.doctorSpecialty}>
                             {secretary.doctorSpecialty}
                           </div>
                         </div>
                       ) : (
-                        <span className="text-sm text-amber-600 font-medium">Unassigned</span>
+                        <span className="text-sm text-warning-600 font-medium">Unassigned</span>
                       )}
                     </td>
                     <td className="px-5 py-4 align-middle">
                       {secretary.isActive ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 h-7 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 h-7 rounded-full text-xs font-semibold bg-success-50 text-success-700 border border-success-200 whitespace-nowrap">
+                          <span className="w-1.5 h-1.5 rounded-full bg-success-500"></span>
                           Active
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 h-7 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 h-7 rounded-full text-xs font-semibold bg-error-50 text-error-700 border border-error-200 whitespace-nowrap">
                           <span className="material-symbols-outlined text-[14px]">block</span>
                           Inactive
                         </span>
@@ -284,21 +284,21 @@ export default function SecretaryManagement() {
                         {secretary.isActive ? (
                           <button
                             onClick={() => handleDeactivateSecretary(secretary)}
-                            className="px-3 h-8 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                            className="px-3 h-8 text-xs font-semibold text-error-700 bg-error-50 hover:bg-error-100 border border-error-200 rounded-lg transition-colors"
                           >
                             Deactivate
                           </button>
                         ) : (
                           <button
                             onClick={() => handleReactivateSecretary(secretary.id)}
-                            className="px-3 h-8 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
+                            className="px-3 h-8 text-xs font-semibold text-success-700 bg-success-50 hover:bg-success-100 border border-success-200 rounded-lg transition-colors"
                           >
                             Reactivate
                           </button>
                         )}
                         <button
                           onClick={() => handleResetPassword(secretary)}
-                          className="px-3 h-8 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+                          className="px-3 h-8 text-xs font-semibold text-neutral-700 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-lg transition-colors"
                         >
                           Reset Password
                         </button>
@@ -322,22 +322,22 @@ export default function SecretaryManagement() {
             className="fmd-modal-panel bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             data-state={showCreateModal ? 'open' : 'closed'}
           >
-            <div className="p-6 border-b border-slate-200">
-              <h2 className="text-lg font-bold text-slate-900">Add New Secretary</h2>
-              <p className="text-sm text-slate-500 mt-1">Create a new secretary account and associate with a doctor</p>
+            <div className="p-6 border-b border-neutral-200">
+              <h2 className="text-lg font-bold text-neutral-900">Add New Secretary</h2>
+              <p className="text-sm text-neutral-500 mt-1">Create a new secretary account and associate with a doctor</p>
             </div>
             <div className="p-6">
-              <p className="text-sm text-slate-600">Secretary creation form would go here.</p>
-              <p className="text-xs text-slate-400 mt-2">Note: This requires selecting a doctor to associate the secretary with.</p>
+              <p className="text-sm text-neutral-600">Secretary creation form would go here.</p>
+              <p className="text-xs text-neutral-400 mt-2">Note: This requires selecting a doctor to associate the secretary with.</p>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-neutral-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-neutral-700 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-lg transition-colors"
               >
                 Cancel
               </button>
-              <button className="px-4 py-2 text-sm font-semibold text-white bg-[#1b5eb8] hover:bg-[#14468f] rounded-lg transition-colors">
+              <button className="px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">
                 Create Secretary
               </button>
             </div>
@@ -355,14 +355,14 @@ export default function SecretaryManagement() {
             className="fmd-modal-panel bg-white rounded-2xl max-w-md w-full shadow-xl"
             data-state={deactivateModalOpen ? 'open' : 'closed'}
           >
-            <div className="p-6 border-b border-slate-200">
-              <h2 className="text-lg font-bold text-slate-900">Deactivate Secretary Account</h2>
-              <p className="text-sm text-slate-500 mt-1">Are you sure you want to deactivate this secretary?</p>
+            <div className="p-6 border-b border-neutral-200">
+              <h2 className="text-lg font-bold text-neutral-900">Deactivate Secretary Account</h2>
+              <p className="text-sm text-neutral-500 mt-1">Are you sure you want to deactivate this secretary?</p>
             </div>
             <div className="p-6">
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <p className="text-sm text-amber-800 font-medium mb-2">This action will:</p>
-                <ul className="text-sm text-amber-700 list-disc list-inside space-y-1">
+              <div className="bg-warning-50 border border-warning-200 rounded-lg p-4">
+                <p className="text-sm text-warning-800 font-medium mb-2">This action will:</p>
+                <ul className="text-sm text-warning-700 list-disc list-inside space-y-1">
                   <li>Prevent the Secretary from logging in</li>
                   <li>Invalidate all existing sessions and tokens</li>
                   <li>Remove all registered push device tokens</li>
@@ -370,18 +370,18 @@ export default function SecretaryManagement() {
                 </ul>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-neutral-200 flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowDeactivateModal(false);
                 }}
-                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-neutral-700 bg-white hover:bg-neutral-100 border border-neutral-300 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDeactivateSecretary}
-                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-white bg-error-600 hover:bg-error-700 rounded-lg transition-colors"
               >
                 Deactivate Account
               </button>
@@ -400,29 +400,29 @@ export default function SecretaryManagement() {
             className="fmd-modal-panel bg-white rounded-2xl max-w-md w-full shadow-xl"
             data-state={passwordModalOpen ? 'open' : 'closed'}
           >
-            <div className="p-6 border-b border-slate-200">
-              <h2 className="text-lg font-bold text-slate-900">Temporary Credentials Generated</h2>
-              <p className="text-sm text-slate-500 mt-1">New password for the secretary account</p>
+            <div className="p-6 border-b border-neutral-200">
+              <h2 className="text-lg font-bold text-neutral-900">Temporary Credentials Generated</h2>
+              <p className="text-sm text-neutral-500 mt-1">New password for the secretary account</p>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</label>
-                <p className="text-sm font-medium text-slate-900 mt-1">{passwordResult.email}</p>
+                <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Email</label>
+                <p className="text-sm font-medium text-neutral-900 mt-1">{passwordResult.email}</p>
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Temporary Password</label>
-                <div className="mt-1 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                  <p className="text-lg font-mono font-bold text-slate-900">{passwordResult.temporaryPassword}</p>
+                <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Temporary Password</label>
+                <div className="mt-1 p-3 bg-neutral-50 border border-neutral-200 rounded-lg">
+                  <p className="text-lg font-mono font-bold text-neutral-900">{passwordResult.temporaryPassword}</p>
                 </div>
-                <p className="text-xs text-slate-500 mt-2">The secretary must change this password on first login.</p>
+                <p className="text-xs text-neutral-500 mt-2">The secretary must change this password on first login.</p>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end">
+            <div className="p-6 border-t border-neutral-200 flex justify-end">
               <button
                 onClick={() => {
                   setShowPasswordModal(false);
                 }}
-                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-neutral-700 bg-white hover:bg-neutral-100 border border-neutral-300 rounded-lg transition-colors"
               >
                 Close
               </button>

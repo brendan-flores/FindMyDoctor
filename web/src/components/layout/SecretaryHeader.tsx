@@ -132,14 +132,14 @@ export default function SecretaryHeader({ userName = 'Secretary', userEmail = ''
   const getTypeBadgeColor = (type: string) => {
     switch (type) {
       case 'PAYMENT_VERIFIED':
-        return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+        return 'bg-success-50 text-success-600 border-success-100';
       case 'PAYMENT_REJECTED':
-        return 'bg-rose-50 text-rose-600 border-rose-100';
+        return 'bg-error-50 text-error-600 border-error-100';
       case 'NEW_SECRETARY_MESSAGE':
       case 'NEW_PATIENT_MESSAGE':
-        return 'bg-blue-50 text-blue-600 border-blue-100';
+        return 'bg-primary-50 text-primary-600 border-primary-100';
       default:
-        return 'bg-slate-50 text-slate-600 border-slate-100';
+        return 'bg-neutral-50 text-neutral-600 border-neutral-100';
     }
   };
 
@@ -182,15 +182,15 @@ export default function SecretaryHeader({ userName = 'Secretary', userEmail = ''
   };
 
   return (
-    <header className="fixed top-0 left-64 right-0 h-16 bg-white border-b border-slate-200 z-20 flex items-center justify-between px-8">
+    <header className="fixed top-0 left-64 right-0 h-16 bg-white border-b border-neutral-200 z-20 flex items-center justify-between px-8">
       {/* Left: Badge & Hierarchy */}
       <div className="flex items-center gap-4 min-w-0">
         <div className="flex items-center gap-3">
-          <span className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-blue-50 text-[#1b5eb8] border border-blue-100">
+          <span className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-primary-50 text-primary-600 border border-primary-100">
             Secretary Portal
           </span>
-          <span className="text-slate-300">|</span>
-          <div className="text-sm font-semibold text-slate-800 truncate">
+          <span className="text-neutral-300">|</span>
+          <div className="text-sm font-semibold text-neutral-800 truncate">
             FindMyDoctor Healthcare Network
           </div>
         </div>
@@ -200,19 +200,19 @@ export default function SecretaryHeader({ userName = 'Secretary', userEmail = ''
       <div className="flex items-center gap-5">
         {/* Date / Shift Tag */}
         <div className="hidden xl:flex flex-col text-right leading-tight">
-          <span className="text-xs font-semibold text-slate-700">{formattedDate}</span>
-          <span className="text-[11px] font-mono text-slate-400">{formattedTime}</span>
+          <span className="text-xs font-semibold text-neutral-700">{formattedDate}</span>
+          <span className="text-[11px] font-mono text-neutral-400">{formattedTime}</span>
         </div>
 
         {/* Notification Bell with Badge */}
         <div className="relative" ref={notificationRef}>
           <button
             onClick={handleNotificationClick}
-            className="relative w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+            className="relative w-9 h-9 rounded-lg border border-neutral-200 flex items-center justify-center text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 transition-colors"
           >
             <span className="material-symbols-outlined text-[20px]">notifications</span>
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-error-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
@@ -222,11 +222,11 @@ export default function SecretaryHeader({ userName = 'Secretary', userEmail = ''
           {notificationPresent && (
             <div
               data-state={isNotificationOpen ? 'open' : 'closed'}
-              className="fmd-dropdown absolute right-0 top-full mt-2 w-80 bg-white rounded-lg border border-slate-200 shadow-lg py-2 z-50 max-h-96 overflow-y-auto"
+              className="fmd-dropdown absolute right-0 top-full mt-2 w-80 bg-white rounded-lg border border-neutral-200 shadow-lg py-2 z-50 max-h-96 overflow-y-auto"
             >
               {notifications.length === 0 ? (
-                <div className="px-4 py-8 text-center text-slate-500 text-sm">
-                  <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">notifications_none</span>
+                <div className="px-4 py-8 text-center text-neutral-500 text-sm">
+                  <span className="material-symbols-outlined text-4xl text-neutral-300 mb-2">notifications_none</span>
                   <p>No notifications</p>
                 </div>
               ) : (
@@ -234,7 +234,7 @@ export default function SecretaryHeader({ userName = 'Secretary', userEmail = ''
                   <button
                     key={notification.id}
                     onClick={() => handleNotificationItemClick(notification)}
-                    className="w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+                    className="w-full px-4 py-3 text-left hover:bg-neutral-50 transition-colors border-b border-neutral-100 last:border-b-0"
                   >
                     <div className="flex items-start gap-3">
                       <span
@@ -246,13 +246,13 @@ export default function SecretaryHeader({ userName = 'Secretary', userEmail = ''
                       </span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-medium text-slate-800 truncate">{notification.title}</p>
+                          <p className="text-sm font-medium text-neutral-800 truncate">{notification.title}</p>
                           {!notification.is_read && (
-                            <span className="w-2 h-2 bg-blue-500 rounded-full shrink-0"></span>
+                            <span className="w-2 h-2 bg-primary-500 rounded-full shrink-0"></span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-500 truncate mt-0.5">{notification.message}</p>
-                        <p className="text-[10px] text-slate-400 mt-1">{formatTimestamp(notification.created_at)}</p>
+                        <p className="text-xs text-neutral-500 truncate mt-0.5">{notification.message}</p>
+                        <p className="text-[10px] text-neutral-400 mt-1">{formatTimestamp(notification.created_at)}</p>
                       </div>
                     </div>
                   </button>
@@ -266,14 +266,14 @@ export default function SecretaryHeader({ userName = 'Secretary', userEmail = ''
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={handleProfileClick}
-            className="flex items-center gap-2.5 pl-1 border-l border-slate-200 hover:bg-slate-50 rounded-lg px-2 py-1 transition-colors"
+            className="flex items-center gap-2.5 pl-1 border-l border-neutral-200 hover:bg-neutral-50 rounded-lg px-2 py-1 transition-colors"
           >
-            <div className="w-8 h-8 rounded-full bg-[#1b5eb8] text-white flex items-center justify-center font-semibold text-xs shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center font-semibold text-xs shadow-sm">
               {getInitials(userName)}
             </div>
             <div className="hidden lg:block text-left leading-none">
-              <div className="text-xs font-semibold text-slate-800">{userName}</div>
-              <div className="text-[10px] text-slate-400">{userEmail}</div>
+              <div className="text-xs font-semibold text-neutral-800">{userName}</div>
+              <div className="text-[10px] text-neutral-400">{userEmail}</div>
             </div>
           </button>
 
@@ -281,26 +281,26 @@ export default function SecretaryHeader({ userName = 'Secretary', userEmail = ''
           {dropdownPresent && (
             <div
               data-state={isDropdownOpen ? 'open' : 'closed'}
-              className="fmd-dropdown absolute right-0 top-full mt-2 w-48 bg-white rounded-lg border border-slate-200 shadow-lg py-1 z-50"
+              className="fmd-dropdown absolute right-0 top-full mt-2 w-48 bg-white rounded-lg border border-neutral-200 shadow-lg py-1 z-50"
             >
               <button
                 onClick={handleViewProfile}
-                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                className="w-full px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50 flex items-center gap-2 transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">account_circle</span>
                 Profile
               </button>
               <button
                 onClick={handleChangeSettings}
-                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                className="w-full px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50 flex items-center gap-2 transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">settings</span>
                 Settings
               </button>
-              <div className="border-t border-slate-100 my-1"></div>
+              <div className="border-t border-neutral-100 my-1"></div>
               <button
                 onClick={handleSignOut}
-                className="w-full px-4 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                className="w-full px-4 py-2 text-left text-sm text-error-600 hover:bg-error-50 flex items-center gap-2 transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">logout</span>
                 Sign Out

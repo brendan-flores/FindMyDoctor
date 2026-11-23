@@ -221,14 +221,14 @@ export default function OtpVerification({ email, challengeId, onVerifySuccess, o
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-lg font-bold text-slate-900 mb-2">Enter Verification Code</h3>
-        <p className="text-sm text-slate-600">
-          We sent a 6-digit code to <span className="font-semibold text-slate-900">{email}</span>
+        <h3 className="text-lg font-bold text-neutral-900 mb-2">Enter Verification Code</h3>
+        <p className="text-sm text-neutral-600">
+          We sent a 6-digit code to <span className="font-semibold text-neutral-900">{email}</span>
         </p>
       </div>
 
       {otpError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+        <div className="bg-error-50 border border-error-200 text-error-700 px-4 py-3 rounded-xl text-sm">
           {otpError}
         </div>
       )}
@@ -246,7 +246,7 @@ export default function OtpVerification({ email, challengeId, onVerifySuccess, o
               onChange={(e) => handleOtpChange(index, e.target.value)}
               onKeyDown={(e) => handleOtpKeyDown(index, e)}
               onFocus={() => handleOtpFocus(index)}
-              className="w-12 h-14 text-center text-2xl font-bold text-slate-900 border-2 border-slate-300 rounded-lg focus:border-[#1A62CD] focus:outline-none focus:ring-2 focus:ring-[#1A62CD]/20 transition-all"
+              className="w-12 h-14 text-center text-2xl font-bold text-neutral-900 border-2 border-neutral-300 rounded-lg focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all"
             />
           ))}
         </div>
@@ -256,7 +256,7 @@ export default function OtpVerification({ email, challengeId, onVerifySuccess, o
             type="button"
             onClick={handleResendOtp}
             disabled={resendDisabled || isLoading}
-            className="text-sm font-semibold text-[#1967D2] hover:text-[#0D3B75] disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
+            className="text-sm font-semibold text-primary-600 hover:text-primary-800 disabled:text-neutral-400 disabled:cursor-not-allowed transition-colors"
           >
             {resendDisabled ? `Resend in ${resendCooldown}s` : 'Resend Code'}
           </button>
@@ -266,7 +266,7 @@ export default function OtpVerification({ email, challengeId, onVerifySuccess, o
               type="button"
               onClick={onCancel}
               disabled={isLoading}
-              className="text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
+              className="text-sm font-semibold text-neutral-600 hover:text-neutral-900 disabled:text-neutral-400 disabled:cursor-not-allowed transition-colors"
             >
               Cancel
             </button>
@@ -276,7 +276,7 @@ export default function OtpVerification({ email, challengeId, onVerifySuccess, o
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-[#0D3B75] hover:bg-[#092B57] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D3B75] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? 'Verifying...' : 'Verify'}
         </button>

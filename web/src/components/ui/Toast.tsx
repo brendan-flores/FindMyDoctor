@@ -30,7 +30,7 @@ export default function Toast({ message, type, onClose, duration = 2000 }: Toast
 
   return (
     <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-xl shadow-2xl text-sm font-semibold transition-all transform animate-in slide-in-from-right fade-in duration-300 flex items-center gap-3 ${
-      type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+      type === 'error' ? 'bg-error-500 text-white' : 'bg-success-500 text-white'
     }`}>
       <span>{message}</span>
       <button
