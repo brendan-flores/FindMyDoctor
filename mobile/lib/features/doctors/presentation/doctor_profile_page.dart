@@ -287,14 +287,12 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Doctor name - always visible, up to 2 lines, no dynamic shrinking
               Text(
-                displayName,
+                profile.displayName,
                 style: AppTextStyles.headlineSm.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                overflow: TextOverflow.visible,
                 semanticsLabel: profile.displayName,
               ),
               if (profile.specialty != null) ...[
@@ -331,7 +329,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
     Color backgroundColor;
     Color textColor;
     IconData icon;
-    
+
     if (available) {
       // Available today - light green (same as Next available chip)
       backgroundColor = AppColors.tertiary.withOpacity(0.1);
@@ -356,19 +354,15 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: textColor,
-          ),
+          Icon(icon, size: 20, color: textColor),
           const SizedBox(width: spacing.AppSpacing.gutterSm),
           Expanded(
             child: Text(
               available
                   ? 'Available today · ${_slotsLabel(slotsLeft)}'
                   : (nextDate != null
-                      ? 'Not available today · Next available: ${_formatDate(nextDate)}'
-                      : 'Not available today · No upcoming availability yet'),
+                        ? 'Not available today · Next available: ${_formatDate(nextDate)}'
+                        : 'Not available today · No upcoming availability yet'),
               style: AppTextStyles.labelMd.copyWith(
                 color: textColor,
                 fontWeight: FontWeight.w600,
@@ -564,7 +558,9 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
               ),
               decoration: BoxDecoration(
                 color: AppColors.tertiary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+                borderRadius: BorderRadius.circular(
+                  spacing.AppSpacing.radiusMd,
+                ),
               ),
               child: Text(
                 'Next available: ${_formatDate(availability.nextAvailableDate!)}',
@@ -593,22 +589,23 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                   ? ranges.first.dayName
                   : '';
               final isToday = dayOfWeek == todayDayOfWeek;
-              
+
               // Check if day off (no ranges or empty time strings)
-              final isDayOff = ranges.isEmpty || 
-                  (ranges.length == 1 && 
-                   ranges.first.startTime.isEmpty && 
-                   ranges.first.endTime.isEmpty);
-              
+              final isDayOff =
+                  ranges.isEmpty ||
+                  (ranges.length == 1 &&
+                      ranges.first.startTime.isEmpty &&
+                      ranges.first.endTime.isEmpty);
+
               final hours = isDayOff
                   ? 'Day off'
                   : ranges
-                      .map(
-                        (range) =>
-                            '${_formatTime12h(range.startTime)} – ${_formatTime12h(range.endTime)}',
-                      )
-                      .join(', ');
-              
+                        .map(
+                          (range) =>
+                              '${_formatTime12h(range.startTime)} – ${_formatTime12h(range.endTime)}',
+                        )
+                        .join(', ');
+
               return _buildScheduleTile(
                 dayName: dayName,
                 hours: hours,
@@ -631,14 +628,14 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
   }) {
     final mediaQuery = MediaQuery.of(context);
     final reduceMotion = mediaQuery.disableAnimations || mediaQuery.boldText;
-    
+
     return Padding(
-      padding: const EdgeInsets.only(
-        bottom: spacing.AppSpacing.gutterSm,
-      ),
+      padding: const EdgeInsets.only(bottom: spacing.AppSpacing.gutterSm),
       child: AnimatedSlide(
         offset: reduceMotion ? Offset.zero : const Offset(0, 0.05),
-        duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 180),
+        duration: reduceMotion
+            ? Duration.zero
+            : const Duration(milliseconds: 180),
         curve: Curves.easeOut,
         onEnd: () {},
         child: FadeTransition(
@@ -657,7 +654,9 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
               border: Border.all(
                 color: isToday
                     ? AppColors.primary
-                    : (isDayOff ? AppColors.outlineVariant : AppColors.outlineVariant),
+                    : (isDayOff
+                          ? AppColors.outlineVariant
+                          : AppColors.outlineVariant),
                 width: isToday ? 1.5 : 1,
               ),
               boxShadow: isToday
@@ -677,7 +676,9 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                   size: 18,
                   color: isToday
                       ? AppColors.primary
-                      : (isDayOff ? AppColors.onSurfaceVariant : AppColors.outline),
+                      : (isDayOff
+                            ? AppColors.onSurfaceVariant
+                            : AppColors.outline),
                 ),
                 const SizedBox(width: spacing.AppSpacing.gutterSm),
                 Expanded(
@@ -687,7 +688,9 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                         TextSpan(
                           text: dayName,
                           style: AppTextStyles.labelMd.copyWith(
-                            fontWeight: isToday ? FontWeight.w600 : FontWeight.w500,
+                            fontWeight: isToday
+                                ? FontWeight.w600
+                                : FontWeight.w500,
                             color: AppColors.onSurface,
                           ),
                         ),
@@ -715,14 +718,18 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                 ),
                 if (isToday)
                   Container(
-                    margin: const EdgeInsets.only(left: spacing.AppSpacing.gutterSm),
+                    margin: const EdgeInsets.only(
+                      left: spacing.AppSpacing.gutterSm,
+                    ),
                     padding: const EdgeInsets.symmetric(
                       horizontal: spacing.AppSpacing.gutterSm,
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusFull),
+                      borderRadius: BorderRadius.circular(
+                        spacing.AppSpacing.radiusFull,
+                      ),
                     ),
                     child: Text(
                       'Today',

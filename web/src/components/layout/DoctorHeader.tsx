@@ -7,22 +7,30 @@ import { usePresence } from '@/hooks/usePresence';
 
 interface DoctorHeaderProps {
   userName?: string;
+  userEmail?: string;
   userRole?: string;
 }
 
-export default function DoctorHeader({ userName = 'Dr. Smith', userRole = 'Doctor' }: DoctorHeaderProps) {
+export default function DoctorHeader({
+  userName = 'Doctor',
+  userEmail = '',
+  userRole = 'Doctor',
+}: DoctorHeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownPresent = usePresence(isDropdownOpen);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   const getInitials = (name: string) => {
-    return name
-      .split(' ')
+    const initials = name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
       .map(n => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
+    return initials || 'D';
   };
 
   const currentDate = new Date();
@@ -119,9 +127,15 @@ export default function DoctorHeader({ userName = 'Dr. Smith', userRole = 'Docto
             <div className="w-8 h-8 rounded-full bg-[#1b5eb8] text-white flex items-center justify-center font-semibold text-xs shadow-sm">
               {getInitials(userName)}
             </div>
-            <div className="hidden lg:block text-left leading-none">
-              <div className="text-xs font-semibold text-slate-800">{userName}</div>
-              <div className="text-[10px] text-slate-400">{userRole}</div>
+            <div className="hidden lg:block text-left leading-tight max-w-[220px]">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-slate-800 truncate" title={userName}>
+                  {userName}
+                </span>
+              </div>
+              <div className="text-[10px] text-slate-500 truncate" title={userEmail}>
+                {userEmail}
+              </div>
             </div>
           </button>
 
