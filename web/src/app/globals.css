@@ -7,14 +7,92 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
-}
+  --foreground: #0F172A;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* FMD brand ramp — mirrors `primary` in tailwind.config.ts */
+  --fmd-primary-50: #EFF6FF;
+  --fmd-primary-100: #DBEAFE;
+  --fmd-primary-200: #BFDBFE;
+  --fmd-primary-300: #93C5FD;
+  --fmd-primary-400: #60A5FA;
+  --fmd-primary-500: #3B82F6;
+  --fmd-primary-600: #1764C0;
+  --fmd-primary-700: #124E9E;
+  --fmd-primary-800: #0E3D7C;
+  --fmd-primary-900: #0A2C5B;
+  --fmd-primary: #1764C0;
+  --fmd-primary-hover: #124E9E;
+  --fmd-primary-subtle: #EFF6FF;
+  --fmd-primary-border: #BFDBFE;
+  --fmd-primary-on: #FFFFFF;
+
+  /* FMD success ramp — mirrors `success` in tailwind.config.ts */
+  --fmd-success-50: #ECFDF5;
+  --fmd-success-100: #D1FAE5;
+  --fmd-success-200: #A7F3D0;
+  --fmd-success-300: #6EE7B7;
+  --fmd-success-400: #34D399;
+  --fmd-success-500: #10B981;
+  --fmd-success-600: #059669;
+  --fmd-success-700: #047857;
+  --fmd-success-800: #065F46;
+  --fmd-success-900: #064E3B;
+  --fmd-success: #047857;
+  --fmd-success-hover: #065F46;
+  --fmd-success-subtle: #ECFDF5;
+  --fmd-success-border: #A7F3D0;
+  --fmd-success-on: #FFFFFF;
+
+  /* FMD warning ramp — mirrors `warning` in tailwind.config.ts */
+  --fmd-warning-50: #FFFBEB;
+  --fmd-warning-100: #FEF3C7;
+  --fmd-warning-200: #FDE68A;
+  --fmd-warning-300: #FCD34D;
+  --fmd-warning-400: #FBBF24;
+  --fmd-warning-500: #F59E0B;
+  --fmd-warning-600: #D97706;
+  --fmd-warning-700: #B45309;
+  --fmd-warning-800: #92400E;
+  --fmd-warning-900: #78350F;
+  --fmd-warning: #B45309;
+  --fmd-warning-hover: #92400E;
+  --fmd-warning-subtle: #FFFBEB;
+  --fmd-warning-border: #FDE68A;
+  --fmd-warning-on: #FFFFFF;
+
+  /* FMD error ramp — mirrors `error` in tailwind.config.ts */
+  --fmd-error-50: #FEF2F2;
+  --fmd-error-100: #FEE2E2;
+  --fmd-error-200: #FECACA;
+  --fmd-error-300: #FCA5A5;
+  --fmd-error-400: #F87171;
+  --fmd-error-500: #EF4444;
+  --fmd-error-600: #DC2626;
+  --fmd-error-700: #B91C1C;
+  --fmd-error-800: #991B1B;
+  --fmd-error-900: #7F1D1D;
+  --fmd-error: #DC2626;
+  --fmd-error-hover: #B91C1C;
+  --fmd-error-subtle: #FEF2F2;
+  --fmd-error-border: #FECACA;
+  --fmd-error-on: #FFFFFF;
+
+  /* FMD neutral ramp — mirrors `neutral` in tailwind.config.ts */
+  --fmd-neutral-50: #F8FAFC;
+  --fmd-neutral-100: #F1F5F9;
+  --fmd-neutral-200: #E2E8F0;
+  --fmd-neutral-300: #CBD5E1;
+  --fmd-neutral-400: #94A3B8;
+  --fmd-neutral-500: #64748B;
+  --fmd-neutral-600: #475569;
+  --fmd-neutral-700: #334155;
+  --fmd-neutral-800: #1E293B;
+  --fmd-neutral-900: #0F172A;
+  --fmd-neutral-950: #020617;
+  --fmd-neutral: #475569;
+  --fmd-neutral-subtle: #F8FAFC;
+  --fmd-neutral-border: #E2E8F0;
+  --fmd-neutral-on: #0F172A;
 }
 
 html,
@@ -48,16 +126,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--fmd-neutral-100);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--fmd-neutral-300);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--fmd-neutral-400);
 }
 
 @layer utilities {
@@ -73,32 +151,32 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 /* Color scheme for time picker dropdown */
 input[type="time"]::-webkit-datetime-edit {
-  color: slate-700;
+  color: var(--fmd-neutral-700);
 }
 
 input[type="time"]::-webkit-datetime-edit-fields-wrapper {
-  background: linear-gradient(to bottom, #f8fafc, #ffffff);
+  background: linear-gradient(to bottom, var(--fmd-neutral-50), #ffffff);
   border-radius: 8px;
 }
 
 input[type="time"]::-webkit-datetime-edit-text {
-  color: #334155;
+  color: var(--fmd-neutral-700);
   font-weight: 500;
 }
 
 input[type="time"]::-webkit-datetime-edit-hour-field,
 input[type="time"]::-webkit-datetime-edit-minute-field {
-  background: linear-gradient(to bottom, #f1f5f9, #ffffff);
+  background: linear-gradient(to bottom, var(--fmd-neutral-100), #ffffff);
   border-radius: 6px;
   padding: 2px 4px;
   margin: 0 2px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--fmd-neutral-200);
 }
 
 input[type="time"]::-webkit-datetime-edit-hour-field:focus,
 input[type="time"]::-webkit-datetime-edit-minute-field:focus {
-  background: #dbeafe;
-  border-color: #3b82f6;
+  background: var(--fmd-primary-100);
+  border-color: var(--fmd-primary-500);
   outline: none;
 }
 
