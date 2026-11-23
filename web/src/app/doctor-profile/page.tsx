@@ -219,11 +219,10 @@ export default function DoctorProfile() {
     setIsScheduleSaving(true);
     try {
       const payload = {
-        day_of_week: parseInt(scheduleForm.day_of_week),
-        start_time: scheduleForm.start_time,
-        end_time: scheduleForm.end_time,
+        dayOfWeek: parseInt(scheduleForm.day_of_week),
+        startTime: scheduleForm.start_time,
+        endTime: scheduleForm.end_time,
         consultation_duration_minutes: 30,
-        is_active: true,
       };
       const response = await doctorApi.createSchedule(payload);
       if (response.success) {
@@ -851,6 +850,7 @@ export default function DoctorProfile() {
                         onChange={(value) => setScheduleForm({ ...scheduleForm, day_of_week: value })}
                         placeholder="Select day"
                         options={dayOptions}
+                        triggerClassName="text-neutral-900"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -907,7 +907,7 @@ export default function DoctorProfile() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-neutral-500 italic">No schedules added yet</p>
+                  <p className="text-sm text-neutral-600 italic">No schedules added yet</p>
                 )}
               </div>
 
