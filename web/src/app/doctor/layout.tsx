@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import DoctorSidebar from '@/components/layout/DoctorSidebar';
 import DoctorHeader from '@/components/layout/DoctorHeader';
 import PageTransition from '@/components/PageTransition';
 import { apiClient } from '@/lib/api/apiClient';
+import { doctorApi, DoctorProfile } from '@/lib/api/doctorApi';
+import { createRefreshGate } from '@/lib/api/refreshGate';
+import { resolveDoctorIdentity } from '@/lib/doctorIdentity';
 
 interface DoctorLayoutProps {
   children: React.ReactNode;
@@ -19,9 +22,10 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
     pathname === '/doctor/forgot-password' ||
     pathname === '/doctor/reset-password' ||
     isTrustPage;
-  const [userName, setUserName] = useState('Dr. Smith');
-  const [userRole, setUserRole] = useState('Doctor');
+  const [sessionEmail, setSessionEmail] = useState<string | undefined>(undefined);
+  const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const hasLoadedProfileRef = useRef(false);
 
   useEffect(() => {
     // Check authentication - prefer role-scoped HttpOnly cookies, fall back to localStorage
@@ -64,8 +68,8 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
         shouldRedirect = true;
         redirectPath = '/doctor-login';
       } else {
-        setUserName(user.email.split('@')[0] || 'Doctor');
-        setUserRole(user.role || 'Doctor');
+        // The stored session identity stays available as the display fallback.
+        setSessionEmail(typeof user.email === 'string' ? user.email : undefined);
         apiClient.setToken(token);
       }
     }
@@ -76,6 +80,55 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
 
     setIsLoading(false);
   }, [router]);
+
+  // The shared doctor profile lives in the layout so the header and sidebar
+  // read one source. A forced refresh (profileUpdated) bypasses the short GET
+  // cache, and the gate coalesces overlapping triggers so the profile is never
+  // requested twice for a single event.
+  const refreshProfile = useMemo(
+    () =>
+      createRefreshGate(async (force: boolean) => {
+        const token = apiClient.getStoredToken();
+        if (!token) return;
+
+        apiClient.setToken(token);
+
+        await doctorApi
+          .getProfile({ skipCache: force })
+          .then((response) => {
+            if (response.success && response.data) {
+              setDoctorProfile(response.data);
+            }
+          })
+          .catch((err) => {
+            // A failed profile read keeps the stored session identity as the
+            // fallback and must never clear the session or redirect.
+            console.error('Error loading doctor profile:', err);
+          });
+      }).run,
+    []
+  );
+
+  // Skip profile loading on the public doctor pages. Portal navigation does not
+  // change this flag, so the profile is not re-fetched on every page change.
+  useEffect(() => {
+    if (isPublicPage) return;
+    if (hasLoadedProfileRef.current) return;
+    hasLoadedProfileRef.current = true;
+    refreshProfile();
+  }, [isPublicPage, refreshProfile]);
+
+  // Profile edits dispatch `profileUpdated`; the layout owns the refresh.
+  useEffect(() => {
+    if (isPublicPage) return;
+    const handleUpdate = () => {
+      refreshProfile(true);
+    };
+    window.addEventListener('profileUpdated', handleUpdate);
+    return () => {
+      window.removeEventListener('profileUpdated', handleUpdate);
+    };
+  }, [isPublicPage, refreshProfile]);
 
   if (isLoading) {
     return (
@@ -89,10 +142,16 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
     return <PageTransition>{children}</PageTransition>;
   }
 
+  const identity = resolveDoctorIdentity(doctorProfile, sessionEmail);
+
   return (
     <div className="min-h-screen bg-[#f8f9ff]">
-      <DoctorSidebar userName={userName} userRole={userRole} />
-      <DoctorHeader userName={userName} userRole={userRole} />
+      <DoctorSidebar profile={doctorProfile} />
+      <DoctorHeader
+        userName={identity.displayName}
+        userEmail={identity.email}
+        userRole={identity.role}
+      />
       <main className="ml-64 pt-20 bg-[#f8f9ff] p-6">
         <div className="max-w-[1600px] mx-auto">
           <PageTransition>{children}</PageTransition>

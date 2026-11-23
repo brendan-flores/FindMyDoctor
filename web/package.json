@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
-    "test": "node --test src/lib/api/requestPolicy.test.ts src/lib/api/ttlCache.test.ts src/lib/phone.test.ts",
+    "test": "node --test src/lib/api/requestPolicy.test.ts src/lib/api/ttlCache.test.ts src/lib/phone.test.ts src/lib/doctorIdentity.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
