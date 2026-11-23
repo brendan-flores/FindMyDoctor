@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { usePresence } from '@/hooks/usePresence';
 
 export interface SelectOption {
@@ -35,25 +36,108 @@ export default function Select({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownPresent = usePresence(isOpen);
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    placement: 'top' | 'bottom';
+  } | null>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
   const displayLabel = selectedOption ? selectedOption.label : value || placeholder;
 
+  const reposition = useCallback(() => {
+    if (!isOpen || !containerRef.current || !menuRef.current) return;
+
+    const triggerRect = containerRef.current.getBoundingClientRect();
+    const menuHeight = menuRef.current.getBoundingClientRect().height;
+
+    let top: number;
+    let placement: 'top' | 'bottom' = 'bottom';
+
+    if (
+      triggerRect.bottom + menuHeight > window.innerHeight &&
+      triggerRect.top - menuHeight >= 0
+    ) {
+      top = triggerRect.top;
+      placement = 'top';
+    } else {
+      top = triggerRect.bottom;
+      placement = 'bottom';
+    }
+
+    setDropdownPosition({
+      top,
+      left: triggerRect.left,
+      width: triggerRect.width,
+      placement,
+    });
+  }, [isOpen]);
+
   useEffect(() => {
     if (!isOpen) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+        placement: 'bottom',
+      });
+    }
+
+    const frame = requestAnimationFrame(() => reposition());
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, reposition]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    return () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+  }, [isOpen, reposition]);
+
+  const handleClickOutside = useCallback(
+    (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node) &&
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
-    };
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
+  }, [isOpen, handleClickOutside]);
 
   const handleSelect = (val: string) => {
     onChange(val);
     setIsOpen(false);
   };
+
+  const menuStyle = dropdownPosition
+    ? {
+        position: 'fixed' as const,
+        top: dropdownPosition.top,
+        left: dropdownPosition.left,
+        width: dropdownPosition.width,
+        ...(dropdownPosition.placement === 'top'
+          ? { transform: 'translateY(-100%)' }
+          : {}),
+      }
+    : undefined;
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -79,27 +163,32 @@ export default function Select({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {dropdownPresent && (
-        <div
-          data-dropdown-content
-          data-state={isOpen ? 'open' : 'closed'}
-          className="fmd-dropdown absolute z-10 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-60 overflow-y-auto"
-        >
-          {options.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              disabled={opt.disabled}
-              onClick={() => handleSelect(opt.value)}
-              className={`w-full px-4 py-2 text-left hover:bg-success-50 hover:text-success-700 transition-colors truncate first:rounded-t-lg last:rounded-b-lg ${
-                opt.value === value ? 'bg-success-50 text-success-700' : 'text-neutral-700'
-              } ${opt.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {dropdownPresent && dropdownPosition ? (
+        createPortal(
+          <div
+            ref={menuRef}
+            data-dropdown-content
+            data-state={isOpen ? 'open' : 'closed'}
+            style={menuStyle}
+            className="fmd-dropdown fixed z-[9999] bg-white border border-neutral-200 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+          >
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                disabled={opt.disabled}
+                onClick={() => handleSelect(opt.value)}
+                className={`w-full px-4 py-2 text-left hover:bg-success-50 hover:text-success-700 transition-colors truncate first:rounded-t-lg last:rounded-b-lg ${
+                  opt.value === value ? 'bg-success-50 text-success-700' : 'text-neutral-700'
+                } ${opt.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>,
+          document.body
+        )
+      ) : null}
     </div>
   );
 }
