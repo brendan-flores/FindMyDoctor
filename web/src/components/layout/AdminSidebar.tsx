@@ -27,7 +27,6 @@ export default function AdminSidebar({ userName = 'Eleanor Vance', userRole = 'S
     ...(userRole === 'SUPERADMIN' ? [
       { id: 'admin', label: 'Admin', icon: 'admin_panel_settings' }
     ] : []),
-    { id: 'settings', label: 'Settings', icon: 'tune' },
   ];
 
   const handleNavClick = (tabId: string) => {
