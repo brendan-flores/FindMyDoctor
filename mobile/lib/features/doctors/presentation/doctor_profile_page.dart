@@ -282,17 +282,13 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  profile.displayName,
-                  style: AppTextStyles.headlineSm.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  semanticsLabel: profile.displayName,
+              Text(
+                profile.displayName,
+                style: AppTextStyles.headlineSm.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
+                overflow: TextOverflow.visible,
+                semanticsLabel: profile.displayName,
               ),
               if (profile.specialty != null) ...[
                 const SizedBox(height: spacing.AppSpacing.gutterXs),
