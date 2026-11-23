@@ -365,7 +365,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         Expanded(
           child: Text(
             'Appointment Details',
-            style: AppTextStyles.headlineMd,
+            style: AppTextStyles.headlineSm,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         Container(

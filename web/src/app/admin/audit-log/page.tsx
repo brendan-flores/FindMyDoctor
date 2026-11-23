@@ -148,6 +148,7 @@ export default function AuditLogPage() {
             />
           </div>
 
+
           {/* Start Date Filter */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400 font-medium hidden sm:inline whitespace-nowrap">From:</span>
@@ -171,6 +172,10 @@ export default function AuditLogPage() {
               className="w-40"
             />
           </div>
+
+
+
+
         </div>
 
         <button
@@ -382,7 +387,7 @@ export default function AuditLogPage() {
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Timestamp</h3>
                 <div className="bg-slate-50 rounded-lg p-4">
-                  <p className="text-xs font-medium text-slate-900">{formatTimestamp(selectedEntry.timestamp)}</p>
+                  <p className="text-xs font-medium text-slate-900">{formatTimestamp(selectedEntry.timestamp).datePart}</p>
                   <p className="text-xs text-slate-500 font-mono mt-1">{selectedEntry.timestamp}</p>
                 </div>
               </div>
