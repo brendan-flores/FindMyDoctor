@@ -12,7 +12,6 @@ import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/utils/json_parsers.dart';
 import 'appointment_detail_page.dart';
-import '../../payments/presentation/invoice_bottom_sheet.dart';
 
 class AppointmentsPage extends StatefulWidget {
   final ApiService? apiService;
@@ -31,7 +30,7 @@ class AppointmentsPage extends StatefulWidget {
 }
 
 class _AppointmentsPageState extends State<AppointmentsPage> {
-  String _selectedFilter = 'upcoming';
+  String _selectedFilter = 'all';
   DateTime? _selectedDate;
   late final ApiService _apiService;
   List<dynamic> _allAppointments = []; // Store all appointments
@@ -141,16 +140,17 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
   }
 
   bool _matchesStatusFilter(dynamic appointment, String filter) {
+    final status = (appointment['status'] ?? '').toString().toUpperCase();
     switch (filter) {
       case 'upcoming':
-        return appointment['status'] == 'SCHEDULED' ||
-            appointment['status'] == 'CONFIRMED' ||
-            appointment['status'] == 'IN_PROGRESS';
+        return status == 'SCHEDULED' ||
+            status == 'CONFIRMED' ||
+            status == 'IN_PROGRESS';
       case 'completed':
-        return appointment['status'] == 'COMPLETED';
+        return status == 'COMPLETED';
       case 'cancelled':
-        return appointment['status'] == 'CANCELLED' ||
-            appointment['status'] == 'NO_SHOW';
+        return status == 'CANCELLED' ||
+            status == 'NO_SHOW';
       case 'all':
       default:
         return true;
@@ -288,7 +288,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                 ),
               ),
             ),
-            const SizedBox(width: spacing.AppSpacing.gutterMd),
+            SizedBox(width: spacing.AppSpacing.gutterMd),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,45 +338,30 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 spacing.AppSpacing.screenPadding,
-                spacing.AppSpacing.gutterSm,
+                spacing.AppSpacing.gutterXs,
                 spacing.AppSpacing.screenPadding,
                 0,
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Expanded(child: _buildDateFilterButton()),
-                  if (_selectedDate != null) ...[
-                    const SizedBox(width: spacing.AppSpacing.gutterSm),
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedDate = null;
-                          _filterAppointments();
-                        });
-                      },
-                      child: const Text('Clear date'),
-                    ),
-                  ],
-                  const SizedBox(width: spacing.AppSpacing.gutterSm),
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _selectedFilter = 'upcoming';
-                        _selectedDate = null;
-                        _filterAppointments();
-                      });
-                    },
-                    child: const Text('Clear All'),
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: _buildDateFilterButton(),
                   ),
+                  if (_selectedDate != null || _selectedFilter != 'upcoming') ...[
+                    const SizedBox(width: spacing.AppSpacing.gutterXs),
+                    _buildClearAction(),
+                  ],
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 spacing.AppSpacing.screenPadding,
-                spacing.AppSpacing.gutterSm,
+                spacing.AppSpacing.gutterXs,
                 spacing.AppSpacing.screenPadding,
-                spacing.AppSpacing.gutterSm,
+                spacing.AppSpacing.gutterXs,
               ),
               child: _buildFilterTabs(),
             ),
@@ -533,7 +518,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                   ],
                 ),
               ),
-            ),
+             ),
           ],
         ),
       ),
@@ -560,7 +545,30 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
         }
       },
       icon: const Icon(Icons.calendar_today, size: 16),
-      label: Text(label),
+      label: SizedBox(
+        width: double.infinity,
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClearAction() {
+    return TextButton(
+      onPressed: () {
+        setState(() {
+          _selectedFilter = 'upcoming';
+          _selectedDate = null;
+          _filterAppointments();
+        });
+      },
+      child: const Text(
+        'Clear All',
+        style: TextStyle(fontSize: 12),
+      ),
     );
   }
 
@@ -571,16 +579,21 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
         color: AppColors.surfaceLow,
         borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
       ),
-      child: Row(
-        children: [
-          Expanded(child: _buildFilterTab('All', 'all')),
-          const SizedBox(width: spacing.AppSpacing.gutterXs),
-          Expanded(child: _buildFilterTab('Upcoming', 'upcoming')),
-          const SizedBox(width: spacing.AppSpacing.gutterXs),
-          Expanded(child: _buildFilterTab('Completed', 'completed')),
-          const SizedBox(width: spacing.AppSpacing.gutterXs),
-          Expanded(child: _buildFilterTab('Cancelled', 'cancelled')),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildFilterTab('All', 'all'),
+            const SizedBox(width: spacing.AppSpacing.gutterXs),
+            _buildFilterTab('Upcoming', 'upcoming'),
+            const SizedBox(width: spacing.AppSpacing.gutterXs),
+            _buildFilterTab('Completed', 'completed'),
+            const SizedBox(width: spacing.AppSpacing.gutterXs),
+            _buildFilterTab('Cancelled', 'cancelled'),
+          ],
+        ),
       ),
     );
   }
@@ -603,8 +616,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
       borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: spacing.AppSpacing.gutterXs,
-          vertical: spacing.AppSpacing.gutterSm,
+          horizontal: spacing.AppSpacing.gutterSm,
+          vertical: spacing.AppSpacing.gutterXs,
         ),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.surfaceLowest : Colors.transparent,
@@ -620,37 +633,38 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
               : null,
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               label,
-              style: AppTextStyles.labelMd.copyWith(
+              style: AppTextStyles.labelSm.copyWith(
+                fontWeight: FontWeight.w600,
                 color: isSelected ? AppColors.primary : AppColors.secondary,
               ),
             ),
-            const SizedBox(width: spacing.AppSpacing.gutterXs),
-            Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primary.withValues(alpha: 0.1)
-                    : AppColors.surfaceContainer,
-                borderRadius: BorderRadius.circular(
-                  spacing.AppSpacing.radiusFull,
+            if (count > 0) const SizedBox(width: spacing.AppSpacing.gutterXs),
+            if (count > 0)
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.primary.withValues(alpha: 0.1)
+                      : AppColors.surfaceContainer,
+                  borderRadius: BorderRadius.circular(
+                    spacing.AppSpacing.radiusFull,
+                  ),
                 ),
-              ),
-              child: Center(
-                child: Text(
-                  count.toString(),
-                  style: AppTextStyles.labelSm.copyWith(
-                    color: isSelected ? AppColors.primary : AppColors.secondary,
-                    fontSize: 10,
+                child: Center(
+                  child: Text(
+                    count.toString(),
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: isSelected ? AppColors.primary : AppColors.secondary,
+                      fontSize: 9,
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -660,10 +674,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
   Widget _buildWaitlistRow() {
     final count = _waitlists.length;
 
-    return Semantics(
-      label: 'My waitlists, $count ${count == 1 ? 'entry' : 'entries'}',
-      button: true,
-      child: Material(
+    return Material(
         color: AppColors.surfaceLow,
         borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
         child: InkWell(
@@ -694,7 +705,6 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                 ),
                 const Icon(Icons.chevron_right, color: AppColors.secondary),
               ],
-            ),
           ),
         ),
       ),
@@ -715,235 +725,184 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     final queueNumber = parseInt(appointment['queue_number']);
     final status = appointment['status'];
     final appointmentId = appointment['id']?.toString() ?? '';
+    final isCompleted = status == 'COMPLETED';
+    final isScheduled = status == 'SCHEDULED' || status == 'CONFIRMED';
     // consultation_fee is a PostgreSQL DECIMAL column, so the API delivers it
     // as a JSON string (e.g. "500.00") - parse it instead of casting.
     final consultationFee = parseNum(appointment['consultation_fee']);
     final paymentStatus = parseString(appointment['payment_status']);
     final paymentMethod = parseString(appointment['payment_method']);
-    final paymentId = appointment['payment_id']?.toString();
-
-    // Show invoice button only for completed appointments with PAID status (case-insensitive)
-    final showInvoiceButton =
-        status == 'COMPLETED' &&
-        paymentStatus?.toUpperCase() == 'PAID' &&
-        paymentId != null;
-
-    // Enhanced debug logging for invoice button visibility
-    print('=== Invoice Button Debug (Appointments List) ===');
-    print('Appointment ID: $appointmentId');
-    print('Status: $status');
-    print('Payment Status: $paymentStatus');
-    print('Payment Status (uppercase): ${paymentStatus?.toUpperCase()}');
-    print('Payment ID: $paymentId');
-    print('Show Invoice Button: $showInvoiceButton');
-    print('Full appointment object: $appointment');
-    print('================================================');
-
     return AppCard(
-      padding: EdgeInsets.all(spacing.AppSpacing.gutterLg),
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
       onTap: () => _navigateToDetail(appointmentId),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header badge
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: spacing.AppSpacing.gutterSm,
-                  vertical: spacing.AppSpacing.gutterXs,
-                ),
-                decoration: BoxDecoration(
-                  color: status == 'SCHEDULED'
-                      ? AppColors.tertiaryContainer.withValues(alpha: 0.15)
-                      : status == 'COMPLETED'
-                      ? AppColors.surfaceContainer
-                      : AppColors.errorContainer,
-                  borderRadius: BorderRadius.circular(
-                    spacing.AppSpacing.radiusFull,
+          // Header badge — skip for COMPLETED appointments since the
+          // user is already viewing the Completed tab.
+          if (isScheduled) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.AppSpacing.gutterSm,
+                    vertical: spacing.AppSpacing.gutterXs,
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      status == 'SCHEDULED'
-                          ? Icons.radio_button_checked
-                          : status == 'COMPLETED'
-                          ? Icons.check_circle
-                          : Icons.cancel,
-                      size: spacing.AppSpacing.iconSm,
-                      color: status == 'SCHEDULED'
-                          ? AppColors.onTertiaryContainer
-                          : status == 'COMPLETED'
-                          ? AppColors.tertiary
-                          : AppColors.onErrorContainer,
+                  decoration: BoxDecoration(
+                    color: status == 'SCHEDULED'
+                        ? AppColors.tertiaryContainer.withValues(alpha: 0.15)
+                        : AppColors.errorContainer,
+                    borderRadius: BorderRadius.circular(
+                      spacing.AppSpacing.radiusFull,
                     ),
-                    const SizedBox(width: spacing.AppSpacing.gutterXs),
-                    Flexible(
-                      child: Text(
-                        status == 'SCHEDULED'
-                            ? queueNumber != null
-                                  ? 'Confirmed • Queue #$queueNumber'
-                                  : 'Confirmed'
-                            : status == 'COMPLETED'
-                            ? 'Completed'
-                            : 'Cancelled',
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        color: AppColors.tertiary,
+                        size: spacing.AppSpacing.iconSm,
+                      ),
+                      const SizedBox(width: spacing.AppSpacing.gutterXs),
+                      Text(
+                        'Confirmed',
                         style: AppTextStyles.labelMd.copyWith(
-                          color: status == 'SCHEDULED'
-                              ? AppColors.onTertiaryContainer
-                              : status == 'COMPLETED'
-                              ? AppColors.secondary
-                              : AppColors.onErrorContainer,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onTertiaryContainer,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.AppSpacing.gutterSm,
+                    vertical: spacing.AppSpacing.gutterXs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainer,
+                    borderRadius: BorderRadius.circular(
+                      spacing.AppSpacing.radiusFull,
                     ),
-                  ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Queue #',
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.secondary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                      ),
+                      Text(
+                        queueNumber != null ? queueNumber.toString() : '--',
+                        style: AppTextStyles.labelMd.copyWith(
+                          color: AppColors.onSurface,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: spacing.AppSpacing.gutterMd),
+          ] else if (isCompleted) ...[
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: spacing.AppSpacing.gutterSm,
+                vertical: spacing.AppSpacing.gutterXs,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainer,
+                borderRadius: BorderRadius.circular(
+                  spacing.AppSpacing.radiusFull,
                 ),
               ),
-              if (status == 'COMPLETED')
-                Padding(
-                  padding: EdgeInsets.only(right: spacing.AppSpacing.gutterXs),
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pushNamed('/payments');
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: spacing.AppSpacing.gutterSm,
-                        vertical: spacing.AppSpacing.gutterXs,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.secondaryContainer.withValues(
-                          alpha: 0.3,
-                        ),
-                        borderRadius: BorderRadius.circular(
-                          spacing.AppSpacing.radiusFull,
-                        ),
-                        border: Border.all(
-                          color: AppColors.secondary.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.payments_outlined,
-                            size: spacing.AppSpacing.iconSm,
-                            color: AppColors.secondary,
-                          ),
-                          const SizedBox(width: spacing.AppSpacing.gutterXs),
-                          Text(
-                            'Payments',
-                            style: AppTextStyles.labelSm.copyWith(
-                              color: AppColors.secondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              if (showInvoiceButton)
-                GestureDetector(
-                  onTap: () {
-                    print('Invoice button tapped for paymentId: $paymentId');
-                    AppNavigator.showAppModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) =>
-                          InvoiceBottomSheet(paymentId: paymentId!),
-                    );
-                  },
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: spacing.AppSpacing.gutterSm,
-                      vertical: spacing.AppSpacing.gutterXs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryContainer.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(
-                        spacing.AppSpacing.radiusFull,
-                      ),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.receipt_long,
-                          size: spacing.AppSpacing.iconSm,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: spacing.AppSpacing.gutterXs),
-                        Text(
-                          'View Invoice',
-                          style: AppTextStyles.labelSm.copyWith(
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          if (appointment['needs_attention'] == true &&
-              (status == 'SCHEDULED' ||
-                  status == 'CONFIRMED' ||
-                  status == 'IN_PROGRESS'))
-            Padding(
-              padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(
-                    Icons.warning_amber_rounded,
-                    color: AppColors.statusWarning,
+                    Icons.check_circle,
+                    color: AppColors.tertiary,
                     size: spacing.AppSpacing.iconSm,
                   ),
                   const SizedBox(width: spacing.AppSpacing.gutterXs),
-                  Expanded(
-                    child: Text(
-                      "The clinic changed the doctor's schedule. They will contact you.",
-                      style: AppTextStyles.labelSm.copyWith(
-                        color: AppColors.slate700,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  Text(
+                    'Completed',
+                    style: AppTextStyles.labelMd.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.secondary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: spacing.AppSpacing.gutterMd),
+          ],
+          if (appointment['needs_attention'] == true &&
+              (status == 'SCHEDULED' ||
+                  status == 'CONFIRMED' ||
+                  status == 'IN_PROGRESS')) ...[
+            const SizedBox(height: spacing.AppSpacing.gutterSm),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: AppColors.statusWarning,
+                  size: spacing.AppSpacing.iconSm,
+                ),
+                const SizedBox(width: spacing.AppSpacing.gutterXs),
+                Expanded(
+                  child: Text(
+                    "The clinic changed the doctor's schedule. They will contact you.",
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.slate700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: spacing.AppSpacing.gutterMd),
           // Doctor info
           Row(
             children: [
               DoctorProfileImage(
                 photoUrl: professionalPhotoUrl,
-                size: 64,
+                size: 56,
                 showVerifiedBadge: true,
               ),
-              const SizedBox(width: spacing.AppSpacing.gutterMd),
+              SizedBox(width: spacing.AppSpacing.gutterMd),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Dr. $doctorFirstName $doctorLastName',
-                      style: AppTextStyles.headlineSm,
+                      style: AppTextStyles.headlineSm.copyWith(
+                        fontSize: 17,
+                      ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       specialty,
                       style: AppTextStyles.bodyMdMedium.copyWith(
                         color: AppColors.primary,
+                        fontSize: 13,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: spacing.AppSpacing.gutterXs),
                     Row(
@@ -959,7 +918,10 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                             practiceName,
                             style: AppTextStyles.bodyMd.copyWith(
                               color: AppColors.secondary,
+                              fontSize: 13,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -970,7 +932,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
             ],
           ),
           const SizedBox(height: spacing.AppSpacing.gutterMd),
-          // Schedule info
+          // Schedule + Fee container
           Container(
             padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
             decoration: BoxDecoration(
@@ -1005,8 +967,9 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                           children: [
                             Text(
                               appointmentDate != null
-                                  ? DateFormat('EEEE, MMM d, yyyy')
-                                        .format(appointmentDate)
+                                  ? DateFormat('EEEE, MMM d, yyyy').format(
+                                    appointmentDate,
+                                  )
                                   : 'Date not available',
                               style: AppTextStyles.bodyMdMedium,
                               maxLines: 1,
@@ -1014,8 +977,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
                             ),
                             Text(
                               appointmentDate != null
-                                  ? DateFormat('hh:mm a')
-                                        .format(appointmentDate)
+                                  ? '${DateFormat('hh:mm a').format(appointmentDate)} Slot'
                                   : 'Time not available',
                               style: AppTextStyles.labelSm.copyWith(
                                 color: AppColors.secondary,
@@ -1111,63 +1073,99 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
               ],
             ),
           ),
-          if (status == 'SCHEDULED') ...[
-            const SizedBox(height: spacing.AppSpacing.gutterMd),
-            // Action buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  height: 48,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: spacing.AppSpacing.gutterMd,
-                  ),
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceLow,
+                    color: isCompleted
+                        ? AppColors.surfaceLowest
+                        : AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(
                       spacing.AppSpacing.radiusLg,
                     ),
-                  ),
-                  child: Icon(
-                    Icons.chat,
-                    color: AppColors.primary,
-                    size: spacing.AppSpacing.iconMd,
-                  ),
-                ),
-                const SizedBox(width: spacing.AppSpacing.gutterSm),
-                Container(
-                  height: 48,
-                  width: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLow,
-                    borderRadius: BorderRadius.circular(
-                      spacing.AppSpacing.radiusLg,
+                    border: Border.all(
+                      color: isCompleted
+                          ? AppColors.primary.withValues(alpha: 0.3)
+                          : AppColors.primary.withValues(alpha: 0.3),
                     ),
                   ),
-                  child: Icon(
-                    Icons.directions,
-                    color: AppColors.secondary,
-                    size: spacing.AppSpacing.iconMd,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: spacing.AppSpacing.gutterSm),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _navigateToReschedule(appointmentId),
-                icon: const Icon(Icons.event_repeat, size: 18),
-                label: const Text('Reschedule appointment'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: spacing.AppSpacing.gutterSm,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        if (isCompleted) {
+                          Navigator.of(context).pushNamed(
+                            '/appointment-detail',
+                            arguments: {'appointmentId': appointmentId},
+                          );
+                        } else {
+                          _navigateToReschedule(appointmentId);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(
+                        spacing.AppSpacing.radiusLg,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.event_repeat,
+                            color: AppColors.primary,
+                            size: 18,
+                          ),
+                          const SizedBox(width: spacing.AppSpacing.gutterXs),
+                          Text(
+                            isCompleted ? 'View Summary' : 'Reschedule',
+                            style: AppTextStyles.labelMd.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: spacing.AppSpacing.gutterSm),
+              Container(
+                height: 44,
+                width: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLow,
+                  borderRadius: BorderRadius.circular(
+                    spacing.AppSpacing.radiusLg,
+                  ),
+                ),
+                child: Icon(
+                  Icons.chat,
+                  color: AppColors.primary,
+                  size: spacing.AppSpacing.iconMd,
+                ),
+              ),
+              const SizedBox(width: spacing.AppSpacing.gutterSm),
+              Container(
+                height: 44,
+                width: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLow,
+                  borderRadius: BorderRadius.circular(
+                    spacing.AppSpacing.radiusLg,
+                  ),
+                ),
+                child: Icon(
+                  Icons.directions,
+                  color: AppColors.secondary,
+                  size: spacing.AppSpacing.iconMd,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -1189,3 +1187,5 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
     }
   }
 }
+
+
