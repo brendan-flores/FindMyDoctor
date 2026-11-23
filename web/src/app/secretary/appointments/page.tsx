@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api/apiClient';
+import { usePresence } from '@/hooks/usePresence';
 
 interface Appointment {
   id: string;
@@ -21,6 +22,10 @@ export default function SecretaryAppointments() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+
+  const showDetailModal = selectedAppointment !== null;
+  const detailModalPresent = usePresence(showDetailModal);
 
   useEffect(() => {
     fetchAppointments();
@@ -275,14 +280,13 @@ export default function SecretaryAppointments() {
                   </div>
                   
                   <div className="ml-4 flex gap-2">
-                    <button className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
+                    <button
+                      onClick={() => setSelectedAppointment(appointment)}
+                      className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                      aria-label="View appointment details"
+                    >
                       <span className="material-symbols-outlined">visibility</span>
                     </button>
-                    {appointment.status === 'SCHEDULED' && (
-                      <button className="p-2 text-neutral-400 hover:text-success-600 hover:bg-success-50 rounded-lg transition-colors">
-                        <span className="material-symbols-outlined">play_arrow</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
@@ -290,6 +294,104 @@ export default function SecretaryAppointments() {
           </div>
         )}
       </div>
+
+      {/* Appointment Details Modal */}
+      {detailModalPresent && selectedAppointment && (
+        <div
+          className="fmd-modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          data-state={showDetailModal ? 'open' : 'closed'}
+        >
+          <div
+            className="fmd-modal-panel bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl"
+            data-state={showDetailModal ? 'open' : 'closed'}
+          >
+            <div className="p-6 border-b border-neutral-200 bg-neutral-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-neutral-900">Appointment Details</h2>
+                  <p className="text-sm text-neutral-500 mt-1">
+                    {selectedAppointment.patient_first_name} {selectedAppointment.patient_last_name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedAppointment(null)}
+                  className="text-neutral-400 hover:text-neutral-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100">
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Date</p>
+                  <p className="text-sm font-medium text-neutral-900 mt-1">
+                    {formatDate(selectedAppointment.appointment_date)}
+                  </p>
+                </div>
+                <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100">
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Time</p>
+                  <p className="text-sm font-medium text-neutral-900 mt-1">
+                    {formatTime(selectedAppointment.appointment_date)}
+                  </p>
+                </div>
+                <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100">
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Status</p>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedAppointment.status)}`}
+                  >
+                    {selectedAppointment.status.replace('_', ' ')}
+                  </span>
+                </div>
+                {selectedAppointment.queue_number && (
+                  <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100">
+                    <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Queue</p>
+                    <p className="text-sm font-medium text-neutral-900 mt-1">
+                      #{selectedAppointment.queue_number}
+                    </p>
+                  </div>
+                )}
+              </div>
+              {selectedAppointment.reason_for_visit && (
+                <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100">
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
+                    Reason for Visit
+                  </p>
+                  <p className="text-sm text-neutral-700 mt-1">{selectedAppointment.reason_for_visit}</p>
+                </div>
+              )}
+              {selectedAppointment.practice_name && (
+                <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100">
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
+                    Practice
+                  </p>
+                  <p className="text-sm text-neutral-700 mt-1">{selectedAppointment.practice_name}</p>
+                </div>
+              )}
+              {selectedAppointment.needs_attention && selectedAppointment.status !== 'CANCELLED' && selectedAppointment.status !== 'COMPLETED' && selectedAppointment.status !== 'NO_SHOW' && (
+                <div className="bg-warning-50 border border-warning-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-warning-800 uppercase tracking-wide mb-1">
+                    Needs Attention
+                  </p>
+                  <p className="text-sm text-warning-700">
+                    The clinic changed the doctor's schedule. The clinic will contact this patient.
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="p-6 border-t border-neutral-200 bg-neutral-50">
+              <button
+                onClick={() => setSelectedAppointment(null)}
+                className="w-full px-5 py-2.5 text-sm font-semibold text-neutral-700 bg-white hover:bg-neutral-100 border border-neutral-300 rounded-lg transition-colors shadow-md"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
