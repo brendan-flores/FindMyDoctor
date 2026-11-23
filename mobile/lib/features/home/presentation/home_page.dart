@@ -425,11 +425,10 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: _buildBottomNavigation(),
       // M2: Floating "Ask MediGuide" shortcut in patient shell
       // HomePage is only shown to patients (secretaries get SecretaryHomePage)
-      // Hide on Chat tab (index 3) and Profile/Settings tab (index 4)
+      // Show only on Home tab (index 0) and Doctors tab (index 1)
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      floatingActionButton: _currentIndex == 3 || _currentIndex == 4
-          ? null
-          : FloatingActionButton(
+      floatingActionButton: (_currentIndex == 0 || _currentIndex == 1)
+          ? FloatingActionButton(
               tooltip: AiConstants.shortcutLabel,
               onPressed: () {
                 setState(() {
@@ -449,7 +448,8 @@ class _HomePageState extends State<HomePage> {
                   fit: BoxFit.contain,
                 ),
               ),
-            ),
+            )
+          : null,
     );
   }
 

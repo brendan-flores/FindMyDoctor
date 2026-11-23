@@ -146,44 +146,88 @@ class MyAppState extends State<MyApp> {
       navigatorKey: AppNavigator.key,
       home: _getInitialHome(),
       onGenerateRoute: (settings) {
-        // Route guards for authentication and password change requirement
-        // Use cached state from initialization for synchronous checks
+        final args = settings.arguments as Map<String, dynamic>?;
+
+        // ---- Public routes (no authenticated session required) ----
         switch (settings.name) {
           case '/login':
             return MaterialPageRoute(builder: (context) => const LoginPage());
           case '/signup':
             return MaterialPageRoute(builder: (context) => const SignUpPage());
-          case '/change-password':
-            // Prevent unauthenticated access to password change page
-            if (!_isAuthenticated) {
-              return MaterialPageRoute(builder: (context) => const LoginPage());
-            }
+          case '/specializations':
+            return MaterialPageRoute(
+              builder: (context) => const SpecializationsPage(specialties: []),
+            );
+          case '/recent-updates':
+            return MaterialPageRoute(
+              builder: (context) => const RecentUpdatesPage(),
+            );
+        }
+
+        // ---- Change password (session required) ----
+        if (settings.name == '/change-password') {
+          if (!_isAuthenticated) {
+            return MaterialPageRoute(builder: (context) => const LoginPage());
+          }
+          return MaterialPageRoute(
+            builder: (context) => const ChangePasswordPage(),
+          );
+        }
+
+        // ---- Secretary-only home (session + role required) ----
+        if (settings.name == '/secretary-home') {
+          if (!_isAuthenticated) {
+            return MaterialPageRoute(builder: (context) => const LoginPage());
+          }
+          if (_mustChangePassword) {
             return MaterialPageRoute(
               builder: (context) => const ChangePasswordPage(),
             );
-          case '/secretary-home':
-            // Secretary-only chat-first home. Unauthenticated users are sent
-            // to login, outstanding password changes are enforced, and
-            // non-secretaries fall back to the patient home.
-            if (!_isAuthenticated) {
-              return MaterialPageRoute(builder: (context) => const LoginPage());
-            }
-            if (_mustChangePassword) {
-              return MaterialPageRoute(
-                builder: (context) => const ChangePasswordPage(),
-              );
-            }
-            if (!_isSecretary) {
-              return MaterialPageRoute(builder: (context) => const HomePage());
-            }
-            return MaterialPageRoute(
-              builder: (context) => const SecretaryHomePage(),
-            );
+          }
+          if (!_isSecretary) {
+            return MaterialPageRoute(builder: (context) => const HomePage());
+          }
+          return MaterialPageRoute(
+            builder: (context) => const SecretaryHomePage(),
+          );
+        }
+
+        // ---- All remaining routes require an authenticated session ----
+        if (!_isAuthenticated) {
+          return MaterialPageRoute(builder: (context) => const LoginPage());
+        }
+        if (_mustChangePassword) {
+          return MaterialPageRoute(
+            builder: (context) => const ChangePasswordPage(),
+          );
+        }
+        // Secretaries have no queue, payment, walk-in, or schedule
+        // management screens. Keep them on the chat-first home except for
+        // the shared conversation thread.
+        if (_isSecretary && settings.name != '/conversation-thread') {
+          return MaterialPageRoute(
+            builder: (context) => const SecretaryHomePage(),
+          );
+        }
+
+        // Allow navigation to protected routes
+        switch (settings.name) {
           case '/home':
+            final initialTab = args?['initialTab'] as int?;
+            return MaterialPageRoute(
+              builder: (context) => HomePage(initialTab: initialTab),
+            );
           case '/doctors':
+            return MaterialPageRoute(
+              builder: (context) => const DoctorsPage(onNavigateToTab: null),
+            );
           case '/doctor-profile':
+            return MaterialPageRoute(
+              builder: (context) => DoctorProfilePage(
+                doctorId: args?['doctorId']?.toString() ?? '',
+              ),
+            );
           case '/doctor-schedule':
-            final args = settings.arguments as Map<String, dynamic>?;
             return MaterialPageRoute(
               builder: (context) => DoctorSchedulePage(
                 doctorId: args?['doctorId'] ?? '',
@@ -195,228 +239,108 @@ class MyAppState extends State<MyApp> {
                 defaultDate: args?['defaultDate'],
               ),
             );
-          case '/specializations':
+          case '/booking-confirmation':
             return MaterialPageRoute(
-              builder: (context) => const SpecializationsPage(
-                specialties: [],
+              builder: (context) => BookingConfirmationPage(
+                doctorId: args?['doctorId'] ?? '',
+                doctorName: args?['doctorName'],
+                specialty: args?['specialty'],
+                clinic: args?['clinic'],
+                consultationFee: args?['consultationFee'],
+                selectedDate: args?['selectedDate'],
+                paymentMethod: args?['paymentMethod'],
+                professionalPhotoUrl: args?['professionalPhotoUrl'],
               ),
             );
-          case '/booking-confirmation':
           case '/patient-details':
-          case '/patient-profile':
-          case '/privacy-notice':
-          case '/payment':
-          case '/payments':
-          case '/notifications':
+            return MaterialPageRoute(
+              builder: (context) => PatientDetailsPage(
+                doctorId: args?['doctorId'] ?? '',
+                doctorName: args?['doctorName'],
+                specialty: args?['specialty'],
+                clinic: args?['clinic'],
+                consultationFee: args?['consultationFee'],
+                selectedDate: args?['selectedDate'],
+                paymentMethod: args?['paymentMethod'],
+                professionalPhotoUrl: args?['professionalPhotoUrl'],
+              ),
+            );
           case '/conversation-thread':
+            return MaterialPageRoute(
+              builder: (context) => ConversationThreadPage(
+                conversationId: args?['conversationId'] ?? '',
+                counterpartName: args?['counterpartName'] as String?,
+              ),
+            );
           case '/ai-conversation':
+            return MaterialPageRoute(
+              builder: (context) => const AiConversationPage(),
+            );
           case '/ai-conversation-history':
+            return MaterialPageRoute(
+              builder: (context) => const AiConversationHistoryPage(),
+            );
+          case '/patient-profile':
+            return MaterialPageRoute(
+              builder: (context) => const PatientProfilePage(),
+            );
+          case '/privacy-notice':
+            return MaterialPageRoute(
+              builder: (context) => const PrivacyNoticePage(),
+            );
+          case '/notifications':
+            return MaterialPageRoute(
+              builder: (context) => const NotificationsPage(),
+            );
           case '/recent-updates':
             return MaterialPageRoute(
               builder: (context) => const RecentUpdatesPage(),
             );
           case '/waitlist':
-          case '/reschedule':
-          case '/appointment-detail':
-          case '/medical-records':
-          case '/prescription-detail':
-            // Protect all authenticated routes - enforce password change requirement
-            if (!_isAuthenticated) {              return MaterialPageRoute(builder: (context) => const LoginPage());
-            }
-            if (_mustChangePassword) {
-              return MaterialPageRoute(
-                builder: (context) => const ChangePasswordPage(),
-              );
-            }
-            // Secretaries have no queue, payment, walk-in, or schedule
-            // management screens. Keep them on the chat-first home except for
-            // the shared conversation thread.
-            if (_isSecretary && settings.name != '/conversation-thread') {
-              return MaterialPageRoute(
-                builder: (context) => const SecretaryHomePage(),
-              );
-            }
-            // Allow navigation to protected routes
-            switch (settings.name) {
-              case '/home':
-                final args = settings.arguments as Map<String, dynamic>?;
-                final initialTab = args?['initialTab'] as int?;
-                return MaterialPageRoute(
-                  builder: (context) => HomePage(initialTab: initialTab),
-                );
-              case '/doctors':
-                return MaterialPageRoute(
-                  builder: (context) =>
-                      const DoctorsPage(onNavigateToTab: null),
-                );
-              case '/doctor-profile':
-                final args = settings.arguments as Map<String, dynamic>?;
-                return MaterialPageRoute(
-                  builder: (context) => DoctorProfilePage(
-                    doctorId: args?['doctorId']?.toString() ?? '',
-                  ),
-                );
-              case '/doctor-schedule':
-                final args = settings.arguments as Map<String, dynamic>?;
-                return MaterialPageRoute(
-                  builder: (context) => DoctorSchedulePage(
-                    doctorId: args?['doctorId'] ?? '',
-                    doctorName: args?['doctorName'],
-                    specialty: args?['specialty'],
-                    clinic: args?['clinic'],
-                    consultationFee: args?['consultationFee'],
-                    professionalPhotoUrl: args?['professionalPhotoUrl'],
-                    defaultDate: args?['defaultDate'],
-                  ),
-                );
-              case '/booking-confirmation':
-                final args = settings.arguments as Map<String, dynamic>?;
-                return MaterialPageRoute(
-                  builder: (context) => BookingConfirmationPage(
-                    doctorId: args?['doctorId'] ?? '',
-                    doctorName: args?['doctorName'],
-                    specialty: args?['specialty'],
-                    clinic: args?['clinic'],
-                    consultationFee: args?['consultationFee'],
-                    selectedDate: args?['selectedDate'],
-                    paymentMethod: args?['paymentMethod'],
-                    professionalPhotoUrl: args?['professionalPhotoUrl'],
-                  ),
-                );
-              case '/patient-details':
-                final args = settings.arguments as Map<String, dynamic>?;
-                return MaterialPageRoute(
-                  builder: (context) => PatientDetailsPage(
-                    doctorId: args?['doctorId'] ?? '',
-                    doctorName: args?['doctorName'],
-                    specialty: args?['specialty'],
-                    clinic: args?['clinic'],
-                    consultationFee: args?['consultationFee'],
-                    selectedDate: args?['selectedDate'],
-                    paymentMethod: args?['paymentMethod'],
-                    professionalPhotoUrl: args?['professionalPhotoUrl'],
-                  ),
-                );
-              case '/conversation-thread':
-                final args = settings.arguments as Map<String, dynamic>?;
-                return MaterialPageRoute(
-                  builder: (context) => ConversationThreadPage(
-                    conversationId: args?['conversationId'] ?? '',
-                    counterpartName: args?['counterpartName'] as String?,
-                  ),
-                );
-              case '/ai-conversation':
-                // M9: Patient-only route guard for AI assistant
-                if (!_isAuthenticated) {
-                  return MaterialPageRoute(builder: (context) => const LoginPage());
-                }
-                if (_mustChangePassword) {
-                  return MaterialPageRoute(
-                    builder: (context) => const ChangePasswordPage(),
-                  );
-                }
-                // M9: Secretaries cannot access AI assistant
-                if (_isSecretary) {
-                  return MaterialPageRoute(
-                    builder: (context) => const SecretaryHomePage(),
-                  );
-                }
-                return MaterialPageRoute(
-                  builder: (context) => const AiConversationPage(),
-                );
-              case '/ai-conversation-history':
-                // M9: Patient-only route guard for AI conversation history
-                if (!_isAuthenticated) {
-                  return MaterialPageRoute(builder: (context) => const LoginPage());
-                }
-                if (_mustChangePassword) {
-                  return MaterialPageRoute(
-                    builder: (context) => const ChangePasswordPage(),
-                  );
-                }
-                if (_isSecretary) {
-                  return MaterialPageRoute(
-                    builder: (context) => const SecretaryHomePage(),
-                  );
-                }
-                return MaterialPageRoute(
-                  builder: (context) => const AiConversationHistoryPage(),
-                );
-              case '/patient-profile':
-                return MaterialPageRoute(
-                  builder: (context) => const PatientProfilePage(),
-                );
-              case '/privacy-notice':
-                return MaterialPageRoute(
-                  builder: (context) => const PrivacyNoticePage(),
-                );
-              case '/notifications':
-                return MaterialPageRoute(
-                  builder: (context) => const NotificationsPage(),
-                );
-              case '/recent-updates':
             return MaterialPageRoute(
-              builder: (context) => const RecentUpdatesPage(),
+              builder: (context) => const WaitlistPage(),
             );
-          case '/waitlist':
-                return MaterialPageRoute(
-                  builder: (context) => const WaitlistPage(),
-                );
-              case '/reschedule':
-                final args = settings.arguments as Map<String, dynamic>?;
-                return MaterialPageRoute(
-                  builder: (context) => ReschedulePage(
-                    appointmentId: args?['appointmentId']?.toString() ?? '',
-                  ),
-                );
-              case '/appointment-detail':
-                final args = settings.arguments as Map<String, dynamic>?;
-                return MaterialPageRoute(
-                  builder: (context) => AppointmentDetailPage(
-                    appointmentId: args?['appointmentId']?.toString() ?? '',
-                  ),
-                );
-              case '/medical-records':
-                return MaterialPageRoute(
-                  builder: (context) => const MedicalRecordsPage(),
-                );
-              case '/prescription-detail':
-                final args = settings.arguments as Map<String, dynamic>?;
-                return MaterialPageRoute(
-                  builder: (context) => PrescriptionDetailPage(
-                    prescriptionId: args?['prescriptionId']?.toString() ?? '',
-                  ),
-                );
-              case '/payment':
-                final args = settings.arguments as Map<String, dynamic>?;
-                return MaterialPageRoute(
-                  builder: (context) => PaymentScreen(
-                    appointmentId: args?['appointmentId'] ?? '',
-                    doctorName: args?['doctorName'],
-                    consultationFee: parseString(args?['consultationFee']),
-                    appointmentDate: args?['appointmentDate'],
-                    doctorId: args?['doctorId'],
-                  ),
-                );
-              case '/payments':
-                return MaterialPageRoute(
-                  builder: (context) => const PaymentsHubPage(),
-                );
-              default:
-                return MaterialPageRoute(
-                  builder: (context) => const HomePage(),
-                );
-            }
+          case '/reschedule':
+            final args = settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (context) => ReschedulePage(
+                appointmentId: args?['appointmentId']?.toString() ?? '',
+              ),
+            );
+          case '/appointment-detail':
+            final args = settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (context) => AppointmentDetailPage(
+                appointmentId: args?['appointmentId']?.toString() ?? '',
+              ),
+            );
+          case '/medical-records':
+            return MaterialPageRoute(
+              builder: (context) => const MedicalRecordsPage(),
+            );
+          case '/prescription-detail':
+            final args = settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (context) => PrescriptionDetailPage(
+                prescriptionId: args?['prescriptionId']?.toString() ?? '',
+              ),
+            );
+          case '/payment':
+            final args = settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (context) => PaymentScreen(
+                appointmentId: args?['appointmentId'] ?? '',
+                doctorName: args?['doctorName'],
+                consultationFee: parseString(args?['consultationFee']),
+                appointmentDate: args?['appointmentDate'],
+                doctorId: args?['doctorId'],
+              ),
+            );
+          case '/payments':
+            return MaterialPageRoute(
+              builder: (context) => const PaymentsHubPage(),
+            );
           default:
-            // Default route - check authentication and password requirement
-            if (!_isAuthenticated) {
-              return MaterialPageRoute(builder: (context) => const LoginPage());
-            }
-            if (_mustChangePassword) {
-              return MaterialPageRoute(
-                builder: (context) => const ChangePasswordPage(),
-              );
-            }
             return MaterialPageRoute(
               builder: (context) =>
                   _isSecretary ? const SecretaryHomePage() : const HomePage(),

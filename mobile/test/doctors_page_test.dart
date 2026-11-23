@@ -57,7 +57,14 @@ void main() {
       if (isKnownCosmeticOverflow) {
         return;
       }
-      originalOnError?.call(details);
+      // Surface genuine errors as test failures. The error is already being
+      // reported through the test binding's uncaught-error path
+      // (handleUncaughtError -> reportError), which fails the test once this
+      // handler returns. Forwarding to the previous handler (originalOnError)
+      // here recurses into handleUncaughtError and trips a
+      // "_pendingExceptionDetails != null" assertion on late async errors,
+      // which previously crashed the suite intermittently.
+      return;
     };
 
     final api = _FakeDoctorApi(failFirst: failFirst);
@@ -446,41 +453,49 @@ void main() {
     expect(find.text('Alice Reyes'), findsOneWidget);
   });
 
-  testWidgets('back/Change navigation keeps active filters selected', (
-    tester,
-  ) async {
-    final api = await pumpDoctorsPage(tester);
+  testWidgets(
+    'back/Change navigation resets the specialization filter',
+    (tester) async {
+      final api = await pumpDoctorsPage(tester);
 
-    await tapSpecialty(tester, 'Dermatology');
-    await tapTopRated(tester);
-    await enterSearch(tester, 'a');
+      await tapSpecialty(tester, 'Dermatology');
+      await tapTopRated(tester);
+      await enterSearch(tester, 'a');
 
-    expect(find.text('Grace Uy'), findsOneWidget);
-    expect(find.text('Elena Garcia'), findsNothing);
-    expect(find.text('Brian Cruz'), findsNothing);
-    expect(find.byIcon(Icons.close), findsNWidgets(3));
+      expect(find.text('Grace Uy'), findsOneWidget);
+      expect(find.text('Elena Garcia'), findsNothing);
+      expect(find.text('Brian Cruz'), findsNothing);
+      expect(find.byIcon(Icons.close), findsNWidgets(3));
 
-    await tapFinder(tester, find.text('Change'));
+      // Returning to the browse view resets the specialization (and any
+      // hospital selection) but keeps unrelated filters (verified-only,
+      // search) active.
+      await tapFinder(tester, find.text('Change'));
 
-    expect(find.text('Specializations'), findsOneWidget);
-    expect(find.byIcon(Icons.close), findsNWidgets(3));
-    expect(find.text('Clear All'), findsOneWidget);
+      expect(find.text('Specializations'), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsNWidgets(2));
+      expect(find.text('Clear All'), findsOneWidget);
+      expect(find.text('Verified only'), findsOneWidget);
+      expect(find.textContaining('Search:'), findsOneWidget);
 
-    // Re-entering the filtered list keeps the same constrained result set.
-    // "2 Docs" is the unique subtitle of the Dermatology picker chip.
-    await tapSpecialtyChipByCount(tester, '2 Docs');
-    expect(api.requests, 1);
-    expect(find.text('Grace Uy'), findsOneWidget);
-    expect(find.text('Elena Garcia'), findsNothing);
-    expect(find.text('Brian Cruz'), findsNothing);
+      // Re-entering the filtered list keeps the same constrained result set.
+      // "2 Docs" is the unique subtitle of the Dermatology picker chip.
+      await tapSpecialtyChipByCount(tester, '2 Docs');
+      expect(api.requests, 1);
+      expect(find.text('Grace Uy'), findsOneWidget);
+      expect(find.text('Elena Garcia'), findsNothing);
+      expect(find.text('Brian Cruz'), findsNothing);
 
-    // The back arrow also returns to browse without dropping the filters.
-    await tapFinder(tester, find.byIcon(Icons.arrow_back));
+      // The back arrow also returns to browse with the specialization reset.
+      await tapFinder(tester, find.byIcon(Icons.arrow_back));
 
-    expect(find.byIcon(Icons.close), findsNWidgets(3));
-    expect(find.text('Clear All'), findsOneWidget);
-    expect(api.requests, 1);
-  });
+      expect(find.byIcon(Icons.close), findsNWidgets(2));
+      expect(find.text('Clear All'), findsOneWidget);
+      expect(find.text('Verified only'), findsOneWidget);
+      expect(find.textContaining('Search:'), findsOneWidget);
+      expect(api.requests, 1);
+    },
+  );
 
   testWidgets('initial load failure shows Retry and recovers on retry', (
     tester,

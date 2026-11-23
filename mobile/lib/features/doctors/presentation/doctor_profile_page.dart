@@ -273,6 +273,11 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
   }
 
   Widget _buildIdentity(DoctorProfile profile) {
+    // Doctor name with "Dr." prefix, avoiding duplicates
+    final displayName = profile.displayName.startsWith('Dr. ')
+        ? profile.displayName
+        : 'Dr. ${profile.displayName}';
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -282,17 +287,15 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  profile.displayName,
-                  style: AppTextStyles.headlineSm.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  semanticsLabel: profile.displayName,
+              // Doctor name - always visible, up to 2 lines, no dynamic shrinking
+              Text(
+                displayName,
+                style: AppTextStyles.headlineSm.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                semanticsLabel: profile.displayName,
               ),
               if (profile.specialty != null) ...[
                 const SizedBox(height: spacing.AppSpacing.gutterXs),
