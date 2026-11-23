@@ -148,7 +148,6 @@ export default function AuditLogPage() {
             />
           </div>
 
-
           {/* Start Date Filter */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400 font-medium hidden sm:inline whitespace-nowrap">From:</span>
@@ -172,10 +171,6 @@ export default function AuditLogPage() {
               className="w-40"
             />
           </div>
-
-
-
-
         </div>
 
         <button
