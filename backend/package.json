@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "tsx src/index.ts",
+    "start": "npx tsx src/index.ts",
     "migrate": "tsx src/database/migrate.ts",
     "migrate:remove-clinics": "tsx src/database/removeClinics.ts",
     "migrate:doctor-registration": "tsx src/database/applyDoctorRegistration.ts",
