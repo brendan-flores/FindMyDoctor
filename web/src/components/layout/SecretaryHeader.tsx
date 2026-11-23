@@ -8,10 +8,11 @@ import { usePresence } from '@/hooks/usePresence';
 
 interface SecretaryHeaderProps {
   userName?: string;
+  userEmail?: string;
   userRole?: string;
 }
 
-export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Secretary' }: SecretaryHeaderProps) {
+export default function SecretaryHeader({ userName = 'Secretary', userEmail = '', userRole = 'Secretary' }: SecretaryHeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const dropdownPresent = usePresence(isDropdownOpen);
@@ -272,7 +273,7 @@ export default function SecretaryHeader({ userName = 'Secretary', userRole = 'Se
             </div>
             <div className="hidden lg:block text-left leading-none">
               <div className="text-xs font-semibold text-slate-800">{userName}</div>
-              <div className="text-[10px] text-slate-400">{userRole}</div>
+              <div className="text-[10px] text-slate-400">{userEmail}</div>
             </div>
           </button>
 

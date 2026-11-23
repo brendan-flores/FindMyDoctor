@@ -26,6 +26,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
     pathname === '/secretary/reset-password' ||
     isTrustPage;
   const [userName, setUserName] = useState('Secretary');
+  const [userEmail, setUserEmail] = useState('');
   const [userRole, setUserRole] = useState('Secretary');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -114,6 +115,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
 
                   // Transient failure (network/5xx): keep the session and fall back to the username.
                   setUserName(user.email.split('@')[0] || 'Secretary');
+                  setUserEmail(user.email);
                   setIsLoading(false);
                   return;
                 }
@@ -138,6 +140,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
                 } else {
                   setUserName(user.email.split('@')[0] || 'Secretary');
                 }
+                setUserEmail(user.email);
                 setIsLoading(false);
               })
               .catch((err) => {
@@ -150,6 +153,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
           } else {
             // If password change is required or on complete-profile page, use username
             setUserName(user.email.split('@')[0] || 'Secretary');
+            setUserEmail(user.email);
           }
 
           setUserRole(user.role || 'Secretary');
@@ -191,7 +195,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
   return (
     <div className="min-h-screen bg-[#f8f9ff]">
       <SecretarySidebar userName={userName} userRole={userRole} />
-      <SecretaryHeader userName={userName} userRole={userRole} />
+      <SecretaryHeader userName={userName} userEmail={userEmail} userRole={userRole} />
       <main className="ml-64 pt-20 bg-[#f8f9ff] p-6">
         <div className="max-w-[1600px] mx-auto">
           <PageTransition>{children}</PageTransition>
