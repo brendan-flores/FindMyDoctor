@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { adminApi, AuditLogEntry, AuditLogResponse } from '@/lib/api/adminApi';
 import Select from '@/components/ui/Select';
+import DatePicker from '@/components/DatePicker';
 
 export default function AuditLogPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -124,21 +125,19 @@ export default function AuditLogPage() {
 
         <div className="flex items-center gap-2 w-full lg:w-auto">
           <span className="text-xs text-slate-400 font-medium">From:</span>
-          <input
-            type="date"
-            className="h-9 px-3 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20"
+          <DatePicker
             value={filters.startDate}
-            onChange={(e) => handleFilterChange('startDate', e.target.value)}
+            onChange={(date) => handleFilterChange('startDate', date)}
+            maxDate={new Date().toISOString().split('T')[0]}
           />
         </div>
 
         <div className="flex items-center gap-2 w-full lg:w-auto">
           <span className="text-xs text-slate-400 font-medium">To:</span>
-          <input
-            type="date"
-            className="h-9 px-3 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1b5eb8]/20"
+          <DatePicker
             value={filters.endDate}
-            onChange={(e) => handleFilterChange('endDate', e.target.value)}
+            onChange={(date) => handleFilterChange('endDate', date)}
+            maxDate={new Date().toISOString().split('T')[0]}
           />
         </div>
 
