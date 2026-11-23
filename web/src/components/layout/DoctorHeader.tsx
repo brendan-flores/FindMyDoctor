@@ -132,7 +132,6 @@ export default function DoctorHeader({
                 <span className="text-xs font-semibold text-slate-800 truncate" title={userName}>
                   {userName}
                 </span>
-                <span className="shrink-0 text-[10px] font-medium text-[#1b5eb8]">{userRole}</span>
               </div>
               <div className="text-[10px] text-slate-500 truncate" title={userEmail}>
                 {userEmail}
