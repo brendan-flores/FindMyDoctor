@@ -43,14 +43,30 @@ export function cookieNamesForRole(role: string) {
   };
 }
 
+function isProduction(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
+/**
+ * SameSite policy for auth cookies. The web app and the API are separate
+ * origins in production, so Lax cookies are never sent on cross-site fetch
+ * calls — which would silently drop the trusted-device cookie and force an
+ * OTP on every sign-in. Production therefore uses SameSite=None together with
+ * Secure (required by browsers for None). Development stays Lax because the
+ * web client and API share the localhost site.
+ */
+function sameSitePolicy(): 'none' | 'lax' {
+  return isProduction() ? 'none' : 'lax';
+}
+
 function baseCookieOptions() {
-  const isProduction = process.env.NODE_ENV === 'production';
+  const production = isProduction();
   return {
     // In development the web client still reads the access token for the
     // Authorization header, matching the pre-existing behavior.
-    httpOnly: isProduction,
-    secure: isProduction,
-    sameSite: 'lax' as const,
+    httpOnly: production,
+    secure: production,
+    sameSite: sameSitePolicy(),
     // Root path so login pages and portal pages share the same cookie.
     path: '/',
   };
@@ -87,8 +103,8 @@ export function setSessionCookies(
   } else {
     res.cookie(names.sessionActive, '1', {
       httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProduction(),
+      sameSite: sameSitePolicy(),
       path: '/',
     });
   }
@@ -97,12 +113,12 @@ export function setSessionCookies(
 /** Trusted-browser tokens are always HttpOnly and never exposed to JavaScript. */
 export function setTrustedBrowserCookie(res: Response, role: string, token: string) {
   const names = cookieNamesForRole(role);
-  const isProduction = process.env.NODE_ENV === 'production';
+  const production = isProduction();
 
   res.cookie(names.trustedBrowser, token, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: 'lax',
+    secure: production,
+    sameSite: sameSitePolicy(),
     path: '/',
     maxAge: TRUSTED_BROWSER_MAX_AGE_MS,
   });
