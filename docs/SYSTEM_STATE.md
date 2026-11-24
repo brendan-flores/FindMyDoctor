@@ -461,6 +461,7 @@ Current System State (November 2026):
 - Queue page shows queue entries with patient name, queue number, status, registration source (ONLINE/WALK_IN), and doctor information
 - Queue page includes KPI cards: Total Patients, Waiting, Completed, and Assigned Doctor
 - Queue page includes date selector to view queue for different dates
+- Web Secretary queue UI preferences (selected date, active status tab, search query, and ONLINE/WALK_IN source filter) persist per signed-in secretary in `sessionStorage` via the shared `usePersistedState` hook (`web/src/hooks/usePersistedState.ts`); keys are namespaced `fido:ui:secretary:/secretary/queue:<userId>:<field>` so different accounts never share state, invalid or corrupted values fall back to defaults, and values are restored after mount before the queue fetch runs so `GET /api/v1/queue/:date` is requested with the restored date rather than the default first. Queue data itself is always fetched fresh from the backend; only these small UI preferences are persisted, and other portals (e.g. `/doctor/dashboard`) do not persist UI state
 - Queue page includes "Call Next Patient" button to advance the queue by calling the next waiting patient
 - `POST /api/v1/queue/:date/next` creates a `QUEUE_UPDATED` notification ("You're Next") for the called patient and sends a best-effort push notification through `sendPushToUser`; notification or push failures do not fail the queue transition
 - The secretary queue active view excludes `COMPLETED` entries; completed checkups remain available under the Completed and To Collect tabs
@@ -627,6 +628,7 @@ Current System State (November 2026):
 - Mobile Appointments page removes all hardcoded data and uses dynamic data from backend with loading, empty, and error states
 - Web Doctor Appointments page at `/doctor/appointments` connects to `GET /api/v1/appointments` and displays real appointment records for the authenticated doctor with status filters and statistics
 - Web Secretary Appointments page at `/secretary/appointments` connects to `GET /api/v1/appointments` and displays real appointment records for the doctor the secretary is assigned to, with status filters and statistics
+- Web Secretary Appointments status filter persists per signed-in secretary in `sessionStorage` under `fido:ui:secretary:/secretary/appointments:<userId>:statusFilter` via the same `usePersistedState` hook; it restores after mount and drives the first `GET /api/v1/appointments` request (e.g. `?status=COMPLETED`), with invalid or corrupted values falling back to `ALL`
 - Backend `GET /api/v1/appointments` supports role-based filtering: PATIENT returns their own appointments, DOCTOR returns their appointments, SECRETARY returns appointments for their assigned doctor
 - Backend appointment creation includes queue number assignment via `queue_entries` table, capacity consumption via `daily_capacities` table, and notification creation
 - Queue number assignment is concurrency-safe using `SELECT COALESCE(MAX(queue_number), 0) + 1` pattern
