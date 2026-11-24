@@ -322,11 +322,27 @@ class ApiClient {
     this.startIdleWatch();
   }
 
+  private setSessionCookie(token: string): void {
+    if (typeof document === 'undefined') return;
+    // 7 days; the middleware reads this cookie and verifies the JWT with the
+    // backend /auth/session endpoint on every portal request. It is never
+    // trusted directly — the backend validates the JWT and returns the role.
+    const isSecure = typeof location !== 'undefined' && location.protocol === 'https:';
+    document.cookie = `fmdo_session=${token}; path=/; max-age=604800; ${isSecure ? 'secure' : ''}; samesite=lax`;
+  }
+
+  private clearSessionCookie(): void {
+    if (typeof document === 'undefined') return;
+    const isSecure = typeof location !== 'undefined' && location.protocol === 'https:';
+    document.cookie = `fmdo_session=; path=/; max-age=0; ${isSecure ? 'secure' : ''}; samesite=lax`;
+  }
+
   setToken(
     token: string,
     refreshToken?: string,
     session?: SessionMetadata | null,
-    preserveSessionStart: boolean = false
+    preserveSessionStart: boolean = false,
+    role?: string
   ) {
     if (!token || token === 'undefined' || token === 'null') {
       this.clearToken();
@@ -337,8 +353,8 @@ class ApiClient {
     const previousRole = this.role;
     this.token = token;
     if (typeof window !== 'undefined') {
-      // Re-detect role from current path to ensure correct scoping
-      this.role = detectRoleFromPath(window.location.pathname);
+      // Use the explicitly-passed role when provided, otherwise re-detect from path
+      this.role = role ?? detectRoleFromPath(window.location.pathname);
 
       const tokenKey = this.storageKey('token');
       const refreshKey = this.storageKey('refreshToken');
@@ -346,6 +362,12 @@ class ApiClient {
       if (refreshToken) {
         this.refreshToken = refreshToken;
         localStorage.setItem(refreshKey, refreshToken);
+      }
+
+      // Write the session marker cookie for middleware portal gating.
+      // The middleware verifies this JWT with the backend /auth/session endpoint.
+      if (this.role) {
+        this.setSessionCookie(this.token);
       }
     }
 
@@ -372,6 +394,7 @@ class ApiClient {
       localStorage.removeItem(this.storageKey('refreshToken'));
       localStorage.removeItem(this.storageKey('user'));
       localStorage.removeItem(this.sessionKey());
+      this.clearSessionCookie();
     }
   }
 
