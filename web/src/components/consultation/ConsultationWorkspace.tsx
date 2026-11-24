@@ -361,6 +361,10 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
   };
 
   const handleFinish = async () => {
+    if (context?.missingPatientInfo && context.missingPatientInfo.length > 0) {
+      setToast({ message: 'Add the missing patient information before reviewing', type: 'error' });
+      return;
+    }
     if (!form.reasonForVisit.trim()) {
       setToast({ message: 'Reason for visit is required before reviewing', type: 'error' });
       return;
@@ -1132,6 +1136,8 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
             </div>
           )}
 
+          {validationRow()}
+
           <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 space-y-4">
             <h2 className="text-lg font-semibold text-neutral-800 flex items-center gap-2">
               <span className="material-symbols-outlined text-primary-600">clinical_notes</span>
@@ -1323,7 +1329,7 @@ export default function ConsultationWorkspace({ appointmentId }: ConsultationWor
               </p>
               <button
                 onClick={handleFinish}
-                disabled={isFinishing || isSaving || conflict}
+                disabled={isFinishing || isSaving || conflict || context.missingPatientInfo.length > 0}
                 className="px-6 py-2.5 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-50"
               >
                 {isFinishing ? 'Preparing review…' : 'Finish'}

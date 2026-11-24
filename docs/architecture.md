@@ -1253,6 +1253,8 @@ Skip / Not Present
 Complete Checkup
 ```
 
+Calling the next patient must create a patient notification and send a best-effort push through the notification module. The secretary active queue view excludes `COMPLETED` entries; completed records remain available through the completed and payment-collection views.
+
 The mobile interface should call backend actions rather than implementing queue state transitions locally.
 
 ---
@@ -1932,18 +1934,11 @@ PUT    /secretaries/managed-doctors/break-periods/:id
 DELETE /secretaries/managed-doctors/break-periods/:id
 ```
 
-Secretary schedule endpoints use the `secretaries.doctor_id` ownership check. Weekly schedules are read-only for secretaries. Exception and break-period writes that affect active future appointments do not apply; they are saved as PENDING `schedule_change_requests` and returned with HTTP 202 (a clearly distinguishable pending response), and the change takes effect only after the secretary confirms via `POST /schedule-changes/:id/confirm`. Changes that affect no appointments apply immediately as before. Doctor-equivalent endpoints behave the same (`/doctors/me/unavailability`, `/doctors/me/break-periods`); the doctor-side versions validate break periods against working hours and same-date overlaps exactly as before, and the secretary-side versions keep their existing validation (no working-hours or same-date overlap enforcement) by design in this release.
+Secretary schedule endpoints use the `secretaries.doctor_id` ownership check. Weekly schedules are read-only for secretaries. Exception and break-period writes apply immediately for both roles (`/doctors/me/unavailability`, `/doctors/me/break-periods`, and the secretary `managed-doctors` equivalents); there is no approval step. When a CREATE or UPDATE affects active future appointments, the affected appointments are flagged `needs_attention` with reason `SCHEDULE_CHANGE` and each affected patient receives a `SCHEDULE_CHANGE_NOTICE` notification plus a best-effort push; appointments are never cancelled or rescheduled automatically. DELETE restores availability and does not flag or notify. The doctor-side versions validate break periods against working hours and same-date overlaps; the secretary-side versions keep their existing validation (no working-hours or same-date overlap enforcement).
 
-### Schedule-Change Confirmation
+### Schedule-Change Notifications
 
-```text
-GET  /schedule-changes
-POST /schedule-changes/:id/confirm
-POST /schedule-changes/:id/dismiss
-GET  /doctors/me/schedule-change-requests   (doctor read-only, own requests)
-```
-
-All three `/schedule-changes` endpoints are SECRETARY-only and scoped to the caller's assigned doctor; other roles, and secretaries of another doctor, receive the standard 403 authorization error. `GET /schedule-changes` returns the assigned doctor's PENDING requests (pending only, newest first, doctor name, requester name and role, affected appointment count and identifiers — no patient personal data beyond count and ids). `POST /:id/confirm` runs in a single transaction with the request row locked `FOR UPDATE`: it verifies the request is still PENDING, re-validates the change against the current schedule (target must exist and match the snapshot, otherwise a 409 conflict is returned and the request stays PENDING), applies the change, recomputes the affected set against current appointment data, flags affected appointments `needs_attention = true` with reason `SCHEDULE_CHANGE` (no appointment is cancelled or rescheduled), creates one `SCHEDULE_CHANGE_NOTICE` per affected patient linked to the appointment, marks the request CONFIRMED with `resolved_at`/`resolved_by`, and only afterwards invalidates the availability cache and sends best-effort pushes with generic text. `POST /:id/dismiss` marks the request DISMISSED; the change stays unapplied and no patient is notified. Confirm and dismiss never run twice; the second of the two is rejected with 409. The doctor read-only list endpoint allows `/doctor/schedule` to display the doctor's own pending changes.
+There are no schedule-change request endpoints; exception and break-period writes apply directly inside their own transactions. After a successful CREATE or UPDATE, the backend computes the appointments newly in conflict with the change (active statuses `SCHEDULED`/`CONFIRMED`/`IN_PROGRESS`, clinic date today or later; UPDATE counts only the newly covered set), flags them `needs_attention = true` with reason `SCHEDULE_CHANGE`, creates one `SCHEDULE_CHANGE_NOTICE` per affected patient linked to the appointment, commits, and then sends best-effort pushes with generic text. The `schedule_change_requests` table is retained for historical audit only; no new rows are written.
 
 ### Queue
 
@@ -1958,6 +1953,8 @@ PATCH /queue/:id/status
 `GET /queue/today/me` is PATIENT-only and resolves the patient from the token. It returns `{ date, queues: [...] }` for the clinic's current date, where every entry carries the queue number and status, the current now-serving number, the number of patients ahead, the estimated wait (patients ahead × consultation duration), and the doctor's name, specialty, practice, room, photo, and consultation fee. An empty `queues` list means the patient has no queue today.
 
 `GET /queue/:date/patient/:patientId` is scoped: a patient may read only their own entry (403 otherwise), a doctor only entries for their own doctor, a secretary only for their assigned doctor, and an admin any entry. Invalid dates return 400 and missing entries 404.
+
+`POST /queue/:date/next` marks the next `WAITING` entry as `CALLED`, then creates a `QUEUE_UPDATED` patient notification and sends a best-effort push with generic queue details. Notification or push delivery failures are logged and do not fail the queue transition.
 
 ### Appointment Changes
 
@@ -2507,9 +2504,10 @@ Dashboard navigation must not exhaust rate limits or duplicate reads. The behavi
 ### Backend Rate Limits
 
 - `backend/src/middleware/rateLimit.ts` exports `createRateLimiter`, `apiLimiter`, and `authLimiter`.
-- General API: `RATE_LIMIT_MAX_REQUESTS` (default `300`) per `RATE_LIMIT_WINDOW_MS` (default `60000`) per IP, mounted on `/api/`.
-- Sensitive authentication: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default `30`) per `AUTH_RATE_LIMIT_WINDOW_MS` (default `900000`) per IP, mounted on `/api/v1` and skipped for non-auth paths. Covered paths: `/auth/login`, `/auth/verify-login-otp`, `/auth/resend-login-otp`, `/auth/otp`, `/auth/patient/otp`, `/auth/register`, `/auth/change-password`.
+- General API: `RATE_LIMIT_MAX_REQUESTS` (default `600`) per `RATE_LIMIT_WINDOW_MS` (default `60000`) per IP, mounted on `/api/`.
+- Sensitive authentication: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default `60`) per `AUTH_RATE_LIMIT_WINDOW_MS` (default `900000`) per IP, mounted on `/api/v1` and skipped for non-auth paths. Covered paths: `/auth/login`, `/auth/verify-login-otp`, `/auth/resend-login-otp`, `/auth/otp`, `/auth/patient/otp`, `/auth/register`, `/auth/change-password`.
 - Sensitive routes count against both budgets, so the stricter auth budget applies.
+- `POST /api/v1/consultation/visits/:visitId/issue` is exempt from the general API budget (`isConsultationIssueRequest` in `rateLimit.ts`) so issuing a consultation is never blocked by the autosave/context traffic of a single consultation session. The route remains authenticated and restricted to the `DOCTOR` role; only the per-IP budget is skipped.
 - `429` responses carry `Retry-After` (seconds) and `{ success: false, error: { code: "RATE_LIMIT", message } }`.
 - `OPTIONS` requests do not consume either budget.
 - Rate limiting is additive to authentication/authorization; protected routes still validate token and role on every request.

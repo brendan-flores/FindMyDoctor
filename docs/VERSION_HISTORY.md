@@ -4,6 +4,31 @@ This document contains the complete version history for the FindMyDoctor applica
 
 ---
 
+### 01.48 (In Progress)
+
+**Purpose:** Notify patients when the secretary calls the next queue patient and keep completed checkups out of the secretary's active queue view.
+
+**Significant Features:**
+- `POST /api/v1/queue/:date/next` now creates a `QUEUE_UPDATED` patient notification ("You're Next") and sends a best-effort push notification through `sendPushToUser` after marking the next waiting entry as `CALLED`.
+- Push payload includes the notification type, queue entry ID, queue number, and appointment ID when available; notification or push failures are logged and do not fail the queue transition.
+- Secretary queue default view is now labeled Active Queue and excludes `COMPLETED` entries.
+
+**Improvements:**
+- Completed checkups remain available under the Completed and To Collect tabs so payment collection workflows are preserved.
+- Backend queue API tests now cover the call-next notification and push delivery.
+
+**Bug Fixes:**
+- Completed checkup entries no longer appear in the secretary's active queue view.
+
+**Removed/Modified Functionality:**
+- The secretary queue "All" tab is now presented as "Active Queue" and hides `COMPLETED` entries; completed records are still accessible through the Completed and To Collect tabs.
+
+**Breaking Changes:** None
+
+**Documentation Updates:** Updated `CURRENT_VERSION.md` to 01.48, added this entry to `VERSION_HISTORY.md`, and extended `SYSTEM_STATE.md`, `architecture.md`, `architecture-essentials.md`, and `prd.md` with the queue-call notification and active-queue filtering rules.
+
+---
+
 ### 01.47 (In Progress)
 
 **Purpose:** Improve alignment, column spacing, readability, and filter presentation on the Admin Audit Log page, and add an audit details modal for viewing complete records.

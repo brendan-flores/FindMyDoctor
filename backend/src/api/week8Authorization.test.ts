@@ -15,7 +15,6 @@ import doctorsRouter from './doctors';
 import paymentsRouter from './payments';
 import invoicesRouter from './invoices';
 import visitsRouter from './visits';
-import scheduleChangesRouter from './scheduleChanges';
 
 let mockUser: any = { id: 'admin-user-id', role: 'ADMIN', mustChangePassword: false };
 
@@ -71,7 +70,6 @@ function buildApp(): express.Application {
   app.use('/api/v1/payments', paymentsRouter);
   app.use('/api/v1/invoices', invoicesRouter);
   app.use('/api/v1/visits', visitsRouter);
-  app.use('/api/v1/schedule-changes', scheduleChangesRouter);
   return app;
 }
 
@@ -141,21 +139,6 @@ describe('Week 8 authorization: admin has no clinic-operation access', () => {
 
     it('denies admin deleting a schedule with 403', async () => {
       const response = await request(app).delete('/api/v1/doctors/me/schedules/schedule-1');
-      expect(response.status).toBe(403);
-    });
-
-    it('denies admin the secretary schedule-change inbox with 403', async () => {
-      const response = await request(app).get('/api/v1/schedule-changes');
-      expect(response.status).toBe(403);
-    });
-
-    it('denies admin confirming a schedule change with 403', async () => {
-      const response = await request(app).post('/api/v1/schedule-changes/change-1/confirm');
-      expect(response.status).toBe(403);
-    });
-
-    it('denies admin dismissing a schedule change with 403', async () => {
-      const response = await request(app).post('/api/v1/schedule-changes/change-1/dismiss');
       expect(response.status).toBe(403);
     });
   });

@@ -57,7 +57,7 @@ Do not invent roles without changing the project requirements.
 
 ### Clinic and Consultation Operations Boundary
 
-Clinic and consultation operations belong to doctors and authorized secretaries. Doctors alone may create, edit, or delete weekly working hours. Secretaries may view weekly working hours and may manage exceptions, break periods, and daily capacity only for their assigned doctor. `ADMIN` and `SUPERADMIN` roles are limited to platform, account, and approval oversight and must not receive permissions to manage schedules, availability, break periods, daily capacity, reservations, queues, payment verification, or consultation records.
+Clinic and consultation operations belong to doctors and authorized secretaries. Doctors alone may create, edit, or delete weekly working hours. Secretaries may view weekly working hours and may manage exceptions, break periods, and daily capacity only for their assigned doctor; these changes apply directly with no approval step. `ADMIN` and `SUPERADMIN` roles are limited to platform, account, and approval oversight and must not receive permissions to manage schedules, availability, break periods, daily capacity, reservations, queues, payment verification, or consultation records.
 
 ---
 
@@ -395,6 +395,8 @@ Skip / Not Present
 Complete Checkup
 ```
 
+Calling the next patient must notify the patient through the backend notification and push pipeline.
+
 Queue status transitions must be handled by the backend.
 
 Do not implement critical queue logic only in the mobile UI.
@@ -586,6 +588,7 @@ Rules:
 - The draft is created once per appointment and reopens on later visits. Drafts are never visible to patients or secretaries.
 - Autosave uses optimistic concurrency; a second tab receives a conflict and must reload before saving, so edits are never silently lost.
 - Issuing requires the patient's date of birth and sex, and a reason for visit. The PDF prints age, sex, and the doctor's PRC license number when present.
+- The review step (Finish) is unavailable until the patient's date of birth and sex are complete and a reason for visit is entered. The missing-information prompt is shown in both edit and review modes so the doctor can complete it before reviewing; Issue keeps the same guard as a final check.
 - A prescription is created only when at least one medication is present. A consultation may be issued without a prescription.
 - Prescriptions are never edited or deleted. Voiding requires a reason; a replacement is a new prescription linked to the voided one.
 - Patients see only `ISSUED` prescriptions. Voided and replaced prescriptions stay in the doctor's history.
@@ -1019,17 +1022,17 @@ Use the `/api/v1/secretaries/managed-doctors/...` API convention:
 - `GET /schedules` for read-only weekly working hours.
 - `GET`, `POST`, `PUT`, and `DELETE` for `/unavailability` and `/break-periods`.
 
-Exception and break-period writes that affect active future appointments return HTTP 202 with a schedule-change request summary instead of applying; such changes take effect only after the secretary confirms via `POST /api/v1/schedule-changes/:id/confirm` (SECRETARY-only, scoped to the caller's assigned doctor; confirm is transactional with the request row locked). Changes that affect no appointments apply immediately as before. Secretary break-period proposals intentionally keep the secretary validation profile (they are not required to fall within working hours and are not overlap-checked against other breaks, unlike doctor proposals) — only the doctor-side endpoints enforce those rules; both roles are subject to the new checks (duplicate/overlapping pending requests → 409, stale target at confirm → 409 and the request stays PENDING). Doctors can view their own pending requests read-only via `GET /api/v1/doctors/me/schedule-change-requests`.
+Exception and break-period writes apply immediately for both doctors and secretaries — there is no approval step. When a CREATE or UPDATE affects active future appointments, the change still applies and the affected appointments are flagged `needs_attention` with reason `SCHEDULE_CHANGE`; each affected patient receives a `SCHEDULE_CHANGE_NOTICE` notification that opens the appointment, plus a best-effort push with generic text. DELETE restores availability and does not flag or notify. Secretary break-period proposals intentionally keep the secretary validation profile (they are not required to fall within working hours and are not overlap-checked against other breaks, unlike doctor proposals) — only the doctor-side endpoints enforce those rules.
 
 Apply the doctor schedule validation rules: start <= end, breaks must fall within working hours, and breaks must not overlap (doctor-side enforcement; the secretary endpoints keep their existing validation behavior).
 
-When an exception or break-period change affects dates with active appointments, the change is saved as a PENDING request and the secretary confirms it on `/secretary/dashboard` (Schedule Alerts) before it takes effect. Affected appointments remain active but are flagged `needs_attention` and shown as "Needs attention"/"Awaiting secretary confirmation" in the UIs; each affected patient receives a `SCHEDULE_CHANGE_NOTICE` notification that opens the appointment. Do not automatically cancel affected appointments; the secretary handles them through existing cancellation and rescheduling flows.
+When an exception or break-period change affects dates with active appointments, the change is saved immediately and the affected appointments remain active but are flagged `needs_attention` and shown as "Needs attention" in the UIs; each affected patient receives a `SCHEDULE_CHANGE_NOTICE` notification that opens the appointment. Do not automatically cancel affected appointments; the secretary handles them through existing cancellation and rescheduling flows.
 
 Do not:
 - Allow a Secretary to create, edit, or delete weekly working hours
 - Allow a Secretary to manage a schedule, exception, break period, or capacity outside their assigned Doctor
 - Return a successful response for unauthorized schedule access; return 404
-- Save an appointment-impacting exception or break-period change without explicit confirmation
+- Apply an exception or break-period change without flagging newly affected appointments and notifying their patients
 - Automatically cancel appointments affected by a confirmed schedule change
 - Allow ADMIN or SUPERADMIN to manage schedules, availability, breaks, or capacity
 
@@ -1284,9 +1287,10 @@ Do not:
 ### API Rate Limiting, Retries, and Read Caching
 
 **Backend budgets** (`backend/src/middleware/rateLimit.ts`, mounted in `backend/src/index.ts`):
-- General API: `RATE_LIMIT_MAX_REQUESTS` (default 300) per `RATE_LIMIT_WINDOW_MS` (default 60,000 ms) per IP, mounted on `/api/`.
-- Sensitive authentication: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default 30) per `AUTH_RATE_LIMIT_WINDOW_MS` (default 900,000 ms) per IP, mounted on `/api/v1` and skipped for non-auth paths. It covers `/auth/login`, `/auth/verify-login-otp`, `/auth/resend-login-otp`, `/auth/otp`, `/auth/patient/otp`, `/auth/register`, and `/auth/change-password`.
+- General API: `RATE_LIMIT_MAX_REQUESTS` (default 600) per `RATE_LIMIT_WINDOW_MS` (default 60,000 ms) per IP, mounted on `/api/`.
+- Sensitive authentication: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default 60) per `AUTH_RATE_LIMIT_WINDOW_MS` (default 900,000 ms) per IP, mounted on `/api/v1` and skipped for non-auth paths. It covers `/auth/login`, `/auth/verify-login-otp`, `/auth/resend-login-otp`, `/auth/otp`, `/auth/patient/otp`, `/auth/register`, and `/auth/change-password`.
 - Sensitive routes are counted by both limiters, so the stricter auth budget is the effective one.
+- `POST /api/v1/consultation/visits/:visitId/issue` is exempt from the general API budget so a consultation session's autosave/context traffic cannot block issuing. It remains authenticated and doctor-only; only the per-IP budget is skipped.
 - Every `429` includes `Retry-After` (seconds) and the standard error envelope with code `RATE_LIMIT`. `OPTIONS` pre-flight requests are skipped.
 - Rate limiting never replaces authentication or authorization; protected routes still validate the token and role on every request.
 

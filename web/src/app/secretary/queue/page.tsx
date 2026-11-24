@@ -285,9 +285,13 @@ export default function SecretaryQueue() {
   const completed = queueEntries.filter(e => e.status === 'COMPLETED').length;
   const skippedNoShow = queueEntries.filter(e => e.status === 'SKIPPED' || e.status === 'NO_SHOW' || e.status === 'NOT_PRESENT').length;
   const toCollect = queueEntries.filter(e => e.status === 'COMPLETED' && e.payment_status && e.payment_status !== 'PAID').length;
+  const activeQueueEntries = queueEntries.filter(entry => entry.status !== 'COMPLETED');
+  const activeQueueCount = activeQueueEntries.length;
 
-  // Filter queue entries based on tab and search
-  const filteredEntries = queueEntries.filter(entry => {
+  const entriesForActiveTab = activeTab === 'completed' || activeTab === 'to-collect'
+    ? queueEntries
+    : activeQueueEntries;
+  const filteredEntries = entriesForActiveTab.filter(entry => {
     // Tab filter
     let statusMatch = true;
     switch (activeTab) {
@@ -435,7 +439,7 @@ export default function SecretaryQueue() {
                 : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
             }`}
           >
-            All ({totalQueue})
+            Active Queue ({activeQueueCount})
           </button>
           <button
             onClick={() => setActiveTab('waiting')}
