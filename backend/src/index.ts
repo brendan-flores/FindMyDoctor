@@ -32,7 +32,6 @@ import gcashQrRouter from './api/gcashQr.js';
 import invoicesRouter from './api/invoices.js';
 import patientDoctorsRouter from './api/patientDoctors.js';
 import waitlistsRouter from './api/waitlists.js';
-import scheduleChangesRouter from './api/scheduleChanges.js';
 import consultationRouter from './api/consultation.js';
 
 const app = express();
@@ -148,7 +147,6 @@ app.use(`/api/${apiVersion}/gcash-qr`, authenticate, gcashQrRouter);
 app.use(`/api/${apiVersion}/invoices`, authenticate, invoicesRouter);
 app.use(`/api/${apiVersion}/admin`, authenticate, adminRouter);
 app.use(`/api/${apiVersion}/waitlists`, authenticate, authorize('PATIENT'), waitlistsRouter);
-app.use(`/api/${apiVersion}/schedule-changes`, authenticate, scheduleChangesRouter);
 app.use(`/api/${apiVersion}/consultation`, authenticate, consultationRouter);
 
 // Error handling

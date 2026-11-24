@@ -4,9 +4,7 @@ import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 import { calculateCapacity, calculateCapacityRange, buildCapacityResult } from '../modules/capacity/capacityService';
 import { calculateAvailability, calculateAvailabilityRange, invalidateAvailabilityCache } from '../modules/availability/availabilityService';
-import { presentRequest } from '../modules/scheduleChanges/scheduleChangeService';
-import { evaluateProposal, snapshotTarget, toPendingSummary } from '../modules/scheduleChanges/scheduleChangeService';
-import { REQUEST_SELECT } from './scheduleChanges';
+import { flagAndNotifyAffectedAppointments, pushScheduleChangeNotices, snapshotTarget } from '../modules/scheduleChanges/scheduleChangeService';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import path from 'path';
@@ -1955,24 +1953,6 @@ router.post('/me/unavailability', authenticate, authorize('DOCTOR'), async (req:
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start date must be before or equal to end date'));
     }
 
-    // Gate: apply immediately or wait for secretary confirmation
-    const gateProposal = {
-      changeType: 'EXCEPTION' as const,
-      operation: 'CREATE' as const,
-      targetId: null,
-      proposed: { startDate, endDate, reason: reason || null },
-      targetSnapshot: null,
-    };
-    const gate = await evaluateProposal(client, doctorId, req.user!.id, gateProposal);
-    if (gate.kind === 'conflict') {
-      await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, gate.message));
-    }
-    if (gate.kind === 'pending') {
-      await client.query('COMMIT');
-      return res.status(202).json(success(toPendingSummary(gate.request), `This change affects ${gate.request.affected_count} active appointment(s) and is waiting for secretary confirmation.`));
-    }
-
     // Create unavailability period
     const result = await client.query(
       `INSERT INTO doctor_unavailability (doctor_id, start_date, end_date, reason, is_active)
@@ -1981,7 +1961,16 @@ router.post('/me/unavailability', authenticate, authorize('DOCTOR'), async (req:
       [doctorId, startDate, endDate, reason || null]
     );
 
+    const notified = await flagAndNotifyAffectedAppointments(client, doctorId, {
+      changeType: 'EXCEPTION',
+      operation: 'CREATE',
+      targetId: null,
+      proposed: { startDate, endDate, reason: reason || null },
+      targetSnapshot: null,
+    });
+
     await client.query('COMMIT');
+    pushScheduleChangeNotices(notified).catch((pushErr) => console.error('Push delivery failed:', pushErr));
 
     res.status(201).json(success(result.rows[0], 'Unavailability period created successfully'));
   } catch (err: any) {
@@ -2048,24 +2037,7 @@ router.put('/me/unavailability/:id', authenticate, authorize('DOCTOR'), async (r
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start date must be before or equal to end date'));
     }
 
-    // Gate: apply immediately or wait for secretary confirmation
     const existingUnavailability = unavailabilityResult.rows[0];
-    const gateProposal = {
-      changeType: 'EXCEPTION' as const,
-      operation: 'UPDATE' as const,
-      targetId: id,
-      proposed: { startDate, endDate, reason: reason || null },
-      targetSnapshot: snapshotTarget(existingUnavailability, 'EXCEPTION'),
-    };
-    const gate = await evaluateProposal(client, doctorId, req.user!.id, gateProposal);
-    if (gate.kind === 'conflict') {
-      await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, gate.message));
-    }
-    if (gate.kind === 'pending') {
-      await client.query('COMMIT');
-      return res.status(202).json(success(toPendingSummary(gate.request), `This change affects ${gate.request.affected_count} active appointment(s) and is waiting for secretary confirmation.`));
-    }
 
     // Update unavailability period
     const result = await client.query(
@@ -2076,7 +2048,16 @@ router.put('/me/unavailability/:id', authenticate, authorize('DOCTOR'), async (r
       [startDate, endDate, reason || null, id, doctorId]
     );
 
+    const notified = await flagAndNotifyAffectedAppointments(client, doctorId, {
+      changeType: 'EXCEPTION',
+      operation: 'UPDATE',
+      targetId: id,
+      proposed: { startDate, endDate, reason: reason || null },
+      targetSnapshot: snapshotTarget(existingUnavailability, 'EXCEPTION'),
+    });
+
     await client.query('COMMIT');
+    pushScheduleChangeNotices(notified).catch((pushErr) => console.error('Push delivery failed:', pushErr));
 
     res.json(success(result.rows[0], 'Unavailability period updated successfully'));
   } catch (err: any) {
@@ -2110,7 +2091,7 @@ router.delete('/me/unavailability/:id', authenticate, authorize('DOCTOR'), async
 
     const doctorId = doctorResult.rows[0].id;
 
-    // Fetch the target (needed for the snapshot and pending check)
+    // Fetch the target to verify ownership before deleting
     const unavailabilityResult = await client.query(
       'SELECT * FROM doctor_unavailability WHERE id = $1 AND doctor_id = $2',
       [id, doctorId]
@@ -2118,20 +2099,6 @@ router.delete('/me/unavailability/:id', authenticate, authorize('DOCTOR'), async
     if (unavailabilityResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Unavailability period not found or access denied'));
-    }
-
-    // Gate: duplicate-pending check (deletes apply immediately)
-    const gateProposal = {
-      changeType: 'EXCEPTION' as const,
-      operation: 'DELETE' as const,
-      targetId: id,
-      proposed: { startDate: '', endDate: '', reason: null },
-      targetSnapshot: snapshotTarget(unavailabilityResult.rows[0], 'EXCEPTION'),
-    };
-    const gate = await evaluateProposal(client, doctorId, req.user!.id, gateProposal);
-    if (gate.kind === 'conflict') {
-      await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, gate.message));
     }
 
     // Verify the unavailability period belongs to the authenticated doctor and delete it
@@ -2306,24 +2273,6 @@ router.post('/me/break-periods', authenticate, authorize('DOCTOR'), async (req: 
       return res.status(409).json(error(ErrorCodes.CONFLICT, 'Break period overlaps with an existing break'));
     }
 
-    // Gate: apply immediately or wait for secretary confirmation
-    const gateProposal = {
-      changeType: 'BREAK' as const,
-      operation: 'CREATE' as const,
-      targetId: null,
-      proposed: { breakDate, startTime, endTime, reason: reason || null },
-      targetSnapshot: null,
-    };
-    const gate = await evaluateProposal(client, doctorId, req.user!.id, gateProposal);
-    if (gate.kind === 'conflict') {
-      await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, gate.message));
-    }
-    if (gate.kind === 'pending') {
-      await client.query('COMMIT');
-      return res.status(202).json(success(toPendingSummary(gate.request), `This change affects ${gate.request.affected_count} active appointment(s) and is waiting for secretary confirmation.`));
-    }
-
     // Create break period
     const result = await client.query(
       `INSERT INTO doctor_break_periods (doctor_id, break_date, start_time, end_time, reason, is_active)
@@ -2332,7 +2281,16 @@ router.post('/me/break-periods', authenticate, authorize('DOCTOR'), async (req: 
       [doctorId, breakDate, startTime, endTime, reason || null]
     );
 
+    const notified = await flagAndNotifyAffectedAppointments(client, doctorId, {
+      changeType: 'BREAK',
+      operation: 'CREATE',
+      targetId: null,
+      proposed: { breakDate, startTime, endTime, reason: reason || null },
+      targetSnapshot: null,
+    });
+
     await client.query('COMMIT');
+    pushScheduleChangeNotices(notified).catch((pushErr) => console.error('Push delivery failed:', pushErr));
 
     res.status(201).json(success(result.rows[0], 'Break period created successfully'));
   } catch (err: any) {
@@ -2455,24 +2413,6 @@ router.put('/me/break-periods/:id', authenticate, authorize('DOCTOR'), async (re
       return res.status(409).json(error(ErrorCodes.CONFLICT, 'Break period overlaps with an existing break'));
     }
 
-    // Gate: apply immediately or wait for secretary confirmation
-    const gateProposal = {
-      changeType: 'BREAK' as const,
-      operation: 'UPDATE' as const,
-      targetId: id,
-      proposed: { breakDate, startTime, endTime, reason: reason || null },
-      targetSnapshot: snapshotTarget(breakResult.rows[0], 'BREAK'),
-    };
-    const gate = await evaluateProposal(client, doctorId, req.user!.id, gateProposal);
-    if (gate.kind === 'conflict') {
-      await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, gate.message));
-    }
-    if (gate.kind === 'pending') {
-      await client.query('COMMIT');
-      return res.status(202).json(success(toPendingSummary(gate.request), `This change affects ${gate.request.affected_count} active appointment(s) and is waiting for secretary confirmation.`));
-    }
-
     // Update break period
     const result = await client.query(
       `UPDATE doctor_break_periods
@@ -2482,7 +2422,16 @@ router.put('/me/break-periods/:id', authenticate, authorize('DOCTOR'), async (re
       [breakDate, startTime, endTime, reason || null, id, doctorId]
     );
 
+    const notified = await flagAndNotifyAffectedAppointments(client, doctorId, {
+      changeType: 'BREAK',
+      operation: 'UPDATE',
+      targetId: id,
+      proposed: { breakDate, startTime, endTime, reason: reason || null },
+      targetSnapshot: snapshotTarget(breakResult.rows[0], 'BREAK'),
+    });
+
     await client.query('COMMIT');
+    pushScheduleChangeNotices(notified).catch((pushErr) => console.error('Push delivery failed:', pushErr));
 
     res.json(success(result.rows[0], 'Break period updated successfully'));
   } catch (err: any) {
@@ -2516,7 +2465,7 @@ router.delete('/me/break-periods/:id', authenticate, authorize('DOCTOR'), async 
 
     const doctorId = doctorResult.rows[0].id;
 
-    // Fetch the target (needed for the snapshot and pending check)
+    // Fetch the target to verify ownership before deleting
     const breakResult = await client.query(
       'SELECT * FROM doctor_break_periods WHERE id = $1 AND doctor_id = $2',
       [id, doctorId]
@@ -2524,20 +2473,6 @@ router.delete('/me/break-periods/:id', authenticate, authorize('DOCTOR'), async 
     if (breakResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Break period not found or access denied'));
-    }
-
-    // Gate: duplicate-pending check (deletes apply immediately)
-    const gateProposal = {
-      changeType: 'BREAK' as const,
-      operation: 'DELETE' as const,
-      targetId: id,
-      proposed: { breakDate: '', startTime: '', endTime: '', reason: null },
-      targetSnapshot: snapshotTarget(breakResult.rows[0], 'BREAK'),
-    };
-    const gate = await evaluateProposal(client, doctorId, req.user!.id, gateProposal);
-    if (gate.kind === 'conflict') {
-      await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, gate.message));
     }
 
     // Verify the break period belongs to the authenticated doctor and delete it
@@ -2560,34 +2495,6 @@ router.delete('/me/break-periods/:id', authenticate, authorize('DOCTOR'), async 
     res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to delete break period'));
   } finally {
     client.release();
-  }
-});
-
-// Read-only list of the doctor's own pending schedule-change requests.
-// Doctors cannot approve/dismiss them — that is secretary-only via
-// /api/v1/schedule-changes.
-router.get('/me/schedule-change-requests', authenticate, authorize('DOCTOR'), async (req: AuthRequest, res: Response) => {
-  try {
-    const doctorResult = await query(
-      'SELECT id FROM doctors WHERE user_id = $1',
-      [req.user!.id]
-    );
-
-    if (doctorResult.rows.length === 0) {
-      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Doctor profile not found'));
-    }
-
-    const doctorId = doctorResult.rows[0].id;
-
-    const result = await query(
-      `${REQUEST_SELECT} WHERE r.doctor_id = $1 AND r.status = 'PENDING' ORDER BY r.created_at DESC`,
-      [doctorId]
-    );
-
-    res.json(success(result.rows.map(presentRequest)));
-  } catch (err: any) {
-    console.error('Failed to fetch doctor schedule change requests:', err);
-    res.status(500).json(error(ErrorCodes.SERVER_ERROR, 'Failed to fetch schedule change requests'));
   }
 });
 

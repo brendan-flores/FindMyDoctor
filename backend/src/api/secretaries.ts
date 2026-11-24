@@ -5,7 +5,7 @@ import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 import { calculateCapacity, calculateCapacityRange } from '../modules/capacity/capacityService';
 import { invalidateAvailabilityCache } from '../modules/availability/availabilityService';
 import { getClinicDate, toClinicDateString } from '../utils/date';
-import { evaluateProposal, snapshotTarget, toPendingSummary } from '../modules/scheduleChanges/scheduleChangeService';
+import { flagAndNotifyAffectedAppointments, pushScheduleChangeNotices, snapshotTarget } from '../modules/scheduleChanges/scheduleChangeService';
 
 const router = Router();
 
@@ -453,24 +453,6 @@ router.post('/managed-doctors/unavailability', authenticate, authorize('SECRETAR
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start date must be before or equal to end date'));
     }
 
-    // Gate: apply immediately or wait for secretary confirmation
-    const gateProposal = {
-      changeType: 'EXCEPTION' as const,
-      operation: 'CREATE' as const,
-      targetId: null,
-      proposed: { startDate, endDate, reason: reason || null },
-      targetSnapshot: null,
-    };
-    const gate = await evaluateProposal(client, doctorId, req.user!.id, gateProposal);
-    if (gate.kind === 'conflict') {
-      await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, gate.message));
-    }
-    if (gate.kind === 'pending') {
-      await client.query('COMMIT');
-      return res.status(202).json(success(toPendingSummary(gate.request), `This change affects ${gate.request.affected_count} active appointment(s) and is waiting for secretary confirmation.`));
-    }
-
     // Create unavailability period
     const result = await client.query(
       `INSERT INTO doctor_unavailability (doctor_id, start_date, end_date, reason, is_active)
@@ -479,7 +461,16 @@ router.post('/managed-doctors/unavailability', authenticate, authorize('SECRETAR
       [doctorId, startDate, endDate, reason || null]
     );
 
+    const notified = await flagAndNotifyAffectedAppointments(client, doctorId, {
+      changeType: 'EXCEPTION',
+      operation: 'CREATE',
+      targetId: null,
+      proposed: { startDate, endDate, reason: reason || null },
+      targetSnapshot: null,
+    });
+
     await client.query('COMMIT');
+    pushScheduleChangeNotices(notified).catch((pushErr) => console.error('Push delivery failed:', pushErr));
 
     res.status(201).json(success(result.rows[0], 'Unavailability period created successfully'));
   } catch (err: any) {
@@ -540,23 +531,7 @@ router.put('/managed-doctors/unavailability/:id', authenticate, authorize('SECRE
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start date must be before or equal to end date'));
     }
 
-    // Gate: apply immediately or wait for secretary confirmation
-    const gateProposal = {
-      changeType: 'EXCEPTION' as const,
-      operation: 'UPDATE' as const,
-      targetId: id,
-      proposed: { startDate, endDate, reason: reason || null },
-      targetSnapshot: snapshotTarget(unavailabilityResult.rows[0], 'EXCEPTION'),
-    };
-    const gate = await evaluateProposal(client, doctorId, req.user!.id, gateProposal);
-    if (gate.kind === 'conflict') {
-      await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, gate.message));
-    }
-    if (gate.kind === 'pending') {
-      await client.query('COMMIT');
-      return res.status(202).json(success(toPendingSummary(gate.request), `This change affects ${gate.request.affected_count} active appointment(s) and is waiting for secretary confirmation.`));
-    }
+    const existingUnavailability = unavailabilityResult.rows[0];
 
     // Update unavailability period
     const result = await client.query(
@@ -567,7 +542,16 @@ router.put('/managed-doctors/unavailability/:id', authenticate, authorize('SECRE
       [startDate, endDate, reason || null, id, doctorId]
     );
 
+    const notified = await flagAndNotifyAffectedAppointments(client, doctorId, {
+      changeType: 'EXCEPTION',
+      operation: 'UPDATE',
+      targetId: id,
+      proposed: { startDate, endDate, reason: reason || null },
+      targetSnapshot: snapshotTarget(existingUnavailability, 'EXCEPTION'),
+    });
+
     await client.query('COMMIT');
+    pushScheduleChangeNotices(notified).catch((pushErr) => console.error('Push delivery failed:', pushErr));
 
     res.json(success(result.rows[0], 'Unavailability period updated successfully'));
   } catch (err: any) {
@@ -610,20 +594,6 @@ router.delete('/managed-doctors/unavailability/:id', authenticate, authorize('SE
     if (unavailabilityResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Unavailability period not found or access denied'));
-    }
-
-    // Gate: duplicate-pending check (deletes apply immediately)
-    const gateProposal = {
-      changeType: 'EXCEPTION' as const,
-      operation: 'DELETE' as const,
-      targetId: id,
-      proposed: { startDate: '', endDate: '', reason: null },
-      targetSnapshot: snapshotTarget(unavailabilityResult.rows[0], 'EXCEPTION'),
-    };
-    const gate = await evaluateProposal(client, doctorId, req.user!.id, gateProposal);
-    if (gate.kind === 'conflict') {
-      await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, gate.message));
     }
 
     // Delete unavailability period
@@ -732,24 +702,6 @@ router.post('/managed-doctors/break-periods', authenticate, authorize('SECRETARY
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start time must be before end time'));
     }
 
-    // Gate: apply immediately or wait for secretary confirmation
-    const gateProposal = {
-      changeType: 'BREAK' as const,
-      operation: 'CREATE' as const,
-      targetId: null,
-      proposed: { breakDate, startTime, endTime, reason: reason || null },
-      targetSnapshot: null,
-    };
-    const gate = await evaluateProposal(client, doctorId, req.user!.id, gateProposal);
-    if (gate.kind === 'conflict') {
-      await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, gate.message));
-    }
-    if (gate.kind === 'pending') {
-      await client.query('COMMIT');
-      return res.status(202).json(success(toPendingSummary(gate.request), `This change affects ${gate.request.affected_count} active appointment(s) and is waiting for secretary confirmation.`));
-    }
-
     // Create break period
     const result = await client.query(
       `INSERT INTO doctor_break_periods (doctor_id, break_date, start_time, end_time, reason, is_active)
@@ -758,7 +710,16 @@ router.post('/managed-doctors/break-periods', authenticate, authorize('SECRETARY
       [doctorId, breakDate, startTime, endTime, reason || null]
     );
 
+    const notified = await flagAndNotifyAffectedAppointments(client, doctorId, {
+      changeType: 'BREAK',
+      operation: 'CREATE',
+      targetId: null,
+      proposed: { breakDate, startTime, endTime, reason: reason || null },
+      targetSnapshot: null,
+    });
+
     await client.query('COMMIT');
+    pushScheduleChangeNotices(notified).catch((pushErr) => console.error('Push delivery failed:', pushErr));
 
     res.status(201).json(success(result.rows[0], 'Break period created successfully'));
   } catch (err: any) {
@@ -819,24 +780,6 @@ router.put('/managed-doctors/break-periods/:id', authenticate, authorize('SECRET
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Start time must be before end time'));
     }
 
-    // Gate: apply immediately or wait for secretary confirmation
-    const gateProposal = {
-      changeType: 'BREAK' as const,
-      operation: 'UPDATE' as const,
-      targetId: id,
-      proposed: { breakDate, startTime, endTime, reason: reason || null },
-      targetSnapshot: snapshotTarget(breakResult.rows[0], 'BREAK'),
-    };
-    const gate = await evaluateProposal(client, doctorId, req.user!.id, gateProposal);
-    if (gate.kind === 'conflict') {
-      await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, gate.message));
-    }
-    if (gate.kind === 'pending') {
-      await client.query('COMMIT');
-      return res.status(202).json(success(toPendingSummary(gate.request), `This change affects ${gate.request.affected_count} active appointment(s) and is waiting for secretary confirmation.`));
-    }
-
     // Update break period
     const result = await client.query(
       `UPDATE doctor_break_periods
@@ -846,7 +789,16 @@ router.put('/managed-doctors/break-periods/:id', authenticate, authorize('SECRET
       [breakDate, startTime, endTime, reason || null, id, doctorId]
     );
 
+    const notified = await flagAndNotifyAffectedAppointments(client, doctorId, {
+      changeType: 'BREAK',
+      operation: 'UPDATE',
+      targetId: id,
+      proposed: { breakDate, startTime, endTime, reason: reason || null },
+      targetSnapshot: snapshotTarget(breakResult.rows[0], 'BREAK'),
+    });
+
     await client.query('COMMIT');
+    pushScheduleChangeNotices(notified).catch((pushErr) => console.error('Push delivery failed:', pushErr));
 
     res.json(success(result.rows[0], 'Break period updated successfully'));
   } catch (err: any) {
@@ -889,20 +841,6 @@ router.delete('/managed-doctors/break-periods/:id', authenticate, authorize('SEC
     if (breakResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Break period not found or access denied'));
-    }
-
-    // Gate: duplicate-pending check (deletes apply immediately)
-    const gateProposal = {
-      changeType: 'BREAK' as const,
-      operation: 'DELETE' as const,
-      targetId: id,
-      proposed: { breakDate: '', startTime: '', endTime: '', reason: null },
-      targetSnapshot: snapshotTarget(breakResult.rows[0], 'BREAK'),
-    };
-    const gate = await evaluateProposal(client, doctorId, req.user!.id, gateProposal);
-    if (gate.kind === 'conflict') {
-      await client.query('ROLLBACK');
-      return res.status(409).json(error(ErrorCodes.CONFLICT, gate.message));
     }
 
     // Delete break period
