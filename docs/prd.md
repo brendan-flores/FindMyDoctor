@@ -205,7 +205,7 @@ Secretaries can:
 - Add, edit, and delete date-specific exceptions and break periods for their assigned doctor.
 - Configure daily patient capacity for their assigned doctor.
 - Manage the unified queue.
-- Call patients.
+- Call patients; the patient receives a notification and push alert.
 - Skip or mark patients as not present.
 - Start checkups.
 - Complete checkups.
@@ -1339,6 +1339,8 @@ Next Patient
   ↓
 Call Patient
   ↓
+Notify Patient
+  ↓
 Present?
  ├── Yes → Start Checkup
  │             ↓
@@ -1348,6 +1350,8 @@ Present?
               ↓
          Remains Recorded
 ```
+
+Completed checkups are excluded from the secretary's active queue view and remain available in the Completed and payment-collection views.
 
 ## Patient-Secretary Chat
 

@@ -1253,6 +1253,8 @@ Skip / Not Present
 Complete Checkup
 ```
 
+Calling the next patient must create a patient notification and send a best-effort push through the notification module. The secretary active queue view excludes `COMPLETED` entries; completed records remain available through the completed and payment-collection views.
+
 The mobile interface should call backend actions rather than implementing queue state transitions locally.
 
 ---
@@ -1958,6 +1960,8 @@ PATCH /queue/:id/status
 `GET /queue/today/me` is PATIENT-only and resolves the patient from the token. It returns `{ date, queues: [...] }` for the clinic's current date, where every entry carries the queue number and status, the current now-serving number, the number of patients ahead, the estimated wait (patients ahead × consultation duration), and the doctor's name, specialty, practice, room, photo, and consultation fee. An empty `queues` list means the patient has no queue today.
 
 `GET /queue/:date/patient/:patientId` is scoped: a patient may read only their own entry (403 otherwise), a doctor only entries for their own doctor, a secretary only for their assigned doctor, and an admin any entry. Invalid dates return 400 and missing entries 404.
+
+`POST /queue/:date/next` marks the next `WAITING` entry as `CALLED`, then creates a `QUEUE_UPDATED` patient notification and sends a best-effort push with generic queue details. Notification or push delivery failures are logged and do not fail the queue transition.
 
 ### Appointment Changes
 

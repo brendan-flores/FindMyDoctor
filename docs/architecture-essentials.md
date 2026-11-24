@@ -395,6 +395,8 @@ Skip / Not Present
 Complete Checkup
 ```
 
+Calling the next patient must notify the patient through the backend notification and push pipeline.
+
 Queue status transitions must be handled by the backend.
 
 Do not implement critical queue logic only in the mobile UI.

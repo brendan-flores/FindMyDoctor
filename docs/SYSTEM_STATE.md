@@ -462,6 +462,8 @@ Current System State (November 2026):
 - Queue page includes KPI cards: Total Patients, Waiting, Completed, and Assigned Doctor
 - Queue page includes date selector to view queue for different dates
 - Queue page includes "Call Next Patient" button to advance the queue by calling the next waiting patient
+- `POST /api/v1/queue/:date/next` creates a `QUEUE_UPDATED` notification ("You're Next") for the called patient and sends a best-effort push notification through `sendPushToUser`; notification or push failures do not fail the queue transition
+- The secretary queue active view excludes `COMPLETED` entries; completed checkups remain available under the Completed and To Collect tabs
 - Queue entry actions are status-dependent: WAITING (Call, Not Present), CALLED (Start Checkup, Skip), IN_CHECKUP (Complete), SKIPPED/NOT_PRESENT (Re-queue)
 - Backend queue API endpoints enforce secretary-to-doctor assignment on all operations
 - Backend `GET /api/v1/queue/:date` is DOCTOR/SECRETARY-only and automatically filters by the secretary's assigned doctor for the SECRETARY role; DOCTOR may optionally filter by `doctorId`; ADMIN/SUPERADMIN do not have access (403)
