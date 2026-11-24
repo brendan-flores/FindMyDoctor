@@ -161,7 +161,8 @@ void main() {
 
         // Act - Initialize app with restored session
         await tester.pumpWidget(const MyApp());
-        await tester.pumpAndSettle(const Duration(seconds: 2));
+        // Wait for initialization plus the ~3 s startup splash animation.
+        await tester.pumpAndSettle(const Duration(seconds: 4));
 
         // Assert - Verify ChangePasswordPage is shown for outstanding requirement
         // With the corrected _getInitialHome() logic, authenticated users with
@@ -181,7 +182,8 @@ void main() {
 
         // Act - Initialize app with restored session
         await tester.pumpWidget(const MyApp());
-        await tester.pumpAndSettle(const Duration(seconds: 2));
+        // Wait for initialization plus the ~3 s startup splash animation.
+        await tester.pumpAndSettle(const Duration(seconds: 4));
 
         // Assert - Verify home page is shown
         expect(find.byType(HomePage), findsOneWidget);
@@ -198,7 +200,8 @@ void main() {
 
       // Act - Initialize app without session
       await tester.pumpWidget(const MyApp());
-      await tester.pumpAndSettle(const Duration(seconds: 2));
+      // Wait for initialization plus the ~3 s startup splash animation.
+      await tester.pumpAndSettle(const Duration(seconds: 4));
 
       // Assert - Verify login page is shown
       expect(find.byType(LoginPage), findsOneWidget);

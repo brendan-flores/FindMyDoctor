@@ -335,6 +335,10 @@ void main() {
     await tester.pumpWidget(const MyApp());
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
+    // Let the startup splash animation complete (~3 s) so MyApp reveals the
+    // home (LoginPage when unauthenticated).
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
 
     // Guarded route: the unauthenticated request is bounced to login.
     final navigator = tester.state<NavigatorState>(
