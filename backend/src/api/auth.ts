@@ -664,6 +664,35 @@ router.post('/trusted-browsers/revoke-all', authenticate, async (req: AuthReques
   }
 });
 
+// Session verification for frontend middleware.
+// Validates the JWT from the Authorization header and returns the user's role.
+// Used by Next.js middleware to verify portal access without exposing JWT secrets.
+router.get('/session', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json(
+        error(ErrorCodes.UNAUTHORIZED, 'Authentication required')
+      );
+    }
+
+    res.json(
+      success({
+        user: {
+          id: req.user.id,
+          email: req.user.email,
+          role: req.user.role,
+          mustChangePassword: req.user.mustChangePassword,
+        },
+      },
+      'Session valid')
+    );
+  } catch (err) {
+    return res.status(401).json(
+      error(ErrorCodes.UNAUTHORIZED, 'Invalid or expired session')
+    );
+  }
+});
+
 // Revoke the current trusted browser (also used when the user declines trust)
 router.post('/revoke-trusted-browser', authenticate, async (req: AuthRequest, res: Response) => {
   try {
