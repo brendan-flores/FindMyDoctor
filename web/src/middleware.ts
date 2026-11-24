@@ -88,8 +88,21 @@ const SESSION_COOKIE = 'fmdo_session';
  * https://findmydoctor-api.onrender.com/api/v1), so we append /auth/session
  * directly without stripping anything.
  */
+function normalizeBackendSessionUrl(rawUrl: string): string {
+  if (!rawUrl) return 'https://findmydoctor-api.onrender.com/api/v1/auth/session';
+
+  let url = rawUrl.trim().replace(/\/+$/, '');
+  if (!url.endsWith('/api/v1')) {
+    url = `${url}/api/v1`;
+  }
+  return `${url}/auth/session`;
+}
+
 const BACKEND_SESSION_URL =
-  (process.env.NEXT_PUBLIC_API_URL || 'https://findmydoctor-api.onrender.com/api/v1') + '/auth/session';
+  normalizeBackendSessionUrl(
+    process.env.NEXT_PUBLIC_API_URL ||
+      'https://findmydoctor-api.onrender.com/api/v1'
+  );
 
 /**
  * Outcome of verifying a session with the backend.

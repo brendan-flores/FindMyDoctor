@@ -7,7 +7,28 @@ import {
   shouldRetryResponse,
 } from './requestPolicy';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1';
+function normalizeApiBaseUrl(rawUrl: string): string {
+  if (!rawUrl) return 'http://127.0.0.1:3000/api/v1';
+
+  let url = rawUrl.trim();
+
+  // Remove trailing slash(es) for consistent handling.
+  url = url.replace(/\/+$/, '');
+
+  // Ensure /api/v1 is present exactly once.
+  // If the URL already ends with /api/v1, keep it as-is (do not duplicate).
+  // Otherwise append /api/v1 so that endpoint paths like /auth/login resolve
+  // to /api/v1/auth/login on the backend.
+  if (!url.endsWith('/api/v1')) {
+    url = `${url}/api/v1`;
+  }
+
+  return url;
+}
+
+const API_BASE_URL = normalizeApiBaseUrl(
+  process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1'
+);
 
 /** Error code returned when the caller aborted a request. */
 export const REQUEST_ABORTED_ERROR_CODE = 'REQUEST_ABORTED';
