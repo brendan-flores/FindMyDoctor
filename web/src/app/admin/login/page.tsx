@@ -43,7 +43,7 @@ export default function AdminLogin() {
         };
 
         localStorage.setItem('admin_user', JSON.stringify(authData.user));
-        apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null);
+        apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null, false, 'ADMIN');
 
         // Verify backend-returned role is ADMIN or SUPERADMIN
         if (authData.user.role === 'ADMIN' || authData.user.role === 'SUPERADMIN') {
@@ -68,7 +68,7 @@ export default function AdminLogin() {
     // Verify backend-returned role is ADMIN or SUPERADMIN
     if (data.user.role === 'ADMIN' || data.user.role === 'SUPERADMIN') {
       localStorage.setItem('admin_user', JSON.stringify(data.user));
-      apiClient.setToken(data.accessToken, data.refreshToken, data.session || null);
+      apiClient.setToken(data.accessToken, data.refreshToken, data.session || null, false, 'ADMIN');
 
       router.push('/admin/dashboard');
     } else {

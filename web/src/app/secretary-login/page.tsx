@@ -114,7 +114,7 @@ export default function SecretaryLogin() {
         };
 
         localStorage.setItem('secretary_user', JSON.stringify(authData.user));
-        apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null);
+        apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null, false, 'SECRETARY');
 
         if (authData.user.role === 'SECRETARY') {
           if (authData.user.mustChangePassword === true) {
@@ -146,7 +146,7 @@ export default function SecretaryLogin() {
   const handleOtpVerifySuccess = (data: any) => {
     if (data.user.role === 'SECRETARY') {
       localStorage.setItem('secretary_user', JSON.stringify(data.user));
-      apiClient.setToken(data.accessToken, data.refreshToken, data.session || null);
+      apiClient.setToken(data.accessToken, data.refreshToken, data.session || null, false, 'SECRETARY');
 
       if (data.user.mustChangePassword === true) {
         router.push('/secretary/change-password');

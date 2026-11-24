@@ -433,7 +433,9 @@ export default function DoctorSignupOtp() {
       apiClient.setToken(
         authData.accessToken,
         authData.refreshToken,
-        authData.session || null
+        authData.session || null,
+        false,
+        'DOCTOR'
       );
 
       // Keep the doctor-scoped user record used by the doctor portal layout.

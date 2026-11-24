@@ -113,7 +113,7 @@ export default function DoctorLogin() {
 
         // Store the user profile and start the session watchdog.
         localStorage.setItem('doctor_user', JSON.stringify(authData.user));
-        apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null);
+        apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null, false, 'DOCTOR');
 
         if (authData.user.role === 'DOCTOR') {
           await routeBasedOnApprovalStatus(authData.requiresTrustPrompt === true);
@@ -135,7 +135,7 @@ export default function DoctorLogin() {
   const handleOtpVerifySuccess = async (data: any) => {
     if (data.user.role === 'DOCTOR') {
       localStorage.setItem('doctor_user', JSON.stringify(data.user));
-      apiClient.setToken(data.accessToken, data.refreshToken, data.session || null);
+      apiClient.setToken(data.accessToken, data.refreshToken, data.session || null, false, 'DOCTOR');
 
       await routeBasedOnApprovalStatus(data.requiresTrustPrompt === true);
     } else {
