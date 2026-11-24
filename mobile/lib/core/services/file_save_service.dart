@@ -28,7 +28,7 @@ class SavedFile {
 /// file manager (Downloads on Android, the Files app on iOS).
 class FileSaveService {
   static const MethodChannel _channel =
-      MethodChannel('com.example.mobile/files');
+      MethodChannel('com.findmydoctor.app/files');
 
   static Future<SavedFile> savePdf(
     List<int> bytes,
