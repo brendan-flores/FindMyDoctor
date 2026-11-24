@@ -45,10 +45,20 @@ export default function DoctorLogin() {
           if (storedUser?.mustChangePassword === true) {
             router.replace('/doctor/settings');
           } else {
-            const session = apiClient.getSessionMetadata();
-            const isPersistent =
-              session?.persistent === true || session?.rememberMe === true;
-            router.replace(isPersistent ? '/doctor/dashboard' : '/doctor/trust-device');
+            // Corrective destinations (rejection review, onboarding) skip the
+            // device-trust prompt; it is only offered when entering the portal.
+            const needsProfileCorrection =
+              response.data.approval_status === 'REJECTED' ||
+              (response.data.approval_status === 'PENDING' &&
+                response.data.profile_completion_status !== 'SUBMITTED');
+            if (needsProfileCorrection) {
+              router.replace('/doctor-profile');
+            } else {
+              const session = apiClient.getSessionMetadata();
+              const isPersistent =
+                session?.persistent === true || session?.rememberMe === true;
+              router.replace(isPersistent ? '/doctor/dashboard' : '/doctor/trust-device');
+            }
           }
         } else {
           apiClient.clearToken();
@@ -100,11 +110,7 @@ export default function DoctorLogin() {
         apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null);
 
         if (authData.user.role === 'DOCTOR') {
-          if (authData.requiresTrustPrompt) {
-            router.push('/doctor/trust-device');
-          } else {
-            await routeBasedOnApprovalStatus();
-          }
+          await routeBasedOnApprovalStatus(authData.requiresTrustPrompt === true);
         } else {
           setError('Invalid username or password.');
           localStorage.removeItem('doctor_user');
@@ -125,11 +131,7 @@ export default function DoctorLogin() {
       localStorage.setItem('doctor_user', JSON.stringify(data.user));
       apiClient.setToken(data.accessToken, data.refreshToken, data.session || null);
 
-      if (data.requiresTrustPrompt) {
-        router.push('/doctor/trust-device');
-      } else {
-        await routeBasedOnApprovalStatus();
-      }
+      await routeBasedOnApprovalStatus(data.requiresTrustPrompt === true);
     } else {
       setError('Invalid username or password.');
       localStorage.removeItem('doctor_user');
@@ -151,28 +153,32 @@ export default function DoctorLogin() {
     setChallengeId(newChallengeId);
   };
 
-  const routeBasedOnApprovalStatus = async () => {
+  const routeBasedOnApprovalStatus = async (requiresTrustPrompt: boolean) => {
     try {
       const response = await doctorApi.getProfile();
 
       if (response.success && response.data) {
         const approvalStatus = response.data.approval_status;
 
-        if (approvalStatus === 'ACTIVE') {
-          router.push('/doctor/dashboard');
-        } else if (approvalStatus === 'REJECTED') {
+        // The device-trust prompt is only offered when the login leads into
+        // the portal dashboard. Corrective flows — a rejected doctor reviewing
+        // the rejection reason or a pending doctor finishing onboarding — go
+        // straight to /doctor-profile instead.
+        const needsProfileCorrection =
+          approvalStatus === 'REJECTED' ||
+          (approvalStatus === 'PENDING' &&
+            response.data.profile_completion_status !== 'SUBMITTED');
+
+        if (needsProfileCorrection) {
           router.push('/doctor-profile');
+        } else if (approvalStatus === 'ACTIVE') {
+          router.push(requiresTrustPrompt ? '/doctor/trust-device' : '/doctor/dashboard');
         } else if (approvalStatus === 'PENDING') {
-          // A doctor who has not submitted the professional profile yet must
-          // complete it. PENDING + SUBMITTED is rejected by the login endpoint,
-          // so this branch means the profile still needs to be finished.
-          if (response.data.profile_completion_status !== 'SUBMITTED') {
-            router.push('/doctor-profile');
-          } else {
-            setError('Your account is awaiting administrator approval');
-            localStorage.removeItem('doctor_user');
-            apiClient.clearToken();
-          }
+          // PENDING + SUBMITTED is rejected by the login endpoint, so reaching
+          // this branch means the account is awaiting administrator approval.
+          setError('Your account is awaiting administrator approval');
+          localStorage.removeItem('doctor_user');
+          apiClient.clearToken();
         } else {
           setError('Invalid account status');
           localStorage.removeItem('doctor_user');
