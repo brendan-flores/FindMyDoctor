@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { secretaryApi, SecretaryProfile, DirectWalkInRegistrationRequest } from '@/lib/api/secretaryApi';
-import { formatPhoneFieldInput, phoneFormatErrorMessage, toPatientMobileE164 } from '@/lib/phone';
+import { toPatientMobileE164 } from '@/lib/phone';
 import DatePicker from '@/components/DatePicker';
 import Select from '@/components/ui/Select';
+import InternationalPhoneInput from '@/components/ui/InternationalPhoneInput';
 
 type Step = 'form' | 'success';
 
@@ -26,6 +27,7 @@ export default function SecretaryWalkIns() {
     address: '',
   });
   const [isRegistering, setIsRegistering] = useState(false);
+  const [phoneCountry, setPhoneCountry] = useState('PH');
 
   // Success result
   const [registrationResult, setRegistrationResult] = useState<any>(null);
@@ -70,9 +72,9 @@ export default function SecretaryWalkIns() {
     }
 
     // Validate Philippine mobile number format
-    const canonicalPhone = toPatientMobileE164(formData.phone);
+    const canonicalPhone = toPatientMobileE164(formData.phone, phoneCountry);
     if (!canonicalPhone) {
-      setFieldErrors({ phone: 'Enter a valid Philippine mobile number' });
+      setFieldErrors({ phone: 'Enter a valid mobile number' });
       return;
     }
 
@@ -148,17 +150,22 @@ export default function SecretaryWalkIns() {
     }
   };
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const result = formatPhoneFieldInput(e.target.value, formData.phone, { allowLandline: false });
-    const formatted = result.value;
-    const phoneError = result.error;
+  const handlePhoneChange = (value: string) => {
+    setFormData(prev => ({ ...prev, phone: value }));
 
-    setFormData(prev => ({ ...prev, phone: formatted }));
-
-    if (phoneError) {
-      setFieldErrors(prev => ({ ...prev, phone: phoneFormatErrorMessage(phoneError) }));
-    } else if (fieldErrors.phone) {
+    if (fieldErrors.phone) {
       setFieldErrors(prev => ({ ...prev, phone: '' }));
+    }
+  };
+
+  const handlePhoneCountryChange = (iso: string) => {
+    setPhoneCountry(iso);
+
+    if (formData.phone.trim()) {
+      setFieldErrors(prev => ({
+        ...prev,
+        phone: toPatientMobileE164(formData.phone, iso) ? '' : 'Enter a valid mobile number',
+      }));
     }
   };
 
@@ -177,6 +184,7 @@ export default function SecretaryWalkIns() {
     setRegistrationResult(null);
     setError(null);
     setFieldErrors({});
+    setPhoneCountry('PH');
   };
 
   const handleReturnToForm = () => {
@@ -350,24 +358,16 @@ export default function SecretaryWalkIns() {
               </div>
             </div>
             <div>
-              <label className="block text-sm text-neutral-600 mb-2">Mobile Number *</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 font-medium">+63</span>
-                <input
-                  type="text"
-                  value={formData.phone}
-                  onChange={handlePhoneChange}
-                  placeholder="9123456789"
-                  className={`w-full pl-14 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                    fieldErrors.phone
-                      ? 'border-error-500 focus:ring-error-500'
-                      : 'border-neutral-200 focus:ring-success-500'
-                  }`}
-                />
-              </div>
-              {fieldErrors.phone && (
-                <p className="text-xs text-error-600 mt-1">{fieldErrors.phone}</p>
-              )}
+              <label htmlFor="walkInPhone" className="block text-sm text-neutral-600 mb-2">Mobile Number *</label>
+              <InternationalPhoneInput
+                id="walkInPhone"
+                country={phoneCountry}
+                nationalNumber={formData.phone}
+                onCountryChange={handlePhoneCountryChange}
+                onNationalChange={handlePhoneChange}
+                required
+                error={fieldErrors.phone || null}
+              />
             </div>
             <div>
               <label className="block text-sm text-neutral-600 mb-2">Address *</label>

@@ -7,7 +7,7 @@ import SecretaryHeader from '@/components/layout/SecretaryHeader';
 import PageTransition from '@/components/PageTransition';
 import { apiClient } from '@/lib/api/apiClient';
 import { secretaryApi } from '@/lib/api/secretaryApi';
-import { toStaffContactDomestic } from '@/lib/phone';
+import { toStaffContactE164 } from '@/lib/phone';
 import {
   clearSecretarySession,
   isInvalidSecretarySessionStatus,
@@ -125,7 +125,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
                 const lastName = secretary?.last_name?.trim() ?? '';
                 const contactNumber = secretary?.contact_number?.trim() ?? '';
                 const hasValidContact =
-                  contactNumber !== '' && toStaffContactDomestic(contactNumber) !== null;
+                  contactNumber !== '' && toStaffContactE164(contactNumber) !== null;
                 const isComplete = firstName !== '' && lastName !== '' && hasValidContact;
 
                 if (!isComplete) {

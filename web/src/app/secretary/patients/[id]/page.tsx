@@ -3,15 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { secretaryApi, Patient, UpdatePatientRequest } from '@/lib/api/secretaryApi';
-import {
-  formatPhoneFieldInput,
-  phoneFieldValueFromStored,
-  phoneFormatErrorMessage,
-  storedPhoneWarningFor,
-  toPatientMobileE164,
-} from '@/lib/phone';
+import { resolveStoredPhone, toPatientMobileE164 } from '@/lib/phone';
 import Select from '@/components/ui/Select';
 import DatePicker from '@/components/DatePicker';
+import InternationalPhoneInput from '@/components/ui/InternationalPhoneInput';
 
 export default function SecretaryPatientDetail() {
   const router = useRouter();
@@ -26,6 +21,7 @@ export default function SecretaryPatientDetail() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [phoneWarning, setPhoneWarning] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState('');
+  const [phoneCountry, setPhoneCountry] = useState('PH');
 
   // Form state
   const [formData, setFormData] = useState<UpdatePatientRequest>({
@@ -57,13 +53,14 @@ export default function SecretaryPatientDetail() {
 
       if (response.success && response.data) {
         setPatient(response.data);
+        const storedPhone = resolveStoredPhone(response.data.phone, false);
         // Initialize form data with patient data
         setFormData({
           firstName: response.data.first_name || '',
           lastName: response.data.last_name || '',
           dateOfBirth: response.data.date_of_birth || '',
           sex: response.data.sex || 'MALE',
-          phone: phoneFieldValueFromStored(response.data.phone, { allowLandline: false }),
+          phone: storedPhone.nationalNumber,
           address: response.data.address || '',
           middleName: response.data.middle_name || '',
           emergencyContactName: response.data.emergency_contact_name || '',
@@ -72,7 +69,8 @@ export default function SecretaryPatientDetail() {
           allergies: response.data.allergies || '',
           currentMedications: response.data.current_medications || '',
         });
-        setPhoneWarning(storedPhoneWarningFor(response.data.phone, { allowLandline: false }));
+        setPhoneCountry(storedPhone.country);
+        setPhoneWarning(storedPhone.warning);
       } else {
         setError(response.error || 'Failed to fetch patient details');
       }
@@ -88,18 +86,19 @@ export default function SecretaryPatientDetail() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handlePhoneInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const result = formatPhoneFieldInput(e.target.value, formData.phone, { allowLandline: false });
-    const formatted = result.value;
-    const phoneErr = result.error;
+  const handlePhoneInputChange = (value: string) => {
+    setFormData(prev => ({ ...prev, phone: value }));
+    setPhoneError('');
+    setPhoneWarning(null);
+  };
 
-    setFormData(prev => ({ ...prev, phone: formatted }));
+  const handlePhoneCountryChange = (iso: string) => {
+    setPhoneCountry(iso);
 
-    if (phoneErr) {
-      setPhoneError(phoneFormatErrorMessage(phoneErr));
-    } else {
-      setPhoneError('');
-      setPhoneWarning(null);
+    if (formData.phone.trim()) {
+      setPhoneError(
+        toPatientMobileE164(formData.phone, iso) ? '' : 'Enter a valid mobile number'
+      );
     }
   };
 
@@ -126,9 +125,9 @@ export default function SecretaryPatientDetail() {
       return;
     }
 
-    const canonicalPhone = toPatientMobileE164(formData.phone);
+    const canonicalPhone = toPatientMobileE164(formData.phone, phoneCountry);
     if (!canonicalPhone) {
-      setPhoneError('Enter a valid Philippine mobile number');
+      setPhoneError('Enter a valid mobile number');
       return;
     }
 
@@ -154,12 +153,13 @@ export default function SecretaryPatientDetail() {
   const handleCancel = () => {
     // Reset form to original patient data
     if (patient) {
+      const storedPhone = resolveStoredPhone(patient.phone, false);
       setFormData({
         firstName: patient.first_name || '',
         lastName: patient.last_name || '',
         dateOfBirth: patient.date_of_birth || '',
         sex: patient.sex || 'MALE',
-        phone: phoneFieldValueFromStored(patient.phone, { allowLandline: false }),
+        phone: storedPhone.nationalNumber,
         address: patient.address || '',
         middleName: patient.middle_name || '',
         emergencyContactName: patient.emergency_contact_name || '',
@@ -168,7 +168,8 @@ export default function SecretaryPatientDetail() {
         allergies: patient.allergies || '',
         currentMedications: patient.current_medications || '',
       });
-      setPhoneWarning(storedPhoneWarningFor(patient.phone, { allowLandline: false }));
+      setPhoneCountry(storedPhone.country);
+      setPhoneWarning(storedPhone.warning);
     }
     setIsEditMode(false);
     setSaveError(null);
@@ -371,22 +372,17 @@ export default function SecretaryPatientDetail() {
                 <p className="text-xs text-neutral-400 mt-1">Email cannot be changed</p>
               </div>
               <div>
-                <label className="block text-sm text-neutral-500 mb-1">Phone *</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 font-medium">+63</span>
-                  <input
-                    type="text"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handlePhoneInputChange}
-                    className={`w-full pl-14 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                      phoneError ? 'border-error-500 focus:ring-error-500' : 'border-neutral-200 focus:ring-success-500'
-                    }`}
-                    placeholder="9171234567"
-                  />
-                </div>
+                <label htmlFor="patientPhone" className="block text-sm text-neutral-500 mb-1">Phone *</label>
+                <InternationalPhoneInput
+                  id="patientPhone"
+                  country={phoneCountry}
+                  nationalNumber={formData.phone}
+                  onCountryChange={handlePhoneCountryChange}
+                  onNationalChange={handlePhoneInputChange}
+                  required
+                  error={phoneError || null}
+                />
                 {phoneWarning && <p className="text-xs text-warning-600 mt-1">{phoneWarning}</p>}
-                {phoneError && <p className="text-xs text-error-600 mt-1">{phoneError}</p>}
               </div>
             </>
           ) : (

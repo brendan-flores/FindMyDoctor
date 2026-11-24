@@ -7,7 +7,8 @@ import 'package:http/testing.dart';
 import 'package:mobile/app/app.dart';
 import 'package:mobile/core/services/api_service.dart';
 import 'package:mobile/core/services/push_notification_service.dart';
-import 'package:mobile/core/utils/phone_input_form.dart';
+import 'package:mobile/core/widgets/international_phone_input.dart';
+import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 import 'package:mobile/features/auth/presentation/change_password_page.dart';
 import 'package:mobile/features/auth/presentation/login_page.dart';
 import 'package:mobile/features/home/presentation/home_page.dart';
@@ -409,8 +410,13 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    Finder phoneFieldFinder() => find.descendant(
+      of: find.byType(InternationalPhoneInput),
+      matching: find.byType(TextField),
+    );
+
     TextField phoneField(WidgetTester tester) =>
-        tester.widget<TextField>(find.byType(TextField).first);
+        tester.widget<TextField>(phoneFieldFinder());
 
     Future<void> save(WidgetTester tester) async {
       final button = find.text('Save Changes');
@@ -432,7 +438,11 @@ void main() {
         await startEditing(tester);
 
         expect(phoneField(tester).controller?.text, '9171234567');
-        expect(find.text('+63 '), findsOneWidget);
+        final dropdown = tester.widget<DropdownButton<IsoCode>>(
+          find.byType(DropdownButton<IsoCode>),
+        );
+        expect(dropdown.value, IsoCode.PH);
+        expect(find.textContaining('+63'), findsOneWidget);
       });
     }
 
@@ -470,9 +480,9 @@ void main() {
       );
       await startEditing(tester);
 
-      await tester.enterText(find.byType(TextField).first, '08171234567');
+      await tester.enterText(phoneFieldFinder(), '08171234567');
       await tester.pumpAndSettle();
-      expect(phoneField(tester).controller?.text, '8171234567');
+      expect(phoneField(tester).controller?.text, '08171234567');
 
       await tester.tap(find.byIcon(Icons.close));
       await tester.pumpAndSettle();
@@ -493,7 +503,7 @@ void main() {
         await startEditing(tester);
 
         expect(phoneField(tester).controller?.text, corrupted);
-        expect(find.text(storedMobileWarning), findsOneWidget);
+        expect(find.text('This saved number is not a recognized mobile number. Please re-enter it.'), findsOneWidget);
 
         await save(tester);
 
@@ -505,7 +515,7 @@ void main() {
           findsWidgets,
         );
 
-        await tester.enterText(find.byType(TextField).first, '09171234567');
+        await tester.enterText(phoneFieldFinder(), '09171234567');
         await tester.pumpAndSettle();
         await save(tester);
 
@@ -526,20 +536,20 @@ void main() {
       );
       await startEditing(tester);
 
-      await tester.enterText(find.byType(TextField).first, '++639171234567');
+      await tester.enterText(phoneFieldFinder(), '++639171234567');
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Remove the extra plus sign and enter digits only.'),
+        find.text('Enter a valid mobile number.'),
         findsOneWidget,
       );
-      expect(phoneField(tester).controller?.text, '9171234567');
+      expect(phoneField(tester).controller?.text, '++639171234567');
 
-      await tester.enterText(find.byType(TextField).first, '917123456789');
+      await tester.enterText(phoneFieldFinder(), '917123456789');
       await tester.pumpAndSettle();
 
       expect(find.text('This mobile number is too long.'), findsOneWidget);
-      expect(phoneField(tester).controller?.text, '9171234567');
+      expect(phoneField(tester).controller?.text, '917123456789');
     });
 
     testWidgets('rejects unallocated 08 prefixes and landlines', (
@@ -552,33 +562,57 @@ void main() {
       );
       await startEditing(tester);
 
-      await tester.enterText(find.byType(TextField).first, '08121234567');
+      await tester.enterText(phoneFieldFinder(), '08121234567');
       await tester.pumpAndSettle();
 
       expect(
         find.text('Enter a valid Philippine mobile number.'),
         findsOneWidget,
       );
-      expect(phoneField(tester).controller?.text, '9171234567');
+      expect(phoneField(tester).controller?.text, '08121234567');
 
       // A landline prefix is tolerated while the user is still typing...
-      await tester.enterText(find.byType(TextField).first, '028');
+      await tester.enterText(phoneFieldFinder(), '028');
       await tester.pumpAndSettle();
       expect(phoneField(tester).controller?.text, '028');
 
       // ...but the completed landline is refused, so the field keeps the
       // incomplete prefix and the mobile number cannot be saved.
-      await tester.enterText(find.byType(TextField).first, '0281234567');
+      await tester.enterText(phoneFieldFinder(), '0281234567');
       await tester.pumpAndSettle();
-      expect(phoneField(tester).controller?.text, '028');
+      expect(phoneField(tester).controller?.text, '0281234567');
 
       await save(tester);
 
       expect(updates, isEmpty);
       expect(
-        find.text('Enter a valid Philippine mobile number.'),
-        findsOneWidget,
+        find.text('Enter a valid mobile number.'),
+        findsWidgets,
       );
+    });
+    testWidgets('restores a foreign number and submits it unchanged', (
+      tester,
+    ) async {
+      final updates = <Map<String, dynamic>>[];
+      await pumpProfile(
+        tester,
+        buildClient(storedPhone: '+447123456789', updates: updates),
+      );
+      await startEditing(tester);
+
+      final dropdown = tester.widget<DropdownButton<IsoCode>>(
+        find.byType(DropdownButton<IsoCode>),
+      );
+      expect(dropdown.value, IsoCode.GB);
+      expect(phoneField(tester).controller?.text, '7123456789');
+      expect(find.text('Enter a valid mobile number.'), findsNothing);
+
+      await save(tester);
+
+      expect(updates, hasLength(1));
+      expect(updates.single['phone'], '+447123456789');
+
+      await tester.pump(const Duration(seconds: 5));
     });
   });
 }

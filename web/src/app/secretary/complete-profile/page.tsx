@@ -11,18 +11,17 @@ import {
 import Toast from '@/components/ui/Toast';
 import { usePresence } from '@/hooks/usePresence';
 import {
-  formatPhoneFieldInput,
-  phoneFieldValueFromStored,
-  phoneFormatErrorMessage,
-  storedPhoneWarningFor,
-  toStaffContactDomestic,
+  resolveStoredPhone,
+  toStaffContactE164,
 } from '@/lib/phone';
+import InternationalPhoneInput from '@/components/ui/InternationalPhoneInput';
 
 export default function SecretaryCompleteProfile() {
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
   const [contactNumber, setContactNumber] = useState('');
+  const [contactCountry, setContactCountry] = useState('PH');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [contactWarning, setContactWarning] = useState<string | null>(null);
@@ -62,7 +61,7 @@ export default function SecretaryCompleteProfile() {
         const isComplete =
           firstName !== '' &&
           lastName !== '' &&
-          toStaffContactDomestic(contactNumber) !== null;
+          toStaffContactE164(contactNumber) !== null;
 
         // Password changes come first; the layout owns that redirect.
         if (isComplete && profile?.must_change_password !== true) {
@@ -74,8 +73,10 @@ export default function SecretaryCompleteProfile() {
         setFirstName(firstName);
         setMiddleName(profile?.middle_name ?? '');
         setLastName(lastName);
-        setContactNumber(phoneFieldValueFromStored(profile?.contact_number, { allowLandline: true }));
-        setContactWarning(storedPhoneWarningFor(profile?.contact_number, { allowLandline: true }));
+        const storedContact = resolveStoredPhone(profile?.contact_number, true);
+        setContactNumber(storedContact.nationalNumber);
+        setContactCountry(storedContact.country);
+        setContactWarning(storedContact.warning);
         setIsCheckingAccess(false);
       })
       .catch(() => {
@@ -126,9 +127,9 @@ export default function SecretaryCompleteProfile() {
       return;
     }
 
-    const domesticContact = toStaffContactDomestic(contactNumber);
-    if (!domesticContact) {
-      setContactError('Enter a valid Philippine contact number');
+    const canonicalContact = toStaffContactE164(contactNumber, contactCountry);
+    if (!canonicalContact) {
+      setContactError('Enter a valid contact number');
       setIsLoading(false);
       return;
     }
@@ -138,7 +139,7 @@ export default function SecretaryCompleteProfile() {
         firstName: firstName.trim(),
         middleName: middleName.trim() || null,
         lastName: lastName.trim(),
-        contactNumber: domesticContact,
+        contactNumber: canonicalContact,
       });
 
       if (response.success) {
@@ -247,28 +248,30 @@ export default function SecretaryCompleteProfile() {
               <label htmlFor="contactNumber" className="block text-[15px] font-bold text-neutral-900">
                 Contact Number
               </label>
-              <div className="relative rounded-2xl shadow-md">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[15px] font-medium text-neutral-400">
-                  +63
-                </div>
-                <input
-                  id="contactNumber"
-                  type="tel"
-                  value={contactNumber}
-                  onChange={(e) => {
-                    const result = formatPhoneFieldInput(e.target.value, contactNumber, { allowLandline: true });
-                    setContactNumber(result.value);
-                    setContactError(result.error ? phoneFormatErrorMessage(result.error) : '');
-                    if (!result.error) setContactWarning(null);
-                  }}
-                  placeholder="9171234567"
-                  required
-                  className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 pl-12 pr-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all duration-150"
-                />
-              </div>
+              <InternationalPhoneInput
+                id="contactNumber"
+                country={contactCountry}
+                nationalNumber={contactNumber}
+                onCountryChange={(iso) => {
+                  setContactCountry(iso);
+                  if (contactNumber.trim()) {
+                    setContactError(
+                      toStaffContactE164(contactNumber, iso)
+                        ? ''
+                        : 'Enter a valid contact number'
+                    );
+                  }
+                }}
+                onNationalChange={(v) => {
+                  setContactNumber(v);
+                  setContactError('');
+                  setContactWarning(null);
+                }}
+                required
+                error={contactError || null}
+              />
               {contactWarning && <p className="text-xs text-warning-600">{contactWarning}</p>}
-              {contactError && <p className="text-xs text-error-600">{contactError}</p>}
-              <p className="text-xs text-neutral-500">Enter the number without +63 (mobile 10 digits, landline 9 digits).</p>
+              <p className="text-xs text-neutral-500">Select a country and enter the number without its country code.</p>
             </div>
 
             <div className="pt-2">

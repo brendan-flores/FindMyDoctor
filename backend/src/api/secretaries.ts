@@ -5,6 +5,7 @@ import { AuthRequest, authenticate, authorize } from '../middleware/auth';
 import { calculateCapacity, calculateCapacityRange } from '../modules/capacity/capacityService';
 import { invalidateAvailabilityCache } from '../modules/availability/availabilityService';
 import { getClinicDate, toClinicDateString } from '../utils/date';
+import { normalizePhoneNumber, phoneErrorMessage } from '../utils/phone';
 import { evaluateProposal, snapshotTarget, toPendingSummary } from '../modules/scheduleChanges/scheduleChangeService';
 
 const router = Router();
@@ -66,15 +67,14 @@ router.put('/me', authenticate, authorize('SECRETARY'), async (req: AuthRequest,
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name is required'));
     }
 
-    if (!contactNumber || typeof contactNumber !== 'string') {
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Contact number is required'));
+    if (contactNumber !== undefined && contactNumber !== null && typeof contactNumber !== 'string') {
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Contact number must be a string'));
     }
 
     // Trim whitespace
     const trimmedFirstName = firstName.trim();
     const trimmedMiddleName = middleName ? middleName.trim() : null;
     const trimmedLastName = lastName.trim();
-    const trimmedContactNumber = contactNumber.trim();
 
     // Length validation
     if (trimmedFirstName.length === 0 || trimmedFirstName.length > 100) {
@@ -89,15 +89,40 @@ router.put('/me', authenticate, authorize('SECRETARY'), async (req: AuthRequest,
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name must be 1-100 characters'));
     }
 
-    if (trimmedContactNumber.length === 0 || trimmedContactNumber.length > 20) {
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Contact number must be 1-20 characters'));
+    const existingResult = await query(
+      'SELECT first_name, last_name, contact_number FROM secretaries WHERE user_id = $1',
+      [userId]
+    );
+
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json(error(ErrorCodes.NOT_FOUND, 'Secretary profile not found'));
     }
 
-    // Contact number format validation (support Philippine and international formats)
-    // Allow: digits, spaces, hyphens, plus sign, parentheses
-    const phoneRegex = /^[\d\s\-\+\(\)]+$/;
-    if (!phoneRegex.test(trimmedContactNumber)) {
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Contact number must contain only digits, spaces, hyphens, plus sign, or parentheses'));
+    const existing = existingResult.rows[0];
+    const rawContactNumber = typeof contactNumber === 'string' ? contactNumber.trim() : '';
+    let normalizedContactNumber: string | null;
+
+    if (rawContactNumber.length === 0) {
+      const hasCompletedCoreProfile =
+        existing.first_name && existing.first_name.trim() !== '' &&
+        existing.last_name && existing.last_name.trim() !== '' &&
+        existing.contact_number && existing.contact_number.trim() !== '';
+
+      if (!hasCompletedCoreProfile) {
+        return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Contact number is required'));
+      }
+
+      normalizedContactNumber = null;
+    } else {
+      const contactResult = normalizePhoneNumber(rawContactNumber, { allowLandline: true });
+
+      if (!contactResult.ok) {
+        return res.status(400).json(
+          error(ErrorCodes.VALIDATION_ERROR, phoneErrorMessage(contactResult.error, 'Contact number'))
+        );
+      }
+
+      normalizedContactNumber = contactResult.e164;
     }
 
     // Update secretary profile using authenticated user_id
@@ -109,7 +134,7 @@ router.put('/me', authenticate, authorize('SECRETARY'), async (req: AuthRequest,
            contact_number = $4
        WHERE user_id = $5
        RETURNING id, first_name, middle_name, last_name, contact_number`,
-      [trimmedFirstName, trimmedMiddleName, trimmedLastName, trimmedContactNumber, userId]
+      [trimmedFirstName, trimmedMiddleName, trimmedLastName, normalizedContactNumber, userId]
     );
 
     if (result.rows.length === 0) {

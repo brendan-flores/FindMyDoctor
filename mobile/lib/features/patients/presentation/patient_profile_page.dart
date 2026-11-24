@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
@@ -7,10 +8,15 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_header.dart';
+import '../../../core/widgets/international_phone_input.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/utils/phone_input.dart';
-import '../../../core/utils/phone_input_form.dart';
+
+/// Warning shown when a stored phone number cannot be used as a mobile number
+/// and is preserved verbatim so the user can review and correct it.
+const String _storedPhoneWarning =
+    'This saved number is not a recognized mobile number. Please re-enter it.';
 
 /// Standalone read-only view of the signed-in patient's own profile.
 ///
@@ -37,39 +43,25 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   bool _isEditing = false;
 
   // Edit form controllers
-  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   String? _formError;
+
+  // Mobile phone (international input)
+  final _phoneInputKey = GlobalKey<InternationalPhoneInputState>();
+  IsoCode _selectedCountry = IsoCode.PH;
+  String _nationalNumber = '';
   String? _phoneInputError;
-  late final PhilippineMobileInputFormatter _phoneFormatter;
+  String? _phoneRestoreWarning;
 
   @override
   void initState() {
     super.initState();
     _apiService = widget.apiService ?? ApiService();
-    _phoneFormatter = PhilippineMobileInputFormatter(
-      onRejected: _handlePhoneRejected,
-    );
     _loadProfile();
-  }
-
-  void _handlePhoneRejected(PhoneFormatError error) {
-    if (!mounted) return;
-    setState(() {
-      _phoneInputError = phoneFormatErrorMessage(error);
-    });
-  }
-
-  void _handlePhoneChanged(String value) {
-    if (_phoneInputError == null) return;
-    setState(() {
-      _phoneInputError = null;
-    });
   }
 
   @override
   void dispose() {
-    _phoneController.dispose();
     _addressController.dispose();
     super.dispose();
   }
@@ -88,9 +80,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
         final patientData = Map<String, dynamic>.from(response['data'] as Map);
         setState(() {
           _patient = patientData;
-          final storedPhone = patientData['phone']?.toString();
-          _phoneController.text = phoneFieldValueFromStored(storedPhone);
-          _phoneInputError = storedMobileWarningFor(storedPhone);
+          _restoreStoredPhone(patientData['phone']?.toString());
           _addressController.text = (patientData['address'] ?? '').toString();
           _isLoading = false;
         });
@@ -114,15 +104,24 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   Future<void> _saveProfile() async {
     if (_patient == null) return;
 
-    final phone = canonicalMobileE164(_phoneController.text);
+    _phoneInputError = null;
+
+    final phoneState = _phoneInputKey.currentState;
     final address = _addressController.text.trim();
 
+    if (phoneState == null || !phoneState.isValid) {
+      setState(() {
+        _formError = null;
+        _phoneInputError = phoneState?.errorText ?? 'Mobile number is required.';
+      });
+      return;
+    }
+
+    final phone = phoneState.e164;
     if (phone == null) {
       setState(() {
         _formError = null;
-        _phoneInputError =
-            validatePhilippineMobile(_phoneController.text) ??
-            'Enter a valid Philippine mobile number.';
+        _phoneInputError = 'Enter a valid mobile number.';
       });
       return;
     }
@@ -184,14 +183,63 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     setState(() {
       if (_isEditing) {
         // Cancel edit - reset controllers
-        final storedPhone = _patient!['phone']?.toString();
-        _phoneController.text = phoneFieldValueFromStored(storedPhone);
-        _phoneInputError = storedMobileWarningFor(storedPhone);
+        _restoreStoredPhone(_patient!['phone']?.toString());
         _addressController.text = (_patient!['address'] ?? '').toString();
         _formError = null;
       }
       _isEditing = !_isEditing;
     });
+  }
+
+  /// Restores a stored phone number into the country + national number fields.
+  /// Philippine domestic and E.164 numbers are normalized; valid foreign E.164
+  /// numbers are restored with their detected country. Unparseable or
+  /// non-mobile values are preserved as the national number with PH as the
+  /// fallback country so the user can review and correct them, with a warning.
+  void _restoreStoredPhone(String? storedPhone) {
+    final trimmed = storedPhone?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      _selectedCountry = IsoCode.PH;
+      _nationalNumber = '';
+      _phoneRestoreWarning = null;
+      return;
+    }
+
+    // International E.164 form: detect the country from the leading +.
+    if (trimmed.startsWith('+')) {
+      try {
+        final parsed = PhoneNumber.parse(trimmed);
+        if (parsed.isValid()) {
+          final isMobile = parsed.isValid(type: PhoneNumberType.mobile);
+          final isFixedLine = parsed.isValid(type: PhoneNumberType.fixedLine);
+          // Patient fields accept mobile numbers only. Preserve landlines,
+          // ambiguous fixed-line-or-mobile, VoIP, toll-free, premium-rate and
+          // other non-mobile values for review with a warning.
+          if (isMobile && !isFixedLine) {
+            _selectedCountry = parsed.isoCode;
+            _nationalNumber = parsed.nsn;
+            _phoneRestoreWarning = null;
+            return;
+          }
+        }
+      } catch (_) {}
+      _selectedCountry = IsoCode.PH;
+      _nationalNumber = trimmed;
+      _phoneRestoreWarning = _storedPhoneWarning;
+      return;
+    }
+
+    // Assume Philippine domestic or national form.
+    _selectedCountry = IsoCode.PH;
+    final result = parsePhone(trimmed);
+    if (result.ok && result.kind == PhoneKind.mobile && result.e164 != null) {
+      _nationalNumber = result.e164!.substring(phCountryCode.length + 1);
+      _phoneRestoreWarning = null;
+    } else {
+      // Preserve unparseable/invalid values for review and editing.
+      _nationalNumber = trimmed;
+      _phoneRestoreWarning = _storedPhoneWarning;
+    }
   }
 
   String _formatDateOfBirth(dynamic value) {
@@ -514,32 +562,42 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                     ),
                   ),
                   const SizedBox(height: spacing.AppSpacing.gutterXs),
-                  TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [_phoneFormatter],
-                    onChanged: _handlePhoneChanged,
-                    decoration: InputDecoration(
-                      hintText: '9XX XXX XXXX',
-                      prefixText: phMobilePrefixText,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: spacing.AppSpacing.gutterMd,
-                        vertical: spacing.AppSpacing.gutterSm,
-                      ),
-                    ),
-                    style: AppTextStyles.bodyMdMedium.copyWith(
-                      color: AppColors.onSurface,
-                    ),
+                  InternationalPhoneInput(
+                    key: _phoneInputKey,
+                    country: _selectedCountry,
+                    nationalNumber: _nationalNumber,
+                    onCountryChanged: (c) =>
+                        setState(() {
+                          _selectedCountry = c;
+                          _phoneInputError = null;
+                          _phoneRestoreWarning = null;
+                        }),
+                    onNationalChanged: (n) =>
+                        setState(() {
+                          _nationalNumber = n;
+                          _phoneInputError = null;
+                          _phoneRestoreWarning = null;
+                        }),
+                    allowLandline: false,
+                    labelText: 'Mobile number',
+                    hintText: '9XX XXX XXXX',
+                    requiredField: true,
+                    errorText: _phoneInputError,
+                    enabled: !_isLoading,
                   ),
                   if (_phoneInputError != null) ...[
                     const SizedBox(height: spacing.AppSpacing.gutterXs),
                     Text(
                       _phoneInputError!,
+                      style: AppTextStyles.bodySm.copyWith(color: AppColors.error),
+                    ),
+                  ],
+                  if (_phoneRestoreWarning != null) ...[
+                    const SizedBox(height: spacing.AppSpacing.gutterXs),
+                    Text(
+                      _phoneRestoreWarning!,
                       style: AppTextStyles.bodySm.copyWith(
-                        color: AppColors.error,
+                        color: AppColors.slate600,
                       ),
                     ),
                   ],

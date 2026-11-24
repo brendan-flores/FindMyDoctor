@@ -902,7 +902,7 @@ describe('Patient API Validation', () => {
         expect(response.body.error.message).toContain('First name must be 1-100 characters');
       });
 
-      it('should validate phone length (max 20)', async () => {
+      it('should reject phone numbers longer than the E.164 maximum', async () => {
         mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
 
         const response = await request(app)
@@ -917,7 +917,7 @@ describe('Patient API Validation', () => {
           });
 
         expect(response.status).toBe(400);
-        expect(response.body.error.message).toContain('Mobile number must be 1-20 characters');
+        expect(response.body.error.message).toContain('15 digits in E.164 format');
       });
 
       it('should reject invalid sex values', async () => {
@@ -2014,6 +2014,119 @@ describe('Patient API Validation', () => {
         .get('/api/v1/patients/search');
 
       expect(response.status).toBe(403);
+    });
+  });
+
+  describe('Patient contact number compatibility', () => {
+    const patientId = '550e8400-e29b-41d4-a716-446655440000';
+
+    const patientPayload = (phone: string) => ({
+      firstName: 'John',
+      lastName: 'Doe',
+      dateOfBirth: '1990-01-01',
+      sex: 'MALE',
+      phone,
+      address: '123 Main St',
+    });
+
+    it('stores a foreign E.164 number unchanged on patient update', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+      let updateParams: any[] = [];
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('UPDATE patients SET')) {
+          updateParams = params;
+          return Promise.resolve({ rows: [{ id: patientId }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .put(`/api/v1/patients/${patientId}`)
+        .send(patientPayload('+14155550123'));
+
+      expect(response.status).toBe(200);
+      expect(updateParams[6]).toBe('+14155550123');
+    });
+
+    it('normalizes legacy Philippine domestic input on patient update', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+      let updateParams: any[] = [];
+
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('UPDATE patients SET')) {
+          updateParams = params;
+          return Promise.resolve({ rows: [{ id: patientId }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .put(`/api/v1/patients/${patientId}`)
+        .send(patientPayload('09171234567'));
+
+      expect(response.status).toBe(200);
+      expect(updateParams[6]).toBe('+639171234567');
+    });
+
+    it('rejects a duplicated Philippine country code on patient update', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      const response = await request(app)
+        .put(`/api/v1/patients/${patientId}`)
+        .send(patientPayload('+63639171234567'));
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toContain('duplicated or invalid country code');
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it('rejects a Philippine landline for a patient mobile field', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+
+      const response = await request(app)
+        .put(`/api/v1/patients/${patientId}`)
+        .send(patientPayload('+63212345678'));
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toContain('valid mobile number');
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it('does not prepend +63 to a foreign E.164 number during association', async () => {
+      mockUser = { id: 'doctor-user-id', role: 'DOCTOR' };
+      let updateParams: any[] = [];
+      const mockClient = {
+        query: jest.fn((sql: string, params: any[]) => {
+          if (sql.includes('SELECT id FROM doctors WHERE user_id')) {
+            return Promise.resolve({ rows: [{ id: 'doctor-id' }] });
+          }
+          if (sql.includes('SELECT id, email FROM users WHERE email')) {
+            return Promise.resolve({ rows: [{ id: 'patient-user-id', email: 'patient@example.com' }] });
+          }
+          if (sql.includes('SELECT id FROM patients WHERE user_id')) {
+            return Promise.resolve({ rows: [{ id: 'patient-id' }] });
+          }
+          if (sql.includes('UPDATE patients')) {
+            updateParams = params;
+            return Promise.resolve({ rows: [{ id: 'patient-id' }] });
+          }
+          return Promise.resolve({ rows: [] });
+        }),
+        release: jest.fn(),
+      };
+      getClient.mockResolvedValue(mockClient);
+
+      const response = await request(app)
+        .post('/api/v1/patients/associate')
+        .send({
+          email: 'patient@example.com',
+          ...patientPayload('+14155550123'),
+        });
+
+      expect(response.status).toBe(200);
+      expect(updateParams[5]).toBe('+14155550123');
+      expect(updateParams[5].startsWith('+63')).toBe(false);
     });
   });
 });

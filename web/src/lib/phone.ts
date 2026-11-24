@@ -287,7 +287,13 @@ function buildResult(ns: string): PhoneParseResult {
  * Incomplete input is a failure here: use `formatPhoneInput` while the user is
  * still typing.
  */
-export function parsePhone(raw: string): PhoneParseResult {
+import {
+  getCountryCallingCode,
+  parsePhoneNumberFromString,
+  type CountryCode,
+} from 'libphonenumber-js/max';
+
+export function parsePhonePhilippines(raw: string): PhoneParseResult {
   if (raw.trim().length === 0) return { ok: false, error: 'empty' };
 
   if (isCorruptedValue(raw)) return { ok: false, error: 'corrupted' };
@@ -454,11 +460,34 @@ export function formatPhoneFieldInput(
   return { value: result.value, error: result.error };
 }
 
-/** Canonical `+63` value for a patient mobile field, or null when not a mobile. */
-export function toPatientMobileE164(raw: string | null | undefined): string | null {
-  const result = parsePhone(raw ?? '');
-  if (!result.ok || result.kind !== 'mobile') return null;
-  return result.e164;
+/**
+ * Canonical E.164 value for a form field validated against the selected country,
+ * or null when the value is empty or not accepted by the field.
+ *
+ * Mobile fields accept mobiles only. Staff contact fields set `allowLandline` so
+ * supported landlines are accepted too. The caller decides whether an empty
+ * value is allowed for its own required/optional behavior.
+ */
+export function toPhoneFieldE164(
+  raw: string | null | undefined,
+  country = 'PH',
+  options: PhoneFieldOptions = {},
+): string | null {
+  const trimmed = (raw ?? '').trim();
+  if (trimmed.length === 0) return null;
+  const result = parsePhone(trimmed, country);
+  if (!result.ok) return null;
+  if (result.kind === 'mobile') return result.e164;
+  if (options.allowLandline && result.kind === 'landline') return result.e164;
+  return null;
+}
+
+/** Canonical E.164 value for a patient mobile field, or null when not a mobile. */
+export function toPatientMobileE164(
+  raw: string | null | undefined,
+  country = 'PH',
+): string | null {
+  return toPhoneFieldE164(raw, country);
 }
 
 /** Domestic `0` value for a staff contact field (mobile or landline), or null. */
@@ -466,6 +495,11 @@ export function toStaffContactDomestic(raw: string | null | undefined): string |
   const result = parsePhone(raw ?? '');
   if (!result.ok) return null;
   return result.national;
+}
+
+/** Canonical E.164 value for a staff contact field (mobile or landline), or null. */
+export function toStaffContactE164(raw: string | null | undefined, country?: string): string | null {
+  return toPhoneFieldE164(raw, country ?? 'PH', { allowLandline: true });
 }
 
 /**
@@ -514,4 +548,158 @@ export function phoneFormatErrorMessage(error: PhoneFormatError): string {
     case 'invalid_prefix':
       return 'Enter a valid Philippine phone number.';
   }
+}
+
+export function parsePhone(raw: string, country?: string): PhoneParseResult {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return { ok: false, error: 'empty' };
+
+  const digitsOnly = trimmed.replace(/[^0-9]/g, '');
+  const isPhilippines = (country || 'PH').toUpperCase() === 'PH';
+  if (trimmed.startsWith('+63') || (isPhilippines && digitsOnly.startsWith('63') && digitsOnly.length >= 12)) {
+    if (isCorruptedValue(trimmed)) return { ok: false, error: 'corrupted' };
+    if (hasMalformedPlus(trimmed)) return { ok: false, error: 'malformed_plus' };
+    return parsePhonePhilippines(raw);
+  }
+
+  if (trimmed.startsWith('+')) {
+    if (trimmed.startsWith('+0')) return { ok: false, error: 'malformed_plus' };
+    if (hasMalformedPlus(trimmed)) return { ok: false, error: 'malformed_plus' };
+    const stripped = trimmed.replace(/[\s\-().]/g, '');
+    if (!/^\+?\d+$/.test(stripped)) return { ok: false, error: 'invalid_characters' };
+    const phoneNumber = parsePhoneNumberFromString(stripped);
+    if (!phoneNumber || !phoneNumber.isValid()) {
+      const digits = stripped.slice(1);
+      if (digits.length > 15) return { ok: false, error: 'too_long' };
+      return { ok: false, error: 'invalid_prefix' };
+    }
+    const type = phoneNumber.getType();
+    let kind: PhoneKind | null = null;
+    if (type === 'MOBILE') kind = 'mobile';
+    else if (type === 'FIXED_LINE' || type === 'FIXED_LINE_OR_MOBILE') kind = 'landline';
+    if (!kind) return { ok: false, error: 'invalid_prefix' };
+    return {
+      ok: true,
+      kind: kind as PhoneKind,
+      e164: phoneNumber.format('E.164'),
+      national: phoneNumber.nationalNumber,
+    };
+  }
+
+  const iso = (country || 'PH').toUpperCase();
+  if (iso === 'PH') {
+    return parsePhonePhilippines(raw);
+  }
+
+  if (isCorruptedValue(raw)) return { ok: false, error: 'corrupted' };
+  if (hasMalformedPlus(raw)) return { ok: false, error: 'malformed_plus' };
+  const stripped = raw.trim().replace(/[\s\-().]/g, '');
+  if (!/^\d+$/.test(stripped)) return { ok: false, error: 'invalid_characters' };
+  const phoneNumber = parsePhoneNumberFromString(stripped, iso as any);
+  if (!phoneNumber || !phoneNumber.isValid()) {
+    if (stripped.length > 15) return { ok: false, error: 'too_long' };
+    return { ok: false, error: 'invalid_prefix' };
+  }
+  const type = phoneNumber.getType();
+  let kind: PhoneKind | null = null;
+  if (type === 'MOBILE') kind = 'mobile';
+  else if (type === 'FIXED_LINE' || type === 'FIXED_LINE_OR_MOBILE') kind = 'landline';
+  if (!kind) return { ok: false, error: 'invalid_prefix' };
+  return {
+    ok: true,
+    kind: kind as PhoneKind,
+    e164: phoneNumber.format('E.164'),
+    national: phoneNumber.nationalNumber,
+  };
+}
+
+export interface SplitPhoneInput {
+  country: string;
+  nationalNumber: string;
+}
+
+/**
+ * Splits a pasted international number into the country selector and the
+ * national number.
+ *
+ * A leading `+` is accepted on its own. A digits-only value is split only when
+ * it starts with the currently selected country's calling code, so a pasted
+ * domestic number is left alone instead of being misread as another country.
+ * A duplicated country code does not parse and is therefore left in the field
+ * for the parser to reject with a visible message.
+ */
+export function splitInternationalInput(
+  raw: string,
+  selectedCountry = 'PH',
+): SplitPhoneInput | null {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  // Never repair a duplicated country code or trunk prefix by splitting it.
+  if (isCorruptedValue(trimmed)) return null;
+
+  let candidate;
+  if (trimmed.startsWith('+')) {
+    candidate = parsePhoneNumberFromString(trimmed);
+  } else {
+    const digits = trimmed.replace(/[\s\-().]/g, '');
+    if (!/^\d+$/.test(digits)) return null;
+
+    let callingCode: string;
+    try {
+      callingCode = getCountryCallingCode(selectedCountry.toUpperCase() as CountryCode);
+    } catch {
+      return null;
+    }
+
+    if (!digits.startsWith(callingCode) || digits.length <= callingCode.length) {
+      return null;
+    }
+    candidate = parsePhoneNumberFromString(`+${digits}`);
+  }
+
+  if (!candidate || !candidate.isValid() || !candidate.country) return null;
+  return { country: candidate.country, nationalNumber: candidate.nationalNumber };
+}
+
+export interface ResolvedStoredPhone {
+  country: string;
+  nationalNumber: string;
+  warning: string | null;
+}
+
+export function resolveStoredPhone(
+  raw: string | null | undefined,
+  allowLandline = false,
+): ResolvedStoredPhone {
+  const trimmed = (raw ?? '').trim();
+  if (trimmed.length === 0) {
+    return { country: 'PH', nationalNumber: '', warning: null };
+  }
+
+  if (isCorruptedValue(trimmed) || hasMalformedPlus(trimmed)) {
+    return { country: 'PH', nationalNumber: trimmed, warning: STORED_PHONE_WARNING };
+  }
+
+  if (trimmed.startsWith('+')) {
+    const phoneNumber = parsePhoneNumberFromString(trimmed);
+    if (phoneNumber && phoneNumber.isValid()) {
+      const type = phoneNumber.getType();
+      const isMobile = type === 'MOBILE';
+      const isLandline = type === 'FIXED_LINE' || type === 'FIXED_LINE_OR_MOBILE';
+      if (isMobile || (allowLandline && isLandline)) {
+        return {
+          country: phoneNumber.country || 'PH',
+          nationalNumber: phoneNumber.nationalNumber,
+          warning: null,
+        };
+      }
+    }
+    return { country: 'PH', nationalNumber: trimmed, warning: STORED_PHONE_WARNING };
+  }
+
+  const parsed = parsePhone(trimmed, 'PH');
+  if (parsed.ok && (parsed.kind === 'mobile' || (allowLandline && parsed.kind === 'landline'))) {
+    return { country: 'PH', nationalNumber: parsed.national.replace(/^0/, '') , warning: null };
+  }
+  return { country: 'PH', nationalNumber: trimmed, warning: STORED_PHONE_WARNING };
 }

@@ -4,6 +4,7 @@ import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, requireSecretaryProfileCompletion } from '../middleware/auth';
 import { invalidateAvailabilityCache } from '../modules/availability/availabilityService';
 import { getClinicDate, getClinicDateTime, toClinicDateString } from '../utils/date';
+import { normalizePhoneNumber, phoneErrorMessage } from '../utils/phone';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
@@ -23,9 +24,6 @@ router.use((req, res, next) => {
 
 // Valid sex values
 const VALID_SEX_VALUES = ['MALE', 'FEMALE', 'OTHER', 'NOT_SPECIFIED'];
-
-// Mobile number regex (Philippine and international formats)
-const MOBILE_REGEX = /^[\d\s\-\+\(\)]+$/;
 
 // Search for patient by email (restricted to secretary's assigned doctor's patients)
 router.get('/search', authenticate, requireSecretaryPasswordChange, requireSecretaryProfileCompletion, authorize('SECRETARY'), async (req: AuthRequest, res: Response) => {
@@ -574,8 +572,7 @@ router.post('/submit-patient-details', authenticate, requireSecretaryPasswordCha
     const trimmedMiddleName = middleName ? middleName.trim() : null;
     const trimmedLastName = lastName.trim();
     const trimmedSex = sex.trim().toUpperCase();
-    // Prepend '+63' to phone number for Philippine format (e.g., +639123456789)
-    const trimmedPhone = phone.trim().startsWith('+63') ? phone.trim() : `+63${phone.trim()}`;
+    const phoneResult = normalizePhoneNumber(phone);
     const trimmedAddress = address.trim();
 
     // Length validation
@@ -594,10 +591,11 @@ router.post('/submit-patient-details', authenticate, requireSecretaryPasswordCha
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name must be 1-100 characters'));
     }
 
-    if (trimmedPhone.length !== 13) {
+    if (!phoneResult.ok) {
       await client.query('ROLLBACK');
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 13 characters (+63 followed by 10 digits)'));
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, phoneErrorMessage(phoneResult.error)));
     }
+    const trimmedPhone = phoneResult.e164;
 
     if (trimmedAddress.length === 0) {
       await client.query('ROLLBACK');
@@ -608,12 +606,6 @@ router.post('/submit-patient-details', authenticate, requireSecretaryPasswordCha
     if (!VALID_SEX_VALUES.includes(trimmedSex)) {
       await client.query('ROLLBACK');
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Sex must be one of: MALE, FEMALE, OTHER, NOT_SPECIFIED'));
-    }
-
-    // Validate mobile number format
-    if (!MOBILE_REGEX.test(trimmedPhone)) {
-      await client.query('ROLLBACK');
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must contain only digits, spaces, hyphens, plus sign, or parentheses'));
     }
 
     // Validate date of birth
@@ -779,8 +771,7 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
     const trimmedMiddleName = middleName ? middleName.trim() : null;
     const trimmedLastName = lastName.trim();
     const trimmedSex = sex.trim().toUpperCase();
-    // Prepend '+63' to phone number for Philippine format (e.g., +639123456789)
-    const trimmedPhone = phone.trim().startsWith('+63') ? phone.trim() : `+63${phone.trim()}`;
+    const phoneResult = normalizePhoneNumber(phone);
     const trimmedAddress = address.trim();
 
     // Length validation
@@ -799,10 +790,11 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Last name must be 1-100 characters'));
     }
 
-    if (trimmedPhone.length !== 13) {
+    if (!phoneResult.ok) {
       await client.query('ROLLBACK');
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must be 13 characters (+63 followed by 10 digits)'));
+      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, phoneErrorMessage(phoneResult.error)));
     }
+    const trimmedPhone = phoneResult.e164;
 
     if (trimmedAddress.length === 0) {
       await client.query('ROLLBACK');
@@ -813,12 +805,6 @@ router.post('/direct-register', authenticate, requireSecretaryPasswordChange, re
     if (!VALID_SEX_VALUES.includes(trimmedSex)) {
       await client.query('ROLLBACK');
       return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Sex must be one of: MALE, FEMALE, OTHER, NOT_SPECIFIED'));
-    }
-
-    // Validate mobile number format
-    if (!MOBILE_REGEX.test(trimmedPhone)) {
-      await client.query('ROLLBACK');
-      return res.status(400).json(error(ErrorCodes.VALIDATION_ERROR, 'Mobile number must contain only digits, spaces, hyphens, plus sign, or parentheses'));
     }
 
     // Validate date of birth

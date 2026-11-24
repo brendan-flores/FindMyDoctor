@@ -93,6 +93,7 @@ dependencies:
   # Reads the app version from pubspec.yaml at runtime for the Profile
   # "About" section (no other version source exists in the app).
   package_info_plus: ^10.2.2
+  phone_numbers_parser: ^9.0.29
 
 dev_dependencies:
   flutter_test:

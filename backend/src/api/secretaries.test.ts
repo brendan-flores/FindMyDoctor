@@ -625,3 +625,187 @@ describe('Secretary Schedule API Security', () => {
     });
   });
 });
+
+describe('Secretary profile contact number', () => {
+  let app: express.Application;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/secretaries', secretariesRouter);
+    jest.clearAllMocks();
+    mockUser = { id: 'test-secretary-id', role: 'SECRETARY' };
+  });
+
+  const profilePayload = (contactNumber: string | null | undefined) => ({
+    firstName: 'Sara',
+    middleName: null,
+    lastName: 'Santos',
+    contactNumber,
+  });
+
+  it('allows an empty contact number to be saved from the secretary profile', async () => {
+    let updateParams: any[] = [];
+
+    query.mockImplementation((sql: string, params: any[]) => {
+      if (sql.includes('SELECT first_name, last_name, contact_number FROM secretaries')) {
+        return Promise.resolve({
+          rows: [{ first_name: 'Sara', last_name: 'Santos', contact_number: '+639171234567' }],
+        });
+      }
+      if (sql.includes('UPDATE secretaries')) {
+        updateParams = params;
+        return Promise.resolve({
+          rows: [{
+            id: 'secretary-id',
+            first_name: 'Sara',
+            middle_name: null,
+            last_name: 'Santos',
+            contact_number: null,
+          }],
+        });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .put('/api/v1/secretaries/me')
+      .send(profilePayload(''));
+
+    expect(response.status).toBe(200);
+    expect(updateParams[3]).toBeNull();
+    expect(response.body.data.contactNumber).toBeNull();
+  });
+
+  it('does not allow an empty contact number to complete the profile', async () => {
+    query.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT first_name, last_name, contact_number FROM secretaries')) {
+        return Promise.resolve({
+          rows: [{ first_name: null, last_name: null, contact_number: null }],
+        });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .put('/api/v1/secretaries/me')
+      .send(profilePayload(''));
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toContain('Contact number is required');
+  });
+
+  it('stores a foreign E.164 contact number unchanged', async () => {
+    let updateParams: any[] = [];
+
+    query.mockImplementation((sql: string, params: any[]) => {
+      if (sql.includes('SELECT first_name, last_name, contact_number FROM secretaries')) {
+        return Promise.resolve({
+          rows: [{ first_name: 'Sara', last_name: 'Santos', contact_number: '+639171234567' }],
+        });
+      }
+      if (sql.includes('UPDATE secretaries')) {
+        updateParams = params;
+        return Promise.resolve({
+          rows: [{
+            id: 'secretary-id',
+            first_name: 'Sara',
+            middle_name: null,
+            last_name: 'Santos',
+            contact_number: '+14155550123',
+          }],
+        });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .put('/api/v1/secretaries/me')
+      .send(profilePayload('+14155550123'));
+
+    expect(response.status).toBe(200);
+    expect(updateParams[3]).toBe('+14155550123');
+  });
+
+  it('normalizes a legacy domestic contact number', async () => {
+    let updateParams: any[] = [];
+
+    query.mockImplementation((sql: string, params: any[]) => {
+      if (sql.includes('SELECT first_name, last_name, contact_number FROM secretaries')) {
+        return Promise.resolve({
+          rows: [{ first_name: 'Sara', last_name: 'Santos', contact_number: '+639171234567' }],
+        });
+      }
+      if (sql.includes('UPDATE secretaries')) {
+        updateParams = params;
+        return Promise.resolve({
+          rows: [{
+            id: 'secretary-id',
+            first_name: 'Sara',
+            middle_name: null,
+            last_name: 'Santos',
+            contact_number: '+639171234567',
+          }],
+        });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .put('/api/v1/secretaries/me')
+      .send(profilePayload('09171234567'));
+
+    expect(response.status).toBe(200);
+    expect(updateParams[3]).toBe('+639171234567');
+  });
+
+  it('accepts a landline staff contact number', async () => {
+    let updateParams: any[] = [];
+
+    query.mockImplementation((sql: string, params: any[]) => {
+      if (sql.includes('SELECT first_name, last_name, contact_number FROM secretaries')) {
+        return Promise.resolve({
+          rows: [{ first_name: 'Sara', last_name: 'Santos', contact_number: '+639171234567' }],
+        });
+      }
+      if (sql.includes('UPDATE secretaries')) {
+        updateParams = params;
+        return Promise.resolve({
+          rows: [{
+            id: 'secretary-id',
+            first_name: 'Sara',
+            middle_name: null,
+            last_name: 'Santos',
+            contact_number: '+63212345678',
+          }],
+        });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .put('/api/v1/secretaries/me')
+      .send(profilePayload('+63212345678'));
+
+    expect(response.status).toBe(200);
+    expect(updateParams[3]).toBe('+63212345678');
+  });
+
+  it('rejects an invalid contact number', async () => {
+    query.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT first_name, last_name, contact_number FROM secretaries')) {
+        return Promise.resolve({
+          rows: [{ first_name: 'Sara', last_name: 'Santos', contact_number: '+639171234567' }],
+        });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .put('/api/v1/secretaries/me')
+      .send(profilePayload('+63639171234567'));
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toContain('duplicated or invalid country code');
+  });
+});

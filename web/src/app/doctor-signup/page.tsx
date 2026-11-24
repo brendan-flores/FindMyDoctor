@@ -11,7 +11,8 @@ import { MEDICAL_CREDENTIALS } from '@/data/medicalCredentials';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import SearchableMultiSelect from '@/components/ui/SearchableMultiSelect';
 import Toast from '@/components/ui/Toast';
-import { formatPhoneFieldInput, phoneFormatErrorMessage, toStaffContactDomestic } from '@/lib/phone';
+import { parsePhone } from '@/lib/phone';
+import InternationalPhoneInput from '@/components/ui/InternationalPhoneInput';
 
 type Step = 'signup' | 'otp';
 type FormStatus = 'idle' | 'loading';
@@ -41,6 +42,7 @@ export default function DoctorSignupOtp() {
 
   const [formError, setFormError] = useState('');
   const [contactNumberError, setContactNumberError] = useState('');
+  const [contactCountry, setContactCountry] = useState('PH');
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -307,10 +309,14 @@ export default function DoctorSignupOtp() {
       return;
     }
 
-    const contactNumber = toStaffContactDomestic(formData.contactNumber);
-    if (!contactNumber) {
-      setContactNumberError('Enter a valid Philippine contact number.');
-      return;
+    let contactNumber = '';
+    if (formData.contactNumber.trim()) {
+      const parsedContact = parsePhone(formData.contactNumber, contactCountry);
+      if (!parsedContact.ok) {
+        setContactNumberError('Enter a valid contact number.');
+        return;
+      }
+      contactNumber = parsedContact.e164;
     }
 
     setEmailStatus('loading');
@@ -757,39 +763,27 @@ export default function DoctorSignupOtp() {
                   Contact Number
                 </label>
 
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] font-medium text-neutral-400">
-                    +63
-                  </span>
-
-                  <input
-                    id="contactNumber"
-                    type="tel"
-                    value={formData.contactNumber}
-                    onChange={(event) => {
-                      const result = formatPhoneFieldInput(event.target.value, formData.contactNumber, {
-                        allowLandline: true,
-                      });
-
-                      setFormData({
-                        ...formData,
-                        contactNumber: result.value,
-                      });
-
+                <InternationalPhoneInput
+                  id="contactNumber"
+                  country={contactCountry}
+                  nationalNumber={formData.contactNumber}
+                  onCountryChange={(iso) => {
+                    setContactCountry(iso);
+                    if (formData.contactNumber.trim()) {
                       setContactNumberError(
-                        result.error ? phoneFormatErrorMessage(result.error) : ''
+                        parsePhone(formData.contactNumber, iso).ok
+                          ? ''
+                          : 'Enter a valid contact number.'
                       );
-                      setFormError('');
-                    }}
-                    placeholder="9171234567"
-                    autoComplete="tel"
-                    className="block w-full rounded-2xl border border-neutral-200 bg-white py-3.5 pl-14 pr-4 text-[15px] text-neutral-900 placeholder-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 transition-all"
-                  />
-                </div>
-
-                {contactNumberError && (
-                  <p className="mt-1 text-[12px] text-error-600">{contactNumberError}</p>
-                )}
+                    }
+                  }}
+                  onNationalChange={(v) => {
+                    setFormData({ ...formData, contactNumber: v });
+                    setContactNumberError('');
+                    setFormError('');
+                  }}
+                  error={contactNumberError || null}
+                />
               </div>
 
               {/* Password */}
