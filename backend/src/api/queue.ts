@@ -3,6 +3,8 @@ import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requirePasswordChange, requireSecretaryPasswordChange, requireSecretaryProfileCompletion } from '../middleware/auth';
 import { getClinicDate } from '../utils/date';
+import { createNotification, NotificationTypes } from './notifications';
+import { sendPushToUser } from '../services/pushService';
 
 const router = Router();
 
@@ -328,6 +330,46 @@ router.post('/:date/next', authenticate, requireSecretaryPasswordChange, require
        WHERE id = $1`,
       [queueEntry.id]
     );
+
+    try {
+      const patientUserResult = await query(
+        'SELECT user_id FROM patients WHERE id = $1',
+        [queueEntry.patient_id]
+      );
+
+      const patientUserId = patientUserResult.rows[0]?.user_id;
+      if (patientUserId) {
+        const notificationMessage = `You are queue number ${queueEntry.queue_number}. Please proceed to the clinic.`;
+
+        try {
+          await createNotification(
+            patientUserId,
+            NotificationTypes.QUEUE_UPDATED,
+            "You're Next",
+            notificationMessage,
+            'queue',
+            queueEntry.id
+          );
+        } catch (notificationError) {
+          console.error('Failed to create queue-called notification:', notificationError);
+        }
+
+        await sendPushToUser(patientUserId, {
+          title: "You're Next",
+          body: notificationMessage,
+          data: {
+            type: NotificationTypes.QUEUE_UPDATED,
+            queueEntryId: queueEntry.id,
+            queueNumber: String(queueEntry.queue_number ?? ''),
+            ...(queueEntry.appointment_id
+              ? { appointmentId: String(queueEntry.appointment_id) }
+              : {}),
+          },
+        });
+      }
+    } catch (notificationError) {
+      console.error('Failed to notify patient about queue call:', notificationError);
+    }
 
     res.json(success(queueEntry, 'Next patient called'));
   } catch (err: any) {

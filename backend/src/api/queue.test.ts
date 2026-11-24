@@ -33,7 +33,20 @@ jest.mock('../middleware/auth', () => ({
   requirePasswordChange: (req: any, res: any, next: any) => next(),
 }));
 
+jest.mock('./notifications', () => ({
+  createNotification: jest.fn().mockResolvedValue(undefined),
+  NotificationTypes: {
+    QUEUE_UPDATED: 'QUEUE_UPDATED',
+  },
+}));
+
+jest.mock('../services/pushService', () => ({
+  sendPushToUser: jest.fn().mockResolvedValue(undefined),
+}));
+
 const { query, getClient } = require('../database/connection');
+const { createNotification } = require('./notifications');
+const { sendPushToUser } = require('../services/pushService');
 
 describe('Queue API Security', () => {
   let app: express.Application;
@@ -329,6 +342,59 @@ describe('Queue API Security', () => {
         .send({});
 
       expect(response.status).toBe(200);
+    });
+
+    it('should create a notification and send a push to the called patient', async () => {
+      query.mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT doctor_id FROM secretaries')) {
+          return Promise.resolve({ rows: [{ doctor_id: 'assigned-doctor-id' }] });
+        }
+        if (sql.includes('FROM queue_entries') && sql.includes('WHERE queue_date = $1 AND doctor_id = $2')) {
+          return Promise.resolve({
+            rows: [{
+              id: 'queue-1',
+              patient_id: 'patient-1',
+              appointment_id: 'appointment-1',
+              doctor_id: 'assigned-doctor-id',
+              queue_date: '2024-12-01',
+              queue_number: 1,
+              status: 'WAITING'
+            }]
+          });
+        }
+        if (sql.includes('UPDATE queue_entries') && sql.includes('status = \'CALLED\'')) {
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.includes('SELECT user_id FROM patients')) {
+          expect(params).toEqual(['patient-1']);
+          return Promise.resolve({ rows: [{ user_id: 'patient-user-1' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const response = await request(app)
+        .post('/api/v1/queue/2024-12-01/next')
+        .send({});
+
+      expect(response.status).toBe(200);
+      expect(createNotification).toHaveBeenCalledWith(
+        'patient-user-1',
+        'QUEUE_UPDATED',
+        "You're Next",
+        'You are queue number 1. Please proceed to the clinic.',
+        'queue',
+        'queue-1'
+      );
+      expect(sendPushToUser).toHaveBeenCalledWith('patient-user-1', {
+        title: "You're Next",
+        body: 'You are queue number 1. Please proceed to the clinic.',
+        data: {
+          type: 'QUEUE_UPDATED',
+          queueEntryId: 'queue-1',
+          queueNumber: '1',
+          appointmentId: 'appointment-1',
+        },
+      });
     });
 
     it('should reject if secretary provides doctorId that does not match assignment', async () => {
