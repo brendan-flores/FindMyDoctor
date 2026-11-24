@@ -12,6 +12,15 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { authenticate, authorize, AuthRequest } from './auth';
 
+// Mock the database connection so the middleware's approval-status lookup
+// does not require a live database in unit tests.
+jest.mock('../database/connection', () => ({
+  query: jest.fn(),
+  getClient: jest.fn(),
+}));
+
+const { query } = require('../database/connection');
+
 function signToken(
   role: string,
   expiresIn: string | number = '1h'
@@ -65,6 +74,15 @@ describe('authenticate role resolution', () => {
 
   beforeEach(() => {
     app = createApp();
+    jest.clearAllMocks();
+    // By default, a doctor lookup returns ACTIVE approval status so the
+    // middleware's rejection check does not block valid doctor sessions.
+    (query as jest.Mock).mockImplementation((sql: string) => {
+      if (sql.includes('approval_status FROM doctors')) {
+        return Promise.resolve({ rows: [{ approval_status: 'ACTIVE' }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
   });
 
   it('accepts a valid doctor token on a doctor path', async () => {
@@ -199,6 +217,21 @@ describe('authenticate role resolution', () => {
     const response = await request(app)
       .get('/api/v1/patients/doctor/doctor-1')
       .set('X-Portal-Role', 'doctor');
+
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects a rejected doctor token on a doctor path', async () => {
+    (query as jest.Mock).mockImplementation((sql: string) => {
+      if (sql.includes('approval_status FROM doctors')) {
+        return Promise.resolve({ rows: [{ approval_status: 'REJECTED' }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const response = await request(app)
+      .get('/api/v1/doctors/me')
+      .set('Authorization', `Bearer ${signToken('DOCTOR')}`);
 
     expect(response.status).toBe(401);
   });

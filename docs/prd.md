@@ -980,7 +980,7 @@ The system shall support a doctor rejection and resubmission workflow:
 9. Administrators shall not be able to directly approve a REJECTED doctor; the doctor must resubmit first.
 10. The doctor profile page shall display a rejection banner with the reason when in REJECTED status.
 11. The doctor profile page shall allow editing and resubmission when in REJECTED status, even if `profile_completion_status === 'SUBMITTED'`.
-12. The doctor login page shall route authenticated doctors based on approval_status: ACTIVE → dashboard, REJECTED → profile page.
+12. The doctor login page shall deny authentication for REJECTED doctors with a generic invalid-credentials error (no tokens, no session, no redirect). ACTIVE doctors proceed to the dashboard; PENDING doctors may log in only while their profile is not yet submitted.
 13. PENDING doctors may log in only while their profile is not yet submitted so they can complete and submit it; PENDING doctors who have submitted their profile shall not be able to log in while awaiting administrator approval.
 
 ## FR-006 — Availability

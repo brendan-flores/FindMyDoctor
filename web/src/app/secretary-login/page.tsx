@@ -9,6 +9,24 @@ import { secretaryApi } from '@/lib/api/secretaryApi';
 import OtpVerification from '@/components/auth/OtpVerification';
 import Toast from '@/components/ui/Toast';
 
+// Set by /secretary/change-password after a successful temporary-password
+// change. That first login already consumed the browser's one-time
+// device-trust prompt (password change takes precedence over it), so the
+// re-login that follows goes straight to the dashboard.
+const POST_PASSWORD_CHANGE_FLAG = 'secretary_post_password_change';
+
+function consumePostPasswordChangeFlag(): boolean {
+  try {
+    if (sessionStorage.getItem(POST_PASSWORD_CHANGE_FLAG) === '1') {
+      sessionStorage.removeItem(POST_PASSWORD_CHANGE_FLAG);
+      return true;
+    }
+  } catch {
+    // sessionStorage unavailable — treat as a normal login.
+  }
+  return false;
+}
+
 export default function SecretaryLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -102,10 +120,13 @@ export default function SecretaryLogin() {
           if (authData.user.mustChangePassword === true) {
             // Password change must complete before device trust is offered.
             router.push('/secretary/change-password');
-          } else if (authData.requiresTrustPrompt) {
-            router.push('/secretary/trust-device');
           } else {
-            router.push('/secretary/dashboard');
+            const skipTrustPrompt = consumePostPasswordChangeFlag();
+            if (authData.requiresTrustPrompt && !skipTrustPrompt) {
+              router.push('/secretary/trust-device');
+            } else {
+              router.push('/secretary/dashboard');
+            }
           }
         } else {
           setError('Invalid username or password.');
@@ -129,10 +150,13 @@ export default function SecretaryLogin() {
 
       if (data.user.mustChangePassword === true) {
         router.push('/secretary/change-password');
-      } else if (data.requiresTrustPrompt) {
-        router.push('/secretary/trust-device');
       } else {
-        router.push('/secretary/dashboard');
+        const skipTrustPrompt = consumePostPasswordChangeFlag();
+        if (data.requiresTrustPrompt && !skipTrustPrompt) {
+          router.push('/secretary/trust-device');
+        } else {
+          router.push('/secretary/dashboard');
+        }
       }
     } else {
       setError('Invalid username or password.');

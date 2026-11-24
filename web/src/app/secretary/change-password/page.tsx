@@ -55,6 +55,16 @@ export default function SecretaryChangePassword() {
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
 
+        // The first login already consumed this browser's one-time
+        // device-trust prompt (password change took precedence over it), so
+        // the re-login goes straight to the dashboard.
+        try {
+          sessionStorage.setItem('secretary_post_password_change', '1');
+        } catch {
+          // sessionStorage unavailable — the re-login will simply show the
+          // trust prompt again, which is safe.
+        }
+
         // Show success modal
         setShowSuccessModal(true);
       } else {

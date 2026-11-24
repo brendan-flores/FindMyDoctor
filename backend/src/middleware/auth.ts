@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { error, ErrorCodes } from '../utils/response';
 import { query } from '../database/connection';
+import { clearSessionCookies } from '../modules/auth/cookies';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -73,7 +74,7 @@ function resolveRolePrefix(req: Request): string {
   return '';
 }
 
-export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
+export async function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     // First try to get token from Authorization header
     let token: string | undefined;
@@ -146,6 +147,27 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
       sessionVersion: decoded.sv,
       remember: decoded.remember === true,
     };
+
+    // Reject rejected doctors from accessing protected resources through an
+    // existing session. The token may have been issued before the account was
+    // rejected; clearing the cookies forces the client to sign in again, which
+    // will now fail at the login endpoint.
+    if (decoded.role === 'DOCTOR') {
+      const doctorResult = await query(
+        'SELECT approval_status FROM doctors WHERE user_id = $1',
+        [decoded.id]
+      );
+      if (
+        doctorResult.rows.length > 0 &&
+        doctorResult.rows[0].approval_status === 'REJECTED'
+      ) {
+        clearSessionCookies(res, 'doctor');
+        return res.status(401).json(
+          error(ErrorCodes.UNAUTHORIZED, 'Invalid or expired token')
+        );
+      }
+    }
+
     next();
   } catch (err) {
     // Never log the token value.

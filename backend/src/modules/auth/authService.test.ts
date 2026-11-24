@@ -373,7 +373,7 @@ describe('AuthService - Login Behavior', () => {
       expect(result.accessToken).toBeDefined();
     });
 
-    it('should allow DOCTOR login with REJECTED approval status (to allow profile correction)', async () => {
+    it('should reject DOCTOR login with REJECTED approval status (invalid credentials)', async () => {
       query.mockImplementation((sql: string, params: any[]) => {
         if (sql.includes('SELECT * FROM users')) {
           return Promise.resolve({
@@ -390,22 +390,21 @@ describe('AuthService - Login Behavior', () => {
         if (sql.includes('profile_completion_status FROM doctors')) {
           return Promise.resolve({ rows: [{ approval_status: 'REJECTED', profile_completion_status: 'INCOMPLETE' }] });
         }
-        if (sql.includes('SELECT two_factor_enabled FROM doctors')) {
-          return Promise.resolve({ rows: [{ two_factor_enabled: false }] });
-        }
         return Promise.resolve({ rows: [] });
       });
 
       bcrypt.compare.mockResolvedValue(true);
 
-      const result = await login({
-        email: 'doctor@example.com',
-        password: 'password123',
-        expectedRole: 'DOCTOR'
+      await expect(
+        login({
+          email: 'doctor@example.com',
+          password: 'password123',
+          expectedRole: 'DOCTOR'
+        })
+      ).rejects.toMatchObject({
+        code: ErrorCodes.INVALID_CREDENTIALS,
+        message: 'Invalid email or password',
       });
-
-      expect(result.user.role).toBe('DOCTOR');
-      expect(result.accessToken).toBeDefined();
     });
   });
 });
