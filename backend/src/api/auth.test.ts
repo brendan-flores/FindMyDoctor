@@ -597,7 +597,7 @@ describe('Auth API - Patient Login Validation', () => {
       expect(response.body.success).toBe(true);
     });
 
-    it('should allow DOCTOR login with REJECTED approval status (to allow profile correction)', async () => {
+    it('should reject DOCTOR login with REJECTED approval status (invalid credentials)', async () => {
       query.mockImplementation((sql: string, params: any[]) => {
         if (sql.includes('SELECT * FROM users')) {
           return Promise.resolve({
@@ -614,9 +614,6 @@ describe('Auth API - Patient Login Validation', () => {
         if (sql.includes('profile_completion_status FROM doctors')) {
           return Promise.resolve({ rows: [{ approval_status: 'REJECTED', profile_completion_status: 'INCOMPLETE' }] });
         }
-        if (sql.includes('SELECT two_factor_enabled FROM doctors')) {
-          return Promise.resolve({ rows: [{ two_factor_enabled: false }] });
-        }
         return Promise.resolve({ rows: [] });
       });
 
@@ -631,8 +628,13 @@ describe('Auth API - Patient Login Validation', () => {
           expectedRole: 'DOCTOR'
         });
 
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
+      // A rejected doctor must be denied authentication exactly like invalid
+      // credentials: 401, generic INVALID_CREDENTIALS error, no tokens.
+      expect(response.status).toBe(401);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('INVALID_CREDENTIALS');
+      expect(response.body.error.message).toBe('Invalid email or password');
+      expect(response.body.data).toBeUndefined();
     });
   });
 

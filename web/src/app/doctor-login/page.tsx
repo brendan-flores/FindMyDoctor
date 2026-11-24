@@ -45,19 +45,25 @@ export default function DoctorLogin() {
           if (storedUser?.mustChangePassword === true) {
             router.replace('/doctor/settings');
           } else {
-            // Corrective destinations (rejection review, onboarding) skip the
-            // device-trust prompt; it is only offered when entering the portal.
-            const needsProfileCorrection =
-              response.data.approval_status === 'REJECTED' ||
-              (response.data.approval_status === 'PENDING' &&
-                response.data.profile_completion_status !== 'SUBMITTED');
-            if (needsProfileCorrection) {
-              router.replace('/doctor-profile');
+            if (response.data.approval_status === 'REJECTED') {
+              // Rejected doctors can no longer authenticate. Clear the stale
+              // session and let the login form be shown.
+              apiClient.clearToken();
+              localStorage.removeItem('doctor_user');
             } else {
-              const session = apiClient.getSessionMetadata();
-              const isPersistent =
-                session?.persistent === true || session?.rememberMe === true;
-              router.replace(isPersistent ? '/doctor/dashboard' : '/doctor/trust-device');
+              // Corrective flows (rejection review, onboarding) skip the
+              // device-trust prompt; it is only offered when entering the portal.
+              const needsProfileCorrection =
+                response.data.approval_status === 'PENDING' &&
+                response.data.profile_completion_status !== 'SUBMITTED';
+              if (needsProfileCorrection) {
+                router.replace('/doctor-profile');
+              } else {
+                const session = apiClient.getSessionMetadata();
+                const isPersistent =
+                  session?.persistent === true || session?.rememberMe === true;
+                router.replace(isPersistent ? '/doctor/dashboard' : '/doctor/trust-device');
+              }
             }
           }
         } else {
@@ -160,14 +166,22 @@ export default function DoctorLogin() {
       if (response.success && response.data) {
         const approvalStatus = response.data.approval_status;
 
+        // Rejected doctors can no longer authenticate. If a stale session
+        // survived the rejection, clear it and show a generic error instead of
+        // routing to a protected page.
+        if (approvalStatus === 'REJECTED') {
+          setError('Invalid email or password.');
+          localStorage.removeItem('doctor_user');
+          apiClient.clearToken();
+          return;
+        }
+
         // The device-trust prompt is only offered when the login leads into
-        // the portal dashboard. Corrective flows — a rejected doctor reviewing
-        // the rejection reason or a pending doctor finishing onboarding — go
-        // straight to /doctor-profile instead.
+        // the portal dashboard. Corrective flows — a pending doctor finishing
+        // onboarding — go straight to /doctor-profile instead.
         const needsProfileCorrection =
-          approvalStatus === 'REJECTED' ||
-          (approvalStatus === 'PENDING' &&
-            response.data.profile_completion_status !== 'SUBMITTED');
+          approvalStatus === 'PENDING' &&
+          response.data.profile_completion_status !== 'SUBMITTED';
 
         if (needsProfileCorrection) {
           router.push('/doctor-profile');

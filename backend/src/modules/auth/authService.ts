@@ -158,8 +158,16 @@ export async function login(data: LoginData) {
         };
       }
 
-      // REJECTED doctors are allowed to authenticate to correct and resubmit their profile
-      // They will be routed to /doctor-profile based on their approval_status
+      // REJECTED doctors must not authenticate. Treat the attempt exactly like
+      // invalid credentials so the rejection status is never revealed to the
+      // client. This check runs before any token generation or device-trust
+      // evaluation.
+      if (approvalStatus === 'REJECTED') {
+        throw {
+          code: ErrorCodes.INVALID_CREDENTIALS,
+          message: 'Invalid email or password',
+        };
+      }
     }
   }
 
@@ -568,6 +576,22 @@ export async function refreshAccessToken(refreshToken: string) {
     }
 
     const user = userResult.rows[0];
+
+    // Reject refresh tokens for rejected doctors so an existing session cannot
+    // be used to obtain new access tokens after rejection.
+    if (user.role === 'DOCTOR') {
+      const doctorResult = await query(
+        'SELECT approval_status FROM doctors WHERE user_id = $1',
+        [user.id]
+      );
+      if (
+        doctorResult.rows.length > 0 &&
+        doctorResult.rows[0].approval_status === 'REJECTED'
+      ) {
+        throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid or expired refresh token' };
+      }
+    }
+
     const currentSessionVersion = Number(user.session_version ?? 0);
     const tokenSessionVersion = decoded.sv === undefined ? null : Number(decoded.sv);
 
@@ -1009,6 +1033,22 @@ export async function verifyLoginOtp(
   }
 
   const user = userResult.rows[0];
+
+  // Reject rejected doctors even if they hold a pre-existing login challenge
+  // (for example one created before the rejection). This keeps the rejection
+  // check effective across the OTP login path as well.
+  if (user.role === 'DOCTOR') {
+    const doctorResult = await query(
+      'SELECT approval_status FROM doctors WHERE user_id = $1',
+      [user.id]
+    );
+    if (
+      doctorResult.rows.length > 0 &&
+      doctorResult.rows[0].approval_status === 'REJECTED'
+    ) {
+      throw { code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid or expired login challenge' };
+    }
+  }
 
   // OTP verification always issues a short staff session. The browser becomes
   // trusted only through the explicit post-login trust prompt, so a password

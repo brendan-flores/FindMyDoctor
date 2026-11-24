@@ -891,10 +891,9 @@ After a doctor completes self-registration, email OTP verification, and profile 
 When a doctor is rejected:
 
 - The doctor's `approval_status` is set to 'REJECTED' and `rejection_reason` contains the admin's explanation.
-- REJECTED doctors may authenticate specifically to correct and resubmit their application (they are not active/patient-visible).
-- The rejected doctor can log in and is routed to `/doctor-profile` to view the rejection reason and correct their profile.
-- The doctor can view their rejection reason via `GET /api/v1/doctors/me` which returns `approval_status` and `rejection_reason`.
-- The rejected doctor can edit their professional profile fields and schedule via the existing profile update and schedule management endpoints.
+- REJECTED doctors cannot authenticate. Login attempts are denied with a generic invalid-credentials error (the same as an incorrect email or password), and no access token, refresh token, or session is issued.
+- The doctor can view their rejection reason via `GET /api/v1/doctors/me` which returns `approval_status` and `rejection_reason` (when they regain an authenticated session after resubmission and approval).
+- The rejected doctor can edit their professional profile fields and schedule via the existing profile update and schedule management endpoints (requires an authenticated session).
 - The rejected doctor can resubmit their profile via `POST /api/v1/doctors/me/profile/submit`.
 - On successful resubmission:
   - `approval_status` is restored to 'PENDING'
@@ -912,9 +911,9 @@ When a doctor is rejected:
   - Reloading the profile after successful resubmission to reflect the updated status
 - The web Doctor login page routes authenticated Doctors based on approval_status:
   - ACTIVE → `/doctor/dashboard`
-  - REJECTED → `/doctor-profile`
   - PENDING with an unsubmitted profile → `/doctor-profile` to finish onboarding
   - PENDING with a submitted profile → blocked by the backend login endpoint
+  - REJECTED → denied at the backend login endpoint with a generic invalid-credentials error (no redirect)
 
 `POST /api/v1/auth/register/doctor` remains available for Administrator-provisioned doctor accounts, but the self-registration page no longer uses it.
 
@@ -1240,7 +1239,7 @@ Session behavior is defined once in `backend/src/modules/auth/sessionPolicy.ts`.
 - **Untrusted browser or trust declined:** 7-hour access token, 8-hour refresh token, 8-hour idle timeout, browser-session cookies, no trusted browser, OTP on every login when 2FA is enabled.
 - **Trusted device:** 7-day access token, 30-day refresh token/session, persistent cookies, trusted browser for 30 days. OTP is skipped on later logins from that browser when 2FA is enabled; the password is always required.
 - Login forms do not include a Remember Me checkbox.
-- After full authentication, an untrusted browser is shown a device-trust page with browser/OS details and "Trust this device" / "Do not trust this device" — only when the login leads into the portal dashboard. Corrective flows skip the prompt: a REJECTED doctor or PENDING doctor with an unsubmitted profile goes straight to `/doctor-profile`, and a secretary re-login immediately after a temporary-password change goes straight to `/secretary/dashboard` because the first login already consumed the prompt (password change takes precedence over it). Trusting registers the browser and upgrades the current session; declining keeps the short session.
+- After full authentication, an untrusted browser is shown a device-trust page with browser/OS details and "Trust this device" / "Do not trust this device" — only when the login leads into the portal dashboard. Corrective flows skip the prompt: a PENDING doctor with an unsubmitted profile goes straight to `/doctor-profile`, and a secretary re-login immediately after a temporary-password change goes straight to `/secretary/dashboard` because the first login already consumed the prompt (password change takes precedence over it). Trusting registers the browser and upgrades the current session; declining keeps the short session.
 - The trust decision never bypasses the OTP required for the current login. `verify-login-otp` always issues a short untrusted session and the trust prompt is shown afterwards.
 - A valid trusted-device cookie skips OTP and the prompt on later logins.
 
