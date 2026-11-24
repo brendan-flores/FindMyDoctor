@@ -2,11 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { config } from './config';
-import { errorHandler, notFoundHandler } from './middleware/errorHandler';
-import { authenticate, authorize } from './middleware/auth';
-import { apiLimiter, authLimiter } from './middleware/rateLimit';
-import { pool } from './database/connection';
+import { config } from './config/index.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { authenticate, authorize } from './middleware/auth.js';
+import { apiLimiter, authLimiter } from './middleware/rateLimit.js';
+import { pool } from './database/connection.js';
 import path from 'path';
 
 // Import routers
