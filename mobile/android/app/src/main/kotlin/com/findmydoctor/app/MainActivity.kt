@@ -1,4 +1,4 @@
-package com.example.mobile
+package com.findmydoctor.app
 
 import android.content.ContentValues
 import android.os.Build
@@ -11,7 +11,7 @@ import java.io.File
 import java.io.FileOutputStream
 
 class MainActivity : FlutterActivity() {
-    private val filesChannel = "com.example.mobile/files"
+    private val filesChannel = "com.findmydoctor.app/files"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

@@ -1,7 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.mobile">
+    package="com.findmydoctor.app">
     <!-- Internet permission for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Network state permission for connectivity checks -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Notification permission (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Legacy only: Android 10+ saves invoices through MediaStore/Downloads. -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -12,7 +16,7 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
-            android:name="com.example.mobile.MainActivity"
+            android:name="com.findmydoctor.app.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
