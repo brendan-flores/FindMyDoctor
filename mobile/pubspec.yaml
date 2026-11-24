@@ -109,6 +109,12 @@ dev_dependencies:
   # OS notification-permission outcomes in test/profile_section_test.dart.
   permission_handler_platform_interface: ^4.4.1
 
+  # Android launcher icons (adaptive + legacy densities).
+  flutter_launcher_icons: ^0.14.3
+
+  # Native launch screen shown while Flutter initializes.
+  flutter_native_splash: ^2.4.4
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -149,3 +155,28 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# ---------------------------------------------------------------------------
+# Android launcher icon (flutter_launcher_icons)
+# ---------------------------------------------------------------------------
+# Generates all required launcher icon densities plus an Android adaptive icon
+# from the app cross mark. iOS and web icons are intentionally unchanged.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/cross.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/cross.png"
+
+# ---------------------------------------------------------------------------
+# Native launch screen (flutter_native_splash)
+# ---------------------------------------------------------------------------
+# Shown by Android while Flutter initializes: the FindMyDoctor logo centered
+# on a white background, matching the Flutter splash page that follows it.
+# iOS and web are disabled so their icons and splash screens are unchanged.
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/images/findmydoctor_logo.png
+  android: true
+  ios: false
+  web: false

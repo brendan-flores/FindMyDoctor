@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/navigation/app_navigator.dart';
 import '../core/services/push_notification_service.dart';
+import 'animated_splash_page.dart';
 import '../core/theme/app_theme.dart';
 import '../core/services/api_service.dart';
 import '../core/utils/json_parsers.dart';
@@ -49,7 +50,13 @@ class MyAppState extends State<MyApp> {
   bool _isInitialized = false;
   bool _isAuthenticated = false;
   bool _mustChangePassword = false;
+  bool _splashCompleted = false;
   String? _userRole;
+
+  /// Completes when app initialization (session restore, auth checks) has
+  /// finished. The startup splash hands off to the home screen only after
+  /// both this future and the splash animation have completed.
+  final Completer<void> _appReadyCompleter = Completer<void>();
 
   // Method to update cached authentication state (called after login)
   void updateAuthState(
@@ -122,6 +129,7 @@ class MyAppState extends State<MyApp> {
       _userRole = userRole;
       _isInitialized = true;
     });
+    _appReadyCompleter.complete();
 
     // Re-register the device token for a restored session (best-effort).
     if (isAuthenticated) {
@@ -131,11 +139,23 @@ class MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInitialized) {
+    // Branded startup splash: shown only during the first launch, until
+    // initialization finishes and the splash animation completes. It never
+    // appears on later navigation, and never bypasses login, registration,
+    // or session restoration.
+    if (!_isInitialized || !_splashCompleted) {
       return MaterialApp(
         title: 'FindMyDoctor',
         theme: AppTheme.lightTheme,
-        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
+        navigatorKey: AppNavigator.key,
+        home: AnimatedSplashPage(
+          ready: _appReadyCompleter.future,
+          onFinished: () {
+            if (mounted) {
+              setState(() => _splashCompleted = true);
+            }
+          },
+        ),
         debugShowCheckedModeBanner: false,
       );
     }
