@@ -14,6 +14,8 @@ import { LANGUAGES } from '@/data/languages';
 import Select from '@/components/ui/Select';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import SearchableMultiSelect from '@/components/ui/SearchableMultiSelect';
+import TimePicker from '@/components/ui/TimePicker';
+import Toast from '@/components/ui/Toast';
 import { usePresence } from '@/hooks/usePresence';
 
 const PRC_LICENSE_PATTERN = /^\d{7}$/;
@@ -28,9 +30,10 @@ export default function DoctorProfile() {
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [error, setError] = useState('');
   const [profileNotFound, setProfileNotFound] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+  const [toastError, setToastError] = useState('');
+  const [toastSuccess, setToastSuccess] = useState('');
 
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
   const [formData, setFormData] = useState({
@@ -62,6 +65,8 @@ export default function DoctorProfile() {
     end_time: '',
   });
   const [isScheduleSaving, setIsScheduleSaving] = useState(false);
+  const [startTimePickerOpen, setStartTimePickerOpen] = useState(false);
+  const [endTimePickerOpen, setEndTimePickerOpen] = useState(false);
 
   const dayOptions = [
     { value: '0', label: 'Sunday' },
@@ -237,12 +242,15 @@ export default function DoctorProfile() {
         } else {
           loadSchedules();
         }
+        setToastSuccess('Schedule added successfully.');
+        // Notify sidebar and other pages to refresh schedules
+        window.dispatchEvent(new CustomEvent('schedulesUpdated'));
       } else {
-        setError(response.error || 'Failed to add schedule');
+        setToastError(response.error || 'Failed to add schedule');
       }
     } catch (err) {
       console.error('Add schedule error:', err);
-      setError('An error occurred while adding schedule');
+      setToastError('An error occurred while adding schedule');
     } finally {
       setIsScheduleSaving(false);
     }
@@ -255,12 +263,15 @@ export default function DoctorProfile() {
       const response = await doctorApi.deleteSchedule(id);
       if (response.success) {
         setSchedules((prev) => prev.filter((s) => s.id !== id));
+        setToastSuccess('Schedule deleted successfully.');
+        // Notify sidebar and other pages to refresh schedules
+        window.dispatchEvent(new CustomEvent('schedulesUpdated'));
       } else {
-        setError(response.error || 'Failed to delete schedule');
+        setToastError(response.error || 'Failed to delete schedule');
       }
     } catch (err) {
       console.error('Delete schedule error:', err);
-      setError('An error occurred while deleting schedule');
+      setToastError('An error occurred while deleting schedule');
     } finally {
       setIsScheduleSaving(false);
     }
@@ -286,7 +297,7 @@ export default function DoctorProfile() {
     setPhotoPreview(previewUrl);
 
     setIsUploadingPhoto(true);
-    setError('');
+    setToastError('');
 
     try {
       const uploadFormData = new FormData();
@@ -302,8 +313,7 @@ export default function DoctorProfile() {
         // Keep the blob URL as preview (it always works)
         // Only update the form data with the server URL
         setFormData({ ...formData, professional_photo_url: response.data.photoUrl || '' });
-        setSuccessMessage('Photo uploaded successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
+        setToastSuccess('Photo uploaded successfully.');
       } else {
         // Clean up the temporary preview URL on error
         URL.revokeObjectURL(previewUrl);
@@ -318,14 +328,14 @@ export default function DoctorProfile() {
           response.error ||
           response.errorCode ||
           `Server returned ${response.httpStatus ?? 'unknown'}`;
-        setError(`Photo upload failed: ${serverMessage}`);
+        setToastError(`Photo upload failed: ${serverMessage}`);
       }
     } catch (err) {
       console.error('Photo upload error:', err);
       // Clean up the temporary preview URL on error
       URL.revokeObjectURL(previewUrl);
       setPhotoPreview(null);
-      setError('An error occurred while uploading your photo');
+      setToastError('An error occurred while uploading your photo');
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -333,7 +343,7 @@ export default function DoctorProfile() {
 
   const handlePhotoDelete = async () => {
     setIsDeletingPhoto(true);
-    setError('');
+    setToastError('');
 
     try {
       const response = await doctorApi.deletePhoto();
@@ -341,14 +351,13 @@ export default function DoctorProfile() {
       if (response.success) {
         setPhotoPreview(null);
         setFormData({ ...formData, professional_photo_url: '' });
-        setSuccessMessage('Photo deleted successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
+        setToastSuccess('Photo deleted successfully.');
       } else {
-        setError(response.error || 'Failed to delete photo');
+        setToastError(response.error || 'Failed to delete photo');
       }
     } catch (err) {
       console.error('Photo deletion error:', err);
-      setError('An error occurred while deleting your photo');
+      setToastError('An error occurred while deleting your photo');
     } finally {
       setIsDeletingPhoto(false);
     }
@@ -377,11 +386,12 @@ export default function DoctorProfile() {
 
   const handleSubmit = async () => {
     setError('');
-    setSuccessMessage('');
+    setToastError('');
+    setToastSuccess('');
 
     const validationError = validateForSubmission();
     if (validationError) {
-      setError(validationError);
+      setToastError(validationError);
       return;
     }
 
@@ -406,7 +416,7 @@ export default function DoctorProfile() {
       const saveResponse = await doctorApi.updateProfile(updatePayload);
 
       if (!saveResponse.success) {
-        setError(saveResponse.error || 'Failed to save profile');
+        setToastError(saveResponse.error || 'Failed to save profile');
         return;
       }
 
@@ -423,11 +433,11 @@ export default function DoctorProfile() {
         // Show confirmation modal
         setShowSubmissionModal(true);
       } else {
-        setError(response.error || 'Failed to submit profile');
+        setToastError(response.error || 'Failed to submit profile');
       }
     } catch (err) {
       console.error('Submit profile error:', err);
-      setError('An error occurred while submitting your profile');
+      setToastError('An error occurred while submitting your profile');
     } finally {
       setIsSubmitting(false);
     }
@@ -560,10 +570,16 @@ export default function DoctorProfile() {
               </div>
             )}
 
-            {successMessage && (
-              <div className="mb-6 bg-success-50 border border-success-200 text-success-700 px-4 py-3 rounded-xl text-sm">
-                {successMessage}
-              </div>
+            {/* Toast Notifications */}
+            {toastError && (
+              <Toast message={toastError} type="error" onClose={() => setToastError('')} />
+            )}
+            {toastSuccess && (
+              <Toast
+                message={toastSuccess}
+                type="success"
+                onClose={() => setToastSuccess('')}
+              />
             )}
 
             {/* Form */}
@@ -856,21 +872,39 @@ export default function DoctorProfile() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm font-medium text-neutral-700 mb-1">Start Time</label>
-                        <input
-                          type="time"
-                          value={scheduleForm.start_time}
-                          onChange={(e) => setScheduleForm({ ...scheduleForm, start_time: e.target.value })}
-                          className="block w-full rounded-lg border border-neutral-300 bg-white py-2 px-3 text-sm text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600/20"
-                        />
+                        <button
+                          type="button"
+                          onClick={() => setStartTimePickerOpen(true)}
+                          disabled={!canEdit || isScheduleSaving}
+                          className={`w-full py-3 px-3 rounded-lg border border-neutral-300 bg-white text-left flex items-center justify-between text-sm text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                            !scheduleForm.start_time ? 'placeholder:text-neutral-400' : ''
+                          }`}
+                        >
+                          <span className="truncate">
+                            {scheduleForm.start_time ? formatTime(scheduleForm.start_time) : 'Select start time'}
+                          </span>
+                        </button>
+                        {!scheduleForm.start_time && (
+                          <p className="mt-1 text-xs text-neutral-400">Tap to set start time</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-neutral-700 mb-1">End Time</label>
-                        <input
-                          type="time"
-                          value={scheduleForm.end_time}
-                          onChange={(e) => setScheduleForm({ ...scheduleForm, end_time: e.target.value })}
-                          className="block w-full rounded-lg border border-neutral-300 bg-white py-2 px-3 text-sm text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600/20"
-                        />
+                        <button
+                          type="button"
+                          onClick={() => setEndTimePickerOpen(true)}
+                          disabled={!canEdit || isScheduleSaving || !scheduleForm.start_time}
+                          className={`w-full py-3 px-3 rounded-lg border border-neutral-300 bg-white text-left flex items-center justify-between text-sm text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                            !scheduleForm.end_time ? 'placeholder:text-neutral-400' : ''
+                          } ${!scheduleForm.start_time ? 'disabled' : ''}`}
+                        >
+                          <span className="truncate">
+                            {scheduleForm.end_time ? formatTime(scheduleForm.end_time) : 'Select end time'}
+                          </span>
+                        </button>
+                        {!scheduleForm.end_time && scheduleForm.start_time && (
+                          <p className="mt-1 text-xs text-neutral-400">Tap to set end time</p>
+                        )}
                       </div>
                     </div>
                     <button
@@ -1007,6 +1041,37 @@ export default function DoctorProfile() {
             />
           </div>
         </div>
+      )}
+
+      {/* Start Time Picker */ }
+      {startTimePickerOpen && (
+        <TimePicker
+          isOpen={startTimePickerOpen}
+          onClose={() => setStartTimePickerOpen(false)}
+          onConfirm={(time) => {
+            setScheduleForm({ ...scheduleForm, start_time: time });
+            if (scheduleForm.end_time && scheduleForm.end_time <= time) {
+              setScheduleForm({ ...scheduleForm, end_time: '' });
+            }
+            setStartTimePickerOpen(false);
+            setToastError('');
+          }}
+          initialTime={scheduleForm.start_time || undefined}
+        />
+      )}
+
+      {/* End Time Picker */ }
+      {endTimePickerOpen && (
+        <TimePicker
+          isOpen={endTimePickerOpen}
+          onClose={() => setEndTimePickerOpen(false)}
+          onConfirm={(time) => {
+            setScheduleForm({ ...scheduleForm, end_time: time });
+            setEndTimePickerOpen(false);
+            setToastError('');
+          }}
+          initialTime={scheduleForm.end_time || undefined}
+        />
       )}
     </div>
   );
