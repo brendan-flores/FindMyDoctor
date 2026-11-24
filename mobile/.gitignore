@@ -54,3 +54,8 @@ app.*.map.json
 
 # Local development configuration (each developer sets their own IP)
 lib/core/config/local_config.dart
+
+# Signing keys (never commit)
+key.properties
+*.jks
+*.keystore
