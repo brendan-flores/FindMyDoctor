@@ -1,6 +1,6 @@
 import express from 'express';
 import request from 'supertest';
-import { createRateLimiter, isSensitiveAuthPath } from './rateLimit';
+import { createRateLimiter, isConsultationIssueRequest, isSensitiveAuthPath } from './rateLimit';
 
 function makeApp(limiter: express.RequestHandler) {
   const app = express();
@@ -70,5 +70,45 @@ describe('auth limiter scoping', () => {
     for (let i = 0; i < 10; i += 1) {
       await request(app).get('/api/v1/doctors').expect(200);
     }
+  });
+});
+
+describe('consultation issue rate-limit exemption', () => {
+  function makeApiApp() {
+    const app = express();
+    // Mirror production: apiLimiter is mounted at /api/ so req.path inside
+    // the limiter is relative to that mount point.
+    app.use('/api/', createRateLimiter({
+      windowMs: 60_000,
+      max: 1,
+      message: 'slow down',
+      skip: (req) => isConsultationIssueRequest(req),
+    }));
+    app.post('/api/v1/consultation/visits/:visitId/issue', (_req, res) => res.json({ ok: true }));
+    app.get('/api/v1/consultation/context', (_req, res) => res.json({ ok: true }));
+    return app;
+  }
+
+  it('never rate-limits the consultation issue endpoint', async () => {
+    const app = makeApiApp();
+
+    for (let i = 0; i < 5; i += 1) {
+      await request(app).post('/api/v1/consultation/visits/visit-1/issue').expect(200);
+    }
+  });
+
+  it('still rate-limits other consultation endpoints', async () => {
+    const app = makeApiApp();
+
+    await request(app).get('/api/v1/consultation/context').expect(200);
+    await request(app).get('/api/v1/consultation/context').expect(429);
+  });
+
+  it('does not exempt lookalike paths or non-POST methods', async () => {
+    const app = makeApiApp();
+    app.get('/api/v1/consultation/visits/:visitId/issue', (_req, res) => res.json({ ok: true }));
+
+    await request(app).get('/api/v1/consultation/visits/visit-1/issue').expect(200);
+    await request(app).get('/api/v1/consultation/visits/visit-1/issue').expect(429);
   });
 });

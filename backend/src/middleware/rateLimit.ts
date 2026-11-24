@@ -24,6 +24,25 @@ export function isSensitiveAuthPath(req: Request): boolean {
 }
 
 /**
+ * Issuing a consultation is a low-frequency, doctor-only action that must
+ * never be blocked by the general per-IP budget: a single consultation
+ * session generates many autosave/context requests, so the shared budget
+ * could already be exhausted when the doctor clicks Issue. The route still
+ * requires authentication and the DOCTOR role inside the consultation
+ * router, so skipping the IP budget does not weaken authorization.
+ *
+ * apiLimiter is mounted at /api/, so req.path is relative to that mount
+ * point (e.g. /v1/consultation/visits/<id>/issue).
+ */
+const CONSULTATION_ISSUE_PATH = new RegExp(
+  `^/${config.app.apiVersion}/consultation/visits/[^/]+/issue$`
+);
+
+export function isConsultationIssueRequest(req: Request): boolean {
+  return req.method === 'POST' && CONSULTATION_ISSUE_PATH.test(req.path);
+}
+
+/**
  * Seconds until the current rate-limit window resets. Uses the value computed
  * by express-rate-limit when available so the header matches the limiter's
  * own window accounting.
@@ -72,6 +91,7 @@ export const apiLimiter = createRateLimiter({
   windowMs: config.rateLimit.windowMs,
   max: config.rateLimit.maxRequests,
   message: 'Too many requests from this IP, please try again later.',
+  skip: (req) => isConsultationIssueRequest(req),
 });
 
 /** Strict budget for login, OTP, registration, and password-change routes. */
