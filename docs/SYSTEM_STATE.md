@@ -274,8 +274,9 @@ Current System State (November 2026):
 
 ## API Rate Limiting and Read Performance
 
-- General API budget: `RATE_LIMIT_MAX_REQUESTS` (default 300) per `RATE_LIMIT_WINDOW_MS` (default 60,000 ms) per IP.
-- Sensitive authentication budget: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default 30) per `AUTH_RATE_LIMIT_WINDOW_MS` (default 900,000 ms) per IP, covering login, login OTP verify/resend, registration, patient OTP, and password change. Sensitive routes also count against the general budget, so the stricter limit applies.
+- General API budget: `RATE_LIMIT_MAX_REQUESTS` (default 600) per `RATE_LIMIT_WINDOW_MS` (default 60,000 ms) per IP.
+- Sensitive authentication budget: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default 60) per `AUTH_RATE_LIMIT_WINDOW_MS` (default 900,000 ms) per IP, covering login, login OTP verify/resend, registration, patient OTP, and password change. Sensitive routes also count against the general budget, so the stricter limit applies.
+- `POST /api/v1/consultation/visits/:visitId/issue` is exempt from the general API budget so consultation autosave/context traffic cannot block issuing; it remains authenticated and doctor-only.
 - `429` responses include a `Retry-After` header and `{ success: false, error: { code: "RATE_LIMIT", message } }`; `OPTIONS` pre-flight requests are skipped.
 - Implemented in `backend/src/middleware/rateLimit.ts` and mounted in `backend/src/index.ts`. Rate limiting is additional to token and role checks, not a replacement.
 - Availability range reads without a patient identity are cached for `AVAILABILITY_CACHE_TTL_MS` (default 20,000 ms) in `backend/src/modules/availability/availabilityService.ts`. The cache is invalidated by successful non-GET requests through the doctors, secretaries, appointments, and walk-ins routers and is never used for patient-specific reads.
@@ -530,7 +531,7 @@ Current System State (November 2026):
 - The workspace is available when the secretary has moved the appointment's queue entry to `IN_CHECKUP`. The doctor never changes queue status.
 - `POST /api/v1/consultation/appointments/:appointmentId/start` creates the draft visit exactly once per appointment (idempotent; safe to call on every load) and reopens an existing draft or issued visit.
 - Draft visit fields and the prescription draft (`visits.prescription_draft jsonb`) autosave through `PATCH /api/v1/consultation/visits/:visitId/draft`. Autosave sends `baseUpdatedAt`; if another tab saved first, the endpoint returns HTTP 409 and the UI warns the doctor and offers "Reload latest" so edits are never silently lost.
-- Finishing opens a read-only review with "Back to edit" and "Issue".
+- Finishing opens a read-only review with "Back to edit" and "Issue". Finish is disabled until the patient's date of birth and sex are complete (the missing-information prompt is shown in both edit and review modes) and a reason for visit is entered; Issue repeats the same guard.
 - `POST /api/v1/consultation/visits/:visitId/issue` requires a reason for visit and the patient's date of birth and sex (so the PDF can print age and sex). It finalizes the visit (`status = 'ISSUED'`, `issued_at`, `doctor_finished_at`), creates a prescription only when at least one medication has a name, generates the PDF, and sends a generic prescription notification with no clinical details.
 - Issuing commits the visit and prescription before the PDF is generated; if PDF generation fails the issued record stands and the workspace offers a PDF retry.
 - A consultation may be issued with no prescription; no prescription row is created in that case.

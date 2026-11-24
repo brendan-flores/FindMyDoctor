@@ -586,6 +586,7 @@ Rules:
 - The draft is created once per appointment and reopens on later visits. Drafts are never visible to patients or secretaries.
 - Autosave uses optimistic concurrency; a second tab receives a conflict and must reload before saving, so edits are never silently lost.
 - Issuing requires the patient's date of birth and sex, and a reason for visit. The PDF prints age, sex, and the doctor's PRC license number when present.
+- The review step (Finish) is unavailable until the patient's date of birth and sex are complete and a reason for visit is entered. The missing-information prompt is shown in both edit and review modes so the doctor can complete it before reviewing; Issue keeps the same guard as a final check.
 - A prescription is created only when at least one medication is present. A consultation may be issued without a prescription.
 - Prescriptions are never edited or deleted. Voiding requires a reason; a replacement is a new prescription linked to the voided one.
 - Patients see only `ISSUED` prescriptions. Voided and replaced prescriptions stay in the doctor's history.
@@ -1284,9 +1285,10 @@ Do not:
 ### API Rate Limiting, Retries, and Read Caching
 
 **Backend budgets** (`backend/src/middleware/rateLimit.ts`, mounted in `backend/src/index.ts`):
-- General API: `RATE_LIMIT_MAX_REQUESTS` (default 300) per `RATE_LIMIT_WINDOW_MS` (default 60,000 ms) per IP, mounted on `/api/`.
-- Sensitive authentication: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default 30) per `AUTH_RATE_LIMIT_WINDOW_MS` (default 900,000 ms) per IP, mounted on `/api/v1` and skipped for non-auth paths. It covers `/auth/login`, `/auth/verify-login-otp`, `/auth/resend-login-otp`, `/auth/otp`, `/auth/patient/otp`, `/auth/register`, and `/auth/change-password`.
+- General API: `RATE_LIMIT_MAX_REQUESTS` (default 600) per `RATE_LIMIT_WINDOW_MS` (default 60,000 ms) per IP, mounted on `/api/`.
+- Sensitive authentication: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default 60) per `AUTH_RATE_LIMIT_WINDOW_MS` (default 900,000 ms) per IP, mounted on `/api/v1` and skipped for non-auth paths. It covers `/auth/login`, `/auth/verify-login-otp`, `/auth/resend-login-otp`, `/auth/otp`, `/auth/patient/otp`, `/auth/register`, and `/auth/change-password`.
 - Sensitive routes are counted by both limiters, so the stricter auth budget is the effective one.
+- `POST /api/v1/consultation/visits/:visitId/issue` is exempt from the general API budget so a consultation session's autosave/context traffic cannot block issuing. It remains authenticated and doctor-only; only the per-IP budget is skipped.
 - Every `429` includes `Retry-After` (seconds) and the standard error envelope with code `RATE_LIMIT`. `OPTIONS` pre-flight requests are skipped.
 - Rate limiting never replaces authentication or authorization; protected routes still validate the token and role on every request.
 

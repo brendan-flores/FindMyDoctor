@@ -2507,9 +2507,10 @@ Dashboard navigation must not exhaust rate limits or duplicate reads. The behavi
 ### Backend Rate Limits
 
 - `backend/src/middleware/rateLimit.ts` exports `createRateLimiter`, `apiLimiter`, and `authLimiter`.
-- General API: `RATE_LIMIT_MAX_REQUESTS` (default `300`) per `RATE_LIMIT_WINDOW_MS` (default `60000`) per IP, mounted on `/api/`.
-- Sensitive authentication: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default `30`) per `AUTH_RATE_LIMIT_WINDOW_MS` (default `900000`) per IP, mounted on `/api/v1` and skipped for non-auth paths. Covered paths: `/auth/login`, `/auth/verify-login-otp`, `/auth/resend-login-otp`, `/auth/otp`, `/auth/patient/otp`, `/auth/register`, `/auth/change-password`.
+- General API: `RATE_LIMIT_MAX_REQUESTS` (default `600`) per `RATE_LIMIT_WINDOW_MS` (default `60000`) per IP, mounted on `/api/`.
+- Sensitive authentication: `AUTH_RATE_LIMIT_MAX_REQUESTS` (default `60`) per `AUTH_RATE_LIMIT_WINDOW_MS` (default `900000`) per IP, mounted on `/api/v1` and skipped for non-auth paths. Covered paths: `/auth/login`, `/auth/verify-login-otp`, `/auth/resend-login-otp`, `/auth/otp`, `/auth/patient/otp`, `/auth/register`, `/auth/change-password`.
 - Sensitive routes count against both budgets, so the stricter auth budget applies.
+- `POST /api/v1/consultation/visits/:visitId/issue` is exempt from the general API budget (`isConsultationIssueRequest` in `rateLimit.ts`) so issuing a consultation is never blocked by the autosave/context traffic of a single consultation session. The route remains authenticated and restricted to the `DOCTOR` role; only the per-IP budget is skipped.
 - `429` responses carry `Retry-After` (seconds) and `{ success: false, error: { code: "RATE_LIMIT", message } }`.
 - `OPTIONS` requests do not consume either budget.
 - Rate limiting is additive to authentication/authorization; protected routes still validate token and role on every request.
