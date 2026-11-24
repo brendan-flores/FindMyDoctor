@@ -1240,7 +1240,7 @@ Session behavior is defined once in `backend/src/modules/auth/sessionPolicy.ts`.
 - **Untrusted browser or trust declined:** 7-hour access token, 8-hour refresh token, 8-hour idle timeout, browser-session cookies, no trusted browser, OTP on every login when 2FA is enabled.
 - **Trusted device:** 7-day access token, 30-day refresh token/session, persistent cookies, trusted browser for 30 days. OTP is skipped on later logins from that browser when 2FA is enabled; the password is always required.
 - Login forms do not include a Remember Me checkbox.
-- After full authentication, an untrusted browser is shown a device-trust page with browser/OS details and "Trust this device" / "Do not trust this device". Trusting registers the browser and upgrades the current session; declining keeps the short session.
+- After full authentication, an untrusted browser is shown a device-trust page with browser/OS details and "Trust this device" / "Do not trust this device" — only when the login leads into the portal dashboard. Corrective flows skip the prompt: a REJECTED doctor or PENDING doctor with an unsubmitted profile goes straight to `/doctor-profile`, and a secretary re-login immediately after a temporary-password change goes straight to `/secretary/dashboard` because the first login already consumed the prompt (password change takes precedence over it). Trusting registers the browser and upgrades the current session; declining keeps the short session.
 - The trust decision never bypasses the OTP required for the current login. `verify-login-otp` always issues a short untrusted session and the trust prompt is shown afterwards.
 - A valid trusted-device cookie skips OTP and the prompt on later logins.
 
