@@ -1,8 +1,12 @@
-import 'dart:io' show Platform, PlatformException;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 import '../config/local_config.dart';
 
 class ApiConstants {
+  // Production backend (Render). Used automatically in release builds.
+  static const String _productionBaseUrl =
+      'https://findmydoctor-api.onrender.com/api/v1';
+
   // For development on emulator, use localhost
   // For real device testing, use your computer's IP address
   // Example: static const String baseUrl = 'http://192.168.1.100:3000/api/v1';
@@ -11,7 +15,12 @@ class ApiConstants {
   static const String _emulatorBaseUrl = 'http://10.0.2.2:3000/api/v1';
 
   static String get baseUrl {
-    // Auto-detect platform and use appropriate base URL
+    // Release builds always point at the production Render backend.
+    if (kReleaseMode) {
+      return _productionBaseUrl;
+    }
+
+    // Debug builds use local development configuration.
     try {
       // Web platform
       if (kIsWeb) {
