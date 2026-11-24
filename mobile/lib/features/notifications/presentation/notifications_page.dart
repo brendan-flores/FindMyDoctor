@@ -359,13 +359,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         final isWaitlistNotification =
                             type == 'WAITLIST_UPDATE';
                         final isAppointmentNotification =
+                            type == 'APPOINTMENT_CONFIRMED' ||
                             type == 'APPOINTMENT_CANCELLED' ||
                             type == 'APPOINTMENT_RESCHEDULED' ||
                             type == 'SCHEDULE_CHANGE_NOTICE';
                         final isPrescriptionNotification =
-                            type == 'PRESCRIPTION_AVAILABLE';
+                            type == 'PRESCRIPTION_AVAILABLE' ||
+                            type == 'PRESCRIPTION_UPDATED';
                         final isInvoiceNotification =
                             type == 'INVOICE_AVAILABLE';
+                        final isQueueNotification = type == 'QUEUE_UPDATED';
+                        final isMessageNotification =
+                            type == 'NEW_SECRETARY_MESSAGE' ||
+                            type == 'NEW_PATIENT_MESSAGE';
 
                         return Card(
                           margin: EdgeInsets.only(
@@ -399,6 +405,32 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     context,
                                     '/appointment-detail',
                                     arguments: {'appointmentId': appointmentId},
+                                  );
+                                }
+                                return;
+                              }
+
+                              // Queue reassignment notifications open the
+                              // appointments tab where the live queue is shown.
+                              if (isQueueNotification) {
+                                Navigator.pushNamed(context, '/home');
+                                return;
+                              }
+
+                              // Secretary/patient message notifications open the
+                              // related conversation thread.
+                              if (isMessageNotification) {
+                                final conversationId =
+                                    notification['related_entity_id']
+                                        ?.toString();
+                                if (conversationId != null &&
+                                    conversationId.isNotEmpty) {
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/conversation-thread',
+                                    arguments: {
+                                      'conversationId': conversationId,
+                                    },
                                   );
                                 }
                                 return;
