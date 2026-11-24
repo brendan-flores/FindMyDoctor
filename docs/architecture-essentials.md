@@ -57,7 +57,7 @@ Do not invent roles without changing the project requirements.
 
 ### Clinic and Consultation Operations Boundary
 
-Clinic and consultation operations belong to doctors and authorized secretaries. Doctors alone may create, edit, or delete weekly working hours. Secretaries may view weekly working hours and may manage exceptions, break periods, and daily capacity only for their assigned doctor. `ADMIN` and `SUPERADMIN` roles are limited to platform, account, and approval oversight and must not receive permissions to manage schedules, availability, break periods, daily capacity, reservations, queues, payment verification, or consultation records.
+Clinic and consultation operations belong to doctors and authorized secretaries. Doctors alone may create, edit, or delete weekly working hours. Secretaries may view weekly working hours and may manage exceptions, break periods, and daily capacity only for their assigned doctor; these changes apply directly with no approval step. `ADMIN` and `SUPERADMIN` roles are limited to platform, account, and approval oversight and must not receive permissions to manage schedules, availability, break periods, daily capacity, reservations, queues, payment verification, or consultation records.
 
 ---
 
@@ -1022,17 +1022,17 @@ Use the `/api/v1/secretaries/managed-doctors/...` API convention:
 - `GET /schedules` for read-only weekly working hours.
 - `GET`, `POST`, `PUT`, and `DELETE` for `/unavailability` and `/break-periods`.
 
-Exception and break-period writes that affect active future appointments return HTTP 202 with a schedule-change request summary instead of applying; such changes take effect only after the secretary confirms via `POST /api/v1/schedule-changes/:id/confirm` (SECRETARY-only, scoped to the caller's assigned doctor; confirm is transactional with the request row locked). Changes that affect no appointments apply immediately as before. Secretary break-period proposals intentionally keep the secretary validation profile (they are not required to fall within working hours and are not overlap-checked against other breaks, unlike doctor proposals) — only the doctor-side endpoints enforce those rules; both roles are subject to the new checks (duplicate/overlapping pending requests → 409, stale target at confirm → 409 and the request stays PENDING). Doctors can view their own pending requests read-only via `GET /api/v1/doctors/me/schedule-change-requests`.
+Exception and break-period writes apply immediately for both doctors and secretaries — there is no approval step. When a CREATE or UPDATE affects active future appointments, the change still applies and the affected appointments are flagged `needs_attention` with reason `SCHEDULE_CHANGE`; each affected patient receives a `SCHEDULE_CHANGE_NOTICE` notification that opens the appointment, plus a best-effort push with generic text. DELETE restores availability and does not flag or notify. Secretary break-period proposals intentionally keep the secretary validation profile (they are not required to fall within working hours and are not overlap-checked against other breaks, unlike doctor proposals) — only the doctor-side endpoints enforce those rules.
 
 Apply the doctor schedule validation rules: start <= end, breaks must fall within working hours, and breaks must not overlap (doctor-side enforcement; the secretary endpoints keep their existing validation behavior).
 
-When an exception or break-period change affects dates with active appointments, the change is saved as a PENDING request and the secretary confirms it on `/secretary/dashboard` (Schedule Alerts) before it takes effect. Affected appointments remain active but are flagged `needs_attention` and shown as "Needs attention"/"Awaiting secretary confirmation" in the UIs; each affected patient receives a `SCHEDULE_CHANGE_NOTICE` notification that opens the appointment. Do not automatically cancel affected appointments; the secretary handles them through existing cancellation and rescheduling flows.
+When an exception or break-period change affects dates with active appointments, the change is saved immediately and the affected appointments remain active but are flagged `needs_attention` and shown as "Needs attention" in the UIs; each affected patient receives a `SCHEDULE_CHANGE_NOTICE` notification that opens the appointment. Do not automatically cancel affected appointments; the secretary handles them through existing cancellation and rescheduling flows.
 
 Do not:
 - Allow a Secretary to create, edit, or delete weekly working hours
 - Allow a Secretary to manage a schedule, exception, break period, or capacity outside their assigned Doctor
 - Return a successful response for unauthorized schedule access; return 404
-- Save an appointment-impacting exception or break-period change without explicit confirmation
+- Apply an exception or break-period change without flagging newly affected appointments and notifying their patients
 - Automatically cancel appointments affected by a confirmed schedule change
 - Allow ADMIN or SUPERADMIN to manage schedules, availability, breaks, or capacity
 

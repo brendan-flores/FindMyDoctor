@@ -1934,18 +1934,11 @@ PUT    /secretaries/managed-doctors/break-periods/:id
 DELETE /secretaries/managed-doctors/break-periods/:id
 ```
 
-Secretary schedule endpoints use the `secretaries.doctor_id` ownership check. Weekly schedules are read-only for secretaries. Exception and break-period writes that affect active future appointments do not apply; they are saved as PENDING `schedule_change_requests` and returned with HTTP 202 (a clearly distinguishable pending response), and the change takes effect only after the secretary confirms via `POST /schedule-changes/:id/confirm`. Changes that affect no appointments apply immediately as before. Doctor-equivalent endpoints behave the same (`/doctors/me/unavailability`, `/doctors/me/break-periods`); the doctor-side versions validate break periods against working hours and same-date overlaps exactly as before, and the secretary-side versions keep their existing validation (no working-hours or same-date overlap enforcement) by design in this release.
+Secretary schedule endpoints use the `secretaries.doctor_id` ownership check. Weekly schedules are read-only for secretaries. Exception and break-period writes apply immediately for both roles (`/doctors/me/unavailability`, `/doctors/me/break-periods`, and the secretary `managed-doctors` equivalents); there is no approval step. When a CREATE or UPDATE affects active future appointments, the affected appointments are flagged `needs_attention` with reason `SCHEDULE_CHANGE` and each affected patient receives a `SCHEDULE_CHANGE_NOTICE` notification plus a best-effort push; appointments are never cancelled or rescheduled automatically. DELETE restores availability and does not flag or notify. The doctor-side versions validate break periods against working hours and same-date overlaps; the secretary-side versions keep their existing validation (no working-hours or same-date overlap enforcement).
 
-### Schedule-Change Confirmation
+### Schedule-Change Notifications
 
-```text
-GET  /schedule-changes
-POST /schedule-changes/:id/confirm
-POST /schedule-changes/:id/dismiss
-GET  /doctors/me/schedule-change-requests   (doctor read-only, own requests)
-```
-
-All three `/schedule-changes` endpoints are SECRETARY-only and scoped to the caller's assigned doctor; other roles, and secretaries of another doctor, receive the standard 403 authorization error. `GET /schedule-changes` returns the assigned doctor's PENDING requests (pending only, newest first, doctor name, requester name and role, affected appointment count and identifiers — no patient personal data beyond count and ids). `POST /:id/confirm` runs in a single transaction with the request row locked `FOR UPDATE`: it verifies the request is still PENDING, re-validates the change against the current schedule (target must exist and match the snapshot, otherwise a 409 conflict is returned and the request stays PENDING), applies the change, recomputes the affected set against current appointment data, flags affected appointments `needs_attention = true` with reason `SCHEDULE_CHANGE` (no appointment is cancelled or rescheduled), creates one `SCHEDULE_CHANGE_NOTICE` per affected patient linked to the appointment, marks the request CONFIRMED with `resolved_at`/`resolved_by`, and only afterwards invalidates the availability cache and sends best-effort pushes with generic text. `POST /:id/dismiss` marks the request DISMISSED; the change stays unapplied and no patient is notified. Confirm and dismiss never run twice; the second of the two is rejected with 409. The doctor read-only list endpoint allows `/doctor/schedule` to display the doctor's own pending changes.
+There are no schedule-change request endpoints; exception and break-period writes apply directly inside their own transactions. After a successful CREATE or UPDATE, the backend computes the appointments newly in conflict with the change (active statuses `SCHEDULED`/`CONFIRMED`/`IN_PROGRESS`, clinic date today or later; UPDATE counts only the newly covered set), flags them `needs_attention = true` with reason `SCHEDULE_CHANGE`, creates one `SCHEDULE_CHANGE_NOTICE` per affected patient linked to the appointment, commits, and then sends best-effort pushes with generic text. The `schedule_change_requests` table is retained for historical audit only; no new rows are written.
 
 ### Queue
 

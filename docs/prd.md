@@ -334,7 +334,7 @@ The final allowed capacity is the effective maximum used for the daily queue.
 
 Doctors may create, edit, and delete weekly working hours, exceptions, and break periods. Secretaries may view weekly working hours but may not create, edit, or delete them. A secretary may add, edit, and delete date-specific exceptions and break periods only for their assigned doctor, and may configure capacity for that doctor.
 
-Schedule changes must follow the doctor schedule validation rules: start <= end, breaks must fall within working hours, and breaks must not overlap. Before saving an exception or break-period change that affects dates with active appointments, the system must show the secretary or doctor the number of affected appointments and require explicit confirmation. After confirmation, the change is saved and affected patients are notified through the notification module. Appointments are not automatically cancelled; the secretary handles them through the existing cancel and reschedule flows.
+Schedule changes must follow the doctor schedule validation rules: start <= end, breaks must fall within working hours, and breaks must not overlap. Exception and break-period changes apply immediately for both doctors and secretaries — there is no approval step. When a change affects dates with active appointments, the affected appointments are flagged for attention and affected patients are notified through the notification module. Appointments are not automatically cancelled; the secretary handles them through the existing cancel and reschedule flows.
 
 When creating a new exception or break period, the date picker must not allow past dates and submission must be rejected with a validation error if a past date is somehow submitted. This restriction applies only to creation; editing an existing record may use past or current dates. Exception and break-period lists and tab counters show only records dated today or later.
 
@@ -1242,7 +1242,7 @@ The web and mobile applications shall standardize Philippine phone-number entry 
 
 ### Secretary — Schedule Changes
 
-**As a secretary,** I want to view my assigned doctor's weekly working hours and manage date-specific exceptions and break periods, with confirmation when active appointments are affected, so that I can help with day-to-day schedule changes without changing the doctor's weekly commitment.
+**As a secretary,** I want to view my assigned doctor's weekly working hours and manage date-specific exceptions and break periods that apply directly, so that I can help with day-to-day schedule changes without changing the doctor's weekly commitment.
 
 ### Doctor — Capacity
 
