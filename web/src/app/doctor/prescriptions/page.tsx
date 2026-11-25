@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { doctorApi, Prescription, Patient } from '@/lib/api/doctorApi';
 import { usePresence } from '@/hooks/usePresence';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function DoctorPrescriptions() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function DoctorPrescriptions() {
   const [error, setError] = useState<string | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
+  const [infoDialog, setInfoDialog] = useState<{ title: string; message: string } | null>(null);
   const viewModalOpen = showViewModal && !!selectedPrescription;
   const viewModalPresent = usePresence(viewModalOpen);
 
@@ -87,10 +89,13 @@ export default function DoctorPrescriptions() {
       if (response.success && response.data?.signedUrl) {
         window.open(response.data.signedUrl, '_blank');
       } else {
-        alert(response.error || 'Failed to generate PDF');
+        setInfoDialog({
+          title: 'Unable to generate PDF',
+          message: response.error || 'Failed to generate PDF',
+        });
       }
     } catch (err) {
-      alert('Network error occurred');
+      setInfoDialog({ title: 'Network error', message: 'Network error occurred' });
     }
   };
 
@@ -107,10 +112,13 @@ export default function DoctorPrescriptions() {
         anchor.remove();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       } else {
-        alert(response.error || 'Failed to download PDF');
+        setInfoDialog({
+          title: 'Unable to download PDF',
+          message: response.error || 'Failed to download PDF',
+        });
       }
     } catch (err) {
-      alert('Network error occurred');
+      setInfoDialog({ title: 'Network error', message: 'Network error occurred' });
     }
   };
 
@@ -394,6 +402,15 @@ export default function DoctorPrescriptions() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={infoDialog !== null}
+        mode="info"
+        title={infoDialog?.title ?? ''}
+        message={infoDialog?.message ?? ''}
+        onConfirm={() => setInfoDialog(null)}
+        onCancel={() => setInfoDialog(null)}
+      />
     </div>
   );
 }

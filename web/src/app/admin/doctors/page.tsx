@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { adminApi, Doctor, DoctorSchedule } from '@/lib/api/adminApi';
 import Select from '@/components/ui/Select';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { usePresence } from '@/hooks/usePresence';
 
 export default function DoctorManagement() {
@@ -20,6 +21,9 @@ export default function DoctorManagement() {
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [infoDialog, setInfoDialog] = useState<{ title: string; message: string } | null>(null);
 
   const detailModalOpen = showDetailModal && !!selectedDoctor;
   const deactivateModalOpen = showDeactivateModal && !!selectedDoctor;
@@ -48,13 +52,12 @@ export default function DoctorManagement() {
     }
   };
 
-  const handleApproveDoctor = async (doctorId: string) => {
-    if (!confirm('Are you sure you want to approve this doctor account? Once confirmed, the doctor will be authorized to sign in and access the Doctor Dashboard.')) {
-      return;
-    }
+  const handleApproveDoctor = async () => {
+    if (!selectedDoctor) return;
 
+    setIsApproving(true);
     try {
-      const response = await adminApi.approveDoctor(doctorId);
+      const response = await adminApi.approveDoctor(selectedDoctor.id);
       if (response.success) {
         loadDoctors();
         setShowDetailModal(false);
@@ -62,6 +65,9 @@ export default function DoctorManagement() {
       }
     } catch (error) {
       console.error('Failed to approve doctor:', error);
+    } finally {
+      setIsApproving(false);
+      setShowApproveConfirm(false);
     }
   };
 
@@ -96,7 +102,10 @@ export default function DoctorManagement() {
 
   const confirmRejectDoctor = async () => {
     if (!rejectionReason || rejectionReason.trim() === '') {
-      alert('Rejection reason is required. Please provide a reason for rejecting this doctor.');
+      setInfoDialog({
+        title: 'Rejection reason required',
+        message: 'Please provide a reason for rejecting this doctor.',
+      });
       return;
     }
 
@@ -663,7 +672,7 @@ export default function DoctorManagement() {
                     Reject
                   </button>
                   <button
-                    onClick={() => handleApproveDoctor(selectedDoctor.id)}
+                    onClick={() => setShowApproveConfirm(true)}
                     className="px-5 py-2.5 text-sm font-semibold text-success-700 bg-white hover:bg-success-50 border border-success-300 rounded-lg transition-colors shadow-md"
                   >
                     Approve
@@ -802,6 +811,26 @@ export default function DoctorManagement() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={showApproveConfirm && selectedDoctor !== null}
+        title="Approve doctor?"
+        message="Are you sure you want to approve this doctor account? Once confirmed, the doctor will be authorized to sign in and access the Doctor Dashboard."
+        confirmLabel="Approve"
+        confirmVariant="primary"
+        busy={isApproving}
+        onConfirm={() => void handleApproveDoctor()}
+        onCancel={() => setShowApproveConfirm(false)}
+      />
+
+      <ConfirmDialog
+        open={infoDialog !== null}
+        mode="info"
+        title={infoDialog?.title ?? ''}
+        message={infoDialog?.message ?? ''}
+        onConfirm={() => setInfoDialog(null)}
+        onCancel={() => setInfoDialog(null)}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { authApi, type TrustedBrowser } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
 import { describeDevice } from '@/lib/deviceInfo';
+import { usePresenceValue } from '@/hooks/usePresence';
 import Toast from '@/components/ui/Toast';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
@@ -43,6 +44,8 @@ export default function TrustedBrowsersCard({ confirmDialogs = true }: TrustedBr
   const [isSigningOutAll, setIsSigningOutAll] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const revokeTarget = confirm?.kind === 'revoke' ? confirm : null;
+  const { value: revokeValue } = usePresenceValue(revokeTarget);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -212,35 +215,35 @@ export default function TrustedBrowsersCard({ confirmDialogs = true }: TrustedBr
         )}
       </div>
 
-      {confirm?.kind === 'revoke' && (
-        <ConfirmDialog
-          open
-          title="Revoke trusted browser"
-          message={
-            confirm.browser.is_current
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        title="Revoke trusted browser"
+        message={
+          revokeValue
+            ? revokeValue.browser.is_current
               ? 'Revoke your current browser? You will need to enter a verification code the next time you sign in.'
               : 'Revoke trust for this browser? It will need a verification code the next time it signs in.'
-          }
-          confirmLabel="Revoke"
-          confirmVariant="danger"
-          busy={busyId === confirm.browser.id}
-          onConfirm={() => handleRevoke(confirm.browser)}
-          onCancel={() => setConfirm(null)}
-        />
-      )}
+            : ''
+        }
+        confirmLabel="Revoke"
+        confirmVariant="danger"
+        busy={revokeValue !== null && busyId === revokeValue.browser.id}
+        onConfirm={() => {
+          if (revokeValue) void handleRevoke(revokeValue.browser);
+        }}
+        onCancel={() => setConfirm(null)}
+      />
 
-      {confirm?.kind === 'signOutAll' && (
-        <ConfirmDialog
-          open
-          title="Sign out everywhere?"
-          message="You will need to sign in again on every device."
-          confirmLabel="Sign out all devices"
-          confirmVariant="danger"
-          busy={isSigningOutAll}
-          onConfirm={handleSignOutAll}
-          onCancel={() => setConfirm(null)}
-        />
-      )}
+      <ConfirmDialog
+        open={confirm?.kind === 'signOutAll'}
+        title="Sign out everywhere?"
+        message="You will need to sign in again on every device."
+        confirmLabel="Sign out all devices"
+        confirmVariant="danger"
+        busy={isSigningOutAll}
+        onConfirm={handleSignOutAll}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { doctorApi, Patient, Visit, Prescription } from '@/lib/api/doctorApi';
 import { usePresence } from '@/hooks/usePresence';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function PatientDetails() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function PatientDetails() {
   const [isEditingVisit, setIsEditingVisit] = useState(false);
   const [editVisitError, setEditVisitError] = useState<string | null>(null);
   const [showPatientNotified, setShowPatientNotified] = useState(false);
+  const [infoDialog, setInfoDialog] = useState<{ title: string; message: string } | null>(null);
 
   const [visitFormData, setVisitFormData] = useState({
     reasonForVisit: '',
@@ -147,10 +149,13 @@ export default function PatientDetails() {
       if (response.success && response.data?.signedUrl) {
         window.open(response.data.signedUrl, '_blank');
       } else {
-        alert(response.error || 'Failed to generate PDF');
+        setInfoDialog({
+          title: 'Unable to generate PDF',
+          message: response.error || 'Failed to generate PDF',
+        });
       }
     } catch (err) {
-      alert('Network error occurred');
+      setInfoDialog({ title: 'Network error', message: 'Network error occurred' });
     }
   };
 
@@ -167,10 +172,13 @@ export default function PatientDetails() {
         anchor.remove();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       } else {
-        alert(response.error || 'Failed to download PDF');
+        setInfoDialog({
+          title: 'Unable to download PDF',
+          message: response.error || 'Failed to download PDF',
+        });
       }
     } catch (err) {
-      alert('Network error occurred');
+      setInfoDialog({ title: 'Network error', message: 'Network error occurred' });
     }
   };
 
@@ -575,6 +583,15 @@ export default function PatientDetails() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={infoDialog !== null}
+        mode="info"
+        title={infoDialog?.title ?? ''}
+        message={infoDialog?.message ?? ''}
+        onConfirm={() => setInfoDialog(null)}
+        onCancel={() => setInfoDialog(null)}
+      />
     </div>
   );
 }

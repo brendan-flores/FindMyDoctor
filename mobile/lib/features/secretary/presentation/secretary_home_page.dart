@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_dialog.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
@@ -593,22 +594,12 @@ class _SecretaryHomePageState extends State<SecretaryHomePage> {
   }
 
   Future<void> _confirmLogout() async {
-    final shouldLogout = await AppNavigator.showAppDialog<bool>(
+    final shouldLogout = await AppDialogs.showConfirm(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to log out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Logout', style: TextStyle(color: AppColors.error)),
-          ),
-        ],
-      ),
+      title: 'Logout',
+      message: 'Are you sure you want to log out?',
+      confirmLabel: 'Logout',
+      tone: AppDialogTone.danger,
     );
 
     if (shouldLogout != true || !mounted) return;

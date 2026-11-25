@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
 import { usePresence } from '@/hooks/usePresence';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface Admin {
   id: string;
@@ -22,6 +23,27 @@ export default function AdminManagement() {
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [userRole, setUserRole] = useState<string>('');
   const createModalPresent = usePresence(showCreateModal);
+  const [infoDialog, setInfoDialog] = useState<{
+    title: string;
+    message: string;
+    onDismiss?: () => void;
+  } | null>(null);
+  const [deleteAdminId, setDeleteAdminId] = useState<string | null>(null);
+  const [isDeletingAdmin, setIsDeletingAdmin] = useState(false);
+
+  const showInfo = (
+    title: string,
+    message: string,
+    onDismiss?: () => void,
+  ) => {
+    setInfoDialog({ title, message, onDismiss });
+  };
+
+  const dismissInfoDialog = () => {
+    const onDismiss = infoDialog?.onDismiss;
+    setInfoDialog(null);
+    onDismiss?.();
+  };
 
   useEffect(() => {
     // Check authentication and role - use admin-scoped keys
@@ -38,8 +60,9 @@ export default function AdminManagement() {
 
     // Check if user is SUPERADMIN
     if (user.role !== 'SUPERADMIN') {
-      alert('Access denied. SUPERADMIN access required.');
-      router.push('/admin/login');
+      showInfo('Access denied', 'SUPERADMIN access required.', () =>
+        router.push('/admin/login'),
+      );
       return;
     }
 
@@ -60,11 +83,11 @@ export default function AdminManagement() {
         console.log('Admins set:', response.data);
       } else {
         console.error('Admin API error:', response.error);
-        alert(`Failed to fetch admins: ${response.error || 'Unknown error'}`);
+        showInfo('Error', `Failed to fetch admins: ${response.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error fetching admins:', error);
-      alert('Failed to fetch admins. Please check your connection.');
+      showInfo('Error', 'Failed to fetch admins. Please check your connection.');
     } finally {
       setIsLoading(false);
     }
@@ -80,12 +103,12 @@ export default function AdminManagement() {
     
     // Basic validation
     if (!newAdminEmail || !newAdminPassword) {
-      alert('Please fill in all fields');
+      showInfo('Missing information', 'Please fill in all fields');
       return;
     }
 
     if (newAdminPassword.length < 8) {
-      alert('Password must be at least 8 characters long');
+      showInfo('Invalid password', 'Password must be at least 8 characters long');
       return;
     }
 
@@ -101,14 +124,15 @@ export default function AdminManagement() {
         setShowCreateModal(false);
         setNewAdminEmail('');
         setNewAdminPassword('');
-        alert('Admin account created successfully!');
-        await fetchAdmins(); // Refresh the list
+        showInfo('Success', 'Admin account created successfully!', () => {
+          void fetchAdmins(); // Refresh the list after acknowledgement
+        });
       } else {
-        alert(`Failed to create admin: ${response.error || 'Unknown error'}`);
+        showInfo('Error', `Failed to create admin: ${response.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error creating admin:', error);
-      alert('Failed to create admin account. Please try again.');
+      showInfo('Error', 'Failed to create admin account. Please try again.');
     }
   };
 
@@ -121,36 +145,70 @@ export default function AdminManagement() {
       if (response.success) {
         await fetchAdmins(); // Refresh the list
       } else {
-        alert(response.error || 'Failed to update admin status');
+        showInfo('Error', response.error || 'Failed to update admin status');
       }
     } catch (error) {
       console.error('Error toggling admin status:', error);
-      alert('Failed to update admin status');
+      showInfo('Error', 'Failed to update admin status');
     }
   };
 
-  const handleDeleteAdmin = async (adminId: string) => {
-    if (!confirm('Are you sure you want to delete this admin account?')) return;
+  const handleDeleteAdmin = (adminId: string) => {
+    setDeleteAdminId(adminId);
+  };
 
+  const confirmDeleteAdmin = async () => {
+    if (!deleteAdminId) return;
+
+    setIsDeletingAdmin(true);
     try {
-      const response = await apiClient.delete(`/admin/admins/${adminId}`);
+      const response = await apiClient.delete(`/admin/admins/${deleteAdminId}`);
 
       if (response.success) {
         await fetchAdmins(); // Refresh the list
       } else {
-        alert(response.error || 'Failed to delete admin account');
+        showInfo('Error', response.error || 'Failed to delete admin account');
       }
     } catch (error) {
       console.error('Error deleting admin:', error);
-      alert('Failed to delete admin account');
+      showInfo('Error', 'Failed to delete admin account');
+    } finally {
+      setIsDeletingAdmin(false);
+      setDeleteAdminId(null);
     }
   };
 
+  const dialogElements = (
+    <>
+      <ConfirmDialog
+        open={infoDialog !== null}
+        mode="info"
+        title={infoDialog?.title ?? ''}
+        message={infoDialog?.message ?? ''}
+        onConfirm={dismissInfoDialog}
+        onCancel={dismissInfoDialog}
+      />
+      <ConfirmDialog
+        open={deleteAdminId !== null}
+        title="Delete admin account?"
+        message="Are you sure you want to delete this admin account?"
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        busy={isDeletingAdmin}
+        onConfirm={() => void confirmDeleteAdmin()}
+        onCancel={() => setDeleteAdminId(null)}
+      />
+    </>
+  );
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-neutral-600">Loading...</div>
-      </div>
+      <>
+        {dialogElements}
+        <div className="flex items-center justify-center h-64">
+          <div className="text-neutral-600">Loading...</div>
+        </div>
+      </>
     );
   }
 
@@ -293,6 +351,8 @@ export default function AdminManagement() {
           </div>
         </div>
       )}
+
+      {dialogElements}
     </div>
   );
 }

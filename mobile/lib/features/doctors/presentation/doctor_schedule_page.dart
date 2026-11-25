@@ -4,11 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
-import '../../../core/navigation/app_navigator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_dialog.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
@@ -1033,22 +1033,12 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
   Future<void> _joinWaitlist() async {
     if (_selectedDate == null) return;
 
-    final confirmed = await AppNavigator.showAppDialog<bool>(
+    final confirmed = await AppDialogs.showConfirm(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Join Waitlist'),
-        content: Text('Join waitlist for ${DateFormat('MMM dd, yyyy').format(_selectedDate!)}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Join'),
-          ),
-        ],
-      ),
+      title: 'Join Waitlist',
+      message:
+          'Join waitlist for ${DateFormat('MMM dd, yyyy').format(_selectedDate!)}?',
+      confirmLabel: 'Join',
     );
 
     if (confirmed == true) {
