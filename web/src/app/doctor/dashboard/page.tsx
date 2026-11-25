@@ -45,30 +45,48 @@ export default function DoctorDashboard() {
       apiClient.setToken(token);
 
       try {
-        const response = await doctorApi.getProfile({ signal: controller.signal });
+        // Fetch the profile (approval-status gate) and dashboard data in
+        // parallel instead of sequentially. Previously the dashboard request
+        // only started after the profile round trip finished, and the profile
+        // was also fetched by the layout. Parallel loading makes the initial
+        // dashboard load closer to max(profile, dashboard) rather than their sum.
+        const [profileResponse, dashboardResponse] = await Promise.all([
+          doctorApi.getProfile({ signal: controller.signal }),
+          doctorApi.getDashboard(undefined, { signal: controller.signal }),
+        ]);
 
         if (controller.signal.aborted) return;
 
-        if (response.success && response.data) {
-          const approvalStatus = response.data.approval_status;
+        if (profileResponse.success && profileResponse.data) {
+          const approvalStatus = profileResponse.data.approval_status;
 
           if (approvalStatus === 'ACTIVE') {
-            setProfile(response.data);
+            setProfile(profileResponse.data);
             setIsLoadingAuth(false);
-            // Load dashboard data from backend
-            loadDashboardData(controller.signal);
+            if (dashboardResponse.success && dashboardResponse.data) {
+              setDashboardData(dashboardResponse.data);
+            } else {
+              setDashboardError(dashboardResponse.error || 'Failed to load dashboard data');
+            }
+            setIsLoadingDashboard(false);
           } else if (approvalStatus === 'REJECTED') {
             router.push('/doctor-profile');
+            setIsLoadingAuth(false);
+            setIsLoadingDashboard(false);
           } else if (approvalStatus === 'PENDING') {
             // PENDING doctors who have not submitted their professional profile
             // must complete it instead of being signed out.
             router.push('/doctor-profile');
+            setIsLoadingAuth(false);
+            setIsLoadingDashboard(false);
           } else {
             localStorage.removeItem('token');
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('user');
             apiClient.clearToken();
             router.push('/doctor-login');
+            setIsLoadingAuth(false);
+            setIsLoadingDashboard(false);
           }
         } else {
           localStorage.removeItem('token');
@@ -76,6 +94,8 @@ export default function DoctorDashboard() {
           localStorage.removeItem('user');
           apiClient.clearToken();
           router.push('/doctor-login');
+          setIsLoadingAuth(false);
+          setIsLoadingDashboard(false);
         }
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -85,6 +105,8 @@ export default function DoctorDashboard() {
         localStorage.removeItem('user');
         apiClient.clearToken();
         router.push('/doctor-login');
+        setIsLoadingAuth(false);
+        setIsLoadingDashboard(false);
       }
     };
 
