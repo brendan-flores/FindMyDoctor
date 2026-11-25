@@ -44,48 +44,51 @@ router.get('/users', authenticate, authorize('ADMIN'), async (req: AuthRequest, 
 // Get dashboard statistics (ADMIN or SUPERADMIN)
 router.get('/dashboard/stats', authenticate, authorize('ADMIN', 'SUPERADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    // Get doctor status counts
-    const doctorStats = await query(
-      `SELECT
+    // All four reads are independent, so run them in parallel instead of
+    // awaiting each one sequentially. Endpoint latency becomes the max of the
+    // four queries rather than their sum.
+    const [
+      doctorStats,
+      userStats,
+      unassignedSecretaries,
+      pendingApprovals,
+    ] = await Promise.all([
+      query(
+        `SELECT
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE approval_status = 'PENDING') as pending,
         COUNT(*) FILTER (WHERE approval_status = 'ACTIVE') as active,
         COUNT(*) FILTER (WHERE approval_status = 'REJECTED') as rejected
        FROM doctors`
-    );
-
-    // Get user role counts
-    const userStats = await query(
-      `SELECT
+      ),
+      query(
+        `SELECT
         role,
         COUNT(*) as count
        FROM users
        GROUP BY role`
-    );
-
-    // Get secretaries without assigned doctor
-    const unassignedSecretaries = await query(
-      `SELECT COUNT(*) as count
-       FROM secretaries
-       WHERE doctor_id IS NULL`
-    );
-
-    // Get pending approvals list (oldest first)
-    const pendingApprovals = await query(
-      `SELECT
-        d.id,
-        d.first_name,
-        d.last_name,
-        d.specialty,
-        d.profile_submitted_at,
-        d.profile_completion_status,
-        u.email
-       FROM doctors d
-       JOIN users u ON d.user_id = u.id
-       WHERE d.approval_status = 'PENDING'
-       ORDER BY d.profile_submitted_at ASC NULLS LAST
-       LIMIT 10`
-    );
+      ),
+      query(
+        `SELECT COUNT(*) as count
+         FROM secretaries
+         WHERE doctor_id IS NULL`
+      ),
+      query(
+        `SELECT
+          d.id,
+          d.first_name,
+          d.last_name,
+          d.specialty,
+          d.profile_submitted_at,
+          d.profile_completion_status,
+          u.email
+         FROM doctors d
+         JOIN users u ON d.user_id = u.id
+         WHERE d.approval_status = 'PENDING'
+         ORDER BY d.profile_submitted_at ASC NULLS LAST
+         LIMIT 10`
+      ),
+    ]);
 
     // Format pending approvals
     const formattedPending = pendingApprovals.rows.map(d => ({
