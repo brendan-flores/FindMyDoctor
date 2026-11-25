@@ -1556,10 +1556,7 @@ int _tutorialStepIndex = 0;
         ),
         const SizedBox(height: spacing.AppSpacing.gutterMd),
         if (_isLoadingUpcomingAppointment)
-          const SizedBox(
-            height: 200,
-            child: Center(child: CircularProgressIndicator()),
-          )
+          HomeUpcomingAppointmentSkeleton()
         else if (_upcomingAppointmentError)
           const SizedBox(
             height: 100,
@@ -1843,19 +1840,7 @@ int _tutorialStepIndex = 0;
         ),
         const SizedBox(height: spacing.AppSpacing.gutterMd),
         if (_isLoadingRecentUpdates)
-          Column(
-            children: List.generate(3, (index) {
-              return Padding(
-                padding: EdgeInsets.only(
-                  bottom: index < 2 ? spacing.AppSpacing.gutterMd : 0,
-                ),
-                child: const SizedBox(
-                  height: 80,
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              );
-            }),
-          )
+          HomeRecentUpdatesSkeleton()
         else if (_recentUpdatesError)
           const SizedBox(
             height: 100,
@@ -1888,6 +1873,7 @@ int _tutorialStepIndex = 0;
       padding: EdgeInsets.only(bottom: spacing.AppSpacing.gutterMd),
       child: AppCard(
         padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+        onTap: () => _handleRecentUpdateTap(context, update),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1950,6 +1936,30 @@ int _tutorialStepIndex = 0;
         ),
       ),
     );
+  }
+
+  void _handleRecentUpdateTap(BuildContext context, Map<String, dynamic> update) {
+    final type = update['type'] as String?;
+
+    switch (type) {
+      case 'APPOINTMENT_CREATED':
+      case 'APPOINTMENT_UPDATED':
+      case 'APPOINTMENT_CANCELLED':
+      case 'APPOINTMENT_REMINDER':
+        Navigator.of(context).pushNamed('/appointments');
+        break;
+      case 'PRESCRIPTION_READY':
+      case 'PRESCRIPTION_UPDATED':
+        Navigator.of(context).pushNamed('/medical-records');
+        break;
+      case 'PAYMENT_VERIFIED':
+      case 'PAYMENT_REJECTED':
+      case 'PAYMENT_PENDING':
+        Navigator.of(context).pushNamed('/payments');
+        break;
+      default:
+        break;
+    }
   }
 
   IconData _getUpdateIcon(String? type) {

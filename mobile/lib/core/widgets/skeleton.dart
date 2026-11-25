@@ -15,9 +15,16 @@ class SkeletonScope extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseColor = isDark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : AppColors.slate200;
+    final highlightColor = isDark
+        ? Theme.of(context).colorScheme.surfaceContainerLow
+        : AppColors.surfaceLowest;
     return Shimmer.fromColors(
-      baseColor: AppColors.slate200,
-      highlightColor: AppColors.surfaceLowest,
+      baseColor: baseColor,
+      highlightColor: highlightColor,
       child: child,
     );
   }
@@ -33,12 +40,17 @@ class SkeletonBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = isDark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : AppColors.slate200;
+    final radius = borderRadius ?? spacing.AppSpacing.radiusSm;
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: AppColors.surfaceLowest,
-        borderRadius: BorderRadius.circular(borderRadius ?? 8),
+        color: color,
+        borderRadius: BorderRadius.circular(radius),
       ),
     );
   }
@@ -333,8 +345,6 @@ class DoctorCardSkeleton extends StatelessWidget {
           const SizedBox(height: spacing.AppSpacing.gutterSm),
           Row(
             children: const [
-              SkeletonBox(width: 90, height: 24, borderRadius: 12),
-              SizedBox(width: spacing.AppSpacing.gutterSm),
               SkeletonBox(width: 110, height: 24, borderRadius: 12),
             ],
           ),
@@ -1012,50 +1022,52 @@ class LiveQueueBodySkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const SkeletonTile(size: 64, borderRadius: 12),
-            const SizedBox(width: spacing.AppSpacing.gutterMd),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  SkeletonBox(
-                    width: 110,
-                    height: 24,
-                    borderRadius: spacing.AppSpacing.radiusFull,
-                  ),
-                  SizedBox(height: spacing.AppSpacing.gutterXs),
-                  SkeletonLine(width: 140, height: 13),
-                ],
+    return SkeletonScope(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const SkeletonTile(size: 64, borderRadius: 12),
+              const SizedBox(width: spacing.AppSpacing.gutterMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    SkeletonBox(
+                      width: 110,
+                      height: 24,
+                      borderRadius: spacing.AppSpacing.radiusFull,
+                    ),
+                    SizedBox(height: spacing.AppSpacing.gutterXs),
+                    SkeletonLine(width: 140, height: 13),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: spacing.AppSpacing.gutterMd),
-        Container(
-          padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceLow,
-            borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: const [
-              _SkeletonStat(),
-              _SkeletonStatDivider(),
-              _SkeletonStat(),
-              _SkeletonStatDivider(),
-              _SkeletonStat(),
             ],
           ),
-        ),
-        const SizedBox(height: spacing.AppSpacing.gutterSm),
-        const SkeletonLine(width: 90, height: 11),
-      ],
+          const SizedBox(height: spacing.AppSpacing.gutterMd),
+          Container(
+            padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceLow,
+              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: const [
+                _SkeletonStat(),
+                _SkeletonStatDivider(),
+                _SkeletonStat(),
+                _SkeletonStatDivider(),
+                _SkeletonStat(),
+              ],
+            ),
+          ),
+          const SizedBox(height: spacing.AppSpacing.gutterSm),
+          const SkeletonLine(width: 90, height: 11),
+        ],
+      ),
     );
   }
 }
@@ -1502,6 +1514,99 @@ class SpecialtyChipsSkeleton extends StatelessWidget {
             height: 40,
             borderRadius: spacing.AppSpacing.radiusFull,
           ),
+        ),
+      ),
+    );
+  }
+}
+/// Skeleton for the Upcoming Appointment card shown on HomePage when loading.
+/// Skeleton for the Upcoming Appointment card shown on HomePage when loading.
+class HomeUpcomingAppointmentSkeleton extends StatelessWidget {
+  const HomeUpcomingAppointmentSkeleton({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonScope(
+      child: AppCard(
+        padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SkeletonCircle(size: 56),
+                const SizedBox(width: spacing.AppSpacing.gutterMd),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      SkeletonLine(width: 160, height: 16),
+                      SizedBox(height: spacing.AppSpacing.gutterXs),
+                      SkeletonLine(width: 200, height: 12),
+                      SizedBox(height: spacing.AppSpacing.gutterXs),
+                      SkeletonLine(width: 140, height: 11),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: spacing.AppSpacing.gutterMd),
+            SkeletonBox(height: 80, borderRadius: spacing.AppSpacing.radiusLg),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Skeleton for a single Recent Update item shown in the Recent Updates section.
+class RecentUpdateTileSkeleton extends StatelessWidget {
+  const RecentUpdateTileSkeleton({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.all(spacing.AppSpacing.gutterMd),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
+            ),
+            child: const Icon(Icons.notifications_outlined, size: 20, color: Colors.grey),
+          ),
+          const SizedBox(width: spacing.AppSpacing.gutterMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                SkeletonLine(width: 150, height: 14),
+                SizedBox(height: spacing.AppSpacing.gutterXs),
+                SkeletonLine(width: 200, height: 11),
+                SizedBox(height: spacing.AppSpacing.gutterXs),
+                SkeletonLine(width: 80, height: 10),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+        ],
+      ),
+    );
+  }
+}
+
+/// Skeleton list for the Recent Updates section (3 placeholders).
+class HomeRecentUpdatesSkeleton extends StatelessWidget {
+  const HomeRecentUpdatesSkeleton({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonScope(
+      child: Column(
+        children: List.generate(
+          3,
+          (index) => const RecentUpdateTileSkeleton(),
         ),
       ),
     );
