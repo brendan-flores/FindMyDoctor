@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../tutorial/models/tutorial_step.dart';
+import '../../tutorial/presentation/tutorial_overlay.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
@@ -50,6 +53,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
+bool _isTutorialActive = false;
+int _tutorialStepIndex = 0;
   String? _selectedSpecialtyFromHome;
   late final ApiService _apiService;
   List<Conversation> _conversations = [];
@@ -65,6 +70,9 @@ class _HomePageState extends State<HomePage> {
   bool _accountInfoFailed = false;
   bool _isLoadingAccountInfo = true;
   String _chatSegment = 'clinic'; // M1: Segmented control state
+  bool _hasCheckedTutorial = false;
+  String? _currentUserId;
+  final Map<TutorialTarget, BuildContext?> _targetContexts = {};
 
   // Upcoming appointment state
   List<dynamic> _upcomingAppointments = [];
@@ -112,6 +120,86 @@ class _HomePageState extends State<HomePage> {
     _loadRecentUpdates();
   }
 
+  /// Checks the user-scoped tutorial completion preference and starts the
+  /// first-time tutorial if the user has not completed it yet. Wrapped in
+  /// addPostFrameCallback so bottom navigation Builder contexts have laid out
+  /// before targetContextFor measures them, avoiding stale/null context issues.
+  /// Guards against re-triggering mid-session via the _hasCheckedTutorial flag.
+  Future<void> _checkAndStartTutorial({bool fallback = false}) async {
+    if (_hasCheckedTutorial && !fallback) return;
+    _hasCheckedTutorial = true;
+    final prefs = await SharedPreferences.getInstance();
+    // Resolve user ID: use the freshly extracted ID, or fall back to SharedPreference,
+    // or default to 'anonymous' for test scenarios
+    final userId = _currentUserId ?? prefs.getString('user_id') ?? 'anonymous';
+    // If not a PATIENT role, do not show the patient tutorial
+    final role = prefs.getString('user_role');
+    if (role != null && role != 'PATIENT') return;
+    // Read the user-scoped preference: has_completed_tutorial_<userId>
+    final completed =
+        prefs.getBool('has_completed_tutorial_$userId') ?? false;
+    if (!completed) {
+      // Schedule after first frame so bottom navigation Builders have laid out
+      _scheduleTutorialStart();
+    }
+  }
+
+  /// Schedules the tutorial start after the first frame flush.
+  /// This ensures the bottom navigation Builder widgets have captured their
+  // contexts before targetContextFor measures them, preventing null context
+  // failures on the first frame.
+  void _scheduleTutorialStart() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startTutorial();
+    });
+  }
+
+  /// Starts the first-time tutorial after onboarding completion.
+  /// Only shown to patients who have not completed or skipped it before.
+  void _startTutorial() {
+    setState(() {
+      _isTutorialActive = true;
+      _tutorialStepIndex = 0;
+      // Switch to the correct tab based on the first tutorial step
+      _currentIndex = tutorialSteps.first.tabIndex ?? 0;
+    });
+  }
+
+  /// Move to the next tutorial step, or complete the tutorial if at the end.
+  void _nextTutorialStep() {
+    setState(() {
+      if (_tutorialStepIndex < tutorialSteps.length - 1) {
+        _tutorialStepIndex++;
+        _currentIndex = tutorialSteps[_tutorialStepIndex].tabIndex ?? _currentIndex;
+      } else {
+        _completeTutorial();
+      }
+    });
+  }
+
+  /// Move to the previous tutorial step.
+  void _previousTutorialStep() {
+    setState(() {
+      if (_tutorialStepIndex > 0) {
+        _tutorialStepIndex--;
+        _currentIndex = tutorialSteps[_tutorialStepIndex].tabIndex ?? _currentIndex;
+      }
+    });
+  }
+
+  /// Complete the tutorial and persist the completion status.
+  Future<void> _completeTutorial() async {
+    if (!mounted) return;
+    setState(() {
+      _isTutorialActive = false;
+      _currentIndex = 0;
+    });
+    // Persist completion under the exact same user-scoped boolean key
+    final prefs = await SharedPreferences.getInstance();
+    final userId = _currentUserId ?? prefs.getString('user_id') ?? 'anonymous';
+    await prefs.setBool('has_completed_tutorial_$userId', true);
+  }
+
   Future<void> _loadUserInfo() async {
     try {
       final response = await _apiService.getCurrentPatient();
@@ -124,9 +212,13 @@ class _HomePageState extends State<HomePage> {
               ? '${response['data']['first_name']} ${response['data']['last_name']}'
               : response['data']['email'];
           _userEmail = response['data']['email'];
+          // Extract a stable user ID for scoped tutorial preference keys
+          _currentUserId = (response['data']['user_id'] ?? response['data']['id'] ?? response['data']['email'])?.toString();
           _accountInfoFailed = false;
           _isLoadingAccountInfo = false;
         });
+        // Check tutorial completion status after user ID is available
+        await _checkAndStartTutorial();
       } else {
         if (!mounted) return;
         setState(() {
@@ -141,6 +233,8 @@ class _HomePageState extends State<HomePage> {
         _accountInfoFailed = true;
         _isLoadingAccountInfo = false;
       });
+      // On error, check tutorial with fallback ID so widget tests still work
+      await _checkAndStartTutorial(fallback: true);
     }
   }
 
@@ -410,46 +504,77 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          _buildHomeContent(),
-          _buildDoctorsContent(),
-          _buildAppointmentsContent(),
-          _buildChatContent(),
-          _buildProfileContent(),
-        ],
-      ),
-      bottomNavigationBar: _buildBottomNavigation(),
-      // M2: Floating "Ask MediGuide" shortcut in patient shell
-      // HomePage is only shown to patients (secretaries get SecretaryHomePage)
-      // Show only on Home tab (index 0) and Doctors tab (index 1)
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      floatingActionButton: (_currentIndex == 0 || _currentIndex == 1)
-          ? FloatingActionButton(
-              tooltip: AiConstants.shortcutLabel,
-              onPressed: () {
+    // Capture BuildContext for each tutorial target widget
+    // Only the Home tab (index 0) has its AppHeader register the notification bell context
+    return Stack(
+      children: [
+        // Original Scaffold body (IndexedStack of tab contents)
+        Scaffold(
+          backgroundColor: AppColors.background,
+          body: IndexedStack(
+            index: _currentIndex,
+            children: [
+              _buildHomeContent(),
+              _buildDoctorsContent(),
+              _buildAppointmentsContent(),
+              _buildChatContent(),
+              _buildProfileContent(),
+            ],
+          ),
+          bottomNavigationBar: _buildBottomNavigation(),
+          // M2: Floating "Ask MediGuide" shortcut in patient shell
+          // HomePage is only shown to patients (secretaries get SecretaryHomePage)
+          // Show only on Home tab (index 0) and Doctors tab (index 1)
+          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+          floatingActionButton: (_currentIndex == 0 || _currentIndex == 1)
+              ? Builder(
+                  builder: (context) {
+                    // Capture the BuildContext for the MediGuide FAB tutorial target
+                    _targetContexts[TutorialTarget.mediGuideFab] = context;
+                    return FloatingActionButton(
+                      tooltip: AiConstants.shortcutLabel,
+                      onPressed: () {
+                        setState(() {
+                          _currentIndex = 3; // Chat tab
+                          _chatSegment = 'ai'; // Switch to AI segment
+                        });
+                      },
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: AppColors.onPrimary,
+                      elevation: 0,
+                      shape: const CircleBorder(),
+                      child: SizedBox(
+                        width: 72,
+                        height: 72,
+                        child: Image.asset(
+                          'assets/images/mediguide_badge.png',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    );
+                  },
+                )
+              : null,
+        ),
+        // TutorialOverlay is displayed on top when a patient is in the tutorial
+        if (_isTutorialActive)
+          Positioned.fill(
+            child: TutorialOverlay(
+              step: tutorialSteps[_tutorialStepIndex],
+              targetContextFor: (target) => _targetContexts[target],
+              onNext: _nextTutorialStep,
+              onPrevious: _previousTutorialStep,
+              onSkip: _completeTutorial,
+              onFinish: _completeTutorial,
+              onTabChanged: (index) {
+                if (!mounted) return;
                 setState(() {
-                  _currentIndex = 3; // Chat tab
-                  _chatSegment = 'ai'; // Switch to AI segment
+                  _currentIndex = index;
                 });
               },
-              backgroundColor: Colors.transparent,
-              foregroundColor: AppColors.onPrimary,
-              elevation: 0,
-              shape: const CircleBorder(),
-              child: SizedBox(
-                width: 72,
-                height: 72,
-                child: Image.asset(
-                  'assets/images/mediguide_badge.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
-            )
-          : null,
+            ),
+          ),
+      ],
     );
   }
 
@@ -458,11 +583,11 @@ class _HomePageState extends State<HomePage> {
       children: [
         AppHeader(
           showNotifications: true,
-          showProfile: true,
           unreadCount: _notificationUnreadCount,
           onUnreadCountUpdate: () {
             _loadNotificationUnreadCount();
           },
+          onNotificationBellContext: (ctx) => _targetContexts[TutorialTarget.notificationBell] = ctx,
         ),
         Expanded(
           child: RefreshIndicator(
@@ -527,7 +652,6 @@ class _HomePageState extends State<HomePage> {
       children: [
         AppHeader(
           showNotifications: true,
-          showProfile: true,
           unreadCount: _notificationUnreadCount,
           onUnreadCountUpdate: () {
             _loadNotificationUnreadCount();
@@ -700,7 +824,6 @@ class _HomePageState extends State<HomePage> {
       children: [
         AppHeader(
           showNotifications: true,
-          showProfile: true,
           unreadCount: _notificationUnreadCount,
           onUnreadCountUpdate: () {
             _loadNotificationUnreadCount();
@@ -1893,21 +2016,23 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(Icons.home, 'Home', 0),
-              _buildNavItem(Icons.local_hospital, 'Doctors', 1),
+              _buildNavItem(Icons.home, 'Home', 0, target: TutorialTarget.homeTab),
+              _buildNavItem(Icons.local_hospital, 'Doctors', 1, target: TutorialTarget.doctorsTab),
               _buildNavItem(
                 Icons.calendar_month,
                 'Appointments',
                 2,
                 unreadCount: _waitlistCount,
+                target: TutorialTarget.appointmentsTab,
               ),
               _buildNavItem(
                 Icons.chat_bubble,
                 'Chat',
                 3,
                 unreadCount: _totalUnreadCount,
+                target: TutorialTarget.chatTab,
               ),
-              _buildNavItem(Icons.account_circle, 'Profile', 4),
+              _buildNavItem(Icons.account_circle, 'Profile', 4, target: TutorialTarget.profileTab),
             ],
           ),
         ),
@@ -1920,84 +2045,91 @@ class _HomePageState extends State<HomePage> {
     String label,
     int index, {
     int? unreadCount,
+    TutorialTarget? target,
   }) {
     final isActive = _currentIndex == index;
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _currentIndex = index;
-          if (index != 1) {
-            _selectedSpecialtyFromHome = null;
-          }
-        });
-        if (index == 3) {
-          _loadConversations();
-        }
-      },
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: spacing.AppSpacing.gutterSm,
-          vertical: spacing.AppSpacing.gutterXs,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
+    return Builder(
+      builder: (context) {
+        // Capture the BuildContext for the tutorial target measurement
+        _targetContexts[target ?? TutorialTarget.homeTab] = context;
+        return InkWell(
+          onTap: () {
+            setState(() {
+              _currentIndex = index;
+              if (index != 1) {
+                _selectedSpecialtyFromHome = null;
+              }
+            });
+            if (index == 3) {
+              _loadConversations();
+            }
+          },
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: spacing.AppSpacing.gutterSm,
+              vertical: spacing.AppSpacing.gutterXs,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  icon,
-                  color: isActive
-                      ? AppColors.primary
-                      : AppColors.onSurfaceVariant,
-                  size: spacing.AppSpacing.iconLg,
-                ),
-                if (unreadCount != null && unreadCount > 0)
-                  Positioned(
-                    right: -6,
-                    top: -6,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: spacing.AppSpacing.gutterXs,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.error,
-                        borderRadius: BorderRadius.circular(
-                          spacing.AppSpacing.radiusFull,
-                        ),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                      child: Text(
-                        unreadCount > 99 ? '99+' : unreadCount.toString(),
-                        style: AppTextStyles.labelSm.copyWith(
-                          color: AppColors.onError,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      icon,
+                      color: isActive
+                          ? AppColors.primary
+                          : AppColors.onSurfaceVariant,
+                      size: spacing.AppSpacing.iconLg,
                     ),
+                    if (unreadCount != null && unreadCount > 0)
+                      Positioned(
+                        right: -6,
+                        top: -6,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: spacing.AppSpacing.gutterXs,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.error,
+                            borderRadius: BorderRadius.circular(
+                              spacing.AppSpacing.radiusFull,
+                            ),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            unreadCount > 99 ? '99+' : unreadCount.toString(),
+                            style: AppTextStyles.labelSm.copyWith(
+                              color: AppColors.onError,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: spacing.AppSpacing.gutterXs),
+                Text(
+                  label,
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: isActive
+                        ? AppColors.primary
+                        : AppColors.onSurfaceVariant,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                    fontSize: 11,
                   ),
+                ),
               ],
             ),
-            const SizedBox(height: spacing.AppSpacing.gutterXs),
-            Text(
-              label,
-              style: AppTextStyles.labelSm.copyWith(
-                color: isActive
-                    ? AppColors.primary
-                    : AppColors.onSurfaceVariant,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                fontSize: 11,
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
