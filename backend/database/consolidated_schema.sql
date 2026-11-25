@@ -1631,6 +1631,8 @@ CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments USING btree (ap
 CREATE INDEX IF NOT EXISTS idx_appointments_doctor_id ON appointments USING btree (doctor_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_patient_id ON appointments USING btree (patient_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments USING btree (status);
+-- Source migration: 050_add_dashboard_indexes.sql
+CREATE INDEX IF NOT EXISTS idx_appointments_doctor_id_appointment_date ON appointments USING btree (doctor_id, appointment_date);
 -- Source migration: 043_add_billing_redesign.sql
 CREATE INDEX IF NOT EXISTS idx_billing_audit_log_payment_id ON billing_audit_log USING btree (payment_id);
 CREATE INDEX IF NOT EXISTS idx_billing_audit_log_created_at ON billing_audit_log USING btree (created_at DESC);
@@ -1639,6 +1641,8 @@ CREATE INDEX IF NOT EXISTS idx_conversations_patient_id ON conversations USING b
 CREATE INDEX IF NOT EXISTS idx_conversations_secretary_id ON conversations USING btree (secretary_id);
 CREATE INDEX IF NOT EXISTS idx_daily_capacities_date ON daily_capacities USING btree (date);
 CREATE INDEX IF NOT EXISTS idx_daily_capacities_doctor_id ON daily_capacities USING btree (doctor_id);
+-- Source migration: 050_add_dashboard_indexes.sql
+CREATE INDEX IF NOT EXISTS idx_daily_capacities_doctor_id_date ON daily_capacities USING btree (doctor_id, date);
 CREATE INDEX IF NOT EXISTS idx_device_tokens_token ON device_tokens USING btree (token);
 CREATE INDEX IF NOT EXISTS idx_device_tokens_user_id ON device_tokens USING btree (user_id);
 CREATE INDEX IF NOT EXISTS idx_doctor_break_periods_active ON doctor_break_periods USING btree (doctor_id, is_active) WHERE (is_active = true);
@@ -1662,6 +1666,8 @@ CREATE INDEX IF NOT EXISTS idx_login_otp_challenges_expires_at ON login_otp_chal
 CREATE INDEX IF NOT EXISTS idx_login_otp_challenges_hash ON login_otp_challenges USING btree (challenge_token_hash);
 CREATE INDEX IF NOT EXISTS idx_login_otp_challenges_user_id ON login_otp_challenges USING btree (user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages USING btree (conversation_id);
+-- Source migration: 050_add_dashboard_indexes.sql
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id_read_at ON messages USING btree (conversation_id, read_at);
 CREATE INDEX IF NOT EXISTS idx_messages_invoice_id ON messages USING btree (invoice_id);
 CREATE INDEX IF NOT EXISTS idx_messages_sender_user_id ON messages USING btree (sender_user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications USING btree (is_read);
@@ -1696,6 +1702,8 @@ CREATE INDEX IF NOT EXISTS idx_visit_edit_history_visit_id ON visit_edit_history
 CREATE INDEX IF NOT EXISTS idx_queue_entries_doctor_id ON queue_entries USING btree (doctor_id);
 CREATE INDEX IF NOT EXISTS idx_queue_entries_patient_id ON queue_entries USING btree (patient_id);
 CREATE INDEX IF NOT EXISTS idx_queue_entries_queue_date ON queue_entries USING btree (queue_date);
+-- Source migration: 050_add_dashboard_indexes.sql
+CREATE INDEX IF NOT EXISTS idx_queue_entries_doctor_id_queue_date ON queue_entries USING btree (doctor_id, queue_date);
 CREATE INDEX IF NOT EXISTS idx_queue_entries_status ON queue_entries USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_secretaries_doctor_id ON secretaries USING btree (doctor_id);
 CREATE INDEX IF NOT EXISTS idx_secretaries_user_id ON secretaries USING btree (user_id);
