@@ -19,6 +19,7 @@ import { MEDICAL_EXPERTISE } from '@/data/medicalExpertise';
 import { LANGUAGES } from '@/data/languages';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import SearchableMultiSelect from '@/components/ui/SearchableMultiSelect';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 const apiOrigin = new URL(
   process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1'
@@ -59,6 +60,7 @@ export default function DoctorProfilePage() {
   const [isLoadingSignature, setIsLoadingSignature] = useState(false);
   const [isUploadingSignature, setIsUploadingSignature] = useState(false);
   const [isDeletingSignature, setIsDeletingSignature] = useState(false);
+  const [showSignatureDeleteDialog, setShowSignatureDeleteDialog] = useState(false);
   const signatureRetryRef = useRef(false);
 
   const loadSignaturePreview = useCallback(async () => {
@@ -370,10 +372,6 @@ export default function DoctorProfilePage() {
 
   const handleSignatureDelete = async () => {
     if (!hasSignature) return;
-    const confirmed = window.confirm(
-      'Remove your signature? New prescription PDFs will show a blank Physician\'s Signature line until you upload a new one.'
-    );
-    if (!confirmed) return;
 
     setIsDeletingSignature(true);
     setError('');
@@ -395,6 +393,7 @@ export default function DoctorProfilePage() {
       setError('An error occurred while deleting your signature.');
     } finally {
       setIsDeletingSignature(false);
+      setShowSignatureDeleteDialog(false);
     }
   };
 
@@ -780,7 +779,7 @@ export default function DoctorProfilePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleSignatureDelete}
+                  onClick={() => setShowSignatureDeleteDialog(true)}
                   disabled={isDeletingSignature || isUploadingSignature}
                   className="rounded-xl border-2 border-error-200 px-4 py-2.5 text-sm font-semibold text-error-700 transition-all hover:border-error-300 hover:bg-error-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -814,6 +813,17 @@ export default function DoctorProfilePage() {
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={showSignatureDeleteDialog}
+        title="Delete signature?"
+        message="Remove your signature? New prescription PDFs will show a blank Physician's Signature line until you upload a new one."
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        busy={isDeletingSignature}
+        onConfirm={() => void handleSignatureDelete()}
+        onCancel={() => setShowSignatureDeleteDialog(false)}
+      />
     </div>
   );
 }

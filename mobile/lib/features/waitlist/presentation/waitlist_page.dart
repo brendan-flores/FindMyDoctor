@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../../core/navigation/app_navigator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_dialog.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
@@ -62,22 +62,12 @@ class _WaitlistPageState extends State<WaitlistPage> {
   }
 
   Future<void> _leaveWaitlist(Waitlist waitlist) async {
-    final confirmed = await AppNavigator.showAppDialog<bool>(
+    final confirmed = await AppDialogs.showConfirm(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Leave Waitlist'),
-        content: Text('Are you sure you want to leave the waitlist for ${waitlist.doctorName} on ${_formatDate(waitlist.waitlistDate)}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Leave'),
-          ),
-        ],
-      ),
+      title: 'Leave Waitlist',
+      message:
+          'Are you sure you want to leave the waitlist for ${waitlist.doctorName} on ${_formatDate(waitlist.waitlistDate)}?',
+      confirmLabel: 'Leave',
     );
 
     if (confirmed == true) {

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_dialog.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/doctor_profile_image.dart';
 import '../../../core/widgets/skeleton.dart';
@@ -70,23 +71,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   Future<void> _cancelAppointment() async {
-    final confirmed = await AppNavigator.showAppDialog<bool>(
+    final confirmed = await AppDialogs.showConfirm(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel Appointment?'),
-        content: const Text('Are you sure you want to cancel this appointment? This will also cancel your queue number.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Yes, Cancel'),
-          ),
-        ],
-      ),
+      title: 'Cancel Appointment?',
+      message:
+          'Are you sure you want to cancel this appointment? This will also cancel your queue number.',
+      confirmLabel: 'Yes, Cancel',
+      tone: AppDialogTone.danger,
     );
 
     if (confirmed != true) return;

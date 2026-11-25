@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_dialog.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/constants/ai_constants.dart';
@@ -325,23 +326,13 @@ class _AiConversationHistoryPageState extends State<AiConversationHistoryPage> {
   }
 
   Future<void> _showDeleteConfirmation(String conversationId) async {
-    final confirmed = await AppNavigator.showAppDialog<bool>(
+    final confirmed = await AppDialogs.showConfirm(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete conversation'),
-        content: const Text('Are you sure you want to delete this conversation? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete conversation',
+      message:
+          'Are you sure you want to delete this conversation? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      tone: AppDialogTone.danger,
     );
 
     if (confirmed == true) {

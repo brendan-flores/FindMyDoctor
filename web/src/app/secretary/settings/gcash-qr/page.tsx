@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
 import Toast from '@/components/ui/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface Doctor {
   id: string;
@@ -21,6 +22,7 @@ export default function GcashQrManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const router = useRouter();
@@ -173,10 +175,6 @@ export default function GcashQrManagement() {
       return;
     }
 
-    if (!confirm('Are you sure you want to delete the GCash QR code?')) {
-      return;
-    }
-
     setIsDeleting(true);
     setError('');
     setSuccess('');
@@ -194,6 +192,7 @@ export default function GcashQrManagement() {
       setError('An error occurred. Please try again.');
     } finally {
       setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -271,7 +270,7 @@ export default function GcashQrManagement() {
               </div>
               <div className="flex justify-end">
                 <button
-                  onClick={handleDelete}
+                  onClick={() => setShowDeleteConfirm(true)}
                   disabled={isDeleting}
                   className="px-4 py-2 bg-error-600 text-white rounded-lg hover:bg-error-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
@@ -361,6 +360,17 @@ export default function GcashQrManagement() {
           </ul>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete GCash QR code?"
+        message="Are you sure you want to delete the GCash QR code? Patients will no longer be able to scan it for payments."
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        busy={isDeleting}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

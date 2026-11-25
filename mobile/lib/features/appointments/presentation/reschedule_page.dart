@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/services/api_service.dart';
-import '../../../core/navigation/app_navigator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart' as spacing;
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/json_parsers.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_dialog.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/skeleton.dart';
@@ -229,28 +229,17 @@ class _ReschedulePageState extends State<ReschedulePage> {
     final selected = _selectedDate;
     if (selected == null) return;
 
-    final confirmed = await AppNavigator.showAppDialog<bool>(
+    final confirmed = await AppDialogs.showConfirm(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reschedule appointment?'),
-        content: Text(
+      title: 'Reschedule appointment?',
+      message:
           'Your appointment will move from '
           '${_formatFullDate(_parseDate(_appointment?['appointment_date']))} to '
           '${_formatFullDate(selected)}.\n\n'
           'Your previous queue number will be released and a new one will be '
           'assigned for the new date.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep current'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Confirm',
+      cancelLabel: 'Keep current',
     );
 
     if (confirmed != true) return;
