@@ -49,48 +49,44 @@ class InfoTag extends StatelessWidget {
         color: bgColor,
         borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMd),
       ),
-      child: Center(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            Icon(
-              icon,
-              color: iconColor,
-              size: 14,
-              weight: 700,
-            ),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text.rich(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            color: iconColor,
+            size: 14,
+            weight: 700,
+          ),
+          const SizedBox(width: 4),
+          Text.rich(
+            TextSpan(
+              children: [
                 TextSpan(
-                  children: [
-                    TextSpan(
-                      text: label,
-                      style: AppTextStyles.labelSm.copyWith(
-                        color: AppColors.onSurface,
-                        fontSize: 10,
-                      ),
-                    ),
-                    if (labelSuffix.isNotEmpty)
-                      TextSpan(
-                        text: labelSuffix,
-                        style: AppTextStyles.labelSm.copyWith(
-                          color: AppColors.onSurfaceVariant,
-                          fontWeight: FontWeight.normal,
-                          fontSize: 10,
-                        ),
-                      ),
-                  ],
+                  text: label,
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.onSurface,
+                    fontSize: 10,
+                  ),
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+                if (labelSuffix.isNotEmpty)
+                  TextSpan(
+                    text: labelSuffix,
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      fontWeight: FontWeight.normal,
+                      fontSize: 10,
+                    ),
+                  ),
+              ],
             ),
-          ],
-        ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
@@ -104,9 +100,6 @@ class DoctorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final location = doctor.clinicName;
-    final idHash = doctor.id.hashCode.abs();
-    final rating = (4.5 + (idHash % 10) / 10).toStringAsFixed(2);
-    final reviewCount = 50 + (idHash % 200);
     final displayName = doctor.middleName != null && doctor.middleName!.isNotEmpty
         ? 'Dr. ${doctor.firstName} ${doctor.middleName} ${doctor.lastName}'
         : 'Dr. ${doctor.firstName} ${doctor.lastName}';
@@ -183,24 +176,12 @@ class DoctorCard extends StatelessWidget {
           const SizedBox(height: spacing.AppSpacing.gutterMd),
           Row(
             children: [
-              Expanded(
-                child: InfoTag(
-                  icon: Icons.star,
-                  iconColor: AppColors.statusWarning,
-                  label: rating,
-                  labelSuffix: ' ($reviewCount reviews)',
-                  bgColor: AppColors.surfaceContainer,
-                ),
-              ),
-              const SizedBox(width: spacing.AppSpacing.gutterSm),
-              Expanded(
-                child: InfoTag(
-                  icon: Icons.payments,
-                  iconColor: AppColors.primary,
-                  label: formatConsultationFee(doctor),
-                  labelSuffix: ' / consult',
-                  bgColor: AppColors.surfaceContainerHigh,
-                ),
+              InfoTag(
+                icon: Icons.payments,
+                iconColor: AppColors.primary,
+                label: formatConsultationFee(doctor),
+                labelSuffix: ' / consult',
+                bgColor: AppColors.surfaceContainerHigh,
               ),
             ],
           ),
