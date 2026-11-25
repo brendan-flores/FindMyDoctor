@@ -4,13 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/apiClient';
 import Toast from '@/components/ui/Toast';
-import {
-  formatPhoneFieldInput,
-  phoneFieldValueFromStored,
-  phoneFormatErrorMessage,
-  storedPhoneWarningFor,
-  toStaffContactDomestic,
-} from '@/lib/phone';
+import InternationalPhoneInput from '@/components/ui/InternationalPhoneInput';
+import { resolveStoredPhone, toStaffContactE164 } from '@/lib/phone';
 
 interface SecretaryProfile {
   id: string;
@@ -41,6 +36,7 @@ export default function SecretaryProfile() {
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
   const [contactNumber, setContactNumber] = useState('');
+  const [contactCountry, setContactCountry] = useState('PH');
 
   const router = useRouter();
 
@@ -54,8 +50,10 @@ export default function SecretaryProfile() {
         setFirstName(data.first_name || '');
         setMiddleName(data.middle_name || '');
         setLastName(data.last_name || '');
-        setContactNumber(phoneFieldValueFromStored(data.contact_number, { allowLandline: true }));
-        setContactWarning(storedPhoneWarningFor(data.contact_number, { allowLandline: true }));
+        const storedContact = resolveStoredPhone(data.contact_number, true);
+        setContactNumber(storedContact.nationalNumber);
+        setContactCountry(storedContact.country);
+        setContactWarning(storedContact.warning);
       } else {
         setError('Failed to load profile');
       }
@@ -86,14 +84,17 @@ export default function SecretaryProfile() {
       setFirstName(profile.first_name || '');
       setMiddleName(profile.middle_name || '');
       setLastName(profile.last_name || '');
-      setContactNumber(phoneFieldValueFromStored(profile.contact_number, { allowLandline: true }));
-      setContactWarning(storedPhoneWarningFor(profile.contact_number, { allowLandline: true }));
+      const storedContact = resolveStoredPhone(profile.contact_number, true);
+      setContactNumber(storedContact.nationalNumber);
+      setContactCountry(storedContact.country);
+      setContactWarning(storedContact.warning);
     } else {
       // If no profile data, reset to empty
       setFirstName('');
       setMiddleName('');
       setLastName('');
       setContactNumber('');
+      setContactCountry('PH');
       setContactWarning(null);
     }
     setContactError('');
@@ -136,9 +137,9 @@ export default function SecretaryProfile() {
       return;
     }
 
-    const domesticContact = toStaffContactDomestic(contactNumber);
-    if (!domesticContact) {
-      setContactError('Enter a valid Philippine contact number');
+    const canonicalContact = toStaffContactE164(contactNumber, contactCountry);
+    if (!canonicalContact) {
+      setContactError('Enter a valid contact number');
       setIsSaving(false);
       return;
     }
@@ -148,7 +149,7 @@ export default function SecretaryProfile() {
         firstName: firstName.trim(),
         middleName: middleName.trim() || null,
         lastName: lastName.trim(),
-        contactNumber: domesticContact,
+        contactNumber: canonicalContact,
       });
 
       if (response.success) {
@@ -262,26 +263,30 @@ export default function SecretaryProfile() {
                       <label htmlFor="contactNumber" className="block text-sm font-semibold text-neutral-700">
                         Contact Number <span className="text-error-500">*</span>
                       </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-neutral-500">+63</span>
-                        <input
-                          id="contactNumber"
-                          type="tel"
-                          value={contactNumber}
-                          onChange={(e) => {
-                            const result = formatPhoneFieldInput(e.target.value, contactNumber, { allowLandline: true });
-                            setContactNumber(result.value);
-                            setContactError(result.error ? phoneFormatErrorMessage(result.error) : '');
-                            if (!result.error) setContactWarning(null);
-                          }}
-                          placeholder="9171234567"
-                          required
-                          className="w-full h-10 pl-12 pr-4 text-sm border border-neutral-200 rounded-lg text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600"
-                        />
-                      </div>
+                      <InternationalPhoneInput
+                        id="contactNumber"
+                        country={contactCountry}
+                        nationalNumber={contactNumber}
+                        onCountryChange={(iso) => {
+                          setContactCountry(iso);
+                          if (contactNumber.trim()) {
+                            setContactError(
+                              toStaffContactE164(contactNumber, iso)
+                                ? ''
+                                : 'Enter a valid contact number'
+                            );
+                          }
+                        }}
+                        onNationalChange={(value) => {
+                          setContactNumber(value);
+                          setContactError('');
+                          setContactWarning(null);
+                        }}
+                        required
+                        error={contactError || null}
+                      />
                       {contactWarning && <p className="text-xs text-warning-600">{contactWarning}</p>}
-                      {contactError && <p className="text-xs text-error-600">{contactError}</p>}
-                      <p className="text-xs text-neutral-500">Enter the number without +63 (mobile 10 digits, landline 9 digits).</p>
+                      <p className="text-xs text-neutral-500">Select a country and enter the number without its country code.</p>
                     </div>
                   </div>
                 </div>

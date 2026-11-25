@@ -2,15 +2,15 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/custom_text_field.dart';
+import '../../../core/widgets/international_phone_input.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/services/api_service.dart';
-import '../../../core/utils/phone_input.dart';
-import '../../../core/utils/phone_input_form.dart';
 import 'otp_verification_page.dart';
 
 class SignUpPage extends StatefulWidget {
@@ -31,7 +31,6 @@ class _SignUpPageState extends State<SignUpPage> {
   final _middleNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _dateOfBirthController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
 
   // Account credentials
@@ -43,8 +42,11 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _isLoading = false;
   bool _agreeToTerms = false;
   String? _errorMessage;
-  String? _phoneInputError;
-  late final PhilippineMobileInputFormatter _phoneFormatter;
+
+  // Mobile phone (international input)
+  final _phoneInputKey = GlobalKey<InternationalPhoneInputState>();
+  IsoCode _selectedCountry = IsoCode.PH;
+  String _nationalNumber = '';
 
   // Sex selection (backend values)
   String? _selectedSex;
@@ -76,24 +78,7 @@ class _SignUpPageState extends State<SignUpPage> {
   void initState() {
     super.initState();
     _apiService = widget.apiService ?? ApiService();
-    _phoneFormatter = PhilippineMobileInputFormatter(
-      onRejected: _handlePhoneRejected,
-    );
     _sexFocusNode.addListener(_handleSexFocusChange);
-  }
-
-  void _handlePhoneRejected(PhoneFormatError error) {
-    if (!mounted) return;
-    setState(() {
-      _phoneInputError = phoneFormatErrorMessage(error);
-    });
-  }
-
-  void _handlePhoneChanged(String value) {
-    if (_phoneInputError == null) return;
-    setState(() {
-      _phoneInputError = null;
-    });
   }
 
   void _handleSexFocusChange() {
@@ -111,7 +96,6 @@ class _SignUpPageState extends State<SignUpPage> {
     _middleNameController.dispose();
     _lastNameController.dispose();
     _dateOfBirthController.dispose();
-    _phoneController.dispose();
     _addressController.dispose();
     _emailController.dispose();
     _usernameController.dispose();
@@ -199,15 +183,23 @@ class _SignUpPageState extends State<SignUpPage> {
       final password = _passwordController.text;
       final confirmPassword = _confirmPasswordController.text;
       final dateOfBirth = _dateOfBirthController.text.trim();
-      final phone = canonicalMobileE164(_phoneController.text);
+      final phoneState = _phoneInputKey.currentState;
       final address = _addressController.text.trim();
 
+      if (phoneState == null || !phoneState.isValid) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage =
+              phoneState?.errorText ?? 'Mobile number is required.';
+        });
+        return;
+      }
+
+      final phone = phoneState.e164;
       if (phone == null) {
         setState(() {
           _isLoading = false;
-          _phoneInputError =
-              validatePhilippineMobile(_phoneController.text) ??
-              'Enter a valid Philippine mobile number.';
+          _errorMessage = 'Enter a valid mobile number.';
         });
         return;
       }
@@ -886,27 +878,18 @@ class _SignUpPageState extends State<SignUpPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        CustomTextField(
-          label: 'Mobile Number',
-          hint: '9XX XXX XXXX',
-          controller: _phoneController,
-          keyboardType: TextInputType.phone,
-          textInputAction: TextInputAction.next,
-          prefixIcon: Icons.phone_outlined,
-          prefixText: phMobilePrefixText,
+        InternationalPhoneInput(
+          key: _phoneInputKey,
+          country: _selectedCountry,
+          nationalNumber: _nationalNumber,
+          onCountryChanged: (c) => setState(() => _selectedCountry = c),
+          onNationalChanged: (n) => setState(() => _nationalNumber = n),
+          allowLandline: false,
+          labelText: 'Mobile Number',
+          hintText: '9XX XXX XXXX',
+          requiredField: true,
           enabled: !_isLoading,
-          borderRadius: AppSpacing.radiusXl,
-          inputFormatters: [_phoneFormatter],
-          onChanged: _handlePhoneChanged,
-          validator: validatePhilippineMobile,
         ),
-        if (_phoneInputError != null) ...[
-          const SizedBox(height: AppSpacing.gutterXs),
-          Text(
-            _phoneInputError!,
-            style: AppTextStyles.bodySm.copyWith(color: AppColors.error),
-          ),
-        ],
       ],
     );
   }

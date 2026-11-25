@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { doctorApi, Patient, AssociatePatientRequest } from '@/lib/api/doctorApi';
-import { formatPhoneFieldInput, phoneFormatErrorMessage, toPatientMobileE164 } from '@/lib/phone';
+import { parsePhone, toPatientMobileE164 } from '@/lib/phone';
+import InternationalPhoneInput from '@/components/ui/InternationalPhoneInput';
 import Select from '@/components/ui/Select';
 import DatePicker from '@/components/DatePicker';
 import { usePresence } from '@/hooks/usePresence';
@@ -21,6 +22,9 @@ export default function DoctorPatients() {
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [addPhoneError, setAddPhoneError] = useState('');
+  const [addPhoneCountry, setAddPhoneCountry] = useState('PH');
+  const [addEmergencyPhoneError, setAddEmergencyPhoneError] = useState('');
+  const [addEmergencyPhoneCountry, setAddEmergencyPhoneCountry] = useState('PH');
   const [addFormData, setAddFormData] = useState<AssociatePatientRequest>({
     email: '',
     firstName: '',
@@ -166,7 +170,7 @@ export default function DoctorPatients() {
       {/* Add Patient Button */}
       <div className="flex justify-end">
         <button
-          onClick={() => { setAddPhoneError(''); setShowAddModal(true); }}
+          onClick={() => { setAddPhoneError(''); setAddEmergencyPhoneError(''); setShowAddModal(true); }}
           className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium flex items-center gap-2"
         >
           <span className="material-symbols-outlined">add</span>
@@ -292,6 +296,9 @@ export default function DoctorPatients() {
                     setShowAddModal(false);
                     setAddError(null);
                     setAddPhoneError('');
+                    setAddEmergencyPhoneError('');
+                    setAddPhoneCountry('PH');
+                    setAddEmergencyPhoneCountry('PH');
                     setAddFormData({
                       email: '',
                       firstName: '',
@@ -392,24 +399,28 @@ export default function DoctorPatients() {
               </div>
 
               <div>
-                <label className="block text-sm text-neutral-500 mb-1">Phone *</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 font-medium">+63</span>
-                  <input
-                    type="text"
-                    value={addFormData.phone}
-                    onChange={(e) => {
-                      const result = formatPhoneFieldInput(e.target.value, addFormData.phone, { allowLandline: false });
-                      setAddFormData({ ...addFormData, phone: result.value });
-                      setAddPhoneError(result.error ? phoneFormatErrorMessage(result.error) : '');
-                    }}
-                    className={`w-full pl-12 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                      addPhoneError ? 'border-error-500 focus:ring-error-500' : 'border-neutral-200 focus:ring-primary-600'
-                    }`}
-                    placeholder="9171234567"
-                  />
-                </div>
-                {addPhoneError && <p className="text-xs text-error-600 mt-1">{addPhoneError}</p>}
+                <label htmlFor="addPatientPhone" className="block text-sm text-neutral-500 mb-1">Phone *</label>
+                <InternationalPhoneInput
+                  id="addPatientPhone"
+                  country={addPhoneCountry}
+                  nationalNumber={addFormData.phone}
+                  onCountryChange={(iso) => {
+                    setAddPhoneCountry(iso);
+                    if (addFormData.phone.trim()) {
+                      setAddPhoneError(
+                        toPatientMobileE164(addFormData.phone, iso)
+                          ? ''
+                          : 'Enter a valid mobile number'
+                      );
+                    }
+                  }}
+                  onNationalChange={(value) => {
+                    setAddFormData({ ...addFormData, phone: value });
+                    setAddPhoneError('');
+                  }}
+                  required
+                  error={addPhoneError || null}
+                />
               </div>
 
               <div>
@@ -433,12 +444,25 @@ export default function DoctorPatients() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-neutral-500 mb-1">Emergency Contact Phone</label>
-                  <input
-                    type="text"
-                    value={addFormData.emergencyContactPhone}
-                    onChange={(e) => setAddFormData({ ...addFormData, emergencyContactPhone: e.target.value })}
-                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  <label htmlFor="addEmergencyPhone" className="block text-sm text-neutral-500 mb-1">Emergency Contact Phone</label>
+                  <InternationalPhoneInput
+                    id="addEmergencyPhone"
+                    country={addEmergencyPhoneCountry}
+                    nationalNumber={addFormData.emergencyContactPhone || ''}
+                    onCountryChange={(iso) => {
+                      setAddEmergencyPhoneCountry(iso);
+                      const value = (addFormData.emergencyContactPhone || '').trim();
+                      setAddEmergencyPhoneError(
+                        value && !parsePhone(value, iso).ok
+                          ? 'Enter a valid phone number'
+                          : ''
+                      );
+                    }}
+                    onNationalChange={(value) => {
+                      setAddFormData({ ...addFormData, emergencyContactPhone: value });
+                      setAddEmergencyPhoneError('');
+                    }}
+                    error={addEmergencyPhoneError || null}
                   />
                 </div>
               </div>
@@ -524,10 +548,22 @@ export default function DoctorPatients() {
                     setAddError('Phone is required');
                     return;
                   }
-                  const canonicalPhone = toPatientMobileE164(addFormData.phone);
+                  const canonicalPhone = toPatientMobileE164(addFormData.phone, addPhoneCountry);
                   if (!canonicalPhone) {
-                    setAddPhoneError('Enter a valid Philippine mobile number');
+                    setAddPhoneError('Enter a valid mobile number');
                     return;
+                  }
+                  let emergencyContactPhone = '';
+                  if ((addFormData.emergencyContactPhone || '').trim().length > 0) {
+                    const parsedEmergency = parsePhone(
+                      addFormData.emergencyContactPhone as string,
+                      addEmergencyPhoneCountry
+                    );
+                    if (!parsedEmergency.ok) {
+                      setAddEmergencyPhoneError('Enter a valid phone number');
+                      return;
+                    }
+                    emergencyContactPhone = parsedEmergency.e164;
                   }
                   if (!addFormData.address.trim()) {
                     setAddError('Address is required');
@@ -538,12 +574,19 @@ export default function DoctorPatients() {
                   setAddError(null);
 
                   try {
-                    const response = await doctorApi.associatePatient({ ...addFormData, phone: canonicalPhone });
+                    const response = await doctorApi.associatePatient({
+                      ...addFormData,
+                      phone: canonicalPhone,
+                      emergencyContactPhone,
+                    });
 
                     if (response.success && response.data) {
                       setShowAddModal(false);
                       setAddError(null);
                       setAddPhoneError('');
+                      setAddEmergencyPhoneError('');
+                      setAddPhoneCountry('PH');
+                      setAddEmergencyPhoneCountry('PH');
                       setAddFormData({
                         email: '',
                         firstName: '',

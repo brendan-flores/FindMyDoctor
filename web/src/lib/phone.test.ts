@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
 
 import {
   formatPhoneFieldInput,
@@ -12,6 +13,11 @@ import {
   storedPhoneWarningFor,
   toPatientMobileE164,
   toStaffContactDomestic,
+  toStaffContactE164,
+  resolveStoredPhone,
+  splitInternationalInput,
+  toPhoneFieldE164,
+  STORED_PHONE_WARNING,
 } from './phone.ts';
 
 // ---------------------------------------------------------------------------
@@ -778,4 +784,293 @@ test('secretary complete-profile gate treats only a parseable staff contact as c
   assert.equal(isContactComplete(''), false);
   assert.equal(isContactComplete(null), false);
   assert.equal(isContactComplete(undefined), false);
+});
+
+// ---------------------------------------------------------------------------
+// International parsing and stored-number resolution
+// ---------------------------------------------------------------------------
+
+test('parsePhone treats 63-prefixed input as Philippine only when PH is selected', () => {
+  const ph = parsePhone('6315551234', 'PH');
+  // 6315551234 is not a valid Philippine number, so it must not be accepted.
+  assert.equal(ph.ok, false);
+
+  const us = parsePhone('6315551234', 'US');
+  assert.equal(us.ok, true);
+  if (us.ok) {
+    assert.equal(us.kind, 'landline');
+    assert.equal(us.e164, '+16315551234');
+  }
+});
+
+test('parsePhone derives the country from explicit international numbers', () => {
+  const fr = parsePhone('+33612345678');
+  assert.equal(fr.ok, true);
+  if (fr.ok) {
+    assert.equal(fr.kind, 'mobile');
+    assert.equal(fr.e164, '+33612345678');
+  }
+
+  const de = parsePhone('+4915123456789', 'US');
+  assert.equal(de.ok, true);
+  if (de.ok) {
+    assert.equal(de.e164, '+4915123456789');
+  }
+});
+
+test('parsePhone distinguishes countries sharing a calling code by ISO identity', () => {
+  const us = parsePhone('+12125551234');
+  const ca = parsePhone('+14165551234');
+  assert.equal(us.ok, true);
+  assert.equal(ca.ok, true);
+  if (us.ok && ca.ok) {
+    assert.equal(us.e164, '+12125551234');
+    assert.equal(ca.e164, '+14165551234');
+  }
+});
+
+test('toStaffContactE164 uses the selected country', () => {
+  assert.equal(toStaffContactE164('6315551234', 'US'), '+16315551234');
+  assert.equal(toStaffContactE164('9171234567', 'PH'), '+639171234567');
+  assert.equal(toStaffContactE164('917abc', 'US'), null);
+});
+
+test('toPatientMobileE164 remains mobile-only', () => {
+  assert.equal(toPatientMobileE164('+33612345678'), '+33612345678');
+  assert.equal(toPatientMobileE164('+442079460958'), null);
+  assert.equal(toPatientMobileE164('+16315551234'), null);
+});
+
+test('parsePhone rejects VoIP, toll-free, and unsupported types', () => {
+  // +1800 numbers are toll-free; ensure not accepted as landlines.
+  const tollFree = parsePhone('+18005551234');
+  assert.equal(tollFree.ok, false);
+});
+
+test('resolveStoredPhone restores empty, domestic, E.164, foreign, and invalid values', () => {
+  assert.deepEqual(resolveStoredPhone(''), {
+    country: 'PH',
+    nationalNumber: '',
+    warning: null,
+  });
+
+  const domestic = resolveStoredPhone('09171234567');
+  assert.equal(domestic.country, 'PH');
+  assert.equal(domestic.warning, null);
+
+  const phE164 = resolveStoredPhone('+639171234567');
+  assert.equal(phE164.country, 'PH');
+  assert.equal(phE164.nationalNumber, '9171234567');
+  assert.equal(phE164.warning, null);
+
+  const foreign = resolveStoredPhone('+33612345678');
+  assert.equal(foreign.country, 'FR');
+  assert.equal(foreign.warning, null);
+
+  const invalid = resolveStoredPhone('not-a-number');
+  assert.equal(invalid.nationalNumber, 'not-a-number');
+  assert.equal(invalid.warning, STORED_PHONE_WARNING);
+});
+
+test('parsePhone handles invalid ISO country input safely', () => {
+  const result = parsePhone('123', 'ZZ');
+  assert.equal(result.ok, false);
+});
+
+test('parsePhone preserves FIXED_LINE_OR_MOBILE conservatively for mobile-only use', () => {
+  const result = parsePhone('+16315551234');
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    // Classified as landline, not mobile, so mobile-only fields reject it.
+    assert.equal(result.kind, 'landline');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Unsupported types and shared calling-code restoration
+// ---------------------------------------------------------------------------
+
+test('unsupported VoIP, toll-free, and premium-rate numbers are rejected', () => {
+  const voip = '+16003837322';
+  const tollFree = '+18336271907';
+  const premium = '+19009260747';
+
+  // Verify the fixtures' actual types with the approved metadata library.
+  assert.equal(parsePhoneNumberFromString(voip)?.getType(), 'VOIP');
+  assert.equal(parsePhoneNumberFromString(tollFree)?.getType(), 'TOLL_FREE');
+  assert.equal(parsePhoneNumberFromString(premium)?.getType(), 'PREMIUM_RATE');
+
+  for (const value of [voip, tollFree, premium]) {
+    assert.equal(parsePhone(value).ok, false, value);
+    assert.equal(toStaffContactE164(value), null, value);
+  }
+});
+
+test('resolveStoredPhone restores US and Canadian numbers sharing +1 correctly', () => {
+  const us = '+12125551234';
+  const ca = '+14165551234';
+
+  const usResolved = resolveStoredPhone(us, true);
+  const caResolved = resolveStoredPhone(ca, true);
+
+  assert.equal(usResolved.country, 'US');
+  assert.equal(caResolved.country, 'CA');
+  assert.notEqual(usResolved.country, caResolved.country);
+
+  assert.equal(usResolved.nationalNumber, parsePhoneNumberFromString(us)!.nationalNumber);
+  assert.equal(caResolved.nationalNumber, parsePhoneNumberFromString(ca)!.nationalNumber);
+  assert.equal(usResolved.warning, null);
+  assert.equal(caResolved.warning, null);
+});
+
+// ---------------------------------------------------------------------------
+// Migrated web fields
+// ---------------------------------------------------------------------------
+
+const staffContactField = { allowLandline: true } as const;
+const patientMobileField = { allowLandline: false } as const;
+
+test('secretary profile contact accepts mobile and landline and submits E.164', () => {
+  assert.equal(
+    toPhoneFieldE164('9171234567', 'PH', staffContactField),
+    '+639171234567'
+  );
+  assert.equal(
+    toPhoneFieldE164('0281234567', 'PH', staffContactField),
+    '+63281234567'
+  );
+  assert.equal(
+    toPhoneFieldE164('+639171234567', 'PH', staffContactField),
+    '+639171234567'
+  );
+  // Empty is left to the form's required/optional decision.
+  assert.equal(toPhoneFieldE164('', 'PH', staffContactField), null);
+});
+
+test('doctor add-patient phone stays required and mobile-only', () => {
+  assert.equal(
+    toPhoneFieldE164('09171234567', 'PH', patientMobileField),
+    '+639171234567'
+  );
+  assert.equal(
+    toPhoneFieldE164('+639171234567', 'PH', patientMobileField),
+    '+639171234567'
+  );
+  // Landlines and unallocated mobile blocks remain rejected.
+  assert.equal(toPhoneFieldE164('0281234567', 'PH', patientMobileField), null);
+  assert.equal(
+    toPhoneFieldE164('08121234567', 'PH', patientMobileField),
+    null
+  );
+  assert.equal(toPhoneFieldE164('', 'PH', patientMobileField), null);
+});
+
+test('doctor emergency-contact phone stays optional but accepts mobile or landline', () => {
+  assert.equal(toPhoneFieldE164('', 'PH', staffContactField), null);
+  assert.equal(
+    toPhoneFieldE164('9171234567', 'PH', staffContactField),
+    '+639171234567'
+  );
+  assert.equal(
+    toPhoneFieldE164('0281234567', 'PH', staffContactField),
+    '+63281234567'
+  );
+  assert.equal(
+    toPhoneFieldE164('not-a-number', 'PH', staffContactField),
+    null
+  );
+});
+
+test('secretary walk-in phone stays required and mobile-only', () => {
+  assert.equal(
+    toPhoneFieldE164('+639171234567', 'PH', patientMobileField),
+    '+639171234567'
+  );
+  assert.equal(
+    toPhoneFieldE164('09171234567', 'PH', patientMobileField),
+    '+639171234567'
+  );
+  assert.equal(toPhoneFieldE164('0281234567', 'PH', patientMobileField), null);
+  assert.equal(toPhoneFieldE164('', 'PH', patientMobileField), null);
+});
+
+test('secretary patient edit loads domestic and E.164 records and submits E.164', () => {
+  const domestic = resolveStoredPhone('09171234567', false);
+  assert.equal(domestic.country, 'PH');
+  assert.equal(domestic.nationalNumber, '9171234567');
+  assert.equal(domestic.warning, null);
+  assert.equal(
+    toPhoneFieldE164(domestic.nationalNumber, domestic.country, patientMobileField),
+    '+639171234567'
+  );
+
+  const storedE164 = resolveStoredPhone('+639171234567', false);
+  assert.equal(storedE164.country, 'PH');
+  assert.equal(storedE164.nationalNumber, '9171234567');
+  assert.equal(storedE164.warning, null);
+  assert.equal(
+    toPhoneFieldE164(storedE164.nationalNumber, storedE164.country, patientMobileField),
+    '+639171234567'
+  );
+});
+
+test('invalid legacy patient numbers are preserved with a warning', () => {
+  for (const legacy of ['not-a-number', '+6309171234567', '0917abc4567']) {
+    const resolved = resolveStoredPhone(legacy, false);
+    assert.equal(resolved.country, 'PH');
+    assert.equal(resolved.nationalNumber, legacy);
+    assert.equal(resolved.warning, STORED_PHONE_WARNING);
+    assert.equal(
+      toPhoneFieldE164(resolved.nationalNumber, resolved.country, patientMobileField),
+      null
+    );
+  }
+});
+
+test('country changes revalidate against the selected country', () => {
+  // The same national digits resolve differently, and only the selected
+  // country's rules decide whether the value is a mobile.
+  assert.equal(
+    toPhoneFieldE164('0612345678', 'FR', patientMobileField),
+    '+33612345678'
+  );
+  assert.equal(
+    toPhoneFieldE164('0612345678', 'PH', patientMobileField),
+    null
+  );
+  assert.equal(
+    toPhoneFieldE164('9171234567', 'US', patientMobileField),
+    null
+  );
+  assert.equal(
+    toPhoneFieldE164('9171234567', 'PH', patientMobileField),
+    '+639171234567'
+  );
+});
+
+test('pasted domestic and international numbers split without duplicating the country code', () => {
+  assert.deepEqual(splitInternationalInput('+639171234567', 'PH'), {
+    country: 'PH',
+    nationalNumber: '9171234567',
+  });
+  assert.deepEqual(splitInternationalInput('+63 917 123 4567', 'PH'), {
+    country: 'PH',
+    nationalNumber: '9171234567',
+  });
+  // Digits-only international input is split only when it carries the selected
+  // country's calling code.
+  assert.deepEqual(splitInternationalInput('639171234567', 'PH'), {
+    country: 'PH',
+    nationalNumber: '9171234567',
+  });
+  assert.deepEqual(splitInternationalInput('16315551234', 'US'), {
+    country: 'US',
+    nationalNumber: '6315551234',
+  });
+  // A pasted domestic number is left untouched.
+  assert.equal(splitInternationalInput('09171234567', 'PH'), null);
+  assert.equal(splitInternationalInput('6315551234', 'US'), null);
+  // Duplicated country codes and trunk prefixes are not silently repaired.
+  assert.equal(splitInternationalInput('+6309171234567', 'PH'), null);
+  assert.equal(splitInternationalInput('63639171234567', 'PH'), null);
 });

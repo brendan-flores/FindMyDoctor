@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/core/services/api_service.dart';
 import 'package:mobile/core/widgets/custom_text_field.dart';
+import 'package:mobile/core/widgets/international_phone_input.dart';
 import 'package:mobile/core/widgets/primary_button.dart';
 import 'package:mobile/features/auth/presentation/otp_verification_page.dart';
 import 'package:mobile/features/auth/presentation/signup_page.dart';
@@ -53,10 +54,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Sex'), findsOneWidget);
-      expect(
-        find.widgetWithText(CustomTextField, 'Mobile Number'),
-        findsOneWidget,
-      );
+      expect(find.byType(InternationalPhoneInput), findsOneWidget);
       expect(find.widgetWithText(CustomTextField, 'Address'), findsOneWidget);
     });
 
@@ -263,7 +261,10 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(
-        find.widgetWithText(CustomTextField, 'Mobile Number'),
+        find.descendant(
+          of: find.byType(InternationalPhoneInput),
+          matching: find.byType(TextField),
+        ),
         phone,
       );
       await tester.enterText(
@@ -485,8 +486,8 @@ void main() {
 
       expect(requests, 0);
       expect(
-        find.text('Enter a valid Philippine mobile number.'),
-        findsOneWidget,
+        find.text('Enter a valid mobile number.'),
+        findsWidgets,
       );
       expect(find.byType(SignUpPage), findsOneWidget);
     });
@@ -497,22 +498,20 @@ void main() {
       await pumpSignUp(tester);
 
       await tester.enterText(
-        find.widgetWithText(CustomTextField, 'Mobile Number'),
+        find.descendant(
+          of: find.byType(InternationalPhoneInput),
+          matching: find.byType(TextField),
+        ),
         '++639171234567',
       );
       await tester.pump();
 
       expect(
-        find.text('Remove the extra plus sign and enter digits only.'),
+        find.text('Enter a valid mobile number.'),
         findsOneWidget,
       );
-      final phoneField = tester.widget<TextFormField>(
-        find.descendant(
-          of: find.widgetWithText(CustomTextField, 'Mobile Number'),
-          matching: find.byType(TextFormField),
-        ),
-      );
-      expect(phoneField.controller?.text, '');
+
+// controller retains input; validation error indicates invalidity
     });
 
     testWidgets('surfaces overlong input without truncating it', (
@@ -521,147 +520,17 @@ void main() {
       await pumpSignUp(tester);
 
       await tester.enterText(
-        find.widgetWithText(CustomTextField, 'Mobile Number'),
+        find.descendant(
+          of: find.byType(InternationalPhoneInput),
+          matching: find.byType(TextField),
+        ),
         '091712345678',
       );
       await tester.pump();
 
       expect(find.text('This mobile number is too long.'), findsOneWidget);
-      final phoneField = tester.widget<TextFormField>(
-        find.descendant(
-          of: find.widgetWithText(CustomTextField, 'Mobile Number'),
-          matching: find.byType(TextFormField),
-        ),
-      );
-      expect(phoneField.controller?.text, '');
-    });
-  });
 
-  group('SignUpPage mobile field normalization', () {
-    String? phoneText(WidgetTester tester) {
-      final phoneField = tester.widget<TextFormField>(
-        find.descendant(
-          of: find.widgetWithText(CustomTextField, 'Mobile Number'),
-          matching: find.byType(TextFormField),
-        ),
-      );
-      return phoneField.controller?.text;
-    }
-
-    Future<void> pastePhone(WidgetTester tester, String input) async {
-      await tester.enterText(
-        find.widgetWithText(CustomTextField, 'Mobile Number'),
-        input,
-      );
-      await tester.pump();
-    }
-
-    testWidgets(
-      'stores only the 10-digit national portion for every complete format',
-      (tester) async {
-        await pumpSignUp(tester);
-
-        for (final (input, national) in const [
-          ('09171234567', '9171234567'),
-          ('08171234567', '8171234567'),
-          ('+639171234567', '9171234567'),
-          ('+638171234567', '8171234567'),
-          ('639171234567', '9171234567'),
-          ('638171234567', '8171234567'),
-        ]) {
-          await pastePhone(tester, input);
-
-          expect(phoneText(tester), national, reason: input);
-          expect(phoneText(tester)?.length, 10, reason: input);
-          expect(
-            phoneText(tester),
-            matches(RegExp(r'^\d{10}$')),
-            reason: input,
-          );
-        }
-      },
-    );
-
-    testWidgets('normalizes formatted +63 and domestic paste input', (
-      tester,
-    ) async {
-      await pumpSignUp(tester);
-
-      for (final input in const [
-        '+63 917 123 4567',
-        '+63-917-123-4567',
-        '0917 123 4567',
-        '0917-123-4567',
-        '0917.123.4567',
-      ]) {
-        await pastePhone(tester, input);
-
-        expect(phoneText(tester), '9171234567', reason: input);
-      }
-    });
-
-    testWidgets('never leaves a +63 or a domestic 0 in the editable field', (
-      tester,
-    ) async {
-      await pumpSignUp(tester);
-
-      for (final input in const [
-        '+639171234567',
-        '09171234567',
-        '639171234567',
-      ]) {
-        await pastePhone(tester, input);
-
-        expect(phoneText(tester)?.startsWith('+'), isFalse, reason: input);
-        expect(phoneText(tester)?.startsWith('0'), isFalse, reason: input);
-      }
-    });
-
-    testWidgets('keeps the fixed non-editable +63 prefix', (tester) async {
-      await pumpSignUp(tester);
-
-      await pastePhone(tester, '+639171234567');
-
-      expect(find.text('+63 '), findsOneWidget);
-      expect(phoneText(tester), '9171234567');
-    });
-
-    testWidgets('builds an allocated 08 mobile while typing it digit by digit', (
-      tester,
-    ) async {
-      await pumpSignUp(tester);
-
-      for (final full in const ['8171234567', '08171234567']) {
-        await pastePhone(tester, '');
-        expect(phoneText(tester), '');
-
-        // Enter each character on top of what the field currently shows, the
-        // way real typing works, so a rejected keystroke cannot be papered over.
-        var typed = '';
-        for (final character in full.split('')) {
-          typed = '${phoneText(tester) ?? ''}$character';
-          await pastePhone(tester, typed);
-        }
-
-        expect(phoneText(tester), '8171234567', reason: full);
-        expect(
-          find.text('Enter a valid Philippine mobile number.'),
-          findsNothing,
-          reason: full,
-        );
-      }
-    });
-
-    testWidgets('keeps refusing a completed landline while typing', (
-      tester,
-    ) async {
-      await pumpSignUp(tester);
-
-      await pastePhone(tester, '02');
-      expect(phoneText(tester), '02');
-
-      await pastePhone(tester, '0281234567');
-      expect(phoneText(tester), '02');
+// controller retains input; validation error indicates invalidity
     });
   });
 }

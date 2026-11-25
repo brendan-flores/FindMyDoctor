@@ -6,12 +6,10 @@ import { apiClient } from '@/lib/api/apiClient';
 import { doctorApi, DoctorProfile, UpdateProfileRequest } from '@/lib/api/doctorApi';
 import { validateSignatureFile, shouldRefreshSignaturePreview } from '@/lib/doctorSignature';
 import {
-  formatPhoneFieldInput,
-  phoneFieldValueFromStored,
-  phoneFormatErrorMessage,
-  storedPhoneWarningFor,
-  toStaffContactDomestic,
+  resolveStoredPhone,
+  toStaffContactE164,
 } from '@/lib/phone';
+import InternationalPhoneInput from '@/components/ui/InternationalPhoneInput';
 import { CEBU_FACILITIES } from '@/data/cebuFacilities';
 import { MEDICAL_SPECIALTIES } from '@/data/medicalSpecialties';
 import { MEDICAL_CREDENTIALS } from '@/data/medicalCredentials';
@@ -52,6 +50,7 @@ export default function DoctorProfilePage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [contactWarning, setContactWarning] = useState<string | null>(null);
   const [contactError, setContactError] = useState('');
+  const [contactCountry, setContactCountry] = useState('PH');
 
   // Signature management state
   const [hasSignature, setHasSignature] = useState(false);
@@ -133,12 +132,13 @@ export default function DoctorProfilePage() {
     doctorApi.getProfile()
       .then((response) => {
         if (response.success && response.data) {
+          const storedContact = resolveStoredPhone(response.data.contact_number, true);
           setProfile(response.data);
           setEditForm({
             first_name: response.data.first_name || undefined,
             middle_name: response.data.middle_name || undefined,
             last_name: response.data.last_name || undefined,
-            contact_number: phoneFieldValueFromStored(response.data.contact_number, { allowLandline: true }) || undefined,
+            contact_number: storedContact.nationalNumber || undefined,
             email: response.data.email || undefined,
             specialty: response.data.specialty || undefined,
             credentials: response.data.credentials || undefined,
@@ -151,7 +151,8 @@ export default function DoctorProfilePage() {
             languages_spoken: response.data.languages_spoken || undefined,
             room_number: response.data.room_number || undefined,
           });
-          setContactWarning(storedPhoneWarningFor(response.data.contact_number, { allowLandline: true }));
+          setContactWarning(storedContact.warning);
+          setContactCountry(storedContact.country);
           setContactError('');
           if (response.data.professional_photo_url) {
             setPhotoPreview(
@@ -186,11 +187,12 @@ export default function DoctorProfilePage() {
   const handleCancel = () => {
     setIsEditing(false);
     if (profile) {
+      const storedContact = resolveStoredPhone(profile.contact_number, true);
       setEditForm({
         first_name: profile.first_name || undefined,
         middle_name: profile.middle_name || undefined,
         last_name: profile.last_name || undefined,
-        contact_number: phoneFieldValueFromStored(profile.contact_number, { allowLandline: true }) || undefined,
+        contact_number: storedContact.nationalNumber || undefined,
         email: profile.email || undefined,
         specialty: profile.specialty || undefined,
         credentials: profile.credentials || undefined,
@@ -203,7 +205,8 @@ export default function DoctorProfilePage() {
         languages_spoken: profile.languages_spoken || undefined,
         room_number: profile.room_number || undefined,
       });
-      setContactWarning(storedPhoneWarningFor(profile.contact_number, { allowLandline: true }));
+      setContactWarning(storedContact.warning);
+      setContactCountry(storedContact.country);
       setContactError('');
     }
   };
@@ -212,12 +215,12 @@ export default function DoctorProfilePage() {
     const rawContact = (editForm.contact_number ?? '').trim();
     let contactNumber = editForm.contact_number;
     if (rawContact.length > 0) {
-      const domestic = toStaffContactDomestic(rawContact);
-      if (domestic === null) {
-        setContactError('Enter a valid Philippine contact number.');
+      const canonicalContact = toStaffContactE164(rawContact, contactCountry);
+      if (!canonicalContact) {
+        setContactError('Enter a valid contact number.');
         return;
       }
-      contactNumber = domestic;
+      contactNumber = canonicalContact;
     }
 
     setIsSaving(true);
@@ -233,12 +236,13 @@ export default function DoctorProfilePage() {
 
       const response = await doctorApi.updateProfile(profileUpdateData);
       if (response.success && response.data) {
+        const storedContact = resolveStoredPhone(response.data.contact_number, true);
         setProfile(response.data);
         setEditForm({
           first_name: response.data.first_name || undefined,
           middle_name: response.data.middle_name || undefined,
           last_name: response.data.last_name || undefined,
-          contact_number: phoneFieldValueFromStored(response.data.contact_number, { allowLandline: true }) || undefined,
+          contact_number: storedContact.nationalNumber || undefined,
           email: response.data.email || undefined,
           specialty: response.data.specialty || undefined,
           credentials: response.data.credentials || undefined,
@@ -251,7 +255,8 @@ export default function DoctorProfilePage() {
           languages_spoken: response.data.languages_spoken || undefined,
           room_number: response.data.room_number || undefined,
         });
-        setContactWarning(storedPhoneWarningFor(response.data.contact_number, { allowLandline: true }));
+        setContactWarning(storedContact.warning);
+        setContactCountry(storedContact.country);
         setContactError('');
         setIsEditing(false);
         setSuccessMessage('Profile updated successfully');
@@ -558,23 +563,29 @@ export default function DoctorProfilePage() {
             <Detail label="Contact Number" value={profile.contact_number}>
               {isEditing && (
                 <>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500 font-medium">+63</span>
-                    <input
-                      type="tel"
-                      value={editForm.contact_number || ''}
-                      onChange={(e) => {
-                        const result = formatPhoneFieldInput(e.target.value, editForm.contact_number || '', { allowLandline: true });
-                        setEditForm({ ...editForm, contact_number: result.value });
-                        setContactError(result.error ? phoneFormatErrorMessage(result.error) : '');
-                        if (!result.error) setContactWarning(null);
-                      }}
-                      className="w-full pl-14 pr-4 py-3 border-2 border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-500 text-neutral-700 transition-all"
-                      placeholder="9171234567"
-                    />
-                  </div>
+                  <InternationalPhoneInput
+                    id="doctorContactNumber"
+                    country={contactCountry}
+                    nationalNumber={editForm.contact_number || ''}
+                    onCountryChange={(iso) => {
+                      setContactCountry(iso);
+                      const value = (editForm.contact_number ?? '').trim();
+                      if (value) {
+                        setContactError(
+                          toStaffContactE164(value, iso)
+                            ? ''
+                            : 'Enter a valid contact number.'
+                        );
+                      }
+                    }}
+                    onNationalChange={(v) => {
+                      setEditForm({ ...editForm, contact_number: v });
+                      setContactError('');
+                      setContactWarning(null);
+                    }}
+                    error={contactError || null}
+                  />
                   {contactWarning && <p className="mt-2 text-sm text-warning-600">{contactWarning}</p>}
-                  {contactError && <p className="mt-2 text-sm text-error-600">{contactError}</p>}
                 </>
               )}
             </Detail>
