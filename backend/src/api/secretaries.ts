@@ -7,7 +7,6 @@ import { invalidateAvailabilityCache } from '../modules/availability/availabilit
 import { getClinicDate, toClinicDateString } from '../utils/date';
 import { flagAndNotifyAffectedAppointments, pushScheduleChangeNotices, snapshotTarget } from '../modules/scheduleChanges/scheduleChangeService';
 import { normalizePhoneNumber, phoneErrorMessage } from '../utils/phone';
-import { evaluateProposal, snapshotTarget, toPendingSummary } from '../modules/scheduleChanges/scheduleChangeService';
 
 const router = Router();
 
