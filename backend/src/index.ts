@@ -41,10 +41,15 @@ const apiVersion = config.app.apiVersion;
 app.use(helmet());
 
 // CORS
-app.use(cors({
+const corsOptions: cors.CorsOptions = {
   origin: config.cors.origin,
   credentials: true,
-}));
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Portal-Role'],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Rate limiting
 // 1. General API budget for normal dashboard navigation.
@@ -63,12 +68,12 @@ app.use(cookieParser());
 
 // Serve static files from uploads directory (before API routes)
 const uploadsDir = path.resolve(process.cwd(), config.upload.dir);
-app.use('/uploads', cors(config.cors));
+app.use('/uploads', cors(corsOptions));
 app.use('/uploads', express.static(uploadsDir));
 
 // Serve static files from public directory (GCash QR, etc.)
 const publicDir = path.resolve(process.cwd(), 'public');
-app.use('/public', cors(config.cors));
+app.use('/public', cors(corsOptions));
 app.use('/public', express.static(publicDir));
 
 // Request logging

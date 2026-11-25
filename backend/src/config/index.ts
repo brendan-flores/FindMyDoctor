@@ -83,7 +83,10 @@ export const config = {
 
   // CORS
   cors: {
-    origin: (process.env.CORS_ORIGIN || '*').split(','),
+    origin: (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3001')
+      .split(',')
+      .map((o) => o.trim().replace(/\/+$/, ''))
+      .filter(Boolean),
   },
 
   // Supabase (for OTP email verification, Edge Functions, and Storage)
