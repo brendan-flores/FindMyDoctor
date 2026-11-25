@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePersistedState, buildPersistedStateKey } from '@/hooks/usePersistedState';
 import { secretaryApi, QueueEntry, SecretaryProfile } from '@/lib/api/secretaryApi';
 import Toast from '@/components/ui/Toast';
 import BillingPanel from '@/components/BillingPanel';
@@ -41,11 +42,32 @@ const toAmount = (value: number | string | null | undefined): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const isValidDateString = (value: unknown): value is string => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+};
+
 export default function SecretaryQueue() {
-  const [secretary, setSecretary] = useState<SecretaryProfile | null>(null);
-  const [queueEntries, setQueueEntries] = useState<QueueEntry[]>([]);
-  const [selectedDate, setSelectedDate] = useState(() => {
-    // Get current date in Asia/Manila timezone (same as backend getClinicDate)
+  const [userId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('secretary_user') || localStorage.getItem('user');
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed?.id ?? null;
+    } catch {
+      return null;
+    }
+  });
+
+  const defaultDate = (() => {
     const now = new Date();
     const formatter = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Manila',
@@ -54,10 +76,31 @@ export default function SecretaryQueue() {
       day: '2-digit',
     });
     return formatter.format(now);
-  });
-  const [activeTab, setActiveTab] = useState<TabType>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'ONLINE' | 'WALK_IN'>('all');
+  })();
+
+  const [secretary, setSecretary] = useState<SecretaryProfile | null>(null);
+  const [queueEntries, setQueueEntries] = useState<QueueEntry[]>([]);
+  const [selectedDate, setSelectedDate, selectedDateReady] = usePersistedState<string>(
+    buildPersistedStateKey({ role: 'secretary', route: '/secretary/queue', userId, field: 'selectedDate' }),
+    defaultDate,
+    isValidDateString
+  );
+  const [activeTab, setActiveTab, activeTabReady] = usePersistedState<TabType>(
+    buildPersistedStateKey({ role: 'secretary', route: '/secretary/queue', userId, field: 'activeTab' }),
+    'all',
+    (v): v is TabType => v === 'all' || v === 'waiting' || v === 'in-consultation' || v === 'completed' || v === 'skipped' || v === 'to-collect'
+  );
+  const [searchQuery, setSearchQuery, searchQueryReady] = usePersistedState<string>(
+    buildPersistedStateKey({ role: 'secretary', route: '/secretary/queue', userId, field: 'searchQuery' }),
+    '',
+    (v): v is string => typeof v === 'string'
+  );
+  const [sourceFilter, setSourceFilter, sourceFilterReady] = usePersistedState<'all' | 'ONLINE' | 'WALK_IN'>(
+    buildPersistedStateKey({ role: 'secretary', route: '/secretary/queue', userId, field: 'sourceFilter' }),
+    'all',
+    (v): v is 'all' | 'ONLINE' | 'WALK_IN' => v === 'all' || v === 'ONLINE' || v === 'WALK_IN'
+  );
+  const persistedReady = selectedDateReady && activeTabReady && searchQueryReady && sourceFilterReady;
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,10 +117,10 @@ export default function SecretaryQueue() {
   }, []);
 
   useEffect(() => {
-    if (secretary) {
+    if (secretary && persistedReady) {
       fetchQueue();
     }
-  }, [secretary, selectedDate]);
+  }, [secretary, selectedDate, persistedReady]);
 
   const fetchSecretaryProfile = async () => {
     setLoading(true);

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api/apiClient';
 import { usePresence } from '@/hooks/usePresence';
+import { usePersistedState, buildPersistedStateKey } from '@/hooks/usePersistedState';
 
 interface Appointment {
   id: string;
@@ -18,18 +19,35 @@ interface Appointment {
 }
 
 export default function SecretaryAppointments() {
+  const [userId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('secretary_user') || localStorage.getItem('user');
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed?.id ?? null;
+    } catch {
+      return null;
+    }
+  });
+
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter, statusFilterReady] = usePersistedState<string>(
+    buildPersistedStateKey({ role: 'secretary', route: '/secretary/appointments', userId, field: 'statusFilter' }),
+    'ALL',
+    (v): v is string => v === 'ALL' || v === 'SCHEDULED' || v === 'IN_PROGRESS' || v === 'COMPLETED' || v === 'CANCELLED'
+  );
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
   const showDetailModal = selectedAppointment !== null;
   const detailModalPresent = usePresence(showDetailModal);
 
   useEffect(() => {
-    fetchAppointments();
-  }, [statusFilter]);
+    if (statusFilterReady) {
+      fetchAppointments();
+    }
+  }, [statusFilter, statusFilterReady]);
 
   const fetchAppointments = async () => {
     setIsLoading(true);
