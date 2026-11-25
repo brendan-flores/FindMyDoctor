@@ -14,6 +14,14 @@ class DownloadedPdf {
   const DownloadedPdf({required this.bytes, required this.fileName});
 }
 
+/// Cached GET response with an absolute expiry time. Kept top-level because
+/// Dart does not allow nested classes.
+class _GetCacheEntry {
+  final Map<String, dynamic> value;
+  final DateTime expiry;
+  _GetCacheEntry(this.value, this.expiry);
+}
+
 class ApiService {
   /// Same contract as the backend naming function and the web client:
   /// `SURNAME_Firstname_RX-YYYYMMDD-XXXXXXXX.pdf`, optional `_replaces-...`
@@ -24,7 +32,28 @@ class ApiService {
 
   final String baseUrl = ApiConstants.baseUrl;
   String? _accessToken;
+  String? _refreshToken;
   http.Client? _httpClient;
+
+  // GET cache: successful GET responses are held for a short TTL so repeat
+  // screen loads (e.g. navigating back to a list) do not hit the network again.
+  // The cache is cleared whenever the token changes or the user logs out, so
+  // one user's authenticated data is never served to another user.
+  static const Duration _getCacheTtl = Duration(seconds: 15);
+  final Map<String, _GetCacheEntry> _getCache = {};
+
+  // In-flight request dedup: concurrent identical GETs share a single network
+  // request instead of each issuing one.
+  final Map<String, Future<Map<String, dynamic>>> _inFlightGets = {};
+
+  // Maximum retries for safe (GET) requests on transient failures.
+  static const int _getMaxRetries = 3;
+
+  // Refresh-token coordination: prevents multiple concurrent GETs that all
+  // receive 401 from each independently issuing a refresh request. Only one
+  // refresh is performed at a time; waiters reuse its result.
+  bool _isRefreshing = false;
+  bool _refreshSucceeded = false;
 
   // Singleton pattern
   static final ApiService _instance = ApiService._internal();
@@ -39,10 +68,36 @@ class ApiService {
   // Internal constructor for testing only
   ApiService._forTesting(this._httpClient);
 
+  /// Builds a cache/dedup key from the full request URI including query params.
+  String _getCacheKey(String endpoint, Map<String, String>? queryParams) {
+    final uri = Uri.parse('$baseUrl$endpoint');
+    final replaced = queryParams == null || queryParams.isEmpty
+        ? uri
+        : uri.replace(queryParameters: queryParams);
+    return replaced.toString();
+  }
+
+  /// Returns a cached GET response if present and not yet expired.
+  Map<String, dynamic>? _readGetCache(String key) {
+    final entry = _getCache[key];
+    if (entry == null) return null;
+    if (DateTime.now().isAfter(entry.expiry)) {
+      _getCache.remove(key);
+      return null;
+    }
+    return Map<String, dynamic>.from(entry.value);
+  }
+
+  /// Clears the GET cache so data for one session is never reused by another.
+  void _clearGetCache() {
+    _getCache.clear();
+  }
+
   // Initialize and load token from storage
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _accessToken = prefs.getString('access_token');
+    await _readRefreshToken();
   }
 
   // Save token to storage
@@ -56,16 +111,47 @@ class ApiService {
     }
   }
 
+  /// Save refresh token to storage for 401 refresh-and-retry on safe GETs.
+  Future<void> _saveRefreshToken(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('refresh_token', token);
+      _refreshToken = token;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Read the persisted refresh token, if any.
+  Future<String?> _readRefreshToken() async {
+    if (_refreshToken != null && _refreshToken!.isNotEmpty) {
+      return _refreshToken;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('refresh_token');
+      if (token != null && token.isNotEmpty) {
+        _refreshToken = token;
+      }
+      return token;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // Public method to save token (for use after OTP verification)
   Future<void> saveToken(String token) async {
     await _saveToken(token);
   }
 
-  // Clear token from storage
+  // Clear token and refresh token from storage
   Future<void> _clearToken() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('access_token');
+    await prefs.remove('refresh_token');
     _accessToken = null;
+    _refreshToken = null;
+    _clearGetCache();
   }
 
   // Get headers with authorization
@@ -79,24 +165,154 @@ class ApiService {
     return headers;
   }
 
-  // Generic GET request
+  // Generic GET request with short-TTL caching, in-flight dedup, retry with
+  // backoff on transient failures, and 401 refresh-and-retry. Only GET requests
+  // are cached/retried because they are safe and idempotent; mutations are
+  // never cached or retried (see _clearGetCache below).
   Future<Map<String, dynamic>> get(
     String endpoint, {
     bool requireAuth = true,
     Map<String, String>? queryParams,
   }) async {
-    Uri uri = Uri.parse('$baseUrl$endpoint');
-    if (queryParams != null) {
-      uri = uri.replace(queryParameters: queryParams);
+    final key = _getCacheKey(endpoint, queryParams);
+
+    // Serve from cache while fresh.
+    final cached = _readGetCache(key);
+    if (cached != null) {
+      return cached;
     }
 
-    final client = _httpClient ?? http.Client();
-    final response = await client.get(
-      uri,
-      headers: _getHeaders(requireAuth: requireAuth),
-    );
+    // Coalesce concurrent identical GETs onto a single request.
+    if (_inFlightGets.containsKey(key)) {
+      return _inFlightGets[key]!;
+    }
 
+    final request = _getWithRetry(endpoint, requireAuth: requireAuth, queryParams: queryParams);
+    _inFlightGets[key] = request;
+    try {
+      final response = await request;
+      // Cache successful responses only. A failed request is intentionally not
+      // cached so the next attempt can succeed once the backend recovers.
+      _getCache[key] = _GetCacheEntry(response, DateTime.now().add(_getCacheTtl));
+      return response;
+    } finally {
+      _inFlightGets.remove(key);
+    }
+  }
+
+  // Executes a single GET attempt. Network failures are normalised to
+  // ApiException so the retry logic can handle them uniformly.
+  Future<Map<String, dynamic>> _getOnce(
+    String endpoint, {
+    bool requireAuth = true,
+    Map<String, String>? queryParams,
+  }) async {
+    final uri = Uri.parse('$baseUrl$endpoint');
+    final resolved =
+        queryParams == null || queryParams.isEmpty ? uri : uri.replace(queryParameters: queryParams);
+    final client = _httpClient ?? http.Client();
+    http.Response response;
+    try {
+      response = await client.get(resolved, headers: _getHeaders(requireAuth: requireAuth));
+    } on Object catch (e) {
+      throw ApiException(
+        message: 'Network error: $e',
+        code: 'NETWORK_ERROR',
+        statusCode: 0,
+      );
+    }
     return _handleResponse(response);
+  }
+
+  // Retries a safe GET on transient failures: network errors, 429 (rate limit),
+  // and 5xx server errors. A 401 triggers a single token refresh and retry.
+  Future<Map<String, dynamic>> _getWithRetry(
+    String endpoint, {
+    bool requireAuth = true,
+    Map<String, String>? queryParams,
+  }) async {
+    Duration delay = const Duration(milliseconds: 500);
+    ApiException? lastError;
+
+    for (int attempt = 1; attempt <= _getMaxRetries; attempt++) {
+      try {
+        return await _getOnce(endpoint, requireAuth: requireAuth, queryParams: queryParams);
+      } on ApiException catch (e) {
+        lastError = e;
+
+        // 401: attempt to refresh the access token once, then retry this GET.
+        if (e.statusCode == 401 && requireAuth && attempt == 1) {
+          final refreshed = await _refreshAccessTokenStored();
+          if (refreshed) {
+            continue;
+          }
+        }
+
+        final bool isRetriable =
+            e.statusCode == 0 || // network error
+            e.statusCode == 429 ||
+            e.statusCode >= 500;
+
+        if (isRetriable && attempt < _getMaxRetries) {
+          await Future.delayed(delay);
+          delay = Duration(milliseconds: (delay.inMilliseconds * 2).round());
+          continue;
+        }
+
+        rethrow;
+      }
+    }
+    throw lastError ??
+        ApiException(message: 'Request failed', code: 'UNKNOWN_ERROR', statusCode: 0);
+  }
+
+  // Refreshes the access token using the stored refresh token and updates
+  // storage. Returns true when a fresh access token is available. If another
+  // request is already refreshing, this call waits for its result and reuses
+  // it, preventing duplicate refresh requests during concurrent 401s.
+  Future<bool> _refreshAccessTokenStored() async {
+    // If a refresh is already in progress, wait for its result and reuse it.
+    if (_isRefreshing) {
+      for (int i = 0; i < 100; i++) {
+        if (!_isRefreshing) break;
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+      return _refreshSucceeded && _accessToken != null;
+    }
+
+    _isRefreshing = true;
+    _refreshSucceeded = false;
+
+    try {
+      final refreshToken = await _readRefreshToken();
+      if (refreshToken == null || refreshToken.isEmpty) {
+        return false;
+      }
+
+      final response = await post(
+        ApiConstants.refresh,
+        body: {'refreshToken': refreshToken},
+        requireAuth: false,
+      );
+      if (response['success'] == true) {
+        final data = response['data'];
+        final newAccessToken = data is Map ? data['accessToken'] : null;
+        final newRefreshToken = data is Map ? data['refreshToken'] : null;
+        if (newAccessToken is String && newAccessToken.isNotEmpty) {
+          await _saveToken(newAccessToken);
+          if (newRefreshToken is String && newRefreshToken.isNotEmpty) {
+            await _saveRefreshToken(newRefreshToken);
+          }
+          _refreshSucceeded = true;
+          return true;
+        }
+      }
+      return false;
+    } catch (_) {
+      return false;
+    } finally {
+      _isRefreshing = false;
+    }
   }
 
   // Generic POST request
@@ -114,7 +330,10 @@ class ApiService {
       body: body != null ? jsonEncode(body) : null,
     );
 
-    return _handleResponse(response);
+    final result = _handleResponse(response);
+    // Mutations invalidate cached GETs so the caller never reads stale data.
+    _clearGetCache();
+    return result;
   }
 
   // Generic POST request with multipart file upload
@@ -175,6 +394,7 @@ class ApiService {
       final body = jsonDecode(responseBody);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
+        _clearGetCache();
         return body;
       } else {
         throw ApiException(
@@ -208,7 +428,9 @@ class ApiService {
       body: body != null ? jsonEncode(body) : null,
     );
 
-    return _handleResponse(response);
+    final result = _handleResponse(response);
+    _clearGetCache();
+    return result;
   }
 
   // Generic PATCH request
@@ -224,7 +446,9 @@ class ApiService {
       body: body != null ? jsonEncode(body) : null,
     );
 
-    return _handleResponse(response);
+    final result = _handleResponse(response);
+    _clearGetCache();
+    return result;
   }
 
   // Generic DELETE request
@@ -238,7 +462,9 @@ class ApiService {
       headers: _getHeaders(requireAuth: requireAuth),
     );
 
-    return _handleResponse(response);
+    final result = _handleResponse(response);
+    _clearGetCache();
+    return result;
   }
 
   // Handle API response
@@ -273,13 +499,35 @@ class ApiService {
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     // The mobile application is shared by patients and secretaries. There is
-    // no role selector, so the backend is asked to verify the account as a
-    // patient first and then as a secretary. The User record's role field
-    // remains the single source of truth; the backend still rejects any
-    // account that does not match the attempted role.
+    // no role selector, so the backend is asked to verify the account against
+    // a role. The User record's role field remains the single source of truth;
+    // the backend still rejects any account that does not match the attempted
+    // role.
+    //
+    // Performance: returning users already have their role persisted after a
+    // previous successful login. Trying that role first avoids a duplicate
+    // backend login request (and a duplicate OTP send when OTP is required).
+    // First-time users (no persisted role) keep the original patient-then-
+    // secretary ordering, and a stored role that no longer matches falls back
+    // to the other role, so existing authentication behaviour is preserved.
+    final prefs = await SharedPreferences.getInstance();
+    final storedRole = prefs.getString('user_role');
+    final supportedRoles = const ['PATIENT', 'SECRETARY'];
+    final expectedRoles = <String>[];
+    if (storedRole != null &&
+        storedRole.isNotEmpty &&
+        supportedRoles.contains(storedRole)) {
+      expectedRoles.add(storedRole);
+    }
+    for (final role in supportedRoles) {
+      if (!expectedRoles.contains(role)) {
+        expectedRoles.add(role);
+      }
+    }
+
     Map<String, dynamic>? lastFailure;
 
-    for (final expectedRole in const ['PATIENT', 'SECRETARY']) {
+    for (final expectedRole in expectedRoles) {
       try {
         final response = await post(
           ApiConstants.login,
@@ -296,6 +544,17 @@ class ApiService {
           final accessToken = data is Map ? data['accessToken'] : null;
           if (accessToken is String && accessToken.isNotEmpty) {
             await _saveToken(accessToken);
+          }
+          final refreshToken = data is Map ? data['refreshToken'] : null;
+          if (refreshToken is String && refreshToken.isNotEmpty) {
+            await _saveRefreshToken(refreshToken);
+          }
+          // Persist the authenticated role so the next login can skip the
+          // duplicate attempt. Mirrors the role persisted by the login page.
+          final userData = data is Map ? data['user'] : null;
+          final loggedInRole = userData is Map ? userData['role'] : null;
+          if (loggedInRole is String && loggedInRole.isNotEmpty) {
+            await prefs.setString('user_role', loggedInRole);
           }
           return response;
         }
