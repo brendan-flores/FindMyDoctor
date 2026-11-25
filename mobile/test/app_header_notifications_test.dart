@@ -8,7 +8,6 @@ void main() {
       home: Scaffold(
         body: AppHeader(
           showNotifications: true,
-          showProfile: true,
           unreadCount: unreadCount,
         ),
       ),
@@ -51,7 +50,7 @@ void main() {
         initialRoute: '/notifications',
         routes: {
           '/notifications': (context) => Scaffold(
-                body: AppHeader(showNotifications: true, showProfile: true),
+                body: AppHeader(showNotifications: true),
               ),
         },
       ),
@@ -63,5 +62,11 @@ void main() {
 
     // No navigation occurred: still the same single page, still rendered
     expect(find.byType(AppHeader), findsOneWidget);
+  });
+
+  testWidgets('does not render profile placeholder icon', (tester) async {
+    await tester.pumpWidget(buildHeader());
+
+    expect(find.byIcon(Icons.person), findsNothing);
   });
 }

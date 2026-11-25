@@ -144,7 +144,7 @@ class _WaitlistPageState extends State<WaitlistPage> {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          const AppHeader(showNotifications: true, showProfile: true),
+          const AppHeader(showNotifications: true),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _fetchWaitlists,

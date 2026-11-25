@@ -133,7 +133,6 @@ class _BookingConfirmationPageState extends State<BookingConfirmationPage> {
                   ? _goToAppointments
                   : () => Navigator.of(context).pop(),
               showNotifications: false,
-              showProfile: false,
             ),
             Expanded(
               child: SingleChildScrollView(

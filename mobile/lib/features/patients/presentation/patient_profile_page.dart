@@ -239,7 +239,6 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
             showBackButton: true,
             onBackPressed: () => Navigator.of(context).pop(),
             showNotifications: false,
-            showProfile: false,
             actions: _isLoading
                 ? null
                 : [

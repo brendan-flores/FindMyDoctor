@@ -147,7 +147,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          const AppHeader(showNotifications: true, showProfile: true),
+          const AppHeader(showNotifications: true),
           Expanded(
             child: SingleChildScrollView(
               child: Padding(

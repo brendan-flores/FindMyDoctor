@@ -152,7 +152,6 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
             showLogo: false,
             showBackButton: true,
             showNotifications: false,
-            showProfile: false,
           ),
           Expanded(
             child: _isLoading

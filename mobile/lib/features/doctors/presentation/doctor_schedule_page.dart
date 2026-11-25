@@ -350,7 +350,6 @@ class _DoctorSchedulePageState extends State<DoctorSchedulePage> {
             showBackButton: true,
             onBackPressed: () => Navigator.of(context).pop(),
             showNotifications: false,
-            showProfile: false,
           ),
           Expanded(
             child: SingleChildScrollView(

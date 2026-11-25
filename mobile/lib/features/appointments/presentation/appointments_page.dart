@@ -334,7 +334,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> {
         label: 'My Appointments',
         child: Column(
           children: [
-            const AppHeader(showNotifications: true, showProfile: true),
+            const AppHeader(showNotifications: true),
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 spacing.AppSpacing.screenPadding,

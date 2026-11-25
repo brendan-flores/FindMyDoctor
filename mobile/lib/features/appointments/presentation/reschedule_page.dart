@@ -374,7 +374,6 @@ class _ReschedulePageState extends State<ReschedulePage> {
             showBackButton: true,
             onBackPressed: () => Navigator.of(context).pop(),
             showNotifications: false,
-            showProfile: false,
           ),
           Expanded(child: _buildBody()),
           if (!_isLoading && _errorMessage == null && _appointment != null)

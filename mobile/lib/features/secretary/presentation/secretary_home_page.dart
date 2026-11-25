@@ -117,7 +117,6 @@ class _SecretaryHomePageState extends State<SecretaryHomePage> {
         children: [
           AppHeader(
             showNotifications: false,
-            showProfile: false,
             actions: [
               IconButton(
                 icon: const Icon(Icons.more_vert),

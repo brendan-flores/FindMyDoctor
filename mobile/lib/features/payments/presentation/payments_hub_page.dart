@@ -279,7 +279,6 @@ class _PaymentsHubPageState extends State<PaymentsHubPage> {
           const AppHeader(
             showBackButton: true,
             showNotifications: true,
-            showProfile: true,
           ),
           Expanded(
             child: RefreshIndicator(

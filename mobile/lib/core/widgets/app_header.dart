@@ -12,11 +12,14 @@ class AppHeader extends StatefulWidget implements PreferredSizeWidget {
   final bool showBackButton;
   final VoidCallback? onBackPressed;
   final bool showNotifications;
-  final bool showProfile;
   final int? unreadCount;
   /// Called when the user returns from the notifications page so the
   /// caller can refresh the unread badge.
   final VoidCallback? onUnreadCountUpdate;
+  /// Optional callback that captures the BuildContext of the notification
+  /// bell widget. The capturer is invoked after the frame is laid out so
+  /// that the context is valid for measurement (e.g. TutorialOverlay).
+  final void Function(BuildContext)? onNotificationBellContext;
 
   const AppHeader({
     super.key,
@@ -27,9 +30,9 @@ class AppHeader extends StatefulWidget implements PreferredSizeWidget {
     this.showBackButton = false,
     this.onBackPressed,
     this.showNotifications = true,
-    this.showProfile = true,
     this.unreadCount,
     this.onUnreadCountUpdate,
+    this.onNotificationBellContext,
   });
 
   @override
@@ -38,7 +41,7 @@ class AppHeader extends StatefulWidget implements PreferredSizeWidget {
         WidgetsBinding.instance.platformDispatcher.views.first.padding.top /
         WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
     // 72 = gutterMd(12) + content(48, the IconButton touch-target height;
-    // the 32px logo/profile avatar is vertically centered inside it) +
+    // the 32px logo is vertically centered inside it) +
     // gutterMd(12). Keeping 56 here let the header paint 16 px over the
     // page body and triggered a RenderFlex overflow.
     return Size.fromHeight(topPadding + 72.0);
@@ -130,6 +133,17 @@ class _AppHeaderState extends State<AppHeader> {
                         ),
                         onPressed: _handleNotificationTap,
                       ),
+                      if (widget.onNotificationBellContext != null)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: Builder(
+                              builder: (context) {
+                                widget.onNotificationBellContext?.call(context);
+                                return const SizedBox.shrink();
+                              },
+                            ),
+                          ),
+                        ),
                       if (widget.unreadCount != null && widget.unreadCount! > 0)
                         Positioned(
                           top: 6,
@@ -165,24 +179,6 @@ class _AppHeaderState extends State<AppHeader> {
                         ),
                     ],
                   ),
-                if (widget.showProfile) ...[
-                  const SizedBox(width: spacing.AppSpacing.gutterXs),
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainer,
-                      borderRadius: BorderRadius.circular(
-                        spacing.AppSpacing.radiusFull,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.person,
-                      color: AppColors.onSurfaceVariant,
-                      size: spacing.AppSpacing.iconMd,
-                    ),
-                  ),
-                ],
                 if (widget.actions != null) ...[
                   const SizedBox(width: spacing.AppSpacing.gutterSm),
                   ...widget.actions!,

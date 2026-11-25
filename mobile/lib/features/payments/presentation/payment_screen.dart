@@ -335,7 +335,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
               }
             },
             showNotifications: false,
-            showProfile: false,
           ),
           Expanded(
             child: SingleChildScrollView(
