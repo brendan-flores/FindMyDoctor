@@ -108,6 +108,27 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Production-safe database health check. Runs a trivial query against the
+// connection pool so uptime monitors can confirm the instance can serve
+// database-backed requests (useful after a Render spin-down or cold start).
+app.get('/health/db', async (_req, res) => {
+  try {
+    const result = await pool.query('SELECT NOW() AS now');
+    res.json({
+      status: 'ok',
+      database: 'connected',
+      serverTime: result.rows[0].now,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      database: 'disconnected',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 // E2E-only database identity verification. Never enabled in production.
 if (process.env.E2E_TEST_MODE === 'true' && process.env.NODE_ENV !== 'production') {
   app.get('/health/e2e-db', async (_req, res) => {
