@@ -14,7 +14,7 @@ import request from 'supertest';
 import express from 'express';
 import prescriptionsRouter from './prescriptions';
 import paymentsRouter from './payments';
-import invoicesRouter from './invoices';
+import invoicesRouter, { publicInvoiceRouter } from './invoices';
 import conversationsRouter from './conversations';
 
 let mockUser: any = { id: 'doctor-user-1', role: 'DOCTOR', mustChangePassword: false };
@@ -34,6 +34,16 @@ jest.mock('../middleware/auth', () => ({
   requirePasswordChange: (_req: any, _res: any, next: any) => next(),
   requireSecretaryPasswordChange: (_req: any, _res: any, next: any) => next(),
   requireSecretaryProfileCompletion: (_req: any, _res: any, next: any) => next(),
+}));
+
+jest.mock('jsonwebtoken', () => ({
+  sign: jest.fn().mockReturnValue('mocked-jwt-token'),
+  verify: jest.fn((token: string) => {
+    if (token === 'not-a-token') {
+      throw new Error('Invalid token');
+    }
+    return { invoiceId: 'invoice-1', userId: 'patient-user-1', role: 'PATIENT' };
+  }),
 }));
 
 jest.mock('../database/connection', () => ({
@@ -145,6 +155,7 @@ describe('Billing flow', () => {
     app.use(express.json());
     app.use('/api/v1/prescriptions', prescriptionsRouter);
     app.use('/api/v1/payments', paymentsRouter);
+    app.use('/api/v1/invoices', publicInvoiceRouter);
     app.use('/api/v1/invoices', invoicesRouter);
     app.use('/api/v1/conversations', conversationsRouter);
     jest.clearAllMocks();

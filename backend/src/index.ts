@@ -29,7 +29,7 @@ import prescriptionsRouter from './api/prescriptions.js';
 import notificationsRouter from './api/notifications.js';
 import adminRouter from './api/admin.js';
 import gcashQrRouter from './api/gcashQr.js';
-import invoicesRouter from './api/invoices.js';
+import invoicesRouter, { publicInvoiceRouter } from './api/invoices.js';
 import patientDoctorsRouter from './api/patientDoctors.js';
 import waitlistsRouter from './api/waitlists.js';
 import consultationRouter from './api/consultation.js';
@@ -195,6 +195,9 @@ app.use(`/api/${apiVersion}/visits`, authenticate, visitsRouter);
 app.use(`/api/${apiVersion}/prescriptions`, authenticate, prescriptionsRouter);
 app.use(`/api/${apiVersion}/notifications`, authenticate, notificationsRouter);
 app.use(`/api/${apiVersion}/gcash-qr`, authenticate, gcashQrRouter);
+// Public invoice routes (signed URL download - no authentication)
+app.use(`/api/${apiVersion}/invoices`, publicInvoiceRouter);
+// Authenticated invoice routes
 app.use(`/api/${apiVersion}/invoices`, authenticate, invoicesRouter);
 app.use(`/api/${apiVersion}/admin`, authenticate, adminRouter);
 app.use(`/api/${apiVersion}/waitlists`, authenticate, authorize('PATIENT'), waitlistsRouter);

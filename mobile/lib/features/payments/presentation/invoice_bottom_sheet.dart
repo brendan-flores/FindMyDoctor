@@ -104,31 +104,8 @@ class _InvoiceBottomSheetState extends State<InvoiceBottomSheet> {
             throw Exception('Failed to get download URL');
           }
         } catch (e) {
-          // Check if it's an expired link error
-          final errorStr = e.toString().toLowerCase();
-          if (errorStr.contains('expired') || errorStr.contains('unauthorized') || errorStr.contains('invalid')) {
-            if (mounted) {
-              setState(() {
-                _isDownloading = false;
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Download link expired. Please try again.'),
-                  backgroundColor: AppColors.error,
-                  duration: const Duration(seconds: 5),
-                  action: SnackBarAction(
-                    label: 'Retry',
-                    textColor: AppColors.onPrimary,
-                    onPressed: () {
-                      _downloadInvoice();
-                    },
-                  ),
-                ),
-              );
-            }
-            return;
-          }
-          // Fallback to direct download if signed URL fails for other reasons
+          // Fallback to direct authenticated download if signed URL fails for any reason
+          // This handles expired tokens, network errors, and other issues
           pdfBytes = await _apiService.downloadInvoicePdf(invoiceId);
         }
       } else {

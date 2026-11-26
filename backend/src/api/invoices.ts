@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Response, Request } from 'express';
 import { query, getClient } from '../database/connection';
 import { success, error, ErrorCodes } from '../utils/response';
 import { AuthRequest, authenticate, authorize, requireSecretaryPasswordChange, requireSecretaryProfileCompletion } from '../middleware/auth';
@@ -861,8 +861,11 @@ router.get('/:id/download-url', authenticate, async (req: AuthRequest, res: Resp
   }
 });
 
+// Public router for signed URL download (no authentication middleware)
+const publicInvoiceRouter = Router();
+
 // Download invoice using signed URL (public endpoint with token verification)
-router.get('/:id/download', async (req: AuthRequest, res: Response) => {
+publicInvoiceRouter.get('/:id/download', async (req: Request, res: Response) => {
   const client = await getClient();
   try {
     const { id } = req.params;
@@ -972,3 +975,4 @@ router.get('/:id/download', async (req: AuthRequest, res: Response) => {
 });
 
 export default router;
+export { publicInvoiceRouter };
