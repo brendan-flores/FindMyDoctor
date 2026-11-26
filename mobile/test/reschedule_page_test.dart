@@ -283,5 +283,77 @@ void main() {
       expect(find.text('Failed to load appointment'), findsOneWidget);
       expect(find.text('Retry'), findsOneWidget);
     });
+
+    testWidgets(
+      'can select a different available date when current date is ALREADY_BOOKED',
+      (tester) async {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final weekStart = startOfWeek(today);
+
+        // Current appointment is on day 1
+        final currentDate = weekStart.add(const Duration(days: 1));
+        // Target date to select is day 2
+        final targetDate = weekStart.add(const Duration(days: 2));
+
+        final availabilityDates = <Map<String, dynamic>>[
+          for (var i = 0; i < 7; i++)
+            availabilityEntry(
+              weekStart.add(Duration(days: i)),
+              status: i == 1 ? 'ALREADY_BOOKED' : 'AVAILABLE',
+            ),
+        ];
+
+        final mockClient = MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path.endsWith('/appointments/appointment-1')) {
+            return http.Response(
+              jsonEncode({
+                'success': true,
+                'data': {
+                  'id': 'appointment-1',
+                  'patient_id': 'patient-1',
+                  'doctor_id': 'doctor-1',
+                  'appointment_date': localDateToIso(currentDate),
+                  'status': 'SCHEDULED',
+                  'queue_number': 4,
+                  'doctor_first_name': 'Maria',
+                  'doctor_last_name': 'Santos',
+                },
+              }),
+              200,
+            );
+          }
+          if (request.method == 'GET' &&
+              request.url.path.endsWith('/doctors/doctor-1/availability')) {
+            return http.Response(
+              jsonEncode({
+                'success': true,
+                'data': {'dates': availabilityDates},
+              }),
+              200,
+            );
+          }
+          return http.Response('Not found', 404);
+        });
+
+        await pumpPage(
+          tester,
+          apiService: ApiService.createWithClient(mockClient),
+          appointmentId: 'appointment-1',
+        );
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('Reschedule Appointment'), findsOneWidget);
+
+        // Tap the target date (day 2)
+        final targetLabel = DateFormat('d').format(targetDate);
+        await tester.tap(find.text(targetLabel));
+        await tester.pumpAndSettle();
+
+        // Verify the Confirm Reschedule button appears (indicates a date was selected)
+        expect(find.text('Confirm Reschedule'), findsOneWidget);
+      },
+    );
   });
 }

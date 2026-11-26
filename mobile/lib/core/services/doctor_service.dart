@@ -54,6 +54,7 @@ class DoctorService {
     String? date,
     String? startDate,
     String? endDate,
+    String? excludeAppointmentId,
   }) async {
     try {
       final response = await _apiService.getDoctorAvailability(
@@ -61,8 +62,9 @@ class DoctorService {
         date: date,
         startDate: startDate,
         endDate: endDate,
+        excludeAppointmentId: excludeAppointmentId,
       );
-      
+
       if (response['success'] == true) {
         return response['data'];
       }

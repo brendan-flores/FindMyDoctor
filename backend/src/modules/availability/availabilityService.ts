@@ -274,7 +274,8 @@ async function getBookedIntervals(doctorId: string, date: string): Promise<TimeR
 export async function calculateAvailability(
   doctorId: string,
   date: string,
-  patientId?: string | null
+  patientId?: string | null,
+  excludeAppointmentId?: string | null
 ): Promise<DateAvailability> {
   const [year, month, day] = date.split('-').map(Number);
   const dateObj = new Date(year, month - 1, day);
@@ -410,8 +411,9 @@ export async function calculateAvailability(
       `SELECT id FROM appointments
        WHERE patient_id = $1 AND doctor_id = $2
        AND DATE(appointment_date) = $3
-       AND status NOT IN ('CANCELLED', 'NO_SHOW')`,
-      [patientId, doctorId, date]
+       AND status NOT IN ('CANCELLED', 'NO_SHOW')
+       AND ($4::uuid IS NULL OR id <> $4::uuid)`,
+      [patientId, doctorId, date, excludeAppointmentId || null]
     );
 
     if (existingAppointmentResult.rows.length > 0) {
@@ -442,17 +444,18 @@ export async function calculateAvailabilityRange(
   doctorId: string,
   startDate: string,
   endDate: string,
-  patientId?: string | null
+  patientId?: string | null,
+  excludeAppointmentId?: string | null
 ): Promise<AvailabilityRange> {
   if (patientId) {
-    return calculateAvailabilityRangeUncached(doctorId, startDate, endDate, patientId);
+    return calculateAvailabilityRangeUncached(doctorId, startDate, endDate, patientId, excludeAppointmentId);
   }
 
-  const cacheKey = `availability:${doctorId}:${startDate}:${endDate}`;
+  const cacheKey = `availability:${doctorId}:${startDate}:${endDate}:${excludeAppointmentId || 'none'}`;
   return availabilityRangeCache.getOrLoad(
     cacheKey,
     config.cache.availabilityTtlMs,
-    () => calculateAvailabilityRangeUncached(doctorId, startDate, endDate, null)
+    () => calculateAvailabilityRangeUncached(doctorId, startDate, endDate, null, excludeAppointmentId)
   );
 }
 
@@ -460,7 +463,8 @@ async function calculateAvailabilityRangeUncached(
   doctorId: string,
   startDate: string,
   endDate: string,
-  patientId?: string | null
+  patientId?: string | null,
+  excludeAppointmentId?: string | null
 ): Promise<AvailabilityRange> {
   const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
   const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
@@ -534,8 +538,9 @@ async function calculateAvailabilityRangeUncached(
        FROM appointments
        WHERE patient_id = $1 AND doctor_id = $2
        AND DATE(appointment_date) = ANY($3::date[])
-       AND status NOT IN ('CANCELLED', 'NO_SHOW')`,
-      [patientId, doctorId, dateRange]
+       AND status NOT IN ('CANCELLED', 'NO_SHOW')
+       AND ($4::uuid IS NULL OR id <> $4::uuid)`,
+      [patientId, doctorId, dateRange, excludeAppointmentId || null]
     );
     existingResult.rows.forEach(row => {
       let dateStr: string;
@@ -554,11 +559,35 @@ async function calculateAvailabilityRangeUncached(
   // Process data into maps for fast lookup
   const unavailabilityMap: Record<string, boolean> = {};
   unavailabilityResult.rows.forEach(row => {
-    const [uYear, uMonth, uDay] = row.start_date.split('-').map(Number);
-    const [eYear, eMonth, eDay] = row.end_date.split('-').map(Number);
+    // Skip rows with null dates to prevent TypeError
+    if (!row.start_date || !row.end_date) {
+      console.warn(`Skipping unavailability record with null date for doctor ${doctorId}`);
+      return;
+    }
+    // Convert Date objects to strings before splitting
+    let startDateStr: string;
+    let endDateStr: string;
+    if (row.start_date instanceof Date) {
+      const year = row.start_date.getFullYear();
+      const month = String(row.start_date.getMonth() + 1).padStart(2, '0');
+      const day = String(row.start_date.getDate()).padStart(2, '0');
+      startDateStr = `${year}-${month}-${day}`;
+    } else {
+      startDateStr = String(row.start_date).split('T')[0];
+    }
+    if (row.end_date instanceof Date) {
+      const year = row.end_date.getFullYear();
+      const month = String(row.end_date.getMonth() + 1).padStart(2, '0');
+      const day = String(row.end_date.getDate()).padStart(2, '0');
+      endDateStr = `${year}-${month}-${day}`;
+    } else {
+      endDateStr = String(row.end_date).split('T')[0];
+    }
+    const [uYear, uMonth, uDay] = startDateStr.split('-').map(Number);
+    const [eYear, eMonth, eDay] = endDateStr.split('-').map(Number);
     const uStart = new Date(uYear, uMonth - 1, uDay);
     const uEnd = new Date(eYear, eMonth - 1, eDay);
-    
+
     for (let d = new Date(uStart); d <= uEnd; d.setDate(d.getDate() + 1)) {
       const dStr = d.toISOString().split('T')[0];
       unavailabilityMap[dStr] = true;
@@ -578,6 +607,11 @@ async function calculateAvailabilityRangeUncached(
 
   const breaksMap: Record<string, TimeRange[]> = {};
   breaksResult.rows.forEach(row => {
+    // Skip rows with null dates to prevent TypeError
+    if (!row.break_date) {
+      console.warn(`Skipping break period record with null date for doctor ${doctorId}`);
+      return;
+    }
     let dateStr: string;
     if (row.break_date instanceof Date) {
       const year = row.break_date.getFullYear();
@@ -598,6 +632,11 @@ async function calculateAvailabilityRangeUncached(
 
   const capacityMap: Record<string, any> = {};
   capacityResult.rows.forEach(row => {
+    // Skip rows with null dates to prevent TypeError
+    if (!row.date) {
+      console.warn(`Skipping capacity record with null date for doctor ${doctorId}`);
+      return;
+    }
     // Convert date to string format for consistent comparison
     // Use the date portion directly from the database without timezone conversion
     let dateStr: string;
@@ -621,6 +660,11 @@ async function calculateAvailabilityRangeUncached(
 
   const bookedMap: Record<string, TimeRange[]> = {};
   bookedResult.rows.forEach(row => {
+    // Skip rows with null dates to prevent TypeError
+    if (!row.date) {
+      console.warn(`Skipping booked appointment record with null date for doctor ${doctorId}`);
+      return;
+    }
     let dateStr: string;
     if (row.date instanceof Date) {
       const year = row.date.getFullYear();

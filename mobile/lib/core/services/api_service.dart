@@ -930,6 +930,7 @@ class ApiService {
     String? date,
     String? startDate,
     String? endDate,
+    String? excludeAppointmentId,
   }) async {
     return await get(
       '${ApiConstants.doctorDetails}/$doctorId/availability',
@@ -937,6 +938,7 @@ class ApiService {
         if (date != null) 'date': date,
         if (startDate != null) 'startDate': startDate,
         if (endDate != null) 'endDate': endDate,
+        if (excludeAppointmentId != null) 'excludeAppointmentId': excludeAppointmentId,
       },
       requireAuth: true,
     );

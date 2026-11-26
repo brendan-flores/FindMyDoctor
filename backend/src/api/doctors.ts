@@ -551,7 +551,7 @@ router.patch('/me/schedules/:id/reactivate', authenticate, authorize('DOCTOR'), 
 router.get('/:id/availability', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { startDate, endDate, date } = req.query;
+    const { startDate, endDate, date, excludeAppointmentId } = req.query;
     const userId = req.user!.id;
     const role = req.user!.role;
 
@@ -570,13 +570,30 @@ router.get('/:id/availability', authenticate, async (req: AuthRequest, res: Resp
       // Don't restrict to current week - let them browse through weeks
     }
 
+    // Validate excludeAppointmentId if provided
+    let validatedExcludeAppointmentId: string | null = null;
+    if (excludeAppointmentId && patientId) {
+      const appointmentResult = await query(
+        `SELECT id, doctor_id, status
+         FROM appointments
+         WHERE id = $1 AND patient_id = $2 AND doctor_id = $3
+         AND status NOT IN ('CANCELLED', 'NO_SHOW', 'COMPLETED')`,
+        [String(excludeAppointmentId), patientId, id]
+      );
+
+      if (appointmentResult.rows.length > 0) {
+        validatedExcludeAppointmentId = String(excludeAppointmentId);
+      }
+      // If the appointment doesn't belong to this patient or this doctor, ignore the exclusion parameter
+    }
+
     if (date) {
       // Get availability for a specific date
-      const availability = await calculateAvailability(id, String(date), patientId);
+      const availability = await calculateAvailability(id, String(date), patientId, validatedExcludeAppointmentId);
       res.json(success(availability));
     } else if (startDate && endDate) {
       // Get availability for a date range
-      const availabilityRange = await calculateAvailabilityRange(id, String(startDate), String(endDate), patientId);
+      const availabilityRange = await calculateAvailabilityRange(id, String(startDate), String(endDate), patientId, validatedExcludeAppointmentId);
 
       res.json(success(availabilityRange));
     } else {

@@ -129,6 +129,7 @@ class _ReschedulePageState extends State<ReschedulePage> {
         doctorId: doctorId,
         startDate: _dateKey(startDate),
         endDate: _dateKey(endDate),
+        excludeAppointmentId: widget.appointmentId,
       );
 
       if (!mounted) return;
@@ -191,12 +192,16 @@ class _ReschedulePageState extends State<ReschedulePage> {
   }
 
   bool _isSelectable(DateTime date, Map<String, dynamic>? availability) {
-    if (_isPastDate(date) || _isCurrentDate(date)) return false;
+    if (_isPastDate(date)) return false;
     final status = parseString(availability?['status']);
     if (status == null) return false;
+    // Allow the current appointment date to be selectable even if ALREADY_BOOKED
+    // (the user already owns it and may want to keep it during reschedule)
+    final isCurrentAppointment = _isCurrentDate(date);
     return status != 'PAST' &&
         status != 'NON_WORKING' &&
-        status != 'UNAVAILABLE';
+        status != 'UNAVAILABLE' &&
+        (status != 'ALREADY_BOOKED' || isCurrentAppointment);
   }
 
   String _statusLabel(String? status) {
@@ -631,7 +636,7 @@ class _ReschedulePageState extends State<ReschedulePage> {
           if (_isCurrentDateSelectedWeek()) ...[
             const SizedBox(height: spacing.AppSpacing.gutterSm),
             Text(
-              'Your current appointment date is outlined in orange.',
+              'Your current appointment date is outlined in green.',
               style: AppTextStyles.labelSm.copyWith(color: AppColors.outline),
             ),
           ],
