@@ -16,6 +16,8 @@ services:
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
+      - key: API_BASE_URL
+        value: https://findmydoctor-backend.onrender.com
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
