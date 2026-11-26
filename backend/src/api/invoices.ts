@@ -849,7 +849,11 @@ router.get('/:id/download-url', authenticate, async (req: AuthRequest, res: Resp
       { expiresIn: '15m' }
     );
 
-    const downloadUrl = `${process.env.API_BASE_URL || 'http://localhost:3000'}/api/v1/invoices/${id}/download?token=${token}`;
+    // Construct download URL using the request's origin for proper deployment support
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const baseUrl = process.env.API_BASE_URL || `${protocol}://${host}`;
+    const downloadUrl = `${baseUrl}/api/v1/invoices/${id}/download?token=${token}`;
 
     res.json(success({ downloadUrl, expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString() }, 'Download URL generated'));
   } catch (err: any) {
