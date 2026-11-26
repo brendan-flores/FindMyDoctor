@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface DatePickerProps {
   value: string;
@@ -41,6 +41,8 @@ export default function DatePicker({
   popupPosition,
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openDirection, setOpenDirection] = useState<'up' | 'down'>('down');
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const maxDateObj = parseDate(maxDate);
   const minDateObj = parseDate(minDate);
 
@@ -57,6 +59,8 @@ export default function DatePicker({
       const d = parseDate(value) || new Date();
       setSelectedDate(parseDate(value));
       setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+      setShowYearSelector(false);
+      setShowMonthSelector(false);
     }
   }, [isOpen, value]);
 
@@ -175,10 +179,19 @@ export default function DatePicker({
         <label className="block text-xs font-medium text-neutral-500 mb-1.5">{label}</label>
       )}
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => {
           if (!isOpen) onOpen?.();
-          setIsOpen(!isOpen);
+          const willOpen = !isOpen;
+          if (willOpen && buttonRef.current) {
+            // Determine available space below the button
+            const buttonRect = buttonRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - buttonRect.bottom;
+            const dropdownHeight = 400; // Approximate dropdown height
+            setOpenDirection(spaceBelow < dropdownHeight && buttonRect.top > dropdownHeight ? 'up' : 'down');
+          }
+          setIsOpen(willOpen);
         }}
         className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500 text-left flex items-center justify-between bg-white hover:border-success-300 transition-colors"
       >
@@ -192,7 +205,7 @@ export default function DatePicker({
 
       {isOpen && (
         <div
-          className={`fmd-animate-in absolute z-[9999] mt-1 min-w-[360px] max-w-[calc(100vw-32px)] bg-white border border-neutral-200 rounded-lg shadow-2xl p-4 ${
+          className={`fmd-animate-in absolute z-[9999] ${openDirection === 'down' ? 'top-full mt-1' : 'bottom-full mb-1'} w-full max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] overflow-y-auto bg-white border border-neutral-200 rounded-lg shadow-2xl p-4 ${
             popupPosition === 'left' ? 'right-0 left-auto' : 'left-0 right-auto'
           }`}
         >
@@ -348,6 +361,7 @@ export default function DatePicker({
             setIsOpen(false);
             setShowYearSelector(false);
             setShowMonthSelector(false);
+            setOpenDirection('down');
           }}
         />
       )}
