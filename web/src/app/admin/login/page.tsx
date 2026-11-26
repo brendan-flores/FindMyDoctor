@@ -25,12 +25,9 @@ export default function AdminLogin() {
     let cancelled = false;
 
     const resumeSession = async () => {
-      // The refresh token may live in localStorage (dev) or an HttpOnly cookie
-      // on the API origin (production); pass the stored value when present.
-      const storedRefresh =
-        localStorage.getItem('admin_refreshToken') ||
-        localStorage.getItem('refreshToken') ||
-        undefined;
+      // Use apiClient to retrieve the stored refresh token; it handles both
+      // canonical lowercase keys and legacy uppercase keys.
+      const storedRefresh = apiClient.getStoredRefreshToken() || undefined;
       const response = await authApi.refreshToken(storedRefresh);
       if (cancelled || !response.success || !response.data) return;
 

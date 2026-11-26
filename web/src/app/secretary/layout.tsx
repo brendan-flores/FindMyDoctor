@@ -33,19 +33,8 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
   useEffect(() => {
     let active = true;
 
-    // Check authentication - prefer role-scoped HttpOnly cookies, fall back to localStorage
-    const getCookie = (name: string): string | null => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) {
-        return parts.pop()?.split(';').shift() || null;
-      }
-      return null;
-    };
-
-    // Try role-scoped cookie first, then fallback to global cookie
-    const cookieToken = getCookie('secretary_accessToken') || getCookie('accessToken');
-    const token = cookieToken || localStorage.getItem('secretary_token') || localStorage.getItem('token');
+    // Use centralized apiClient to retrieve the stored token
+    const token = apiClient.getStoredToken();
     const userStr = localStorage.getItem('secretary_user') || localStorage.getItem('user');
 
     let shouldRedirect = false;
@@ -80,9 +69,7 @@ export default function SecretaryLayout({ children }: SecretaryLayoutProps) {
       if (user.role !== 'SECRETARY') {
         // Cross-role access denied, redirect to appropriate login
         apiClient.clearToken();
-        localStorage.removeItem('secretary_refreshToken');
         localStorage.removeItem('secretary_user');
-        localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         shouldRedirect = true;
         redirectPath = '/secretary-login';

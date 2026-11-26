@@ -28,19 +28,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       return;
     }
 
-    // Check authentication - prefer role-scoped HttpOnly cookies, fall back to localStorage
-    const getCookie = (name: string): string | null => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) {
-        return parts.pop()?.split(';').shift() || null;
-      }
-      return null;
-    };
-
-    // Try role-scoped cookie first, then fallback to global cookie
-    const cookieToken = getCookie('admin_accessToken') || getCookie('accessToken');
-    const token = cookieToken || localStorage.getItem('admin_token') || localStorage.getItem('token');
+    // Use centralized apiClient to retrieve the stored token and user metadata
+    const token = apiClient.getStoredToken();
     const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
 
     if (!token) {
@@ -54,9 +43,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       if (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
         // Cross-role access denied, redirect to admin login
         apiClient.clearToken();
-        localStorage.removeItem('admin_refreshToken');
         localStorage.removeItem('admin_user');
-        localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         router.push('/admin/login');
         return;

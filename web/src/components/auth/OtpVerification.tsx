@@ -159,11 +159,13 @@ export default function OtpVerification({ email, challengeId, onVerifySuccess, o
       if (response.success && response.data) {
         // Type guard: this is AuthResponse
         const authData = response.data as AuthResponse;
-        
+
         // Tokens are also set as HttpOnly cookies by the backend. Keep the
         // client copy in sync and start the idle watchdog with the server policy.
-        apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null);
-        
+        // Detect role from the auth response for consistent storage keys.
+        const role = authData.user.role || null;
+        apiClient.setToken(authData.accessToken, authData.refreshToken, authData.session || null, false, role);
+
         onVerifySuccess(authData);
       } else {
         setOtpError(response.error || 'Invalid or expired OTP code');

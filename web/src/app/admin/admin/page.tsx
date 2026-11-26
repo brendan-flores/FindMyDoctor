@@ -46,8 +46,8 @@ export default function AdminManagement() {
   };
 
   useEffect(() => {
-    // Check authentication and role - use admin-scoped keys
-    const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
+    // Use centralized apiClient to retrieve the stored token
+    const token = apiClient.getStoredToken();
     const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
 
     if (!token || !userStr) {

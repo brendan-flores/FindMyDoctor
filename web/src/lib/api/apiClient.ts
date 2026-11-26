@@ -104,6 +104,23 @@ function detectRoleFromPath(path: string): string | null {
   return null;
 }
 
+/**
+ * Normalize a role string to lowercase for consistent storage key generation.
+ * Storage keys are always lowercase (admin_token, doctor_token, etc.),
+ * but backend APIs expect uppercase role identifiers (ADMIN, DOCTOR, SECRETARY).
+ * This function only normalizes the storage-key representation.
+ */
+function normalizeRole(role: string | null | undefined): string | null {
+  if (!role) return null;
+  const upper = role.toUpperCase();
+  // Only normalize known portal roles
+  if (['ADMIN', 'DOCTOR', 'SECRETARY', 'PATIENT'].includes(upper)) {
+    return upper.toLowerCase();
+  }
+  // Preserve unknown roles as-is
+  return role;
+}
+
 const IDLE_FALLBACK_MINUTES: Record<string, number> = {
   doctor: 8 * 60,
   secretary: 8 * 60,
@@ -145,7 +162,8 @@ class ApiClient {
   }
 
   private storageKey(name: string, scoped: boolean = true): string {
-    return scoped && this.role ? `${this.role}_${name}` : name;
+    const normalizedRole = normalizeRole(this.role);
+    return scoped && normalizedRole ? `${normalizedRole}_${name}` : name;
   }
 
   private sessionKey(): string {
@@ -154,7 +172,8 @@ class ApiClient {
 
   private hasSessionHint(): boolean {
     if (typeof document === 'undefined' || !this.role) return false;
-    const name = `${this.role}_sessionActive`;
+    const normalizedRole = normalizeRole(this.role);
+    const name = `${normalizedRole}_sessionActive`;
     return document.cookie.split('; ').some((row) => row.startsWith(`${name}=`));
   }
 
@@ -176,12 +195,13 @@ class ApiClient {
     // Admin and staff sessions are persistent to survive page refreshes,
     // but still respect the 8-hour max session limit from the backend.
     // Patient sessions remain non-persistent for security.
-    const isAdminOrStaff = this.role !== 'patient';
+    const normalizedRole = normalizeRole(this.role);
+    const isAdminOrStaff = normalizedRole !== 'patient';
     return {
       rememberMe: isAdminOrStaff,
       persistent: isAdminOrStaff,
-      idleTimeoutMinutes: IDLE_FALLBACK_MINUTES[this.role || ''] || 8 * 60,
-      maxSessionMinutes: MAX_FALLBACK_MINUTES[this.role || ''] ?? null,
+      idleTimeoutMinutes: IDLE_FALLBACK_MINUTES[normalizedRole || ''] || 8 * 60,
+      maxSessionMinutes: MAX_FALLBACK_MINUTES[normalizedRole || ''] ?? null,
       startedAt: now,
       lastActivityAt: now,
     };
@@ -216,8 +236,41 @@ class ApiClient {
       this.session = storedSession;
     }
 
-    const stored = localStorage.getItem(tokenKey);
-    const storedRefresh = localStorage.getItem(refreshKey);
+    // Try canonical lowercase keys first
+    let stored = localStorage.getItem(tokenKey);
+    let storedRefresh = localStorage.getItem(refreshKey);
+
+    // If canonical keys are missing, check for legacy uppercase keys and migrate
+    if ((!stored || stored === 'undefined' || stored === 'null') && this.role) {
+      const normalizedRole = normalizeRole(this.role);
+      if (normalizedRole) {
+        const legacyTokenKey = `${normalizedRole.toUpperCase()}_token`;
+        const legacyRefreshKey = `${normalizedRole.toUpperCase()}_refreshToken`;
+        const legacySessionKey = `${normalizedRole.toUpperCase()}_session`;
+
+        const legacyToken = localStorage.getItem(legacyTokenKey);
+        const legacyRefresh = localStorage.getItem(legacyRefreshKey);
+        const legacySession = localStorage.getItem(legacySessionKey);
+
+        // If we found legacy keys and no canonical keys, migrate them
+        if (legacyToken && !stored) {
+          localStorage.setItem(tokenKey, legacyToken);
+          stored = legacyToken;
+          // Remove legacy key after successful migration
+          localStorage.removeItem(legacyTokenKey);
+        }
+        if (legacyRefresh && (!storedRefresh || storedRefresh === 'undefined' || storedRefresh === 'null')) {
+          localStorage.setItem(refreshKey, legacyRefresh);
+          storedRefresh = legacyRefresh;
+          localStorage.removeItem(legacyRefreshKey);
+        }
+        if (legacySession && !storedSession) {
+          localStorage.setItem(this.sessionKey(), legacySession);
+          localStorage.removeItem(legacySessionKey);
+        }
+      }
+    }
+
     if (stored && stored !== 'undefined' && stored !== 'null') {
       this.token = stored;
     }
@@ -232,9 +285,20 @@ class ApiClient {
 
   private removeStoredCredentials() {
     if (typeof window === 'undefined') return;
+    const normalizedRole = normalizeRole(this.role);
+    // Remove canonical lowercase keys
     localStorage.removeItem(this.storageKey('token'));
     localStorage.removeItem(this.storageKey('refreshToken'));
     localStorage.removeItem(this.storageKey('session'));
+    // Also remove legacy uppercase keys if they exist
+    if (normalizedRole) {
+      const legacyTokenKey = `${normalizedRole.toUpperCase()}_token`;
+      const legacyRefreshKey = `${normalizedRole.toUpperCase()}_refreshToken`;
+      const legacySessionKey = `${normalizedRole.toUpperCase()}_session`;
+      localStorage.removeItem(legacyTokenKey);
+      localStorage.removeItem(legacyRefreshKey);
+      localStorage.removeItem(legacySessionKey);
+    }
     this.token = null;
     this.refreshToken = null;
     this.session = null;
@@ -375,7 +439,10 @@ class ApiClient {
     this.token = token;
     if (typeof window !== 'undefined') {
       // Use the explicitly-passed role when provided, otherwise re-detect from path
-      this.role = role ?? detectRoleFromPath(window.location.pathname);
+      // Keep the original role for API headers (backend expects uppercase),
+      // but normalize for storage keys.
+      const rawRole = role ?? detectRoleFromPath(window.location.pathname);
+      this.role = rawRole;
 
       const tokenKey = this.storageKey('token');
       const refreshKey = this.storageKey('refreshToken');
@@ -435,9 +502,19 @@ class ApiClient {
     if (typeof window === 'undefined') return null;
 
     // Role-scoped localStorage is written by this client for every session.
-    const scopedToken = localStorage.getItem(this.storageKey('token'));
+    let scopedToken = localStorage.getItem(this.storageKey('token'));
     if (scopedToken && scopedToken !== 'undefined' && scopedToken !== 'null') {
       return scopedToken;
+    }
+
+    // Check for legacy uppercase keys if canonical key is missing
+    const normalizedRole = normalizeRole(this.role);
+    if (normalizedRole) {
+      const legacyTokenKey = `${normalizedRole.toUpperCase()}_token`;
+      const legacyToken = localStorage.getItem(legacyTokenKey);
+      if (legacyToken && legacyToken !== 'undefined' && legacyToken !== 'null') {
+        return legacyToken;
+      }
     }
 
     // Role-scoped cookie (HttpOnly in production).
@@ -468,6 +545,43 @@ class ApiClient {
    */
   getStoredToken(): string | null {
     return this.resolveAuthToken();
+  }
+
+  /**
+   * Read the current portal's stored refresh token. Checks in-memory first,
+   * then canonical lowercase localStorage keys, then legacy uppercase keys.
+   */
+  getStoredRefreshToken(): string | null {
+    if (this.refreshToken && this.refreshToken !== 'undefined' && this.refreshToken !== 'null') {
+      return this.refreshToken;
+    }
+
+    if (typeof window === 'undefined') return null;
+
+    const normalizedRole = normalizeRole(this.role);
+    if (!normalizedRole) return null;
+
+    // Try canonical lowercase key first
+    const refreshKey = `${normalizedRole}_refreshToken`;
+    let stored = localStorage.getItem(refreshKey);
+    if (stored && stored !== 'undefined' && stored !== 'null') {
+      return stored;
+    }
+
+    // Check legacy uppercase key
+    const legacyRefreshKey = `${normalizedRole.toUpperCase()}_refreshToken`;
+    const legacyRefresh = localStorage.getItem(legacyRefreshKey);
+    if (legacyRefresh && legacyRefresh !== 'undefined' && legacyRefresh !== 'null') {
+      return legacyRefresh;
+    }
+
+    // Fallback to global refresh token
+    const globalRefresh = localStorage.getItem('refreshToken');
+    if (globalRefresh && globalRefresh !== 'undefined' && globalRefresh !== 'null') {
+      return globalRefresh;
+    }
+
+    return null;
   }
 
   /**
@@ -508,7 +622,7 @@ class ApiClient {
         'Content-Type': 'application/json',
       };
       if (this.role) {
-        headers['X-Portal-Role'] = this.role;
+        headers['X-Portal-Role'] = this.role.toUpperCase();
       }
 
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
@@ -597,7 +711,9 @@ class ApiClient {
   }
 
   private portalHeaders(): Record<string, string> {
-    return this.role ? { 'X-Portal-Role': this.role } : {};
+    // Backend expects uppercase role identifiers (ADMIN, DOCTOR, SECRETARY)
+    const normalizedRole = this.role ? this.role.toUpperCase() : undefined;
+    return normalizedRole ? { 'X-Portal-Role': normalizedRole } : {};
   }
 
   public getBaseUrl(): string {
