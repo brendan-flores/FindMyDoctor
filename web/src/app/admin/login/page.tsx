@@ -21,10 +21,17 @@ export default function AdminLogin() {
   // fmdo_session cookie expires, even though the refresh token may still be
   // valid. Silently resume the session and return to the portal; if the
   // refresh token is also expired/revoked the normal login form is shown.
+  // Skip automatic session restoration if the user explicitly logged out.
   useEffect(() => {
     let cancelled = false;
 
     const resumeSession = async () => {
+      // Check if user explicitly logged out - prevent auto-resume
+      const logoutIntent = localStorage.getItem('admin_logout_intent');
+      if (logoutIntent === 'true') {
+        return; // Skip auto-resume after explicit logout
+      }
+
       // Use apiClient to retrieve the stored refresh token; it handles both
       // canonical lowercase keys and legacy uppercase keys.
       const storedRefresh = apiClient.getStoredRefreshToken() || undefined;
@@ -77,6 +84,8 @@ export default function AdminLogin() {
 
         // Verify backend-returned role is ADMIN or SUPERADMIN
         if (authData.user.role === 'ADMIN' || authData.user.role === 'SUPERADMIN') {
+          // Clear logout-intent flag on successful login
+          localStorage.removeItem('admin_logout_intent');
           router.push('/admin/dashboard');
         } else {
           setError('Invalid username or password.');
@@ -99,6 +108,9 @@ export default function AdminLogin() {
     if (data.user.role === 'ADMIN' || data.user.role === 'SUPERADMIN') {
       localStorage.setItem('admin_user', JSON.stringify(data.user));
       apiClient.setToken(data.accessToken, data.refreshToken, data.session || null, false, 'ADMIN');
+
+      // Clear logout-intent flag on successful OTP login
+      localStorage.removeItem('admin_logout_intent');
 
       router.push('/admin/dashboard');
     } else {

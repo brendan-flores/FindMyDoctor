@@ -478,10 +478,23 @@ class ApiClient {
     this.clearGetCache();
     this.stopIdleWatch();
     if (typeof window !== 'undefined') {
+      const normalizedRole = normalizeRole(this.role);
+      // Remove canonical lowercase keys
       localStorage.removeItem(this.storageKey('token'));
       localStorage.removeItem(this.storageKey('refreshToken'));
       localStorage.removeItem(this.storageKey('user'));
       localStorage.removeItem(this.sessionKey());
+      // Also remove legacy uppercase keys if they exist
+      if (normalizedRole) {
+        const legacyTokenKey = `${normalizedRole.toUpperCase()}_token`;
+        const legacyRefreshKey = `${normalizedRole.toUpperCase()}_refreshToken`;
+        const legacySessionKey = `${normalizedRole.toUpperCase()}_session`;
+        const legacyUserKey = `${normalizedRole.toUpperCase()}_user`;
+        localStorage.removeItem(legacyTokenKey);
+        localStorage.removeItem(legacyRefreshKey);
+        localStorage.removeItem(legacySessionKey);
+        localStorage.removeItem(legacyUserKey);
+      }
       this.clearSessionCookie();
     }
   }

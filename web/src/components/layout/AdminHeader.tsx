@@ -63,6 +63,8 @@ export default function AdminHeader({ userName = 'E. Vance', userRole = 'Super A
 
   const handleSignOut = async () => {
     setIsDropdownOpen(false);
+    // Set logout-intent flag to prevent automatic session restoration
+    localStorage.setItem('admin_logout_intent', 'true');
     try {
       await apiClient.post('/auth/logout', {});
     } catch (err) {

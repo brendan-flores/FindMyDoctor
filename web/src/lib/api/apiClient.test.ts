@@ -213,31 +213,48 @@ describe('ApiClient role normalization', () => {
     assert.strictEqual(localStorageMock['ADMIN_token'], 'legacy_token');
   });
 
-  it('clearToken removes both canonical and legacy keys', () => {
+  it('clearToken removes both canonical and legacy keys for the active role only', () => {
     localStorageMock['admin_token'] = 'token';
     localStorageMock['admin_refreshToken'] = 'refresh';
     localStorageMock['admin_session'] = 'session';
+    localStorageMock['admin_user'] = 'user';
     localStorageMock['ADMIN_token'] = 'legacy_token';
     localStorageMock['ADMIN_refreshToken'] = 'legacy_refresh';
     localStorageMock['ADMIN_session'] = 'legacy_session';
+    localStorageMock['ADMIN_user'] = 'legacy_user';
+    // Ensure other role keys are not affected
+    localStorageMock['doctor_token'] = 'doctor_token_value';
+    localStorageMock['DOCTOR_token'] = 'doctor_legacy_token';
 
-    // Simulate clearToken logic
+    // Simulate clearToken logic for admin role
     const role = 'admin';
     const normalizedRole = role.toLowerCase();
 
+    // Remove canonical lowercase keys for admin
     delete localStorageMock[`${normalizedRole}_token`];
     delete localStorageMock[`${normalizedRole}_refreshToken`];
     delete localStorageMock[`${normalizedRole}_session`];
+    delete localStorageMock[`${normalizedRole}_user`];
+
+    // Remove legacy uppercase keys for admin only
     delete localStorageMock[`${normalizedRole.toUpperCase()}_token`];
     delete localStorageMock[`${normalizedRole.toUpperCase()}_refreshToken`];
     delete localStorageMock[`${normalizedRole.toUpperCase()}_session`];
+    delete localStorageMock[`${normalizedRole.toUpperCase()}_user`];
 
+    // Verify admin keys are removed
     assert.strictEqual(localStorageMock['admin_token'], undefined);
     assert.strictEqual(localStorageMock['admin_refreshToken'], undefined);
     assert.strictEqual(localStorageMock['admin_session'], undefined);
+    assert.strictEqual(localStorageMock['admin_user'], undefined);
     assert.strictEqual(localStorageMock['ADMIN_token'], undefined);
     assert.strictEqual(localStorageMock['ADMIN_refreshToken'], undefined);
     assert.strictEqual(localStorageMock['ADMIN_session'], undefined);
+    assert.strictEqual(localStorageMock['ADMIN_user'], undefined);
+
+    // Verify other role keys are NOT removed
+    assert.strictEqual(localStorageMock['doctor_token'], 'doctor_token_value');
+    assert.strictEqual(localStorageMock['DOCTOR_token'], 'doctor_legacy_token');
   });
 
   it('refresh token retrieval checks canonical then legacy', () => {
