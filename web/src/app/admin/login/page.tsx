@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { authApi } from '@/lib/api/authApi';
+import { authApi, AuthResponse } from '@/lib/api/authApi';
 import { apiClient } from '@/lib/api/apiClient';
 import OtpVerification from '@/components/auth/OtpVerification';
 import Toast from '@/components/ui/Toast';
@@ -16,6 +16,39 @@ export default function AdminLogin() {
   const [showOtp, setShowOtp] = useState(false);
   const [challengeId, setChallengeId] = useState('');
   const router = useRouter();
+
+  // Middleware redirects here whenever the short-lived access token in the
+  // fmdo_session cookie expires, even though the refresh token may still be
+  // valid. Silently resume the session and return to the portal; if the
+  // refresh token is also expired/revoked the normal login form is shown.
+  useEffect(() => {
+    let cancelled = false;
+
+    const resumeSession = async () => {
+      // The refresh token may live in localStorage (dev) or an HttpOnly cookie
+      // on the API origin (production); pass the stored value when present.
+      const storedRefresh =
+        localStorage.getItem('admin_refreshToken') ||
+        localStorage.getItem('refreshToken') ||
+        undefined;
+      const response = await authApi.refreshToken(storedRefresh);
+      if (cancelled || !response.success || !response.data) return;
+
+      const data = response.data as AuthResponse;
+      if (!data.accessToken || (data.user.role !== 'ADMIN' && data.user.role !== 'SUPERADMIN')) {
+        return;
+      }
+
+      localStorage.setItem('admin_user', JSON.stringify(data.user));
+      apiClient.setToken(data.accessToken, data.refreshToken, data.session || null, false, 'ADMIN');
+      router.replace('/admin/dashboard');
+    };
+
+    resumeSession().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
