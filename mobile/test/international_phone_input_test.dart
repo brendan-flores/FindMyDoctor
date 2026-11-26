@@ -46,29 +46,29 @@ void main() {
           matching: find.byType(TextField),
         );
 
-    DropdownButton<IsoCode> dropdown(WidgetTester tester) =>
-        tester.widget<DropdownButton<IsoCode>>(
-          find.descendant(
-            of: find.byType(InternationalPhoneInput),
-            matching: find.byType(DropdownButton<IsoCode>),
-          ),
+    Finder countryCodeText(WidgetTester tester, String code) =>
+        find.descendant(
+          of: find.byType(InternationalPhoneInput),
+          matching: find.text(code),
         );
 
     testWidgets('defaults to Philippines as the selected country', (tester) async {
       await pumpWidget(tester, country: IsoCode.PH, nationalNumber: '');
-      expect(dropdown(tester).value, IsoCode.PH);
+      expect(countryCodeText(tester, '+63'), findsOneWidget);
     });
 
     testWidgets('shows country dropdown with all supported countries and calling codes',
         (tester) async {
       await pumpWidget(tester, country: IsoCode.PH, nationalNumber: '');
-      final drop = dropdown(tester);
-      expect(drop.items, isNotEmpty);
-      expect(drop.items!.length, IsoCode.values.length);
-      final phItem = drop.items!.firstWhere(
-        (item) => item.value == IsoCode.PH,
+      await tester.tap(find.byType(PopupMenuButton<IsoCode>));
+      await tester.pumpAndSettle();
+      expect(
+        find.byType(PopupMenuItem<IsoCode>),
+        findsNWidgets(IsoCode.values.length),
       );
-      expect((phItem.child as Text).data, contains('+63'));
+      expect(find.textContaining('Philippines (+63)'), findsOneWidget);
+      await tester.tap(find.textContaining('Philippines (+63)'));
+      await tester.pumpAndSettle();
     });
 
     testWidgets('accepts a Philippine mobile number and produces E.164',
@@ -255,7 +255,7 @@ void main() {
       expect(key.currentState!.isValid, isFalse);
     });
 
-    testWidgets('shows a required-field error when the number is empty',
+    testWidgets('does not show a required-field error before interaction',
         (tester) async {
       final key = GlobalKey<InternationalPhoneInputState>();
       await pumpWidget(
@@ -266,8 +266,144 @@ void main() {
       );
 
       final state = key.currentState;
+      // An untouched empty required field stays quiet on open, but it is
+      // still invalid so submission is blocked.
+      expect(state!.isValid, isFalse);
+      expect(state.errorText, isNull);
+    });
+
+    testWidgets('shows a required-field error after the field is cleared',
+        (tester) async {
+      final key = GlobalKey<InternationalPhoneInputState>();
+      await pumpWidget(
+        tester,
+        country: IsoCode.PH,
+        nationalNumber: '9171234567',
+        key: key,
+      );
+      expect(key.currentState!.e164, '+639171234567');
+
+      await tester.enterText(textFieldFinder(tester), '');
+      await tester.pump();
+
+      final state = key.currentState;
       expect(state!.isValid, isFalse);
       expect(state.errorText, 'Mobile number is required');
+    });
+
+    testWidgets('revalidates E.164 when the national number changes programmatically',
+        (tester) async {
+      final key = GlobalKey<InternationalPhoneInputState>();
+      await pumpWidget(
+        tester,
+        country: IsoCode.PH,
+        nationalNumber: '',
+        key: key,
+      );
+      expect(key.currentState!.e164, isNull);
+
+      await pumpWidget(
+        tester,
+        country: IsoCode.PH,
+        nationalNumber: '09171234567',
+        key: key,
+      );
+      await tester.pumpAndSettle();
+
+      expect(textField(tester).controller?.text, '09171234567');
+      expect(key.currentState!.e164, '+639171234567');
+      expect(key.currentState!.isValid, isTrue);
+      expect(key.currentState!.errorText, isNull);
+    });
+
+    testWidgets('keeps parent and controller in sync after an invalid international paste',
+        (tester) async {
+      final capturedNational = <String>[];
+      final key = GlobalKey<InternationalPhoneInputState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: InternationalPhoneInput(
+              key: key,
+              country: IsoCode.PH,
+              nationalNumber: '',
+              onCountryChanged: (c) {},
+              onNationalChanged: capturedNational.add,
+              allowLandline: false,
+              labelText: 'Mobile Number',
+              requiredField: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(textFieldFinder(tester), '+15551234');
+      await tester.pump();
+
+      // The raw value stays in the field and is mirrored to the parent, so
+      // neither side holds a stale or divergent number.
+      expect(capturedNational, isNotEmpty);
+      expect(capturedNational.last, '+15551234');
+      expect(textField(tester).controller?.text, '+15551234');
+
+      final state = key.currentState;
+      expect(state!.e164, isNull);
+      expect(state.isValid, isFalse);
+      expect(state.errorText, isNotNull);
+    });
+
+    testWidgets('rejects a pasted Philippine landline when landlines are not allowed',
+        (tester) async {
+      final key = GlobalKey<InternationalPhoneInputState>();
+      await pumpWidget(
+        tester,
+        country: IsoCode.PH,
+        nationalNumber: '',
+        key: key,
+      );
+
+      await tester.enterText(textFieldFinder(tester), '+63212345678');
+      await tester.pump();
+
+      final state = key.currentState;
+      expect(state!.e164, isNull);
+      expect(state.isValid, isFalse);
+      expect(state.errorText, 'Enter a valid mobile number.');
+      expect(countryCodeText(tester, '+63'), findsOneWidget);
+    });
+
+    testWidgets('accepts a pasted Philippine landline when allowLandline is true',
+        (tester) async {
+      final capturedCountry = <IsoCode>[];
+      final capturedNational = <String>[];
+      final key = GlobalKey<InternationalPhoneInputState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: InternationalPhoneInput(
+              key: key,
+              country: IsoCode.PH,
+              nationalNumber: '',
+              onCountryChanged: capturedCountry.add,
+              onNationalChanged: capturedNational.add,
+              allowLandline: true,
+              labelText: 'Contact Number',
+              requiredField: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(textFieldFinder(tester), '+63212345678');
+      await tester.pump();
+
+      expect(capturedCountry, [IsoCode.PH]);
+      expect(capturedNational, ['212345678']);
+      expect(textField(tester).controller?.text, '212345678');
+      expect(key.currentState!.e164, '+63212345678');
+      expect(key.currentState!.isValid, isTrue);
     });
 
     testWidgets('pastes an international E.164 number and detects its country',

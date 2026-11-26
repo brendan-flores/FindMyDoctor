@@ -8,7 +8,6 @@ import 'package:mobile/core/services/api_service.dart';
 import 'package:mobile/core/widgets/skeleton.dart';
 import 'package:mobile/core/widgets/international_phone_input.dart';
 import 'package:mobile/features/patients/presentation/patient_details_page.dart';
-import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
 void main() {
   group('Patient Details Workflow Tests', () {
@@ -270,11 +269,14 @@ void main() {
         );
 
         expect(phoneField(tester).controller?.text, '9171234567');
-        final dropdown = tester.widget<DropdownButton<IsoCode>>(
-          find.byType(DropdownButton<IsoCode>),
+        expect(
+          find.descendant(
+            of: find.byType(InternationalPhoneInput),
+            matching: find.text('+63'),
+          ),
+          findsOneWidget,
         );
-        expect(dropdown.value, IsoCode.PH);
-        expect(find.textContaining('+63'), findsOneWidget);
+        expect(find.textContaining('+63'), findsWidgets);
       });
     }
 
@@ -352,8 +354,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Enter a valid mobile number.'),
-        findsOneWidget,
+        find.text(
+          'Remove the plus sign and country code; enter the 10-digit mobile number.',
+        ),
+        findsWidgets,
       );
       expect(phoneField(tester).controller?.text, '++639171234567');
 
@@ -414,6 +418,35 @@ void main() {
         findsWidgets,
       );
     });
+    testWidgets(
+      'does not show a mobile-number error before interaction on an incomplete profile',
+      (tester) async {
+        final submissions = <Map<String, dynamic>>[];
+        await pumpDetails(
+          tester,
+          buildClient(storedPhone: '', submissions: submissions),
+        );
+
+        expect(phoneField(tester).controller?.text, '');
+        expect(find.text('Mobile number is required'), findsNothing);
+        expect(find.text('Mobile number is required.'), findsNothing);
+
+        final phoneState = tester.state<InternationalPhoneInputState>(
+          find.byType(InternationalPhoneInput),
+        );
+        expect(phoneState.isValid, isFalse);
+        expect(phoneState.errorText, isNull);
+
+        // Submitting with the rest of the profile complete must surface the
+        // required-number validation and block the API call.
+        await selectSex(tester);
+        await submit(tester);
+
+        expect(find.text('Mobile number is required.'), findsWidgets);
+        expect(submissions, isEmpty);
+      },
+    );
+
     testWidgets('restores a foreign number and submits it unchanged', (
       tester,
     ) async {
@@ -423,10 +456,13 @@ void main() {
         buildClient(storedPhone: '+447123456789', submissions: submissions),
       );
 
-      final dropdown = tester.widget<DropdownButton<IsoCode>>(
-        find.byType(DropdownButton<IsoCode>),
+      expect(
+        find.descendant(
+          of: find.byType(InternationalPhoneInput),
+          matching: find.text('+44'),
+        ),
+        findsOneWidget,
       );
-      expect(dropdown.value, IsoCode.GB);
       expect(phoneField(tester).controller?.text, '7123456789');
 
       await selectSex(tester);

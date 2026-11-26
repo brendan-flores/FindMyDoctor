@@ -866,7 +866,7 @@ Patients shall be able to register accounts through email OTP verification. The 
 **Patient Information Requirements:**
 - Names are collected as separate first name, middle name (optional), and last name components (persisted as `first_name`, `middle_name`, `last_name`)
 - Required fields: first name (1–100 characters), last name (1–100 characters), date of birth (valid date), sex, mobile number (maximum 20 characters), address
-- The patient mobile-number field applies the stricter client-side Philippine rules in FR-042 (fixed, non-editable `+63` prefix; `09` and the six allocated `08` prefixes; normalized to `+63` plus the 10 national digits); the backend's existing mobile-number validation (maximum 20 characters) is unchanged and separate from those client-side rules
+- The patient mobile-number field applies the stricter client-side Philippine rules in FR-042 (country-code selector plus national number; `09` and the six allocated `08` prefixes; normalized to canonical `+63` E.164); the backend's existing mobile-number validation (maximum 20 characters) is unchanged and separate from those client-side rules
 - Sex must be one of `MALE`, `FEMALE`, `OTHER`, or `NOT_SPECIFIED`
 - Email, username, password (minimum 8 characters), and confirm password are also required
 - Emergency contact details, medical history, allergies, and current medications are NOT collected during patient sign-up
@@ -1164,21 +1164,21 @@ Doctors shall be able to add Secretaries for their practice. Each Secretary must
 
 The Doctor's Secretary/Team page shall show only Secretaries assigned to that Doctor. Secretary setup updates the Secretary's account/profile without changing the Doctor assignment. Administrators may continue managing Secretary accounts through the existing administrative workflow.
 
-## FR-042 — Standardized Philippine Phone Number Input
+## FR-042 — International Phone Number Input
 
-The web and mobile applications shall standardize Philippine phone-number entry for patient, doctor, and secretary forms.
+The web and mobile applications shall standardize phone-number entry for patient, doctor, and secretary forms using a shared two-part control: a compact country-code selector on the left displaying the selected calling code (default `+63`) and a separate national-number input on the right with matching height, border, and corner radius. The country selector shall list all supported countries with their names and calling codes, and the national-number placeholder for the Philippines shall be `9XX XXX XXXX`.
 
 **Patient mobile-number fields:**
-- The country prefix `+63` shall be fixed and non-editable, and the editable portion shall contain the 10-digit national mobile number.
+- The selected country code and the national number shall be handled separately and kept in sync; the mobile number remains required.
 - Accepted patient mobile numbers are Philippine `09` mobile numbers and only the allocated `08` mobile prefixes `0813`, `0817`, `0895`, `0896`, `0897`, and `0898`.
 - Landlines and unallocated `08` mobile prefixes shall be rejected in patient mobile fields.
-- The client shall recognize valid national, domestic, `+63` international, and digits-only `63` international input forms.
-- Accepted patient mobile numbers shall be normalized to canonical `+63` plus the 10 national digits when submitting.
+- The client shall recognize valid national, domestic, `+63` international, digits-only `63` international, and other-country international input forms; entering or pasting an international number shall select its country and keep only the national number in the input.
+- Accepted patient mobile numbers shall be normalized to canonical E.164 (`+63` plus the 10 national digits for the Philippines) when submitting.
 - Recognized saved numbers shall be normalized for display; invalid legacy values shall be retained in the field for correction rather than silently normalized or discarded (the helpers may trim surrounding whitespace) and shall be shown with a warning so users can correct them.
 - This applies to mobile sign-up, mobile patient details and profile, the web Doctor Add Patient form, secretary patient editing, and secretary walk-in registration.
 
 **Doctor and secretary contact fields:**
-- Contact fields shall use the same fixed, non-editable `+63` prefix.
+- Contact fields shall use the same country-code selector and national-number input.
 - They shall accept Philippine mobile numbers (`09` and the six allocated `08` prefixes) and Philippine landlines, including national 9-digit and domestic 10-digit formats with area-code families beginning 2 through 8.
 - Values shall be submitted as normalized domestic numbers with the leading `0`.
 - Existing optional behavior shall be preserved, including the optional doctor profile contact number; invalid stored values shall show a warning and allow correction.
@@ -1186,7 +1186,7 @@ The web and mobile applications shall standardize Philippine phone-number entry 
 
 **GCash exception:**
 - GCash account numbers remain a separate existing behavior: they remain optional.
-- The secretary settings input receives telephone-oriented visual input treatment only; it does not receive the fixed `+63` prefix or the new phone formatter/serializer.
+- The secretary settings input receives telephone-oriented visual input treatment only; it does not use the shared international phone input or its formatter/serializer.
 - Existing backend GCash validation and normalization remain unchanged, and GCash acceptance shall not be broadened to `08` numbers.
 - The GCash account number is not the clinic invoice `contactNumber` field.
 

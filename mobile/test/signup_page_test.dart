@@ -107,7 +107,9 @@ void main() {
       expect(find.text('Last name is required'), findsOneWidget);
       expect(find.text('Date of birth is required'), findsOneWidget);
       expect(find.text('Sex is required'), findsOneWidget);
-      expect(find.text('Mobile number is required'), findsOneWidget);
+      // The untouched empty phone field stays quiet; form validation fails
+      // first, so no phone-specific message is shown on an empty submit.
+      expect(find.text('Mobile number is required'), findsNothing);
       expect(find.text('Address is required'), findsOneWidget);
       expect(find.text('Please enter your email'), findsOneWidget);
       expect(find.text('Please enter a username'), findsOneWidget);
@@ -507,11 +509,46 @@ void main() {
       await tester.pump();
 
       expect(
-        find.text('Enter a valid mobile number.'),
+        find.text(
+          'Remove the plus sign and country code; enter the 10-digit mobile number.',
+        ),
         findsOneWidget,
       );
 
 // controller retains input; validation error indicates invalidity
+    });
+
+    testWidgets('blocks sign-up when the mobile number is cleared', (
+      tester,
+    ) async {
+      var requests = 0;
+      final client = MockClient((request) async {
+        requests++;
+        return http.Response(
+          otpSentBody,
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      await pumpWithService(tester, ApiService.createWithClient(client));
+      await fillValidForm(tester);
+
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(InternationalPhoneInput),
+          matching: find.byType(TextField),
+        ),
+        '',
+      );
+      await tester.pump();
+
+      await submit(tester);
+
+      expect(requests, 0);
+      expect(find.text('Mobile number is required'), findsWidgets);
+      expect(find.byType(SignUpPage), findsOneWidget);
+      expect(find.byType(OTPVerificationPage), findsNothing);
     });
 
     testWidgets('surfaces overlong input without truncating it', (

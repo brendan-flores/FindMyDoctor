@@ -1067,6 +1067,16 @@ test('pasted domestic and international numbers split without duplicating the co
     country: 'US',
     nationalNumber: '6315551234',
   });
+  // A foreign mobile pasted over the PH default switches country and keeps
+  // only the national portion.
+  assert.deepEqual(splitInternationalInput('+447123456789', 'PH'), {
+    country: 'GB',
+    nationalNumber: '7123456789',
+  });
+  // Incomplete or invalid international input is left for the field's own
+  // validation to reject rather than being split into a bogus country.
+  assert.equal(splitInternationalInput('+15551234', 'PH'), null);
+  assert.equal(splitInternationalInput('+999999999999', 'PH'), null);
   // A pasted domestic number is left untouched.
   assert.equal(splitInternationalInput('09171234567', 'PH'), null);
   assert.equal(splitInternationalInput('6315551234', 'US'), null);

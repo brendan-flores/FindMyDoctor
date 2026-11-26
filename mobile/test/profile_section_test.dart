@@ -8,7 +8,6 @@ import 'package:mobile/app/app.dart';
 import 'package:mobile/core/services/api_service.dart';
 import 'package:mobile/core/services/push_notification_service.dart';
 import 'package:mobile/core/widgets/international_phone_input.dart';
-import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 import 'package:mobile/features/auth/presentation/change_password_page.dart';
 import 'package:mobile/features/auth/presentation/login_page.dart';
 import 'package:mobile/features/home/presentation/home_page.dart';
@@ -442,11 +441,14 @@ void main() {
         await startEditing(tester);
 
         expect(phoneField(tester).controller?.text, '9171234567');
-        final dropdown = tester.widget<DropdownButton<IsoCode>>(
-          find.byType(DropdownButton<IsoCode>),
+        expect(
+          find.descendant(
+            of: find.byType(InternationalPhoneInput),
+            matching: find.text('+63'),
+          ),
+          findsOneWidget,
         );
-        expect(dropdown.value, IsoCode.PH);
-        expect(find.textContaining('+63'), findsOneWidget);
+        expect(find.textContaining('+63'), findsWidgets);
       });
     }
 
@@ -544,7 +546,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Enter a valid mobile number.'),
+        find.text(
+          'Remove the plus sign and country code; enter the 10-digit mobile number.',
+        ),
         findsOneWidget,
       );
       expect(phoneField(tester).controller?.text, '++639171234567');
@@ -604,10 +608,13 @@ void main() {
       );
       await startEditing(tester);
 
-      final dropdown = tester.widget<DropdownButton<IsoCode>>(
-        find.byType(DropdownButton<IsoCode>),
+      expect(
+        find.descendant(
+          of: find.byType(InternationalPhoneInput),
+          matching: find.text('+44'),
+        ),
+        findsOneWidget,
       );
-      expect(dropdown.value, IsoCode.GB);
       expect(phoneField(tester).controller?.text, '7123456789');
       expect(find.text('Enter a valid mobile number.'), findsNothing);
 

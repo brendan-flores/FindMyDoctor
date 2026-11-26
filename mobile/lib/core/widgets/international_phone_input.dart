@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart' as spacing;
+import '../theme/app_text_styles.dart';
 import '../utils/country_names.dart';
 import '../utils/phone_input.dart';
 import '../utils/phone_input_form.dart';
@@ -40,32 +43,41 @@ class InternationalPhoneInputState extends State<InternationalPhoneInput> {
   String? _validationError;
   String? _e164;
   bool _isProgrammaticChange = false;
+  bool _touched = false;
 
   String? get errorText => _validationError ?? widget.errorText;
   String? get e164 => _e164;
   bool get isValid =>
-      _validationError == null && (!widget.requiredField || _controller.text.isNotEmpty);
+      _validationError == null &&
+      (!widget.requiredField || _controller.text.trim().isNotEmpty);
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.nationalNumber);
-    // Validate on mount so a required empty field shows its error immediately
-    // instead of waiting for the first keystroke.
-    _validate();
+    // Validate a restored value on mount so its E.164 form is ready for
+    // submit. An empty required field stays quiet until the user interacts
+    // or the parent attempts submission (isValid still reports it invalid).
+    if (widget.nationalNumber.trim().isNotEmpty) {
+      _validate();
+    }
   }
 
   @override
   void didUpdateWidget(covariant InternationalPhoneInput oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.nationalNumber != widget.nationalNumber &&
+    final nationalChanged = oldWidget.nationalNumber != widget.nationalNumber;
+    final countryChanged = oldWidget.country != widget.country;
+    if (nationalChanged &&
         _controller.text != widget.nationalNumber &&
         !_isProgrammaticChange) {
       _controller.text = widget.nationalNumber;
       _controller.selection = TextSelection.collapsed(offset: _controller.text.length);
     }
-    if (oldWidget.country != widget.country) {
-      _validate(country: widget.country);
+    // Programmatic changes (profile restore, paste split, country switch)
+    // must refresh validation and the E.164 value, not just the text.
+    if (nationalChanged || countryChanged) {
+      _validate();
     }
   }
 
@@ -88,7 +100,9 @@ class InternationalPhoneInputState extends State<InternationalPhoneInput> {
     final national = _controller.text.trim();
     if (national.isEmpty) {
       setState(() {
-        _validationError = widget.requiredField ? 'Mobile number is required' : null;
+        _validationError = widget.requiredField && _touched
+            ? 'Mobile number is required'
+            : null;
         _e164 = null;
       });
       return;
@@ -179,66 +193,141 @@ class InternationalPhoneInputState extends State<InternationalPhoneInput> {
     }
   }
 
+  /// Keeps the controller and the parent form in sync after an international
+  /// value could not be accepted: the raw text stays in the field so the user
+  /// can correct it, the parent receives the same value, and the normal
+  /// validation path reports why it was rejected.
+  void _rejectInternational(String text) {
+    widget.onNationalChanged(text);
+    _validate();
+  }
+
+  /// Philippine `+63` input is validated by the shared Philippine parser so
+  /// paste handling applies exactly the same rules as typing and restore.
+  void _acceptPhilippineInternational(String text) {
+    final result = parsePhone(text);
+    final accepted = result.ok &&
+        result.e164 != null &&
+        (result.kind == PhoneKind.mobile ||
+            (widget.allowLandline && result.kind == PhoneKind.landline));
+    if (!accepted) {
+      _rejectInternational(text);
+      return;
+    }
+    final nsn = result.e164!.substring(phCountryCode.length + 1);
+    _isProgrammaticChange = true;
+    widget.onCountryChanged(IsoCode.PH);
+    widget.onNationalChanged(nsn);
+    _controller.text = nsn;
+    _controller.selection = TextSelection.collapsed(offset: nsn.length);
+    _isProgrammaticChange = false;
+    _validate(country: IsoCode.PH);
+  }
+
   void _handleInternationalPaste(String text) {
+    _touched = true;
+    // Philippine `+63` input always goes through the shared Philippine
+    // parser: it is the authoritative rule set for PH numbers and accepts
+    // shapes the generic parser rejects (e.g. landlines when allowed).
+    final trimmed = text.trim();
+    if (trimmed.startsWith('+') &&
+        trimmed.substring(1).startsWith(phCountryCode)) {
+      _acceptPhilippineInternational(trimmed);
+      return;
+    }
     try {
       final parsed = PhoneNumber.parse(text);
-      if (!parsed.isValid()) {
-        setState(() {
-          _validationError = 'Enter a valid mobile number.';
-          _e164 = null;
-        });
-        return;
+      if (parsed.isValid()) {
+        if (parsed.isoCode == IsoCode.PH) {
+          _acceptPhilippineInternational(text);
+          return;
+        }
+        final isMobile = parsed.isValid(type: PhoneNumberType.mobile);
+        final isFixedLine = parsed.isValid(type: PhoneNumberType.fixedLine);
+        final ambiguous = isMobile && isFixedLine;
+        final accepted = !ambiguous &&
+            ((isMobile && !isFixedLine) ||
+                (widget.allowLandline && isFixedLine && !isMobile));
+        if (accepted) {
+          _isProgrammaticChange = true;
+          widget.onCountryChanged(parsed.isoCode);
+          widget.onNationalChanged(parsed.nsn);
+          _controller.text = parsed.nsn;
+          _controller.selection =
+              TextSelection.collapsed(offset: parsed.nsn.length);
+          _isProgrammaticChange = false;
+          _validate(country: parsed.isoCode);
+          return;
+        }
       }
-      final isMobile = parsed.isValid(type: PhoneNumberType.mobile);
-      final isFixedLine = parsed.isValid(type: PhoneNumberType.fixedLine);
-      final ambiguous = isMobile && isFixedLine;
-      final accepted = !ambiguous &&
-          ((isMobile && !isFixedLine) ||
-              (widget.allowLandline && isFixedLine && !isMobile));
-      if (!accepted) {
-        setState(() {
-          _validationError = 'Enter a valid mobile number.';
-          _e164 = null;
-        });
-        return;
-      }
-      _isProgrammaticChange = true;
-      widget.onCountryChanged(parsed.isoCode);
-      widget.onNationalChanged(parsed.nsn);
-      _controller.text = parsed.nsn;
-      _controller.selection =
-          TextSelection.collapsed(offset: parsed.nsn.length);
-      _isProgrammaticChange = false;
-      _validate(country: parsed.isoCode);
-    } catch (_) {
-      setState(() {
-        _validationError = 'Enter a valid mobile number.';
-        _e164 = null;
-      });
-    }
+    } catch (_) {}
+    _rejectInternational(text);
+  }
+
+  OutlineInputBorder _outlineBorder(Color color, {double width = 1}) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusLg),
+      borderSide: BorderSide(color: color, width: width),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasError = errorText != null;
+    final borderColor = hasError
+        ? AppColors.error
+        : (widget.enabled ? AppColors.slate300 : AppColors.slate200);
+    final fieldDecoration = InputDecoration(
+      filled: true,
+      fillColor: AppColors.surfaceLowest,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: spacing.AppSpacing.gutterLg,
+        vertical: spacing.AppSpacing.gutterMd,
+      ),
+      border: _outlineBorder(borderColor),
+      enabledBorder: _outlineBorder(borderColor),
+      disabledBorder: _outlineBorder(AppColors.slate200),
+      focusedBorder: _outlineBorder(
+        hasError ? AppColors.error : AppColors.primary,
+        width: 2,
+      ),
+      errorBorder: _outlineBorder(AppColors.error),
+      focusedErrorBorder: _outlineBorder(AppColors.error, width: 2),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.labelText != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              widget.requiredField ? '${widget.labelText} *' : widget.labelText!,
-            ),
+        if (widget.labelText != null) ...[
+          Text(
+            widget.requiredField
+                ? '${widget.labelText} *'
+                : widget.labelText!,
+            style: AppTextStyles.inputLabel,
           ),
+          const SizedBox(height: spacing.AppSpacing.gutterXs),
+        ],
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              width: 160,
-              child: DropdownButton<IsoCode>(
-                isExpanded: true,
-                value: widget.country,
-                items: IsoCode.values
-                    .map((c) => DropdownMenuItem<IsoCode>(
+              width: 112,
+              child: InputDecorator(
+              decoration: fieldDecoration,
+              child: PopupMenuButton<IsoCode>(
+                tooltip:
+                    '${countryNames[widget.country.name] ?? widget.country.name} (+${_callingCode(widget.country)})',
+                padding: EdgeInsets.zero,
+                enabled: widget.enabled,
+                onSelected: (v) {
+                  _touched = true;
+                  final current = _controller.text;
+                  widget.onCountryChanged(v);
+                  widget.onNationalChanged(current);
+                  _validate(country: v);
+                },
+                itemBuilder: (context) => IsoCode.values
+                    .map((c) => PopupMenuItem<IsoCode>(
                           value: c,
                           child: Text(
                             '${countryNames[c.name] ?? c.name} (+${_callingCode(c)})',
@@ -246,26 +335,34 @@ class InternationalPhoneInputState extends State<InternationalPhoneInput> {
                           ),
                         ))
                     .toList(),
-              onChanged: widget.enabled
-                  ? (v) {
-                      if (v == null) return;
-                      final current = _controller.text;
-                      _validationError = null;
-                      _e164 = null;
-                      widget.onCountryChanged(v);
-                      widget.onNationalChanged(current);
-                      _validate(country: v);
-                    }
-                  : null,
-             ),
-             ),
-            const SizedBox(width: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '+${_callingCode(widget.country)}',
+                        style: AppTextStyles.inputText,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Icon(
+                      Icons.keyboard_arrow_down,
+                      color: AppColors.slate400,
+                      size: spacing.AppSpacing.iconSm,
+                    ),
+                  ],
+                ),
+              ),
+              ),
+            ),
+            const SizedBox(width: spacing.AppSpacing.gutterMd),
             Expanded(
               child: TextField(
                 controller: _controller,
                 keyboardType: TextInputType.phone,
                 enabled: widget.enabled,
                 onChanged: (value) {
+                  _touched = true;
                   if (_isProgrammaticChange) return;
                   if (value.startsWith('+')) {
                     _handleInternationalPaste(value);
@@ -274,8 +371,13 @@ class InternationalPhoneInputState extends State<InternationalPhoneInput> {
                   widget.onNationalChanged(value);
                   _validate();
                 },
-                decoration: InputDecoration(
-                  hintText: widget.hintText ?? 'National number',
+                style: AppTextStyles.inputText,
+                decoration: fieldDecoration.copyWith(
+                  hintText: widget.hintText ??
+                      (widget.country == IsoCode.PH
+                          ? '9XX XXX XXXX'
+                          : 'National number'),
+                  hintStyle: AppTextStyles.inputPlaceholder,
                   errorText: errorText,
                 ),
               ),
