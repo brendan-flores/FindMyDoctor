@@ -113,6 +113,31 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Enhanced health check with module verification
+app.get('/health/modules', async (req, res) => {
+  try {
+    // Verify critical modules are loadable
+    const { sendDoctorSignupOtp, verifyOtpToken } = await import('./services/otpService.js');
+    const { sendPatientSignupOtp, verifyPatientOtpToken } = await import('./services/patientOtpService.js');
+    
+    res.json({ 
+      status: 'ok', 
+      modules: {
+        otpService: typeof sendDoctorSignupOtp === 'function' && typeof verifyOtpToken === 'function',
+        patientOtpService: typeof sendPatientSignupOtp === 'function' && typeof verifyPatientOtpToken === 'function'
+      },
+      timestamp: new Date().toISOString() 
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'error', 
+      message: 'Module verification failed', 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString() 
+    });
+  }
+});
+
 // Production-safe database health check. Runs a trivial query against the
 // connection pool so uptime monitors can confirm the instance can serve
 // database-backed requests (useful after a Render spin-down or cold start).
