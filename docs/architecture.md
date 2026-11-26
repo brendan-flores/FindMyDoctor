@@ -683,7 +683,14 @@ The backend enforces a single session policy in `backend/src/modules/auth/sessio
 
 **Seed Commands:**
 - `npm run seed:admin` - Create initial Admin account only
+- `npm run seed:superadmin` - Create the initial Super Admin account only (interactive terminal prompt; see below)
 - `npm run seed` - Run all seed scripts including Admin provisioning
+
+**Super Admin Account Provisioning:**
+- The SUPERADMIN account is created exclusively through `npm run seed:superadmin` (run from `backend/`); it is never available through public registration or any API endpoint
+- The command interactively requests the email and password (password entry is hidden on a TTY); no credentials are hardcoded or committed
+- The script refuses to run when any SUPERADMIN account already exists, so it cannot overwrite credentials or create duplicates
+- Passwords are hashed with bcrypt (cost 10), identical to the regular authentication flow; Super Admins sign in through the Admin portal (`/admin/login`) and authenticate directly without OTP
 
 ## Mobile Authentication and Routing
 

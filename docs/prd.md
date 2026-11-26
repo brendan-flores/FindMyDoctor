@@ -1489,6 +1489,7 @@ Secretaries cannot manage appointments, queue, payments, walk-ins, or schedules 
 
 **Seed Process:**
 - Run `npm run seed:admin` to create the initial Admin account
+- Run `npm run seed:superadmin` (from `backend/`) to create the initial Super Admin account; the command interactively prompts for email and a hidden password, refuses to run if a SUPERADMIN already exists, and is the only way a SUPERADMIN account is provisioned (never through public registration or API endpoints)
 - Run `npm run seed` to run all seed scripts including Admin provisioning
 - The seed script checks for existing Admin accounts before creating new ones
 

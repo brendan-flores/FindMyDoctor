@@ -45,6 +45,7 @@
     "migrate:waitlists": "tsx src/database/applyWaitlists.ts",
     "seed": "tsx src/database/seed.ts",
     "seed:admin": "tsx src/database/seedAdmin.ts",
+    "seed:superadmin": "tsx src/database/seedSuperAdmin.ts",
     "clear:data": "tsx src/database/clearData.ts",
     "check:doctors": "tsx src/database/checkDoctors.ts",
     "test": "jest"

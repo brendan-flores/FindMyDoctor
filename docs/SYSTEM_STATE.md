@@ -603,6 +603,7 @@ Current System State (November 2026):
 - Admin reconciliation endpoint `POST /api/v1/admin/admins/reconcile-supabase` provisions Supabase identities for existing regular Admin accounts (SUPERADMIN only)
 - Secretary reconciliation endpoint `POST /api/v1/admin/secretaries/reconcile-supabase` provisions Supabase identities for existing Secretary accounts (ADMIN or SUPERADMIN)
 - Admin seed script creates Admin accounts without immediate Supabase identity provisioning; identities are provisioned on-demand during API calls or via reconciliation endpoint
+- The initial SUPERADMIN account is provisioned only through the terminal command `npm run seed:superadmin` (from `backend/`), implemented in `src/database/seedSuperAdmin.ts`; it interactively prompts for email and a hidden password, validates input, hashes with bcrypt (cost 10), and inserts `role = 'SUPERADMIN'` into `users`. It refuses to run when any SUPERADMIN already exists, is not exposed through any API endpoint or public registration, and requires no Supabase identity because SuperAdmins log in without OTP
 - PostgreSQL remains the single source of truth for all application account data (users, doctors, secretaries, patients)
 - Supabase Auth is used only for OTP delivery and verification, not for storing application accounts or credentials
 

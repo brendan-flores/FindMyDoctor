@@ -871,3 +871,45 @@ describe('Auth API - Patient Login Validation', () => {
     });
   });
 });
+
+describe('Auth API - Registration Role Restrictions', () => {
+  let app: express.Application;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use(cookieParser());
+    app.use('/api/v1/auth', authRouter);
+    jest.clearAllMocks();
+  });
+
+  it('should reject SUPERADMIN role through public registration', async () => {
+    const response = await request(app)
+      .post('/api/v1/auth/register')
+      .send({
+        email: 'superadmin@example.com',
+        password: 'Sup3r$ecret!',
+        role: 'SUPERADMIN'
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('should reject ADMIN role through public registration', async () => {
+    const response = await request(app)
+      .post('/api/v1/auth/register')
+      .send({
+        email: 'admin@example.com',
+        password: 'Sup3r$ecret!',
+        role: 'ADMIN'
+      });
+
+    // The service rejects Admin self-registration; the route surfaces it as an
+    // error response (VALIDATION_ERROR) rather than creating the account.
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(query).not.toHaveBeenCalled();
+  });
+});
